@@ -1,0 +1,13 @@
+{
+  "name": "GlobeEffect.VRCheckerboard.Tests",
+  "rootNamespace": "GlobeEffect.VRCheckerboard.Tests",
+  "references": [
+    "GlobeEffect.VRCheckerboard.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}
