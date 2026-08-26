@@ -1,6 +1,6 @@
-# VR Checkerboard – Globe Effect Study
+# Globe Effect Master Thesis
 
-Unity/C#-Implementierung eines kreisrunden, radial verzeichneten
+Aktueller Projektstand: Unity/C#-Implementierung eines kreisrunden, radial verzeichneten
 Checkerboard-Stimulus fuer die Untersuchung des Globe Effects. Die
 Stimulusgeometrie und die Merlitz-Abbildung sind von der Versuchssteuerung und
 der spaeteren Eye-Tracking-Anbindung getrennt.
@@ -15,20 +15,31 @@ der spaeteren Eye-Tracking-Anbindung getrennt.
 - beidseitige, nur linke oder nur rechte XR-Darbietung;
 - winkelkonstantes zentrales Fixationskreuz;
 - Laufzeit-API, Parameter-Snapshot und Events fuer spaetere Trial-/Eye-Tracking-Anbindung;
+- vorkonfigurierte Demo-Szene mit XR Origin und getrackter Center-Eye-Kamera;
+- Input System, XR Interaction Toolkit, XR Plugin Management und OpenXR als
+  fest versionierte Unity-Pakete;
 - EditMode-Tests fuer Winkelgeometrie und Merlitz-Abbildung.
 
 ## Schnellstart
 
-1. Den Ordner `VRCheckerboardPrototype` mit Unity 6.5 oeffnen. Zielversion ist
+1. Das Projekt mit Unity 6.5 oeffnen. Zielversion ist
    konkret Editor `6000.5.6f1`.
-2. XR Plugin Management/OpenXR passend zum Labor-Headset im Projekt einrichten.
-   Das Projekt legt kein bestimmtes Headset-SDK fest.
-3. Ein leeres GameObject anlegen und `VrCheckerboardStimulus` hinzufuegen.
-4. Den Center-Eye-/Head-Transform der XR-Kamera in `Observer` ziehen.
-5. `Angular Diameter Degrees`, `Viewing Distance Meters`, `Merlitz K` und
-   `Eye Presentation` im Inspector einstellen.
-6. Fuer einen weltfesten Trial `Follow Observer Every Frame` deaktiviert lassen
+2. `Assets/GlobeEffect/Demo/CheckerboardDemo.unity` oeffnen. Die Szene enthaelt
+   bereits XR Origin, Main Camera und Checkerboard-Stimulus.
+3. Unter `Edit > Project Settings > XR Plug-in Management` OpenXR fuer das
+   tatsaechliche Build-Ziel aktivieren. Anschliessend unter OpenXR nur das zum
+   Labor-Headset passende Interaction Profile auswaehlen. Die Pakete und
+   Grundeinstellungen sind vorhanden; ein bestimmtes Headset-SDK ist bewusst
+   nicht festgelegt.
+4. Am Objekt `Checkerboard Stimulus` die Parameter `Angular Diameter Degrees`,
+   `Viewing Distance Meters`, `Merlitz K` und `Eye Presentation` einstellen.
+5. Fuer einen weltfesten Trial `Follow Observer Every Frame` deaktiviert lassen
    und am Trial-Anfang `PlaceInFrontOfObserver()` aufrufen.
+
+Die Referenzszene kann bei Bedarf ueber
+`Tools > Globe Effect > Create or Reset Demo Scene` reproduzierbar neu erstellt
+werden. Dabei werden die Ausgangswerte 70 Grad, 1 Meter, `k = 0.7` und `m = 10`
+gesetzt.
 
 Unity-Einheit ist hier gleich ein Meter. Fuer exakte Skalierung sollte das
 Stimulusobjekt keinen nicht-uniform skalierten Parent besitzen.
@@ -148,6 +159,7 @@ Toolbox keine privaten Inspector-Felder auslesen.
 - Die EditMode-Tests pruefen die Vorwaerts-/Rueckabbildung fuer
   `k = 0, 0.5, 0.7, 1`, die Randnormierung und die exakte Verdopplung des
   physischen Durchmessers bei doppeltem Abstand.
+- Der aktuelle Stand besteht alle 15 EditMode-Tests mit Unity `6000.5.6f1`.
 - Runtime- und Testquellen sind fuer Unity `6000.5.6f1` ausgelegt.
 - Vor der Datenerhebung sind Shader, Augenmaskierung, Render-Pipeline und reale
   Winkelgroesse auf dem Laborrechner mit dem konkreten Headset zu validieren.
@@ -168,10 +180,14 @@ Toolbox keine privaten Inspector-Felder auslesen.
 
 ```text
 Assets/GlobeEffect/
+  Demo/           startfertige Referenzszene
+  Editor/         reproduzierbarer Aufbau der Referenzszene
   Runtime/
     Scripts/      reine Mathematik, Stimulussteuerung, Integrations-API
     Resources/    XR-faehiger analytischer Checkerboard-Shader
   Tests/EditMode/ Mathematik- und Skalierungstests
-Packages/         minimale Unity-Testabhaengigkeit
+Assets/XR/        versionierte OpenXR-Einstellungen und Loader-Asset
+Assets/XRI/       Einstellungen des XR Interaction Toolkit
+Packages/         fest versionierte Unity-, Test- und XR-Abhaengigkeiten
 ProjectSettings/  Unity-Projektversion
 ```

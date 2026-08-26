@@ -4,5 +4,9 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
-  m_configObjects: {}
+  m_Scenes:
+  - enabled: 1
+    path: Assets/GlobeEffect/Demo/CheckerboardDemo.unity
+    guid: 2470f1e9fa438c044a874c8b97fbf185
+  m_configObjects:
+    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: eaeaa666d02549e4480af8548fc2fc48, type: 2}

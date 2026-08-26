@@ -1,0 +1,12 @@
+{
+  "name": "GlobeEffect.VRCheckerboard.Editor",
+  "rootNamespace": "GlobeEffect.VRCheckerboard.Editor",
+  "references": [
+    "GlobeEffect.VRCheckerboard.Runtime",
+    "Unity.InputSystem",
+    "Unity.XR.CoreUtils"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ]
+}
