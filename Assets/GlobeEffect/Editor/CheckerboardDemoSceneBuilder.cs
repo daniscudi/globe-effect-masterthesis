@@ -24,6 +24,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
         private const string MenuPath =
             "Tools/Globe Effect/Create or Reset Demo Scene";
 
+        private const string RenderProbeMaterialPath =
+            "Assets/GlobeEffect/Demo/XrRenderProbe.mat";
+
         static CheckerboardDemoSceneBuilder()
         {
             EditorApplication.delayCall += CreateSceneOnFirstImport;
@@ -60,8 +63,11 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
             Scene previousActiveScene = SceneManager.GetActiveScene();
             bool replaceUntitledScene = string.IsNullOrEmpty(previousActiveScene.path);
+            bool replaceOpenDemoScene = replaceExistingScene &&
+                previousActiveScene.path == DemoScenePath;
+            bool replaceActiveScene = replaceUntitledScene || replaceOpenDemoScene;
 
-            if (replaceUntitledScene && previousActiveScene.isDirty &&
+            if (replaceActiveScene && previousActiveScene.isDirty &&
                 previousActiveScene.rootCount > 0)
             {
                 if (Application.isBatchMode)
@@ -78,17 +84,22 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
             Scene demoScene = EditorSceneManager.NewScene(
                 NewSceneSetup.EmptyScene,
-                replaceUntitledScene ? NewSceneMode.Single : NewSceneMode.Additive);
+                replaceActiveScene ? NewSceneMode.Single : NewSceneMode.Additive);
             SceneManager.SetActiveScene(demoScene);
 
             try
             {
                 Camera camera = CreateXrOrigin();
                 CreateStimulus(camera.transform);
+                CreateRenderProbe(camera.transform);
                 CreateEnvironment();
 
                 EditorSceneManager.MarkSceneDirty(demoScene);
-                EditorSceneManager.SaveScene(demoScene, DemoScenePath);
+                if (!EditorSceneManager.SaveScene(demoScene, DemoScenePath))
+                {
+                    throw new InvalidOperationException(
+                        $"Demoszene konnte nicht gespeichert werden: {DemoScenePath}");
+                }
                 EnsureSceneIsInBuildSettings();
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
@@ -97,7 +108,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
             finally
             {
-                if (!replaceUntitledScene &&
+                if (!replaceActiveScene &&
                     previousActiveScene.IsValid() && previousActiveScene.isLoaded)
                 {
                     SceneManager.SetActiveScene(previousActiveScene);
@@ -119,6 +130,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
             cameraObject.transform.SetParent(cameraOffset.transform, false);
 
             Camera camera = cameraObject.AddComponent<Camera>();
+            // Wird nur fuer die flache Game-View-Vorschau verwendet. Im XR-Betrieb
+            // liefert das Headset seine eigenen Projektionsmatrizen und Winkel.
+            camera.fieldOfView = 90f;
             camera.nearClipPlane = 0.01f;
             camera.farClipPlane = 100f;
             camera.clearFlags = CameraClearFlags.SolidColor;
@@ -196,6 +210,58 @@ namespace GlobeEffect.VRCheckerboard.Editor
             renderer.enabled = false;
 
             UnityEngine.Object.DestroyImmediate(floor.GetComponent<Collider>());
+        }
+
+        private static void CreateRenderProbe(Transform cameraTransform)
+        {
+            // Dieser Test umgeht den Checkerboard-Shader vollstaendig. Wird der
+            // magentafarbene Wuerfel in XR sichtbar, funktioniert der allgemeine
+            // Kamera-/XR-Renderpfad und die Fehlersuche kann sich auf den
+            // Stimulus-Shader konzentrieren.
+            GameObject probeRoot = new GameObject(
+                "XR Render Probe (enable for diagnostics)");
+            probeRoot.transform.SetParent(cameraTransform, false);
+
+            GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            cube.name = "Camera-locked magenta cube";
+            cube.transform.SetParent(probeRoot.transform, false);
+            // Vor dem Stimulus platzieren, damit der Probe auch bei weiterhin
+            // aktivem Checkerboard nicht von dessen Flaeche verdeckt wird.
+            cube.transform.localPosition = new Vector3(0f, 0f, 0.5f);
+            cube.transform.localScale = Vector3.one * 0.1f;
+
+            MeshRenderer renderer = cube.GetComponent<MeshRenderer>();
+            renderer.sharedMaterial = GetOrCreateRenderProbeMaterial();
+            UnityEngine.Object.DestroyImmediate(cube.GetComponent<Collider>());
+
+            // Der Probe gehoert nicht zum Experiment und wird nur bei Bedarf
+            // manuell in der Hierarchy aktiviert.
+            probeRoot.SetActive(false);
+        }
+
+        private static Material GetOrCreateRenderProbeMaterial()
+        {
+            Material existingMaterial =
+                AssetDatabase.LoadAssetAtPath<Material>(RenderProbeMaterialPath);
+            if (existingMaterial != null)
+            {
+                return existingMaterial;
+            }
+
+            Shader shader = Shader.Find("Unlit/Color");
+            if (shader == null)
+            {
+                throw new InvalidOperationException(
+                    "Der eingebaute Shader 'Unlit/Color' wurde nicht gefunden.");
+            }
+
+            Material material = new Material(shader)
+            {
+                name = "XR Render Probe",
+                color = Color.magenta
+            };
+            AssetDatabase.CreateAsset(material, RenderProbeMaterialPath);
+            return material;
         }
 
         private static void EnsureSceneIsInBuildSettings()

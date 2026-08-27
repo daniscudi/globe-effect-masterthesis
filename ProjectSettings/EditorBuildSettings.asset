@@ -9,4 +9,6 @@ EditorBuildSettings:
     path: Assets/GlobeEffect/Demo/CheckerboardDemo.unity
     guid: 2470f1e9fa438c044a874c8b97fbf185
   m_configObjects:
+    Varjo.XR.Settings: {fileID: 11400000, guid: c5e0a465d604cc641b71fa5ac341553b, type: 2}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: ac3e7e32d4904794687705866d55ec81, type: 2}
     com.unity.xr.openxr.settings4: {fileID: 11400000, guid: eaeaa666d02549e4480af8548fc2fc48, type: 2}

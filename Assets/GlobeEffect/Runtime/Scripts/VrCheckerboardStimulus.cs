@@ -34,6 +34,10 @@ namespace GlobeEffect.VRCheckerboard
         [Tooltip("Platziert den Stimulus in jedem Frame erneut vor dem Observer. Fuer einen weltfesten Versuch deaktiviert lassen.")]
         private bool followObserverEveryFrame;
 
+        [SerializeField]
+        [Tooltip("Wartet im Play Mode bis zum ersten LateUpdate, damit die initiale HMD-Pose bereits vorliegt. Danach bleibt der Stimulus weltfest.")]
+        private bool placeOnFirstTrackedPose = true;
+
         [Header("Merlitz-Stimulus")]
         [SerializeField, Range(0f, 1f)]
         [Tooltip("Verzeichnungsparameter k: 1 = Tangensbedingung/gerades Gitter, 0.5 = Kreisbedingung, 0 = Winkelbedingung.")]
@@ -89,6 +93,7 @@ namespace GlobeEffect.VRCheckerboard
         private Material ownedMaterial;
         private MaterialPropertyBlock propertyBlock;
         private bool isVisible = true;
+        private bool initialPlacementPending;
 
         /// <summary>Wird nach Show() mit dem aktuellen Parametersatz ausgeloest.</summary>
         public event Action<CheckerboardStimulusSnapshot> StimulusPresented;
@@ -130,7 +135,14 @@ namespace GlobeEffect.VRCheckerboard
             ValidateSerializedFields();
             EnsureResources();
             isVisible = Application.isPlaying ? visibleAtStart : true;
-            ApplyAll(placeAtObserver: observer != null);
+
+            // Der Tracked Pose Driver uebernimmt die HMD-Pose erst waehrend des
+            // ersten Frames. Eine sofortige Platzierung in OnEnable wuerde den
+            // Stimulus deshalb haeufig relativ zur Editor-Pose (0, 0, 0)
+            // positionieren, bevor die reale Kopfpose bekannt ist.
+            initialPlacementPending = Application.isPlaying &&
+                placeOnFirstTrackedPose && observer != null;
+            ApplyAll(placeAtObserver: observer != null && !initialPlacementPending);
         }
 
         private void OnValidate()
@@ -149,9 +161,15 @@ namespace GlobeEffect.VRCheckerboard
 
         private void LateUpdate()
         {
-            if (followObserverEveryFrame && observer != null)
+            if (observer == null)
+            {
+                return;
+            }
+
+            if (initialPlacementPending || followObserverEveryFrame)
             {
                 ApplyTransform(placeAtObserver: true);
+                initialPlacementPending = false;
             }
         }
 

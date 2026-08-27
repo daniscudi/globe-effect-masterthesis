@@ -16,8 +16,10 @@ der spaeteren Eye-Tracking-Anbindung getrennt.
 - winkelkonstantes zentrales Fixationskreuz;
 - Laufzeit-API, Parameter-Snapshot und Events fuer spaetere Trial-/Eye-Tracking-Anbindung;
 - vorkonfigurierte Demo-Szene mit XR Origin und getrackter Center-Eye-Kamera;
-- Input System, XR Interaction Toolkit, XR Plugin Management und OpenXR als
-  fest versionierte Unity-Pakete;
+- Input System, XR Interaction Toolkit und XR Plugin Management als fest
+  versionierte Unity-Pakete;
+- Varjo Unity XR Plugin `3.7.3` und gespeicherter Varjo-Loader fuer die
+  Varjo XR-4;
 - EditMode-Tests fuer Winkelgeometrie und Merlitz-Abbildung.
 
 ## Schnellstart
@@ -26,11 +28,10 @@ der spaeteren Eye-Tracking-Anbindung getrennt.
    konkret Editor `6000.5.6f1`.
 2. `Assets/GlobeEffect/Demo/CheckerboardDemo.unity` oeffnen. Die Szene enthaelt
    bereits XR Origin, Main Camera und Checkerboard-Stimulus.
-3. Unter `Edit > Project Settings > XR Plug-in Management` OpenXR fuer das
-   tatsaechliche Build-Ziel aktivieren. Anschliessend unter OpenXR nur das zum
-   Labor-Headset passende Interaction Profile auswaehlen. Die Pakete und
-   Grundeinstellungen sind vorhanden; ein bestimmtes Headset-SDK ist bewusst
-   nicht festgelegt.
+3. Unter `Edit > Project Settings > XR Plug-in Management` kontrollieren, dass
+   im Standalone-Reiter `Initialize XR on Startup` und `Varjo` aktiv sind. Diese
+   Zuordnung ist im Repository bereits gespeichert. Fuer den Laborbetrieb nicht
+   gleichzeitig den generischen OpenXR-Loader aktivieren.
 4. Am Objekt `Checkerboard Stimulus` die Parameter `Angular Diameter Degrees`,
    `Viewing Distance Meters`, `Merlitz K` und `Eye Presentation` einstellen.
 5. Fuer einen weltfesten Trial `Follow Observer Every Frame` deaktiviert lassen
@@ -43,6 +44,33 @@ gesetzt.
 
 Unity-Einheit ist hier gleich ein Meter. Fuer exakte Skalierung sollte das
 Stimulusobjekt keinen nicht-uniform skalierten Parent besitzen.
+
+## Vorschau und XR-Diagnose
+
+Die normale Unity Game View zeigt das Checkerboard auch ohne angeschlossene
+Brille als flache Vorschau. Kopfbewegung, Stereo-Augenauswahl und die reale
+Winkelgroesse lassen sich damit nicht validieren. Fuer einen vollstaendigen
+Test ohne angeschlossene XR-4 stellt Varjo Base einen Headset-Simulator bereit.
+
+Bei einem schwarzen Bild zuerst die Game View vor und waehrend des Play Mode
+vergleichen:
+
+1. Ist das Checkerboard vor Play sichtbar, funktionieren Mesh, Material,
+   Grundshader und die normale Kamera grundsaetzlich.
+2. Unter `XR Plug-in Management` muessen `Initialize XR on Startup` und `Varjo`
+   aktiv sein.
+3. Fuer einen unabhaengigen Render-Test in der Hierarchy
+   `XR Origin > Camera Offset > Main Camera > XR Render Probe` aktivieren. Der
+   magentafarbene Wuerfel sitzt kamerafest einen halben Meter vor der Kamera
+   und nutzt keinen Checkerboard-Code.
+4. Ist der Wuerfel sichtbar, aber das Checkerboard nicht, liegt der Fehler im
+   Stimulus-Material beziehungsweise dessen XR-Shaderpfad. Ist auch der Wuerfel
+   unsichtbar, sind XR-Loader, Kamera, Render-Pipeline oder Varjo-Laufzeit zu
+   pruefen.
+
+Beim Start einer XR-Sitzung wird die Kamera erst im ersten Frame auf die reale
+HMD-Pose gesetzt. Der Stimulus wartet deshalb mit seiner initialen Platzierung
+bis `LateUpdate` und bleibt danach standardmaessig weltfest.
 
 ## Mathematik
 
@@ -173,6 +201,12 @@ Toolbox keine privaten Inspector-Felder auslesen.
   *What are the uncurved lines in our visual field? A fresh look at Helmholtz's
   checkerboard*, Perception 38, 1284-1294 (2009):
   https://doi.org/10.1068/p6288
+- Varjo Technologies, *Varjo Unity XR SDK compatibility*:
+  https://developer.varjo.com/docs/unity-xr-sdk/compatibility
+- Varjo Technologies, *Developer tools in Varjo Base*:
+  https://developer.varjo.com/docs/get-started/developer-tools-in-varjo-base
+- Varjo Technologies, *Varjo Unity XR Plugin*:
+  https://github.com/varjocom/VarjoUnityXRPlugin
 - Unity, *Single-pass instanced rendering and custom shaders*:
   https://docs.unity3d.com/6000.0/Documentation/Manual/SinglePassInstancing.html
 
@@ -186,7 +220,7 @@ Assets/GlobeEffect/
     Scripts/      reine Mathematik, Stimulussteuerung, Integrations-API
     Resources/    XR-faehiger analytischer Checkerboard-Shader
   Tests/EditMode/ Mathematik- und Skalierungstests
-Assets/XR/        versionierte OpenXR-Einstellungen und Loader-Asset
+Assets/XR/        versionierte Varjo-/XR-Management-Einstellungen und Loader
 Assets/XRI/       Einstellungen des XR Interaction Toolkit
 Packages/         fest versionierte Unity-, Test- und XR-Abhaengigkeiten
 ProjectSettings/  Unity-Projektversion
