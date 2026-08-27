@@ -377,7 +377,7 @@ MonoBehaviour:
   angularDiameterDegrees: 70
   viewingDistanceMeters: 1
   followObserverEveryFrame: 0
-  merlitzK: 0.7
+  merlitzK: 1
   magnification: 10
   checksAcrossDiameter: 16
   darkColor: {r: 0, g: 0, b: 0, a: 1}
