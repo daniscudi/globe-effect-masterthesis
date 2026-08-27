@@ -1,4 +1,8 @@
 {
   "name": "GlobeEffect.VRCheckerboard.Runtime",
-  "rootNamespace": "GlobeEffect.VRCheckerboard"
+  "rootNamespace": "GlobeEffect.VRCheckerboard",
+  "references": [
+    "Unity.InputSystem",
+    "Varjo.XR"
+  ]
 }

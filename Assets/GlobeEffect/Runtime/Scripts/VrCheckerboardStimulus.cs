@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.XR;
 
 namespace GlobeEffect.VRCheckerboard
 {
@@ -16,6 +17,7 @@ namespace GlobeEffect.VRCheckerboard
         private const string ShaderResourceName = "GlobeEffectMerlitzCheckerboard";
         private const string ShaderFallbackName = "GlobeEffect/Merlitz Checkerboard";
         private const float MinimumDistanceMeters = 0.05f;
+        private const int MaximumInitialPoseWaitFrames = 120;
 
         [Header("Geometrie")]
         [SerializeField]
@@ -94,6 +96,7 @@ namespace GlobeEffect.VRCheckerboard
         private MaterialPropertyBlock propertyBlock;
         private bool isVisible = true;
         private bool initialPlacementPending;
+        private int initialPlacementWaitFrames;
 
         /// <summary>Wird nach Show() mit dem aktuellen Parametersatz ausgeloest.</summary>
         public event Action<CheckerboardStimulusSnapshot> StimulusPresented;
@@ -142,6 +145,7 @@ namespace GlobeEffect.VRCheckerboard
             // positionieren, bevor die reale Kopfpose bekannt ist.
             initialPlacementPending = Application.isPlaying &&
                 placeOnFirstTrackedPose && observer != null;
+            initialPlacementWaitFrames = 0;
             ApplyAll(placeAtObserver: observer != null && !initialPlacementPending);
         }
 
@@ -166,11 +170,25 @@ namespace GlobeEffect.VRCheckerboard
                 return;
             }
 
-            if (initialPlacementPending || followObserverEveryFrame)
+            bool initialPoseReady = initialPlacementPending &&
+                (HasTrackedCenterEyePose() ||
+                 initialPlacementWaitFrames >= MaximumInitialPoseWaitFrames);
+
+            if (followObserverEveryFrame || initialPoseReady)
             {
                 ApplyTransform(placeAtObserver: true);
                 initialPlacementPending = false;
             }
+
+            if (initialPlacementPending)
+            {
+                initialPlacementWaitFrames++;
+            }
+
+            // Im Varjo-Multi-Pass-Modus werden Context- und Focus-Ansicht in
+            // getrennten Durchlaeufen gerendert. Die aktuelle Center-Eye-Pose
+            // dient dem Shader als robuste Links-/Rechts-Referenz.
+            ApplyObserverMaterialProperties();
         }
 
         private void OnDestroy()
@@ -304,7 +322,56 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetFloat("_FixationHalfSizeRad",
                 0.5f * fixationTargetSizeDegrees * Mathf.Deg2Rad);
             propertyBlock.SetColor("_FixationColor", fixationColor);
+
+            if (observer != null)
+            {
+                propertyBlock.SetVector("_ObserverWorldPosition", observer.position);
+                propertyBlock.SetVector("_ObserverWorldRight", observer.right);
+            }
+
             meshRenderer.SetPropertyBlock(propertyBlock);
+        }
+
+        private void ApplyObserverMaterialProperties()
+        {
+            if (meshRenderer == null || observer == null)
+            {
+                return;
+            }
+
+            propertyBlock ??= new MaterialPropertyBlock();
+            meshRenderer.GetPropertyBlock(propertyBlock);
+            propertyBlock.SetVector("_ObserverWorldPosition", observer.position);
+            propertyBlock.SetVector("_ObserverWorldRight", observer.right);
+            meshRenderer.SetPropertyBlock(propertyBlock);
+        }
+
+        private static bool HasTrackedCenterEyePose()
+        {
+            InputDevice centerEye = InputDevices.GetDeviceAtXRNode(XRNode.CenterEye);
+            if (!centerEye.isValid)
+            {
+                return false;
+            }
+
+            if (centerEye.TryGetFeatureValue(CommonUsages.isTracked, out bool isTracked))
+            {
+                return isTracked;
+            }
+
+            if (centerEye.TryGetFeatureValue(
+                CommonUsages.trackingState,
+                out InputTrackingState trackingState))
+            {
+                const InputTrackingState required =
+                    InputTrackingState.Position | InputTrackingState.Rotation;
+                return (trackingState & required) == required;
+            }
+
+            // Manche Provider melden eine gueltige Center-Eye-Einheit, aber
+            // keinen separaten Tracking-State. Dann ist die gueltige Einheit
+            // die beste verfuegbare Startfreigabe.
+            return true;
         }
 
         private void ApplyVisibility()

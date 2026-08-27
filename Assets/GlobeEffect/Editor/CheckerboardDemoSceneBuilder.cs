@@ -7,6 +7,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.XR;
 using UnityEngine.SceneManagement;
 using Unity.XR.CoreUtils;
+using GlobeEffect.VRCheckerboard.EyeTracking;
 
 namespace GlobeEffect.VRCheckerboard.Editor
 {
@@ -23,9 +24,6 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private const string MenuPath =
             "Tools/Globe Effect/Create or Reset Demo Scene";
-
-        private const string RenderProbeMaterialPath =
-            "Assets/GlobeEffect/Demo/XrRenderProbe.mat";
 
         static CheckerboardDemoSceneBuilder()
         {
@@ -90,8 +88,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
             try
             {
                 Camera camera = CreateXrOrigin();
-                CreateStimulus(camera.transform);
-                CreateRenderProbe(camera.transform);
+                VrCheckerboardStimulus stimulus = CreateStimulus(camera.transform);
+                CreateEyeTracking(camera, stimulus);
                 CreateEnvironment();
 
                 EditorSceneManager.MarkSceneDirty(demoScene);
@@ -181,7 +179,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             driver.trackingStateInput = new InputActionProperty(trackingState);
         }
 
-        private static void CreateStimulus(Transform observer)
+        private static VrCheckerboardStimulus CreateStimulus(Transform observer)
         {
             GameObject stimulusObject = new GameObject("Checkerboard Stimulus");
             VrCheckerboardStimulus stimulus =
@@ -194,8 +192,32 @@ namespace GlobeEffect.VRCheckerboard.Editor
             stimulus.SetMagnification(10f);
             stimulus.SetEyePresentation(CheckerboardEyePresentation.BothEyes);
             stimulus.PlaceInFrontOfObserver();
+            stimulusObject.AddComponent<CheckerboardKeyboardController>();
 
             Selection.activeGameObject = stimulusObject;
+            return stimulus;
+        }
+
+        private static void CreateEyeTracking(
+            Camera camera,
+            VrCheckerboardStimulus stimulus)
+        {
+            GameObject toolboxObject = new GameObject("Eye Tracking Toolbox");
+            EyeTrackingToolbox toolbox =
+                toolboxObject.AddComponent<EyeTrackingToolbox>();
+            toolbox.SetProvider(EyeTrackingToolbox.ETProvider.Varjo);
+            toolbox.SetMainCameraTransform(camera.transform);
+            toolbox.SetStimulusForMarkers(stimulus);
+            toolbox.AddTrackedObject(
+                camera.gameObject,
+                EyeTrackingToolbox.TrackingOptions.LocalTransform);
+            toolbox.AddTrackedObject(
+                stimulus.gameObject,
+                EyeTrackingToolbox.TrackingOptions.GlobalTransform);
+
+            CheckerboardFixationMonitor fixationMonitor =
+                toolboxObject.AddComponent<CheckerboardFixationMonitor>();
+            fixationMonitor.Configure(toolbox, stimulus);
         }
 
         private static void CreateEnvironment()
@@ -210,58 +232,6 @@ namespace GlobeEffect.VRCheckerboard.Editor
             renderer.enabled = false;
 
             UnityEngine.Object.DestroyImmediate(floor.GetComponent<Collider>());
-        }
-
-        private static void CreateRenderProbe(Transform cameraTransform)
-        {
-            // Dieser Test umgeht den Checkerboard-Shader vollstaendig. Wird der
-            // magentafarbene Wuerfel in XR sichtbar, funktioniert der allgemeine
-            // Kamera-/XR-Renderpfad und die Fehlersuche kann sich auf den
-            // Stimulus-Shader konzentrieren.
-            GameObject probeRoot = new GameObject(
-                "XR Render Probe (enable for diagnostics)");
-            probeRoot.transform.SetParent(cameraTransform, false);
-
-            GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            cube.name = "Camera-locked magenta cube";
-            cube.transform.SetParent(probeRoot.transform, false);
-            // Vor dem Stimulus platzieren, damit der Probe auch bei weiterhin
-            // aktivem Checkerboard nicht von dessen Flaeche verdeckt wird.
-            cube.transform.localPosition = new Vector3(0f, 0f, 0.5f);
-            cube.transform.localScale = Vector3.one * 0.1f;
-
-            MeshRenderer renderer = cube.GetComponent<MeshRenderer>();
-            renderer.sharedMaterial = GetOrCreateRenderProbeMaterial();
-            UnityEngine.Object.DestroyImmediate(cube.GetComponent<Collider>());
-
-            // Der Probe gehoert nicht zum Experiment und wird nur bei Bedarf
-            // manuell in der Hierarchy aktiviert.
-            probeRoot.SetActive(false);
-        }
-
-        private static Material GetOrCreateRenderProbeMaterial()
-        {
-            Material existingMaterial =
-                AssetDatabase.LoadAssetAtPath<Material>(RenderProbeMaterialPath);
-            if (existingMaterial != null)
-            {
-                return existingMaterial;
-            }
-
-            Shader shader = Shader.Find("Unlit/Color");
-            if (shader == null)
-            {
-                throw new InvalidOperationException(
-                    "Der eingebaute Shader 'Unlit/Color' wurde nicht gefunden.");
-            }
-
-            Material material = new Material(shader)
-            {
-                name = "XR Render Probe",
-                color = Color.magenta
-            };
-            AssetDatabase.CreateAsset(material, RenderProbeMaterialPath);
-            return material;
         }
 
         private static void EnsureSceneIsInBuildSettings()

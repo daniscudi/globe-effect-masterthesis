@@ -3,7 +3,7 @@
 Aktueller Projektstand: Unity/C#-Implementierung eines kreisrunden, radial verzeichneten
 Checkerboard-Stimulus fuer die Untersuchung des Globe Effects. Die
 Stimulusgeometrie und die Merlitz-Abbildung sind von der Versuchssteuerung und
-der spaeteren Eye-Tracking-Anbindung getrennt.
+der Eye-Tracking-Anbindung getrennt.
 
 ## Stand
 
@@ -20,6 +20,13 @@ der spaeteren Eye-Tracking-Anbindung getrennt.
   versionierte Unity-Pakete;
 - Varjo Unity XR Plugin `3.7.3` und gespeicherter Varjo-Loader fuer die
   Varjo XR-4;
+- Varjo-Rendering im auf dem Laborrechner funktionsfaehigen `Multi Pass`-Modus;
+- Tastatursteuerung fuer Recenter und schrittweise Aenderung von `k`;
+- uebernommene Provider-Struktur der Lab-Eye-Tracking-Toolbox;
+- Varjo-XR-4-Provider mit vollstaendiger Abfrage der Gaze-Sample-Queue;
+- Dummy-Provider fuer Tests ohne Headset;
+- getrennte CSV-Dateien fuer Gaze- und Transformdaten sowie Ereignismarker;
+- Fixationskontrolle relativ zum aktuellen Checkerboard-Mittelpunkt;
 - EditMode-Tests fuer Winkelgeometrie und Merlitz-Abbildung.
 
 ## Schnellstart
@@ -31,11 +38,16 @@ der spaeteren Eye-Tracking-Anbindung getrennt.
 3. Unter `Edit > Project Settings > XR Plug-in Management` kontrollieren, dass
    im Standalone-Reiter `Initialize XR on Startup` und `Varjo` aktiv sind. Diese
    Zuordnung ist im Repository bereits gespeichert. Fuer den Laborbetrieb nicht
-   gleichzeitig den generischen OpenXR-Loader aktivieren.
+   gleichzeitig den generischen OpenXR-Loader aktivieren. Unter `Varjo` ist
+   `Stereo Rendering Mode = Multi Pass` gespeichert, da nur dieser Modus auf
+   dem verwendeten XR-4-Rechner ein Bild in Game View und Headset lieferte.
 4. Am Objekt `Checkerboard Stimulus` die Parameter `Angular Diameter Degrees`,
    `Viewing Distance Meters`, `Merlitz K` und `Eye Presentation` einstellen.
-5. Fuer einen weltfesten Trial `Follow Observer Every Frame` deaktiviert lassen
-   und am Trial-Anfang `PlaceInFrontOfObserver()` aufrufen.
+5. Fuer einen weltfesten Trial `Follow Observer Every Frame` deaktiviert lassen.
+   Im Play Mode mit `R` in der aktuellen Blickrichtung platzieren.
+6. Vor Eye-Tracking-Tests in Varjo Base `Allow eye tracking` aktivieren und mit
+   `C` die Blickkalibrierung starten. Die XR-4 sollte nach jedem erneuten
+   Aufsetzen fuer die betreffende Person neu kalibriert werden.
 
 Die Referenzszene kann bei Bedarf ueber
 `Tools > Globe Effect > Create or Reset Demo Scene` reproduzierbar neu erstellt
@@ -59,18 +71,30 @@ vergleichen:
    Grundshader und die normale Kamera grundsaetzlich.
 2. Unter `XR Plug-in Management` muessen `Initialize XR on Startup` und `Varjo`
    aktiv sein.
-3. Fuer einen unabhaengigen Render-Test in der Hierarchy
-   `XR Origin > Camera Offset > Main Camera > XR Render Probe` aktivieren. Der
-   magentafarbene Wuerfel sitzt kamerafest einen halben Meter vor der Kamera
-   und nutzt keinen Checkerboard-Code.
-4. Ist der Wuerfel sichtbar, aber das Checkerboard nicht, liegt der Fehler im
-   Stimulus-Material beziehungsweise dessen XR-Shaderpfad. Ist auch der Wuerfel
-   unsichtbar, sind XR-Loader, Kamera, Render-Pipeline oder Varjo-Laufzeit zu
-   pruefen.
+3. Auf dem verwendeten XR-4-Rechner muss aktuell `Stereo Rendering Mode =
+   Multi Pass` gewaehlt sein; `Stereo` und `Two Pass` lieferten dort ein
+   schwarzes Bild.
 
-Beim Start einer XR-Sitzung wird die Kamera erst im ersten Frame auf die reale
-HMD-Pose gesetzt. Der Stimulus wartet deshalb mit seiner initialen Platzierung
-bis `LateUpdate` und bleibt danach standardmaessig weltfest.
+Beim Start einer XR-Sitzung wird die Kamera erst auf die reale HMD-Pose gesetzt,
+wenn der Provider eine gueltige Center-Eye-Pose meldet. Der Stimulus wartet auf
+diesen Tracking-Status und bleibt danach standardmaessig weltfest.
+
+## Bedienung im Play Mode
+
+Die Komponente `Checkerboard Keyboard Controller` ist nur eine einfache
+technische Bedienung. Vor dem Tastendruck muss die Game View den Eingabefokus
+haben.
+
+- `R`: Stimulus in der aktuellen HMD-Blickrichtung neu platzieren;
+- Pfeiltaste links: `k` um `0.01` verringern;
+- Pfeiltaste rechts: `k` um `0.01` erhoehen;
+- `Shift` zusammen mit einer Pfeiltaste: Schrittweite `0.05`;
+- `C`: Varjo-Blickkalibrierung starten;
+- `F9`: technische Gaze-/Head-Aufzeichnung starten oder beenden.
+
+Jede Aenderung wird in der Console ausgegeben. `F9` dient nur zur technischen
+Pruefung der Datenpipeline. Eine spaetere Trial-Steuerung uebernimmt Start,
+Stop, Randomisierung und Dateinamen kontrolliert pro Versuchssitzung.
 
 ## Mathematik
 
@@ -140,7 +164,40 @@ solchen. Die Uebersetzung des Resultats auf ungefaehr `k = 0.8` ist Merlitz'
 Modellinterpretation; sein eigener einfacher Online-Test ergab eher Werte um
 `k = 0.7`.
 
-## Laufzeit- und Eye-Tracking-Anbindung
+## Eye Tracking
+
+Die Eye-Tracking-Schicht folgt der im Lab verwendeten Toolbox-Struktur:
+`IEyeTracker` definiert den gemeinsamen Provider-Vertrag,
+`EyeTrackingEvent` leitet neue Samples weiter und `EyeTrackingToolbox`
+uebernimmt Weltkoordinaten, Aufzeichnung und Ereignismarker. Der bisherige
+Vive-/SRanipal-Provider wird in diesem Projekt durch `VarjoEyeTracker` ersetzt.
+
+Der Varjo-Provider verwendet `VarjoEyeTracking.GetGazeList(...)`. Dadurch
+werden alle seit dem letzten Unity-Frame bereitgestellten Samples abgeholt und
+nicht nur das jeweils letzte Sample. Rohstatus, Zeitstempel, lokale Blickstrahlen,
+Pupillendurchmesser, Augenoeffnung, Fokusdistanz und IPD bleiben in der
+Gaze-Datei erhalten. Die Toolbox schreibt parallel die konfigurierten
+Transformationen von Main Camera und Checkerboard in eine Head-Datei.
+
+Ohne eigenes Ausgabeverzeichnis liegen technische `F9`-Aufzeichnungen unter:
+
+```text
+Application.persistentDataPath/Measurements
+```
+
+Der genaue Windows-Pfad beider Dateien wird beim Start der Aufzeichnung in der
+Unity Console ausgegeben. Mit dem Provider `Dummy` kann die Pipeline ohne
+Headset getestet werden; der simulierte Blick folgt dann der Maus in der Game
+View.
+
+`CheckerboardFixationMonitor` berechnet den Winkel zwischen Blickstrahl und
+Checkerboard-Mittelpunkt. Bei `LeftEyeOnly` beziehungsweise `RightEyeOnly`
+wird der Blickstrahl des dargestellten Auges benutzt, bei `BothEyes` der
+kombinierte Strahl. Voreinstellung sind 3 Grad Toleranz und 0.3 Sekunden
+ununterbrochene Fixation. Diese Werte sind technische Startwerte und muessen
+vor der eigentlichen Studie als Teil des Versuchsprotokolls festgelegt werden.
+
+## Laufzeit-Anbindung
 
 Die zentrale Komponente stellt unter anderem bereit:
 
@@ -170,15 +227,23 @@ Toolbox keine privaten Inspector-Felder auslesen.
   spaeter eine separate Stereo-Geometrie noetig.
 - Der monokulare Modus unterdrueckt ein Auge im Shader. Er ersetzt keine
   Messung von Display-Crosstalk und keine klinische Okklusion.
-- Die XR-Augenauswahl benutzt Unitys `unity_StereoEyeIndex`. Links/rechts muss
-  mit der konkreten Render-Pipeline, dem Headset und dessen Stereo-Modus im Labor
-  geprueft werden. Im normalen Game-View entspricht die Vorschau dem linken Auge.
+- Die XR-Augenauswahl benutzt Unitys `unity_StereoEyeIndex`. Fuer Varjo
+  `Multi Pass` verwendet der Shader zusaetzlich die Position der jeweiligen
+  Renderkamera relativ zur Center-Eye-Pose. Die
+  vollstaendige Unterdrueckung von Context- und Focus-Ansicht muss nach dieser
+  Aenderung erneut im Headset geprueft werden. Im normalen Game-View entspricht
+  die Vorschau dem linken Auge.
 - Die kreisrunde Apertur und der festgehaltene scheinbare Winkeldurchmesser sind
   Festlegungen dieses Versuchsdesigns, keine Behauptung einer exakten
   Replikation des Oomes-Versuchsaufbaus.
 - Fixation wird angezeigt, aber noch nicht per Eye Tracking erzwungen. Ein Trial
-  sollte spaeter nur gewertet werden, wenn die definierte Fixations- und
-  Datenqualitaetsregel erfuellt ist.
+  kann jetzt technisch ueberwacht werden. Die Regel, ob ein Trial bei einer
+  Fixationsverletzung wiederholt oder ausgeschlossen wird, ist noch nicht als
+  Versuchsablauf festgelegt.
+- `leftValidity` und `rightValidity` akzeptieren Varjos Status `Compensated`
+  oder `Tracked`; die exakten Rohstatuswerte werden zusaetzlich gespeichert.
+  Das endgueltige Qualitaetskriterium muss vor der Datenerhebung festgelegt und
+  in der Auswertung dokumentiert werden.
 - Dieser Stand implementiert den statischen Checkerboard-Einstelltest. Eine
   kontrollierte Schwenk-/Globe-Effect-Animation ist ein separates Modul.
 
@@ -187,7 +252,8 @@ Toolbox keine privaten Inspector-Felder auslesen.
 - Die EditMode-Tests pruefen die Vorwaerts-/Rueckabbildung fuer
   `k = 0, 0.5, 0.7, 1`, die Randnormierung und die exakte Verdopplung des
   physischen Durchmessers bei doppeltem Abstand.
-- Der aktuelle Stand besteht alle 15 EditMode-Tests mit Unity `6000.5.6f1`.
+- Der aktuelle Stand enthaelt 19 EditMode-Tests fuer Mathematik, Skalierung,
+  Blickstrahltransformation und die technische Tastatursteuerung.
 - Runtime- und Testquellen sind fuer Unity `6000.5.6f1` ausgelegt.
 - Vor der Datenerhebung sind Shader, Augenmaskierung, Render-Pipeline und reale
   Winkelgroesse auf dem Laborrechner mit dem konkreten Headset zu validieren.
@@ -207,6 +273,8 @@ Toolbox keine privaten Inspector-Felder auslesen.
   https://developer.varjo.com/docs/get-started/developer-tools-in-varjo-base
 - Varjo Technologies, *Varjo Unity XR Plugin*:
   https://github.com/varjocom/VarjoUnityXRPlugin
+- Varjo Technologies, *Eye tracking with Varjo XR Plugin*:
+  https://developer.varjo.com/docs/unity-xr-sdk/eye-tracking-with-varjo-xr-plugin
 - Unity, *Single-pass instanced rendering and custom shaders*:
   https://docs.unity3d.com/6000.0/Documentation/Manual/SinglePassInstancing.html
 
@@ -217,6 +285,7 @@ Assets/GlobeEffect/
   Demo/           startfertige Referenzszene
   Editor/         reproduzierbarer Aufbau der Referenzszene
   Runtime/
+    EyeTracking/  Provider, CSV-Aufzeichnung und Fixationskontrolle
     Scripts/      reine Mathematik, Stimulussteuerung, Integrations-API
     Resources/    XR-faehiger analytischer Checkerboard-Shader
   Tests/EditMode/ Mathematik- und Skalierungstests
