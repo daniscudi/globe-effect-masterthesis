@@ -734,6 +734,82 @@ MonoBehaviour:
   isInsideTolerance: 0
   currentAngleDegrees: 0
   continuousFixationSeconds: 0
+--- !u!1 &1900000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1900000002}
+  - component: {fileID: 1900000003}
+  m_Layer: 0
+  m_Name: Checkerboard Trial Session
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1900000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1900000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1900000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 085f4814d3964a8f96e76bcb22d5340e, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.Experiment.CheckerboardTrialSessionController
+  stimulus: {fileID: 607094975}
+  keyboardController: {fileID: 607094979}
+  eyeTrackingToolbox: {fileID: 1800000003}
+  fixationMonitor: {fileID: 1800000004}
+  participantId: pilot_001
+  sessionLabel: checkerboard_pilot
+  randomSeed: 20260827
+  outputRoot:
+  autoStartOnPlay: 0
+  angularDiametersDegrees:
+  - 70
+  viewingDistancesMeters:
+  - 1
+  eyePresentations:
+  - 0
+  - 1
+  - 2
+  startingKValues:
+  - 0.3
+  - 0.9
+  magnification: 10
+  repetitionsPerCondition: 1
+  recenterAtTrialStart: 1
+  interTrialSeconds: 0.5
+  requireFixationBeforeConfirmation: 0
+  startSessionKey: 98
+  confirmTrialKey: 2
+  abortSessionKey: 99
+  sessionState: 0
+  currentTrialNumber: 0
+  totalTrials: 0
+  activeSessionFolder:
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -742,3 +818,4 @@ SceneRoots:
   - {fileID: 607094978}
   - {fileID: 980179800}
   - {fileID: 1800000002}
+  - {fileID: 1900000002}

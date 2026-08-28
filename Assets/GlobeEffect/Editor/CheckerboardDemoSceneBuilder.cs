@@ -8,6 +8,7 @@ using UnityEngine.InputSystem.XR;
 using UnityEngine.SceneManagement;
 using Unity.XR.CoreUtils;
 using GlobeEffect.VRCheckerboard.EyeTracking;
+using GlobeEffect.VRCheckerboard.Experiment;
 
 namespace GlobeEffect.VRCheckerboard.Editor
 {
@@ -89,7 +90,11 @@ namespace GlobeEffect.VRCheckerboard.Editor
             {
                 Camera camera = CreateXrOrigin();
                 VrCheckerboardStimulus stimulus = CreateStimulus(camera.transform);
-                CreateEyeTracking(camera, stimulus);
+                EyeTrackingToolbox toolbox = CreateEyeTracking(
+                    camera,
+                    stimulus,
+                    out CheckerboardFixationMonitor fixationMonitor);
+                CreateTrialController(stimulus, toolbox, fixationMonitor);
                 CreateEnvironment();
 
                 EditorSceneManager.MarkSceneDirty(demoScene);
@@ -198,9 +203,10 @@ namespace GlobeEffect.VRCheckerboard.Editor
             return stimulus;
         }
 
-        private static void CreateEyeTracking(
+        private static EyeTrackingToolbox CreateEyeTracking(
             Camera camera,
-            VrCheckerboardStimulus stimulus)
+            VrCheckerboardStimulus stimulus,
+            out CheckerboardFixationMonitor fixationMonitor)
         {
             GameObject toolboxObject = new GameObject("Eye Tracking Toolbox");
             EyeTrackingToolbox toolbox =
@@ -215,9 +221,25 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 stimulus.gameObject,
                 EyeTrackingToolbox.TrackingOptions.GlobalTransform);
 
-            CheckerboardFixationMonitor fixationMonitor =
+            fixationMonitor =
                 toolboxObject.AddComponent<CheckerboardFixationMonitor>();
             fixationMonitor.Configure(toolbox, stimulus);
+            return toolbox;
+        }
+
+        private static void CreateTrialController(
+            VrCheckerboardStimulus stimulus,
+            EyeTrackingToolbox toolbox,
+            CheckerboardFixationMonitor fixationMonitor)
+        {
+            GameObject controllerObject = new GameObject("Checkerboard Trial Session");
+            CheckerboardTrialSessionController controller =
+                controllerObject.AddComponent<CheckerboardTrialSessionController>();
+            controller.Configure(
+                stimulus,
+                stimulus.GetComponent<CheckerboardKeyboardController>(),
+                toolbox,
+                fixationMonitor);
         }
 
         private static void CreateEnvironment()

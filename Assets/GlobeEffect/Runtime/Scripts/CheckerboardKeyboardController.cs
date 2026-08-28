@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -33,6 +34,12 @@ namespace GlobeEffect.VRCheckerboard
         private bool logChanges = true;
 
         private VrCheckerboardStimulus stimulus;
+
+        /// <summary>Wird nach einer manuellen k-Aenderung ausgeloest.</summary>
+        public event Action<float, float> KChanged;
+
+        /// <summary>Wird nach einer manuellen Neupositionierung ausgeloest.</summary>
+        public event Action Recentered;
 
         public float KStep => kStep;
 
@@ -74,6 +81,7 @@ namespace GlobeEffect.VRCheckerboard
         {
             EnsureStimulus();
             stimulus.PlaceInFrontOfObserver();
+            Recentered?.Invoke();
 
             if (logChanges)
             {
@@ -84,7 +92,9 @@ namespace GlobeEffect.VRCheckerboard
         public void ChangeK(float delta)
         {
             EnsureStimulus();
+            float previousK = stimulus.MerlitzK;
             stimulus.SetMerlitzK(stimulus.MerlitzK + delta);
+            KChanged?.Invoke(previousK, stimulus.MerlitzK);
 
             if (logChanges)
             {

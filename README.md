@@ -27,6 +27,11 @@ der Eye-Tracking-Anbindung getrennt.
 - Dummy-Provider fuer Tests ohne Headset;
 - getrennte CSV-Dateien fuer Gaze- und Transformdaten sowie Ereignismarker;
 - Fixationskontrolle relativ zum aktuellen Checkerboard-Mittelpunkt;
+- vollfaktorieller Trialplan mit reproduzierbarer Seed-Randomisierung;
+- automatische Sitzungsordner, Plan-, Antwort-, Gaze- und Head-CSV-Dateien;
+- Trialsteuerung fuer Start, k-Einstellung, Bestaetigung, Recenter und Abbruch;
+- explizites 2D-Koordinatenmodul fuer den linearen `(u,v)`-Bildraum und die
+  Schwenkgleichungen der begleitenden Plots;
 - EditMode-Tests fuer Winkelgeometrie und Merlitz-Abbildung.
 
 ## Schnellstart
@@ -41,13 +46,18 @@ der Eye-Tracking-Anbindung getrennt.
    gleichzeitig den generischen OpenXR-Loader aktivieren. Unter `Varjo` ist
    `Stereo Rendering Mode = Multi Pass` gespeichert, da nur dieser Modus auf
    dem verwendeten XR-4-Rechner ein Bild in Game View und Headset lieferte.
-4. Am Objekt `Checkerboard Stimulus` die Parameter `Angular Diameter Degrees`,
-   `Viewing Distance Meters`, `Merlitz K` und `Eye Presentation` einstellen.
+4. Fuer einen Einzeltest am Objekt `Checkerboard Stimulus` die Parameter
+   `Angular Diameter Degrees`, `Viewing Distance Meters`, `Merlitz K` und
+   `Eye Presentation` einstellen.
 5. Fuer einen weltfesten Trial `Follow Observer Every Frame` deaktiviert lassen.
    Im Play Mode mit `R` in der aktuellen Blickrichtung platzieren.
 6. Vor Eye-Tracking-Tests in Varjo Base `Allow eye tracking` aktivieren und mit
    `C` die Blickkalibrierung starten. Die XR-4 sollte nach jedem erneuten
    Aufsetzen fuer die betreffende Person neu kalibriert werden.
+7. Fuer eine zusammenhaengende Pilot-Sitzung am Objekt
+   `Checkerboard Trial Session` eine pseudonymisierte `Participant Id`, das
+   `Session Label` und die Bedingungslisten kontrollieren. Danach im Play Mode
+   mit `F5` starten.
 
 Die Referenzszene kann bei Bedarf ueber
 `Tools > Globe Effect > Create or Reset Demo Scene` reproduzierbar neu erstellt
@@ -93,8 +103,49 @@ haben.
 - `F9`: technische Gaze-/Head-Aufzeichnung starten oder beenden.
 
 Jede Aenderung wird in der Console ausgegeben. `F9` dient nur zur technischen
-Pruefung der Datenpipeline. Eine spaetere Trial-Steuerung uebernimmt Start,
-Stop, Randomisierung und Dateinamen kontrolliert pro Versuchssitzung.
+Pruefung der Datenpipeline und sollte nicht waehrend einer mit `F5` gestarteten
+Sitzung benutzt werden.
+
+## Pilot-Sitzung
+
+Die Komponente `Checkerboard Trial Session` bildet aus allen Eintraegen in
+`Angular Diameters Degrees`, `Viewing Distances Meters`, `Eye Presentations`
+und `Starting K Values` einen vollfaktoriellen Plan. Jede Kombination kommt pro
+`Repetitions Per Condition` gleich oft vor. Es werden immer komplette
+Bedingungen gemischt, sodass FOV, Abstand, Augenmodus und Startwert nicht
+versehentlich auseinanderfallen. Derselbe `Random Seed` erzeugt bei denselben
+Listen dieselbe Reihenfolge.
+
+Die Demoszene enthaelt als kurzen technischen Startplan sechs Trials: drei
+Augenmodi mal zwei Startwerte fuer `k`. Diese Werte sind noch kein festgelegtes
+Studienprotokoll. Weitere FOV- oder Abstandswerte koennen direkt als neue
+Listeneintraege im Inspector ergaenzt werden.
+
+- `F5`: neue Sitzung starten;
+- Pfeiltasten links/rechts: `k` einstellen;
+- `Shift` plus Pfeiltaste: groessere Schrittweite;
+- `R`: bei Bedarf in der aktuellen Blickrichtung neu zentrieren;
+- `Enter`: aktuellen `k`-Wert bestaetigen und zum naechsten Trial wechseln;
+- `F6`: laufende Sitzung kontrolliert abbrechen und den begonnenen Trial
+  als abgebrochen speichern.
+
+Standardmaessig wird der Fixationsstatus mitgespeichert, blockiert die Antwort
+aber noch nicht. `Require Fixation Before Confirmation` kann im Inspector
+aktiviert werden, sobald Toleranz, Mindestdauer und Umgang mit ungueltigen
+Samples im Versuchsprotokoll festgelegt sind.
+
+Pro Sitzung entsteht unter `Application.persistentDataPath/Measurements` ein
+eigener Ordner mit:
+
+```text
+..._plan.csv    randomisierte Reihenfolge und alle Sollbedingungen
+..._trials.csv  Start-/Endwert von k, Antwortzeit, Recenter und Fixationsstatus
+..._gaze.csv    rohe Varjo-Blicksamples und Ereignismarker
+..._head.csv    Kamera-/Stimulus-Transformationen und Ereignismarker
+```
+
+Die Antwortdatei wird nach jedem Trial erweitert. Ein Abbruch verliert daher
+nicht die bereits bestaetigten Antworten.
 
 ## Mathematik
 
@@ -164,6 +215,41 @@ solchen. Die Uebersetzung des Resultats auf ungefaehr `k = 0.8` ist Merlitz'
 Modellinterpretation; sein eigener einfacher Online-Test ergab eher Werte um
 `k = 0.7`.
 
+## Verbindung zu den x-y-/u-v-Plots
+
+Der statische Checkerboard-Test und die Schwenk-Plots beantworten verwandte,
+aber nicht identische Fragen. Im Checkerboard-Trial wird die radiale
+Instrumentabbildung ueber `k` eingestellt. Die Plots beginnen dagegen mit der
+Bahn eines ruhenden Fernpunkts bei einem horizontalen Kameraschwenk im linearen
+Bildraum:
+
+```text
+x = X/Z,  y = Y/Z
+u = m x,  v = m y
+
+du/dpsi = -(m + u^2/m)
+dv/dpsi = -u v/m
+```
+
+Erst danach vergleichen die Plotunterlagen verschiedene Zielkoordinaten:
+
+```text
+linear:   (x_L, y_L) = (u, v)
+Schoen:   (x_S, y_S) = (atan(u), atan(v))
+Merlitz:  (x_M, y_M) = atan(r)/r * (u, v),  r = sqrt(u^2+v^2)
+```
+
+`GlobeEffectCoordinateMapping2D` enthaelt diese Definitionen jetzt auch in C#.
+Ausserdem ist dort geprueft, dass die instrumentelle Merlitz-Abbildung bei
+`k = 1` genau in die lineare Abbildung `(u,v)=m(x,y)` uebergeht. Damit besitzen
+Plot und Unity-Projekt nun dieselbe explizite Koordinatenbasis.
+
+Die Plotpfeile steuern den sichtbaren Checkerboard-Trial trotzdem noch nicht:
+Sie beschreiben eine **dynamische Schwenkgeschwindigkeit**, waehrend das
+Checkerboard ein **statischer Einstelltest** ist. Eine sichtbare Schwenk- oder
+Punktfeldbedingung bleibt deshalb bewusst ein eigenes spaeteres Stimulusmodul,
+statt ihre Mathematik unbemerkt in den Checkerboard-Shader zu mischen.
+
 ## Eye Tracking
 
 Die Eye-Tracking-Schicht folgt der im Lab verwendeten Toolbox-Struktur:
@@ -215,8 +301,10 @@ stimulus.StimulusPresented += snapshot =>
 ```
 
 `CaptureSnapshot()` liefert Zeitstempel, Sichtbarkeit, FOV, Abstand, physischen
-Durchmesser, `k`, `m`, Check-Anzahl und Augenmodus. Damit muss eine spaetere
-Toolbox keine privaten Inspector-Felder auslesen.
+Durchmesser, `k`, `m`, Check-Anzahl und Augenmodus. Der
+`CheckerboardTrialSessionController` verwendet diese API und kann spaeter durch
+eine Bedienoberflaeche oder weitere Lab-Komponenten erweitert werden, ohne den
+Stimulus neu zu schreiben.
 
 ## Annahmen und offene Validierung
 
@@ -236,23 +324,42 @@ Toolbox keine privaten Inspector-Felder auslesen.
 - Die kreisrunde Apertur und der festgehaltene scheinbare Winkeldurchmesser sind
   Festlegungen dieses Versuchsdesigns, keine Behauptung einer exakten
   Replikation des Oomes-Versuchsaufbaus.
-- Fixation wird angezeigt, aber noch nicht per Eye Tracking erzwungen. Ein Trial
-  kann jetzt technisch ueberwacht werden. Die Regel, ob ein Trial bei einer
-  Fixationsverletzung wiederholt oder ausgeschlossen wird, ist noch nicht als
-  Versuchsablauf festgelegt.
+- Fixation wird angezeigt und pro Trial gespeichert. Eine optionale Freigabe
+  vor `Enter` ist implementiert; die wissenschaftliche Regel fuer Wiederholung
+  oder Ausschluss ist noch nicht festgelegt.
 - `leftValidity` und `rightValidity` akzeptieren Varjos Status `Compensated`
   oder `Tracked`; die exakten Rohstatuswerte werden zusaetzlich gespeichert.
   Das endgueltige Qualitaetskriterium muss vor der Datenerhebung festgelegt und
   in der Auswertung dokumentiert werden.
-- Dieser Stand implementiert den statischen Checkerboard-Einstelltest. Eine
-  kontrollierte Schwenk-/Globe-Effect-Animation ist ein separates Modul.
+- Dieser Stand implementiert den statischen Checkerboard-Einstelltest und die
+  mathematische 2D-Basis der Plots. Eine kontrollierte sichtbare
+  Schwenk-/Globe-Effect-Animation ist weiterhin ein separates Modul.
+
+## Roadmap
+
+1. **Stimulusbasis – umgesetzt:** kreisrundes Checkerboard, FOV, Abstand,
+   winkelkonstante Skalierung, mono/binokular und Merlitz-`k`.
+2. **XR-4-Betrieb – technisch umgesetzt:** Varjo-Loader, Multi Pass,
+   HMD-Tracking, Recenter und XR-Augenauswahl; die Augenmaskierung muss noch
+   systematisch im Headset validiert werden.
+3. **Messpipeline – umgesetzt:** Varjo-Eye-Tracking, Fixationsmonitor,
+   Marker sowie Gaze-/Head-CSV.
+4. **Pilotablauf – umgesetzt:** reproduzierbarer Trialplan, zwei
+   Startwert-Richtungen, Antwortbestaetigung und automatische Sitzungsdateien.
+5. **Dynamische lineare Abbildung – mathematische Basis umgesetzt, visueller
+   Stimulus offen:** `(x,y) -> (u,v)`, Schwenkbahn und Vergleich von linear,
+   Schoen und Merlitz als separates Punkt-/Gittermodul in Unity.
+6. **Vor Hauptstudie offen:** exakte Bedingungen und Wiederholungszahl mit der
+   Betreuung festlegen, Winkel/Fixation/Augenmaskierung am XR-4 messen,
+   Test-Retest-Pilot durchfuehren und Ausschlussregeln einfrieren.
 
 ## Qualitaetssicherung
 
 - Die EditMode-Tests pruefen die Vorwaerts-/Rueckabbildung fuer
   `k = 0, 0.5, 0.7, 1`, die Randnormierung und die exakte Verdopplung des
   physischen Durchmessers bei doppeltem Abstand.
-- Der aktuelle Stand enthaelt 19 EditMode-Tests fuer Mathematik, Skalierung,
+- Der aktuelle Stand enthaelt 30 EditMode-Testfaelle fuer Mathematik,
+  Skalierung, lineare 2D-Koordinaten, reproduzierbare Randomisierung,
   Blickstrahltransformation und die technische Tastatursteuerung.
 - Runtime- und Testquellen sind fuer Unity `6000.5.6f1` ausgelegt.
 - Vor der Datenerhebung sind Shader, Augenmaskierung, Render-Pipeline und reale
@@ -286,6 +393,7 @@ Assets/GlobeEffect/
   Editor/         reproduzierbarer Aufbau der Referenzszene
   Runtime/
     EyeTracking/  Provider, CSV-Aufzeichnung und Fixationskontrolle
+    Experiment/   Trialplan, Sitzungssteuerung und Ergebnisdateien
     Scripts/      reine Mathematik, Stimulussteuerung, Integrations-API
     Resources/    XR-faehiger analytischer Checkerboard-Shader
   Tests/EditMode/ Mathematik- und Skalierungstests
