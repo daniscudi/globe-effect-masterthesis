@@ -1,9 +1,9 @@
 # Globe Effect Master Thesis
 
-Aktueller Projektstand: Unity/C#-Implementierung eines kreisrunden, radial verzeichneten
-Checkerboard-Stimulus fuer die Untersuchung des Globe Effects. Die
-Stimulusgeometrie und die Merlitz-Abbildung sind von der Versuchssteuerung und
-der Eye-Tracking-Anbindung getrennt.
+Aktueller Projektstand: Unity/C#-Implementierung eines kreisrunden, radial
+verzeichneten Checkerboard-Stimulus und eines dynamischen Random-Dot-k-Tests
+fuer die Untersuchung des Globe Effects. Stimulusgeometrie, Merlitz-Abbildung,
+Versuchssteuerung und Eye-Tracking-Anbindung sind modular getrennt.
 
 ## Stand
 
@@ -32,6 +32,11 @@ der Eye-Tracking-Anbindung getrennt.
 - Trialsteuerung fuer Start, k-Einstellung, Bestaetigung, Recenter und Abbruch;
 - explizites 2D-Koordinatenmodul fuer den linearen `(u,v)`-Bildraum und die
   Schwenkgleichungen der begleitenden Plots;
+- reproduzierbares, weltfestes Schwarz-Weiss-Punktfeld mit realer
+  Kopfbewegung und separatem simuliertem Debug-Schwenk;
+- dynamischer Einstelltest, bei dem `k` waehrend wiederholter Links-Rechts-
+  Kopfbewegungen auf subjektive Stabilitaet eingestellt wird;
+- automatische Erkennung und Protokollierung gueltiger Kopf-Seitenwechsel;
 - EditMode-Tests fuer Winkelgeometrie und Merlitz-Abbildung.
 
 ## Schnellstart
@@ -147,6 +152,55 @@ eigener Ordner mit:
 Die Antwortdatei wird nach jedem Trial erweitert. Ein Abbruch verliert daher
 nicht die bereits bestaetigten Antworten.
 
+## Dynamischer Random-Dot-k-Test
+
+Die separate Szene
+`Assets/GlobeEffect/Demo/RandomDotMotionDemo.unity` setzt den dynamischen Teil
+des Globe-Effect-Tests um. Falls die Szene nach einem frischen Pull noch nicht
+vorhanden ist, wird sie beim ersten Unity-Import automatisch erstellt. Sie kann
+ausserdem ueber
+`Tools > Globe Effect > Create or Reset Random Dot Demo Scene` reproduzierbar
+neu aufgebaut werden.
+
+Das Punktfeld besteht standardmaessig aus 4000 schwarzen und weissen Punkten
+auf einer weltfesten sphaerischen Kappe. Die Punkte werden nicht von selbst
+bewegt. Im vorgesehenen Modus `HeadTracked` dreht die Versuchsperson den Kopf
+abwechselnd nach links und rechts. Der dadurch entstehende optische Fluss wird
+mit der instrumentellen Merlitz-Abbildung verzerrt. Die Aufgabe lautet:
+
+> Stelle `k` so ein, dass das Punktfeld waehrend der Kopfbewegung moeglichst
+> stabil und nicht schwimmend erscheint.
+
+Der technische Startplan umfasst zwei Trials mit `k = 0.3` beziehungsweise
+`k = 0.9` als randomisierte Startwerte. Standardmaessig muessen vor `Enter`
+vier Wechsel zwischen linker und rechter Schwelle abgeschlossen sein. Die
+Startschwelle von 2.5 Grad ist ein technischer Wert fuer `m = 10` und noch
+keine festgelegte Studienbedingung. Die erzeugte Punktkappe umfasst zunaechst
+20 Grad im unverzerrten Objektraum; durch `m = 10` fuellt dieser Bereich das
+wesentlich groessere sichtbare Feld. Dieser Wert ist daher nicht mit dem
+angezeigten Winkeldurchmesser von 70 Grad gleichzusetzen.
+
+- `F5`: Random-Dot-Sitzung starten;
+- Pfeiltasten links/rechts: `k` veraendern;
+- `Shift` plus Pfeiltaste: groessere Schrittweite;
+- `R`: Punktfeld an der aktuellen Kopfpose neu verankern und Sweep-Zaehler
+  zuruecksetzen;
+- `Enter`: finalen `k`-Wert bestaetigen, sobald das Kopfkriterium erfuellt ist;
+- `F6`: Sitzung kontrolliert abbrechen;
+- `C`: Varjo-Eye-Tracking vor Sitzungsbeginn kalibrieren.
+
+Fuer eine Vorschau ohne HMD kann im Inspector der Liste `Motion Modes` statt
+`HeadTracked` der Wert `SimulatedYaw` zugewiesen werden. Dieser Modus simuliert
+nur den visuellen Schwenk und ist nicht als Ersatz fuer die reale
+Versuchsbedingung gedacht.
+
+Plan-, Antwort-, Gaze- und Head-Dateien werden wie beim Checkerboard in einem
+eigenen Sitzungsordner gespeichert. Die Trialdatei enthaelt zusaetzlich
+Punkt-Seed, Bewegungsmodus, Winkelschwelle, abgeschlossene Seitenwechsel,
+tatsaechlichen Gierwinkelbereich sowie den Fixationsstatus. Marker wie
+`HeadHalfSweep`, `KAdjusted` und `TrialConfirmed` verbinden diese Ereignisse
+mit Gaze- und Head-Samples.
+
 ## Mathematik
 
 Merlitz fasst die instrumentelle radiale Abbildung als
@@ -244,11 +298,11 @@ Ausserdem ist dort geprueft, dass die instrumentelle Merlitz-Abbildung bei
 `k = 1` genau in die lineare Abbildung `(u,v)=m(x,y)` uebergeht. Damit besitzen
 Plot und Unity-Projekt nun dieselbe explizite Koordinatenbasis.
 
-Die Plotpfeile steuern den sichtbaren Checkerboard-Trial trotzdem noch nicht:
-Sie beschreiben eine **dynamische Schwenkgeschwindigkeit**, waehrend das
-Checkerboard ein **statischer Einstelltest** ist. Eine sichtbare Schwenk- oder
-Punktfeldbedingung bleibt deshalb bewusst ein eigenes spaeteres Stimulusmodul,
-statt ihre Mathematik unbemerkt in den Checkerboard-Shader zu mischen.
+Die Plotpfeile steuern den sichtbaren Checkerboard-Trial weiterhin nicht: Sie
+beschreiben eine **dynamische Schwenkgeschwindigkeit**, waehrend das
+Checkerboard ein **statischer Einstelltest** ist. Der Random-Dot-Test setzt die
+dynamische Fragestellung deshalb als eigenes Stimulusmodul um. Beide verwenden
+dieselbe instrumentelle Merlitz-Gleichung, ohne die Aufgaben zu vermischen.
 
 ## Eye Tracking
 
@@ -331,9 +385,10 @@ Stimulus neu zu schreiben.
   oder `Tracked`; die exakten Rohstatuswerte werden zusaetzlich gespeichert.
   Das endgueltige Qualitaetskriterium muss vor der Datenerhebung festgelegt und
   in der Auswertung dokumentiert werden.
-- Dieser Stand implementiert den statischen Checkerboard-Einstelltest und die
-  mathematische 2D-Basis der Plots. Eine kontrollierte sichtbare
-  Schwenk-/Globe-Effect-Animation ist weiterhin ein separates Modul.
+- Dieser Stand implementiert den statischen Checkerboard-Einstelltest, die
+  mathematische 2D-Basis der Plots und einen separaten dynamischen
+  Random-Dot-k-Prototyp. Die Kopfamplitude, Wiederholungszahl und genaue
+  Instruktion sind noch keine festgelegten Studienparameter.
 
 ## Roadmap
 
@@ -346,10 +401,12 @@ Stimulus neu zu schreiben.
    Marker sowie Gaze-/Head-CSV.
 4. **Pilotablauf – umgesetzt:** reproduzierbarer Trialplan, zwei
    Startwert-Richtungen, Antwortbestaetigung und automatische Sitzungsdateien.
-5. **Dynamische lineare Abbildung – mathematische Basis umgesetzt, visueller
-   Stimulus offen:** `(x,y) -> (u,v)`, Schwenkbahn und Vergleich von linear,
-   Schoen und Merlitz als separates Punkt-/Gittermodul in Unity.
-6. **Vor Hauptstudie offen:** exakte Bedingungen und Wiederholungszahl mit der
+5. **Dynamischer Random-Dot-Test – Prototyp umgesetzt:** weltfestes Punktfeld,
+   reale oder simulierte Gierbewegung, Merlitz-`k`-Einstellung, Sweep-Kriterium
+   und vollstaendige Messdateien; Validierung am XR-4 ist offen.
+6. **Natuerliche Szene – offen:** dieselbe kontrollierte Abbildung nach der
+   Punktfeldvalidierung auf eine alltagsnahe 3D-Szene uebertragen.
+7. **Vor Hauptstudie offen:** exakte Bedingungen und Wiederholungszahl mit der
    Betreuung festlegen, Winkel/Fixation/Augenmaskierung am XR-4 messen,
    Test-Retest-Pilot durchfuehren und Ausschlussregeln einfrieren.
 
@@ -358,9 +415,9 @@ Stimulus neu zu schreiben.
 - Die EditMode-Tests pruefen die Vorwaerts-/Rueckabbildung fuer
   `k = 0, 0.5, 0.7, 1`, die Randnormierung und die exakte Verdopplung des
   physischen Durchmessers bei doppeltem Abstand.
-- Der aktuelle Stand enthaelt 30 EditMode-Testfaelle fuer Mathematik,
+- Der aktuelle Stand enthaelt 35 EditMode-Testfaelle fuer Mathematik,
   Skalierung, lineare 2D-Koordinaten, reproduzierbare Randomisierung,
-  Blickstrahltransformation und die technische Tastatursteuerung.
+  Blickstrahltransformation, Kopf-Sweep-Zaehler und technische Steuerung.
 - Runtime- und Testquellen sind fuer Unity `6000.5.6f1` ausgelegt.
 - Vor der Datenerhebung sind Shader, Augenmaskierung, Render-Pipeline und reale
   Winkelgroesse auf dem Laborrechner mit dem konkreten Headset zu validieren.
@@ -389,13 +446,14 @@ Stimulus neu zu schreiben.
 
 ```text
 Assets/GlobeEffect/
-  Demo/           startfertige Referenzszene
-  Editor/         reproduzierbarer Aufbau der Referenzszene
+  Demo/           getrennte Checkerboard- und Random-Dot-Referenzszenen
+  Editor/         reproduzierbarer Aufbau beider Referenzszenen
   Runtime/
     EyeTracking/  Provider, CSV-Aufzeichnung und Fixationskontrolle
     Experiment/   Trialplan, Sitzungssteuerung und Ergebnisdateien
+    RandomDots/   weltfestes Punktfeld, k-Bedienung und Sweep-Messung
     Scripts/      reine Mathematik, Stimulussteuerung, Integrations-API
-    Resources/    XR-faehiger analytischer Checkerboard-Shader
+    Resources/    XR-faehige Checkerboard- und Random-Dot-Shader
   Tests/EditMode/ Mathematik- und Skalierungstests
 Assets/XR/        versionierte Varjo-/XR-Management-Einstellungen und Loader
 Assets/XRI/       Einstellungen des XR Interaction Toolkit
