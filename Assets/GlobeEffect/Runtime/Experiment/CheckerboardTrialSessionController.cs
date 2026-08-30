@@ -138,6 +138,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public int CurrentTrialNumber => currentTrialNumber;
         public int TotalTrials => totalTrials;
         public string ActiveSessionFolder => activeSessionFolder;
+        public bool RequireFixationBeforeConfirmation =>
+            requireFixationBeforeConfirmation;
         public bool IsSessionActive =>
             sessionState == CheckerboardSessionState.InterTrial ||
             sessionState == CheckerboardSessionState.RunningTrial;

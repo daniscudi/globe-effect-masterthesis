@@ -47,10 +47,16 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         public bool CurrentSampleValid => currentSampleValid;
         public bool IsInsideTolerance => isInsideTolerance;
+        public FixationTargetState TargetState =>
+            FixationTargetStateResolver.Resolve(
+                currentSampleValid,
+                isInsideTolerance);
         public bool RequirementMet => currentSampleValid && isInsideTolerance &&
             continuousFixationSeconds >= requiredContinuousSeconds;
         public float CurrentAngleDegrees => currentAngleDegrees;
         public float ContinuousFixationSeconds => continuousFixationSeconds;
+        public float ToleranceDegrees => toleranceDegrees;
+        public float RequiredContinuousSeconds => requiredContinuousSeconds;
 
         private void OnEnable()
         {

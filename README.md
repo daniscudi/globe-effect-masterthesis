@@ -27,6 +27,8 @@ Versuchssteuerung und Eye-Tracking-Anbindung sind modular getrennt.
 - Dummy-Provider fuer Tests ohne Headset;
 - getrennte CSV-Dateien fuer Gaze- und Transformdaten sowie Ereignismarker;
 - Fixationskontrolle relativ zum aktuellen Checkerboard-Mittelpunkt;
+- gemeinsame Versuchsleiteranzeige mit `ON TARGET`, `OFF TARGET` und
+  `NO VALID GAZE` fuer beide Tests;
 - vollfaktorieller Trialplan mit reproduzierbarer Seed-Randomisierung;
 - automatische Sitzungsordner, Plan-, Antwort-, Gaze- und Head-CSV-Dateien;
 - Trialsteuerung fuer Start, k-Einstellung, Bestaetigung, Recenter und Abbruch;
@@ -337,6 +339,31 @@ kombinierte Strahl. Voreinstellung sind 3 Grad Toleranz und 0.3 Sekunden
 ununterbrochene Fixation. Diese Werte sind technische Startwerte und muessen
 vor der eigentlichen Studie als Teil des Versuchsprotokolls festgelegt werden.
 
+### Versuchsleiteranzeige
+
+Das Editorfenster `Experiment Monitor` verwendet in beiden Demoszenen
+automatisch den jeweils vorhandenen Fixationsmonitor. Es erscheint beim Start
+des Play Mode, ohne der Game View den Tastaturfokus zu nehmen. Alternativ kann
+es ueber `Tools > Globe Effect > Open Experiment Monitor` geoeffnet werden.
+
+Die grosse Statusflaeche unterscheidet drei Zustaende:
+
+- `ON TARGET`: gueltiges Gaze-Sample innerhalb der Winkeltoleranz;
+- `OFF TARGET`: gueltiges Sample, aber Blick ausserhalb der Toleranz;
+- `NO VALID GAZE`: kein verwertbares aktuelles Eye-Tracking-Sample.
+
+Darunter stehen Blickabweichung, Toleranz, kontinuierliche Fixationsdauer,
+Trial, aktuelles `k` und der Status der Antwortfreigabe. Beim Random-Dot-Test
+werden zusaetzlich Gierwinkel und abgeschlossene Kopfseitenwechsel angezeigt.
+Da es ein reines Unity-Editorfenster ist, erscheint diese Information nur auf
+dem Kontrollmonitor und nicht im XR-Bild der Versuchsperson.
+
+Die automatische Oeffnung kann ueber
+`Tools > Globe Effect > Auto Open Experiment Monitor on Play` ein- oder
+ausgeschaltet werden. `Require Fixation Before Confirmation` bleibt davon
+getrennt: Ist dieser Inspector-Haken deaktiviert, wird Fixation angezeigt und
+gespeichert, blockiert `Enter` aber nicht.
+
 ## Laufzeit-Anbindung
 
 Die zentrale Komponente stellt unter anderem bereit:
@@ -415,7 +442,7 @@ Stimulus neu zu schreiben.
 - Die EditMode-Tests pruefen die Vorwaerts-/Rueckabbildung fuer
   `k = 0, 0.5, 0.7, 1`, die Randnormierung und die exakte Verdopplung des
   physischen Durchmessers bei doppeltem Abstand.
-- Der aktuelle Stand enthaelt 35 EditMode-Testfaelle fuer Mathematik,
+- Der aktuelle Stand enthaelt 39 EditMode-Testfaelle fuer Mathematik,
   Skalierung, lineare 2D-Koordinaten, reproduzierbare Randomisierung,
   Blickstrahltransformation, Kopf-Sweep-Zaehler und technische Steuerung.
 - Runtime- und Testquellen sind fuer Unity `6000.5.6f1` ausgelegt.

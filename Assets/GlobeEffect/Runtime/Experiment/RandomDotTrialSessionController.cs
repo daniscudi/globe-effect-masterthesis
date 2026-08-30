@@ -147,7 +147,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public RandomDotSessionState SessionState => sessionState;
         public RandomDotTrial CurrentTrial => currentTrial;
+        public int CurrentTrialNumber => currentTrialNumber;
+        public int TotalTrials => totalTrials;
         public string ActiveSessionFolder => activeSessionFolder;
+        public bool RequireHeadSweepsBeforeConfirmation =>
+            requireHeadSweepsBeforeConfirmation;
+        public bool RequireFixationBeforeConfirmation =>
+            requireFixationBeforeConfirmation;
         public bool IsSessionActive =>
             sessionState == RandomDotSessionState.InterTrial ||
             sessionState == RandomDotSessionState.RunningTrial;
