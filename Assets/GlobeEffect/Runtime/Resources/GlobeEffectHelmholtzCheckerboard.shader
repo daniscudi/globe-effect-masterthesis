@@ -7,6 +7,7 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
         _FixationBackgroundColor ("Fixation Background", Color) = (0.5, 0.5, 0.5, 1)
         _FixationColor ("Fixation Color", Color) = (1, 0, 0, 1)
         _ApparentHalfAngleRad ("Apparent Half Angle [rad]", Float) = 0.785398
+        _ApertureEdgeSoftnessRad ("Aperture Edge Softness [rad]", Float) = 0.0174533
         _VisualSpaceL ("Visual-space l", Range(0, 1.4)) = 0.5
         _ChecksAcrossDiameter ("Checks Across Diameter", Float) = 16
         _CheckerboardEnabled ("Checkerboard Enabled", Float) = 1
@@ -21,10 +22,11 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
 
     SubShader
     {
-        Tags { "RenderType" = "Opaque" "Queue" = "Overlay" }
+        Tags { "RenderType" = "Transparent" "Queue" = "Overlay" }
         Cull Off
         ZWrite Off
         ZTest Always
+        Blend SrcAlpha OneMinusSrcAlpha
 
         Pass
         {
@@ -55,6 +57,7 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
             fixed4 _FixationBackgroundColor;
             fixed4 _FixationColor;
             float _ApparentHalfAngleRad;
+            float _ApertureEdgeSoftnessRad;
             float _VisualSpaceL;
             float _ChecksAcrossDiameter;
             float _CheckerboardEnabled;
@@ -125,13 +128,32 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
                 float2 displayPosition = input.uv * 2.0 - 1.0;
                 float displayRadius = length(displayPosition);
 
-                // Die kreisrunde Blende ist getrennt von der Verzerrung. l kann
-                // dadurch unverändert bleiben, wenn im Inspector nur das FOV
-                // geändert wird.
-                clip(1.0 - displayRadius);
-
                 float tangentAtBoundary = tan(_ApparentHalfAngleRad);
                 float visualAngle = atan(displayRadius * tangentAtBoundary);
+
+                // Das Gitter wird weiterhin auf einem quadratischen Träger
+                // berechnet. Diese unabhängige Kreisblende entscheidet erst
+                // danach, welcher Teil davon sichtbar ist. Die Softness gibt
+                // an, über wie viele Winkelgrad der Rand nach innen ausblendet.
+                float apertureAlpha;
+                if (_ApertureEdgeSoftnessRad <= 1e-6)
+                {
+                    apertureAlpha = step(
+                        visualAngle,
+                        _ApparentHalfAngleRad);
+                }
+                else
+                {
+                    float fadeStart = max(
+                        0.0,
+                        _ApparentHalfAngleRad - _ApertureEdgeSoftnessRad);
+                    apertureAlpha = 1.0 - smoothstep(
+                        fadeStart,
+                        _ApparentHalfAngleRad,
+                        visualAngle);
+                }
+                clip(apertureAlpha - 0.001);
+
                 float sourceRadius;
                 if (_VisualSpaceL < 1e-6)
                 {
@@ -176,7 +198,9 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
                 float fixationMask = saturate(verticalBar + horizontalBar)
                     * step(0.5, _FixationEnabled);
 
-                return lerp(color, _FixationColor, fixationMask);
+                fixed4 finalColor = lerp(color, _FixationColor, fixationMask);
+                finalColor.a *= apertureAlpha;
+                return finalColor;
             }
             ENDCG
         }

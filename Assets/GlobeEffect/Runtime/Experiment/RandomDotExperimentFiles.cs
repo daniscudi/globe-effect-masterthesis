@@ -7,11 +7,14 @@ using System.Text;
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
     /// <summary>
-    /// Schreibt Plan und Antworten des Random-Dot-Tests getrennt von den
-    /// hochfrequenten Gaze-/Head-Dateien der Lab-Toolbox.
+    /// Schreibt den vorab randomisierten Plan und jede tatsächliche
+    /// Random-Dot-Präsentation. Die hochfrequenten Blickdaten bleiben in den
+    /// Dateien der vorhandenen Lab-Toolbox.
     /// </summary>
     public sealed class RandomDotExperimentFiles
     {
+        public const string MappingVersion = "merlitz-instrument-k-directional-v1";
+
         private static readonly UTF8Encoding Utf8WithoutBom = new(false);
 
         private readonly string participantId;
@@ -49,23 +52,30 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             DateTime sessionStartUtc,
             int randomSeed)
         {
+            if (string.IsNullOrWhiteSpace(outputRoot))
+            {
+                throw new ArgumentException(
+                    "Ein Ausgabeverzeichnis ist erforderlich.",
+                    nameof(outputRoot));
+            }
+
             string safeParticipant = CheckerboardExperimentFiles.SanitizeIdentifier(
                 participantId,
                 "pilot");
             string safeSession = CheckerboardExperimentFiles.SanitizeIdentifier(
                 sessionLabel,
                 "random_dot");
-            string participantFolder = Path.Combine(outputRoot, safeParticipant);
-            Directory.CreateDirectory(participantFolder);
-
-            string timestamp = sessionStartUtc.ToString(
+            string timestamp = sessionStartUtc.ToLocalTime().ToString(
                 "yyyyMMdd_HHmmss",
                 CultureInfo.InvariantCulture);
-            string folderStem = safeSession + "_" + timestamp;
+            string participantFolder = Path.Combine(
+                Path.GetFullPath(outputRoot),
+                safeParticipant);
+            Directory.CreateDirectory(participantFolder);
+
+            string folderStem = timestamp + "_" + safeSession;
             string sessionFolder = Path.Combine(participantFolder, folderStem);
             int suffix = 1;
-            // Falls zwei Sitzungen dieselbe Sekundenangabe besitzen, verhindert
-            // der Suffix ein Überschreiben der ersten Messung.
             while (Directory.Exists(sessionFolder))
             {
                 sessionFolder = Path.Combine(
@@ -87,14 +97,17 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public void WritePlan(IReadOnlyList<RandomDotTrial> trials)
         {
-            // Der vollständige randomisierte Plan wird vor der Messung gesichert.
-            // Dot-Seed und Bedingungsnummer sind damit unabhängig rekonstruierbar.
+            if (trials == null)
+            {
+                throw new ArgumentNullException(nameof(trials));
+            }
+
             var builder = new StringBuilder(2048);
             builder.AppendLine(
-                "participant_id,session_label,session_start_utc,random_seed," +
-                "sequence_index,total_trials,condition_index,repetition," +
+                "participant_id,session_label,session_start_utc,random_seed,mapping_version," +
+                "sequence_index,total_planned_trials,condition_index,repetition," +
                 "eye_presentation,angular_diameter_deg,magnification," +
-                "motion_mode,starting_k,dot_seed");
+                "motion_mode,stimulus_k,sweep_direction,dot_seed");
 
             foreach (RandomDotTrial trial in trials)
             {
@@ -107,7 +120,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 AppendFloat(builder, trial.AngularDiameterDegrees);
                 AppendFloat(builder, trial.Magnification);
                 AppendCsv(builder, trial.MotionMode.ToString());
-                AppendFloat(builder, trial.StartingK);
+                AppendFloat(builder, trial.StimulusK);
+                AppendCsv(builder, trial.SweepDirection.ToString());
                 AppendInteger(builder, trial.DotSeed, terminateRow: true);
             }
 
@@ -115,42 +129,53 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             WriteTrialHeader();
         }
 
-        public void AppendResult(RandomDotTrialResult result, int totalTrials)
+        public void AppendResult(RandomDotTrialResult result, int plannedTrials)
         {
-            // Pro abgeschlossenem Trial wird genau eine Zeile geschrieben. Neben
-            // der Antwort enthält sie Bewegungsumfang, Sweep-Zahl und Fixationswerte.
-            var builder = new StringBuilder(1024);
+            if (result == null)
+            {
+                throw new ArgumentNullException(nameof(result));
+            }
+
+            var builder = new StringBuilder(1200);
             RandomDotTrial trial = result.Trial;
             AppendSessionPrefix(builder);
+            AppendInteger(builder, result.PresentationIndex);
             AppendInteger(builder, trial.SequenceIndex);
-            AppendInteger(builder, totalTrials);
+            AppendInteger(builder, plannedTrials);
             AppendInteger(builder, trial.ConditionIndex);
             AppendInteger(builder, trial.Repetition);
+            AppendInteger(builder, trial.AttemptNumber);
             AppendCsv(builder, result.TrialStartUtc.ToString("O", CultureInfo.InvariantCulture));
             AppendDouble(builder, result.TrialStartUnitySeconds);
-            AppendDouble(builder, result.TrialEndUnitySeconds);
+            AppendDouble(builder, result.StimulusEndUnitySeconds);
+            AppendDouble(builder, result.ResponseUnitySeconds);
+            AppendDouble(builder, result.StimulusDurationSeconds);
             AppendDouble(builder, result.ResponseTimeSeconds);
             AppendCsv(builder, trial.EyePresentation.ToString());
             AppendFloat(builder, trial.AngularDiameterDegrees);
+            AppendFloat(builder, result.ApertureEdgeSoftnessDegrees);
             AppendFloat(builder, trial.Magnification);
             AppendCsv(builder, trial.MotionMode.ToString());
-            AppendFloat(builder, trial.StartingK);
-            AppendFloat(builder, result.FinalK);
-            AppendInteger(builder, result.KAdjustmentCount);
-            AppendInteger(builder, result.RecenterCount);
-            AppendInteger(builder, trial.DotSeed);
-            AppendInteger(builder, result.DotCount);
-            AppendFloat(builder, result.WorldCoverageDiameterDegrees);
-            AppendFloat(builder, result.FieldRadiusMeters);
-            AppendFloat(builder, result.SweepThresholdDegrees);
+            AppendFloat(builder, trial.StimulusK);
+            AppendCsv(builder, trial.SweepDirection.ToString());
+            AppendFloat(builder, result.SweepAmplitudeDegrees);
+            AppendFloat(builder, result.SweepSpeedDegreesPerSecond);
             AppendInteger(builder, result.CompletedHalfSweeps);
             AppendFloat(builder, result.MinimumYawDegrees);
             AppendFloat(builder, result.MaximumYawDegrees);
+            AppendInteger(builder, trial.DotSeed);
+            AppendInteger(builder, result.DotCount);
+            AppendFloat(builder, result.WorldCoverageDiameterDegrees);
+            AppendFloat(builder, result.CarrierRadiusMeters);
+            AppendCsv(builder, result.Response.ToString());
+            AppendBoolean(builder, result.ValidForAnalysis);
             AppendBoolean(builder, result.FixationSampleValid);
             AppendBoolean(builder, result.FixationInsideTolerance);
-            AppendBoolean(builder, result.FixationRequirementMet);
             AppendFloat(builder, result.FixationAngleDegrees);
             AppendFloat(builder, result.ContinuousFixationSeconds);
+            AppendFloat(builder, result.FixationValidSampleFraction);
+            AppendFloat(builder, result.LongestOffTargetSeconds);
+            AppendFloat(builder, result.LongestInvalidGazeSeconds);
             AppendCsv(builder, result.Status, terminateRow: true);
             File.AppendAllText(TrialResultsFile, builder.ToString(), Utf8WithoutBom);
         }
@@ -158,17 +183,19 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private void WriteTrialHeader()
         {
             const string header =
-                "participant_id,session_label,session_start_utc,random_seed," +
-                "sequence_index,total_trials,condition_index,repetition," +
-                "trial_start_utc,trial_start_unity_s,trial_end_unity_s," +
-                "response_time_s,eye_presentation,angular_diameter_deg," +
-                "magnification,motion_mode,starting_k,final_k," +
-                "k_adjustment_count,recenter_count,dot_seed,dot_count," +
-                "world_coverage_diameter_deg,field_radius_m," +
-                "sweep_threshold_deg,completed_half_sweeps,min_yaw_deg,max_yaw_deg," +
-                "fixation_sample_valid,fixation_inside_tolerance," +
-                "fixation_requirement_met,fixation_angle_deg," +
-                "continuous_fixation_s,status";
+                "participant_id,session_label,session_start_utc,random_seed,mapping_version," +
+                "presentation_index,sequence_index,total_planned_trials," +
+                "condition_index,repetition,attempt_number,trial_start_utc," +
+                "trial_start_unity_s,stimulus_end_unity_s,response_unity_s," +
+                "stimulus_duration_s,response_time_s,eye_presentation," +
+                "angular_diameter_deg,aperture_edge_softness_deg,magnification," +
+                "motion_mode,stimulus_k,sweep_direction,sweep_amplitude_deg," +
+                "sweep_speed_deg_per_s,completed_half_sweeps,min_yaw_deg,max_yaw_deg," +
+                "dot_seed,dot_count,world_coverage_diameter_deg,carrier_radius_m," +
+                "response,valid_for_analysis,fixation_sample_valid," +
+                "fixation_inside_tolerance,fixation_angle_deg,continuous_fixation_s," +
+                "fixation_valid_sample_fraction,longest_off_target_s," +
+                "longest_invalid_gaze_s,status";
             File.WriteAllText(
                 TrialResultsFile,
                 header + Environment.NewLine,
@@ -181,6 +208,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             AppendCsv(builder, sessionLabel);
             AppendCsv(builder, sessionStartUtc.ToString("O", CultureInfo.InvariantCulture));
             AppendInteger(builder, randomSeed);
+            AppendCsv(builder, MappingVersion);
         }
 
         private static void AppendFloat(
@@ -220,9 +248,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             string value,
             bool terminateRow = false)
         {
-            // Felder werden nur dann in Anführungszeichen gesetzt, wenn CSV-Syntax
-            // oder ein Zeilenumbruch es erfordern. Eingebettete Anführungszeichen
-            // müssen nach CSV-Regel doppelt geschrieben werden.
             string safeValue = value ?? string.Empty;
             bool quote = safeValue.IndexOf(',') >= 0 ||
                 safeValue.IndexOf('"') >= 0 ||

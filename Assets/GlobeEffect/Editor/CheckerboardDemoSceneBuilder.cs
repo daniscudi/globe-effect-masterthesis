@@ -203,6 +203,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             // Trialplan wird am Session Controller im Inspector eingestellt.
             stimulus.Observer = observer;
             stimulus.SetAngularDiameter(90f);
+            stimulus.SetApertureEdgeSoftness(1f);
             stimulus.SetVisualSpaceL(0.5f);
             stimulus.SetEyePresentation(CheckerboardEyePresentation.BothEyes);
             stimulusObject.AddComponent<CheckerboardKeyboardController>();

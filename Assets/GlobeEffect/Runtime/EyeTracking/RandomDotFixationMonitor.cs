@@ -5,8 +5,8 @@ using UnityEngine;
 namespace GlobeEffect.VRCheckerboard.EyeTracking
 {
     /// <summary>
-    /// Prüft, ob der Blick beim Kopfschwenk auf dem weltfesten roten
-    /// Fixationspunkt des Random-Dot-Felds bleibt. Die Augenwahl folgt der
+    /// Prüft, ob der Blick während des automatisch bewegten Punktfelds auf dem
+    /// kopffesten roten Fixationskreuz bleibt. Die Augenwahl folgt der
     /// tatsächlichen mono-/binokularen Darbietung.
     /// </summary>
     [DisallowMultipleComponent]
@@ -39,7 +39,14 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         [SerializeField]
         private float continuousFixationSeconds;
 
+        [SerializeField]
+        private int validSampleCount;
+
+        [SerializeField]
+        private int totalSampleCount;
+
         private double previousSampleTime;
+        private double lastSampleRealtimeSeconds;
         private bool subscribed;
 
         public event Action<bool> FixationStateChanged;
@@ -56,6 +63,20 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         public float ContinuousFixationSeconds => continuousFixationSeconds;
         public float ToleranceDegrees => toleranceDegrees;
         public float RequiredContinuousSeconds => requiredContinuousSeconds;
+        public float ValidSampleFraction => totalSampleCount > 0
+            ? (float)validSampleCount / totalSampleCount
+            : 0f;
+
+        public bool HasRecentSample(float maximumAgeSeconds)
+        {
+            if (lastSampleRealtimeSeconds <= 0d)
+            {
+                return false;
+            }
+
+            return Time.realtimeSinceStartupAsDouble - lastSampleRealtimeSeconds <=
+                Mathf.Max(0f, maximumAgeSeconds);
+        }
 
         private void OnEnable()
         {
@@ -94,10 +115,15 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
             currentAngleDegrees = float.NaN;
             continuousFixationSeconds = 0f;
             previousSampleTime = 0d;
+            lastSampleRealtimeSeconds = 0d;
+            validSampleCount = 0;
+            totalSampleCount = 0;
         }
 
         private void HandleGazeData(GazeData gazeData)
         {
+            lastSampleRealtimeSeconds = Time.realtimeSinceStartupAsDouble;
+            totalSampleCount++;
             bool previousState = isInsideTolerance;
             if (stimulus == null || !TrySelectGazeRay(gazeData, out Ray gazeRay))
             {
@@ -119,6 +145,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
             }
 
             currentSampleValid = true;
+            validSampleCount++;
             currentAngleDegrees = Vector3.Angle(
                 gazeRay.direction,
                 targetDirection);

@@ -14,6 +14,7 @@ namespace GlobeEffect.VRCheckerboard
         public bool visible;
         public bool checkerboardVisible;
         public float angularDiameterDegrees;
+        public float apertureEdgeSoftnessDegrees;
         public float visualSpaceL;
         public int checksAcrossDiameter;
         public CheckerboardEyePresentation eyePresentation;

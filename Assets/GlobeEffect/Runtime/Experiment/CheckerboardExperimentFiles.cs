@@ -14,6 +14,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public DateTime TrialStartUtc { get; }
         public double TrialStartUnitySeconds { get; }
         public double TrialEndUnitySeconds { get; }
+        public float ApertureEdgeSoftnessDegrees { get; }
         public CheckerboardCurvatureResponse Response { get; }
         public bool ValidForAnalysis { get; }
         public bool FixationSampleValid { get; }
@@ -34,6 +35,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             DateTime trialStartUtc,
             double trialStartUnitySeconds,
             double trialEndUnitySeconds,
+            float apertureEdgeSoftnessDegrees,
             CheckerboardCurvatureResponse response,
             bool validForAnalysis,
             bool fixationSampleValid,
@@ -50,6 +52,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             TrialStartUtc = trialStartUtc;
             TrialStartUnitySeconds = trialStartUnitySeconds;
             TrialEndUnitySeconds = trialEndUnitySeconds;
+            ApertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees;
             Response = response;
             ValidForAnalysis = validForAnalysis;
             FixationSampleValid = fixationSampleValid;
@@ -205,6 +208,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             AppendDouble(builder, result.ResponseTimeSeconds);
             AppendCsv(builder, trial.EyePresentation.ToString());
             AppendFloat(builder, trial.AngularDiameterDegrees);
+            AppendFloat(builder, result.ApertureEdgeSoftnessDegrees);
             AppendFloat(builder, trial.VisualSpaceL);
             AppendDouble(
                 builder,
@@ -256,7 +260,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "presentation_index,sequence_index,total_planned_trials," +
                 "condition_index,repetition,attempt_number,trial_start_utc," +
                 "trial_start_unity_s,trial_end_unity_s,response_time_s," +
-                "eye_presentation,angular_diameter_deg,visual_space_l," +
+                "eye_presentation,angular_diameter_deg,aperture_edge_softness_deg,visual_space_l," +
                 "oomes_endpoint_equivalent,response," +
                 "valid_for_analysis,fixation_sample_valid," +
                 "fixation_inside_tolerance,fixation_angle_deg," +

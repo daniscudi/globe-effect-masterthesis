@@ -5,9 +5,9 @@ using UnityEngine.InputSystem;
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
-    /// Technische und experimentelle Tastaturbedienung des Punktfelds. Die
-    /// Trialsteuerung hört nur auf die Ereignisse und bleibt dadurch später
-    /// problemlos durch Controller-Eingaben oder eine UI ersetzbar.
+    /// Nimmt die beiden Antworten des Random-Dot-Tests entgegen. k wird vor dem
+    /// Trial von der Sitzungssteuerung gesetzt und kann von der Versuchsperson
+    /// nicht verändert werden.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(RandomDotFieldStimulus))]
@@ -15,27 +15,25 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     {
         [Header("Tastensteuerung")]
         [SerializeField]
-        private Key recenterKey = Key.R;
+        [Tooltip("Antwort: Die Bewegung beziehungsweise Fläche wirkt konkav.")]
+        private Key concaveKey = Key.LeftArrow;
 
         [SerializeField]
-        private Key decreaseKKey = Key.LeftArrow;
+        [Tooltip("Antwort: Die Bewegung beziehungsweise Fläche wirkt konvex.")]
+        private Key convexKey = Key.RightArrow;
 
         [SerializeField]
-        private Key increaseKKey = Key.RightArrow;
-
-        [SerializeField, Range(0.001f, 0.1f)]
-        [Tooltip("Änderung pro Tastendruck; Shift verfünffacht die Schrittweite.")]
-        private float kStep = 0.01f;
+        [Tooltip("Vertauscht die Bedeutung der beiden Tasten zwischen Versuchspersonen.")]
+        private bool swapResponseKeys;
 
         [SerializeField]
-        private bool logChanges = true;
+        private bool logResponses;
 
         private RandomDotFieldStimulus stimulus;
 
-        public event Action<float, float> KChanged;
-        public event Action Recentered;
+        public event Action<CheckerboardCurvatureResponse> ResponseSubmitted;
 
-        public float KStep => kStep;
+        public bool SwapResponseKeys => swapResponseKeys;
 
         private void Awake()
         {
@@ -50,61 +48,39 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 return;
             }
 
-            if (keyboard[recenterKey].wasPressedThisFrame)
+            if (keyboard[concaveKey].wasPressedThisFrame)
             {
-                Recenter();
+                SubmitResponse(swapResponseKeys
+                    ? CheckerboardCurvatureResponse.Convex
+                    : CheckerboardCurvatureResponse.Concave);
             }
 
-            float step = IsShiftPressed(keyboard) ? kStep * 5f : kStep;
-            if (keyboard[decreaseKKey].wasPressedThisFrame)
+            if (keyboard[convexKey].wasPressedThisFrame)
             {
-                ChangeK(-step);
-            }
-
-            if (keyboard[increaseKKey].wasPressedThisFrame)
-            {
-                ChangeK(step);
+                SubmitResponse(swapResponseKeys
+                    ? CheckerboardCurvatureResponse.Concave
+                    : CheckerboardCurvatureResponse.Convex);
             }
         }
 
-        public void ChangeK(float delta)
+        public void SetSwapResponseKeys(bool value)
         {
-            EnsureStimulus();
-            float previous = stimulus.MerlitzK;
-            stimulus.SetMerlitzK(previous + delta);
-            KChanged?.Invoke(previous, stimulus.MerlitzK);
+            swapResponseKeys = value;
+        }
 
-            if (logChanges)
+        public void SubmitResponse(CheckerboardCurvatureResponse response)
+        {
+            if (response == CheckerboardCurvatureResponse.None)
             {
-                Debug.Log($"Random-Dot-Feld: k = {stimulus.MerlitzK:F3}", stimulus);
+                return;
             }
-        }
 
-        public void Recenter()
-        {
-            EnsureStimulus();
-            stimulus.PlaceAroundObserver();
-            Recentered?.Invoke();
-
-            if (logChanges)
+            ResponseSubmitted?.Invoke(response);
+            if (logResponses)
             {
-                Debug.Log("Random-Dot-Feld an aktueller Kopfpose neu verankert.", stimulus);
+                stimulus ??= GetComponent<RandomDotFieldStimulus>();
+                Debug.Log("Random-Dot-Antwort: " + response, stimulus);
             }
-        }
-
-        private void EnsureStimulus()
-        {
-            stimulus ??= GetComponent<RandomDotFieldStimulus>();
-        }
-
-        private static bool IsShiftPressed(Keyboard keyboard)
-        {
-            return keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed;
-        }
-
-        private void OnValidate()
-        {
-            kStep = Mathf.Clamp(kStep, 0.001f, 0.1f);
         }
     }
 }

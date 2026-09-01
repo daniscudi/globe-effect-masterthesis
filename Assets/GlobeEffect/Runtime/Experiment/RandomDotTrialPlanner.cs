@@ -5,87 +5,78 @@ using GlobeEffect.VRCheckerboard.RandomDots;
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
     /// <summary>
-    /// Erzeugt und randomisiert vollständige Random-Dot-Bedingungen. Die
-    /// Punkt-Seeds hängen von Bedingung und Wiederholung ab, nicht von der
-    /// später gemischten Reihenfolge.
+    /// Erzeugt den Random-Dot-Plan nach der Methode konstanter Reize. Jeder
+    /// vorgegebene k-Wert kommt gleich oft vor. Die Person stellt nichts ein,
+    /// sondern erhält nach jeder Bewegung eine Konkav-/Konvex-Entscheidung.
     /// </summary>
     public static class RandomDotTrialPlanner
     {
         public static IReadOnlyList<RandomDotTrial> CreateRandomizedPlan(
             IReadOnlyList<float> angularDiametersDegrees,
             IReadOnlyList<CheckerboardEyePresentation> eyePresentations,
-            IReadOnlyList<float> startingKValues,
+            IReadOnlyList<float> stimulusKValues,
             IReadOnlyList<float> magnifications,
             IReadOnlyList<RandomDotMotionMode> motionModes,
             int repetitions,
             int randomSeed,
             int dotSeedBase)
         {
-            RequireNonEmpty(angularDiametersDegrees, nameof(angularDiametersDegrees));
-            RequireNonEmpty(eyePresentations, nameof(eyePresentations));
-            RequireNonEmpty(startingKValues, nameof(startingKValues));
-            RequireNonEmpty(magnifications, nameof(magnifications));
-            RequireNonEmpty(motionModes, nameof(motionModes));
-            if (repetitions < 1)
-            {
-                throw new ArgumentOutOfRangeException(nameof(repetitions));
-            }
-
-            foreach (float value in angularDiametersDegrees)
-            {
-                if (value < 5f || value > 170f)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(angularDiametersDegrees));
-                }
-            }
-
-            foreach (float value in startingKValues)
-            {
-                if (value < 0f || value > 1f)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(startingKValues));
-                }
-            }
-
-            foreach (float value in magnifications)
-            {
-                if (value <= 0f)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(magnifications));
-                }
-            }
+            ValidateValues(
+                angularDiametersDegrees,
+                eyePresentations,
+                stimulusKValues,
+                magnifications,
+                motionModes,
+                repetitions);
 
             var trials = new List<RandomDotTrial>();
             int conditionIndex = 0;
-            // Jede Kombination aus FOV, Auge, Start-k, Vergrößerung und Bewegung
-            // wird für jede Wiederholung genau einmal angelegt.
+            int contextIndex = 0;
+
             foreach (float angularDiameter in angularDiametersDegrees)
             {
                 foreach (CheckerboardEyePresentation eye in eyePresentations)
                 {
-                    foreach (float startingK in startingKValues)
+                    foreach (float magnification in magnifications)
                     {
-                        foreach (float magnification in magnifications)
+                        foreach (RandomDotMotionMode motionMode in motionModes)
                         {
-                            foreach (RandomDotMotionMode motionMode in motionModes)
+                            contextIndex++;
+                            int directionOffset = unchecked(
+                                randomSeed + contextIndex * 7919) & 1;
+
+                            foreach (float stimulusK in stimulusKValues)
                             {
                                 conditionIndex++;
-                                for (int repetition = 1; repetition <= repetitions; repetition++)
+                                for (int repetition = 1;
+                                    repetition <= repetitions;
+                                    repetition++)
                                 {
+                                    // Derselbe Repetition-Seed wird bei allen
+                                    // k-Werten wiederverwendet. So ist keine
+                                    // bestimmte Punktverteilung mit nur einem k
+                                    // verknüpft. Die spätere Reihenfolge bleibt
+                                    // trotzdem vollständig randomisiert.
                                     int dotSeed = unchecked(
-                                        dotSeedBase + conditionIndex * 1009 + repetition * 9176);
-                                    // Der Punkt-Seed hängt von der fachlichen Bedingung
-                                    // ab und ändert sich daher nicht durch die Mischung.
+                                        dotSeedBase +
+                                        contextIndex * 1009 +
+                                        repetition * 9176);
+                                    bool rightFirst = ((repetition + directionOffset) & 1) == 0;
+
                                     trials.Add(new RandomDotTrial(
                                         sequenceIndex: 0,
-                                        conditionIndex,
-                                        repetition,
-                                        angularDiameter,
-                                        eye,
-                                        startingK,
-                                        magnification,
-                                        motionMode,
-                                        dotSeed));
+                                        conditionIndex: conditionIndex,
+                                        repetition: repetition,
+                                        attemptNumber: 1,
+                                        angularDiameterDegrees: angularDiameter,
+                                        eyePresentation: eye,
+                                        stimulusK: stimulusK,
+                                        magnification: magnification,
+                                        motionMode: motionMode,
+                                        sweepDirection: rightFirst
+                                            ? RandomDotSweepDirection.RightFirst
+                                            : RandomDotSweepDirection.LeftFirst,
+                                        dotSeed: dotSeed));
                                 }
                             }
                         }
@@ -94,7 +85,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             var random = new Random(randomSeed);
-            // Reproduzierbare Fisher-Yates-Mischung der vollständigen Trials.
             for (int index = trials.Count - 1; index > 0; index--)
             {
                 int swapIndex = random.Next(index + 1);
@@ -108,6 +98,50 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             return trials;
+        }
+
+        private static void ValidateValues(
+            IReadOnlyList<float> angularDiametersDegrees,
+            IReadOnlyList<CheckerboardEyePresentation> eyePresentations,
+            IReadOnlyList<float> stimulusKValues,
+            IReadOnlyList<float> magnifications,
+            IReadOnlyList<RandomDotMotionMode> motionModes,
+            int repetitions)
+        {
+            RequireNonEmpty(angularDiametersDegrees, nameof(angularDiametersDegrees));
+            RequireNonEmpty(eyePresentations, nameof(eyePresentations));
+            RequireNonEmpty(stimulusKValues, nameof(stimulusKValues));
+            RequireNonEmpty(magnifications, nameof(magnifications));
+            RequireNonEmpty(motionModes, nameof(motionModes));
+
+            if (repetitions < 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(repetitions));
+            }
+
+            foreach (float value in angularDiametersDegrees)
+            {
+                if (value < 5f || value > 170f)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(angularDiametersDegrees));
+                }
+            }
+
+            foreach (float value in stimulusKValues)
+            {
+                if (value < 0f || value > 1f)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(stimulusKValues));
+                }
+            }
+
+            foreach (float value in magnifications)
+            {
+                if (value <= 0f)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(magnifications));
+                }
+            }
         }
 
         private static void RequireNonEmpty<T>(IReadOnlyCollection<T> values, string name)

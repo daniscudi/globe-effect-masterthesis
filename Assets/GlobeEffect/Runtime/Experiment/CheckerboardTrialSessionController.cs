@@ -594,6 +594,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 trialStartUtc,
                 trialStartUnitySeconds,
                 Time.realtimeSinceStartupAsDouble,
+                stimulus.ApertureEdgeSoftnessDegrees,
                 response,
                 validForAnalysis,
                 sampleValid,
@@ -766,14 +767,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             eyeTrackingToolbox?.WriteMessage(message);
         }
 
-        private static string BuildTrialStartMarker(
+        private string BuildTrialStartMarker(
             CheckerboardTrial trial,
             int presentationIndex)
         {
             return string.Format(
                 CultureInfo.InvariantCulture,
                 "TrialStart;presentation={0};sequence={1};condition={2};repetition={3};" +
-                "attempt={4};eye={5};fov_deg={6:F3};visual_space_l={7:F4}",
+                "attempt={4};eye={5};fov_deg={6:F3};edge_softness_deg={7:F3};visual_space_l={8:F4}",
                 presentationIndex,
                 trial.SequenceIndex,
                 trial.ConditionIndex,
@@ -781,6 +782,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 trial.AttemptNumber,
                 trial.EyePresentation,
                 trial.AngularDiameterDegrees,
+                stimulus.ApertureEdgeSoftnessDegrees,
                 trial.VisualSpaceL);
         }
 

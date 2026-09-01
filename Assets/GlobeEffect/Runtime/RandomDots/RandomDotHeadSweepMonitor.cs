@@ -4,9 +4,10 @@ using UnityEngine;
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
-    /// Misst horizontale Kopfbewegungen relativ zur Trial-Startpose. Im
-    /// simulierten Debug-Modus wird stattdessen der technische Shader-Schwenk
-    /// ausgewertet. Dadurch bleibt die Trialsteuerung für beide Modi gleich.
+    /// Protokolliert den horizontalen Bewegungsverlauf. In der kontrollierten
+    /// SimulatedYaw-Bedingung wird der Shader-Schwenk ausgewertet. Im optionalen
+    /// HeadTracked-Modus wird stattdessen die Kopfbewegung relativ zur Startpose
+    /// gemessen.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RandomDotHeadSweepMonitor : MonoBehaviour
@@ -18,13 +19,13 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [SerializeField]
         private RandomDotFieldStimulus stimulus;
 
-        [Header("Schwenkkriterium")]
+        [Header("Bewegungsprotokoll")]
         [SerializeField, Range(0.5f, 45f)]
         [Tooltip("Gierwinkel je Seite, ab dem eine linke/rechte Extremposition gilt.")]
         private float yawThresholdDegrees = 2.5f;
 
         [SerializeField, Range(1, 20)]
-        [Tooltip("Erforderliche Wechsel zwischen den beiden Seiten vor der Antwort.")]
+        [Tooltip("Referenzwert für technische Kontrollen; die Antwort wird im festen Trialablauf nicht davon blockiert.")]
         private int requiredHalfSweeps = 4;
 
         [Header("Laufzeitstatus")]

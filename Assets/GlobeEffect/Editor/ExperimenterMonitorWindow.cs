@@ -243,13 +243,21 @@ namespace GlobeEffect.VRCheckerboard.Editor
                         ? sweepMonitor.CurrentYawDegrees.ToString("F2", CultureInfo.InvariantCulture) + "°"
                         : "–");
                 EditorGUILayout.LabelField(
-                    "Kopfseitenwechsel",
+                    "Bewegungswechsel",
                     sweepMonitor != null
-                        ? $"{sweepMonitor.CompletedHalfSweeps} / {sweepMonitor.RequiredHalfSweeps}"
+                        ? sweepMonitor.CompletedHalfSweeps.ToString(
+                            CultureInfo.InvariantCulture)
                         : "–");
-                DrawConfirmationGate(
-                    randomDotSession != null &&
-                    randomDotSession.RequireFixationBeforeConfirmation);
+                EditorGUILayout.LabelField(
+                    "Antwort",
+                    randomDotSession != null && randomDotSession.ResponseKeysSwapped
+                        ? "← konvex   |   konkav →"
+                        : "← konkav   |   konvex →");
+                EditorGUILayout.LabelField(
+                    "Fixationsbruch",
+                    randomDotSession != null && randomDotSession.RequireFixation
+                        ? "Trial ungültig, Wiederholung hinten"
+                        : "Kontrolle ausgeschaltet");
             }
         }
 
@@ -311,13 +319,6 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 GUILayout.ExpandWidth(true));
             EditorGUI.DrawRect(statusRect, backgroundColor);
             GUI.Label(statusRect, label, statusStyle);
-        }
-
-        private static void DrawConfirmationGate(bool enabled)
-        {
-            EditorGUILayout.LabelField(
-                "Fixation blockiert Enter",
-                enabled ? "JA" : "NEIN – nur Protokollierung");
         }
 
         private static string FormatTrial(int current, int total)

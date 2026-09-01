@@ -3,8 +3,10 @@ using System;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Hier steht die Merlitz-Gleichung, die wir für das Checkerboard und das
-    /// Random-Dot-Feld verwenden. Die Gleichung stammt aus Merlitz
+    /// Hier steht die Merlitz-Gleichung, die wir für das dynamische
+    /// Random-Dot-Feld und die zugehörigen Vergleichsrechnungen verwenden. Der
+    /// statische Checkerboard-Test besitzt inzwischen eine getrennte
+    /// Visual-Space-l-Abbildung. Die Gleichung stammt aus Merlitz
     /// (JOSA A 27, 50-57, 2010):
     ///
     ///     tan(k a) = m tan(k A)
@@ -14,8 +16,8 @@ namespace GlobeEffect.VRCheckerboard
     /// Nähe der Bildmitte. k bestimmt, wie sich die Abbildung zum Rand hin
     /// verhält. Für k = 0 wird der Grenzfall a = m A verwendet.
     ///
-    /// In dieser Datei steht nur die Mathematik. Position, Größe und Material
-    /// des Unity-Objekts werden in VrCheckerboardStimulus gesteuert.
+    /// In dieser Datei steht nur die Mathematik. Position, Bewegung und Material
+    /// des Punktfelds werden in RandomDotFieldStimulus gesteuert.
     /// </summary>
     public static class MerlitzCheckerboardMath
     {
@@ -46,9 +48,8 @@ namespace GlobeEffect.VRCheckerboard
 
         /// <summary>
         /// Rückwärtsrichtung der Gleichung: Zu einem bereits sichtbaren Winkel a
-        /// wird der ursprüngliche Objektwinkel A gesucht. Das Checkerboard nutzt
-        /// diese Richtung, weil der Shader für jeden fertigen Pixel wissen muss,
-        /// welche Stelle des geraden Ausgangsmusters dort hingehört.
+        /// wird der ursprüngliche Objektwinkel A gesucht. Diese Richtung wird
+        /// noch für mathematische Vergleiche und Plot-Abbildungen verwendet.
         /// </summary>
         public static double ObjectAngleFromApparent(
             double apparentAngleRadians,

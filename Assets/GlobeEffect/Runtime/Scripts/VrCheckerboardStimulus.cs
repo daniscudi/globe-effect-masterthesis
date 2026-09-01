@@ -29,6 +29,10 @@ namespace GlobeEffect.VRCheckerboard
         [Tooltip("Winkeldurchmesser der kreisrunden Blende. 90 bedeutet 90 Grad von Rand zu Rand.")]
         private float angularDiameterDegrees = 90f;
 
+        [SerializeField, Range(0f, 10f)]
+        [Tooltip("Breite des weichen Übergangs am inneren Rand der Kreisblende. 0 ergibt eine harte Kante.")]
+        private float apertureEdgeSoftnessDegrees = 1f;
+
         [Header("Visual-Space-/Helmholtz-Gitter")]
         [SerializeField, Range(0f, 1.4f)]
         [Tooltip("l = 1 zeigt ein gerades Gitter, l = 0,5 den Helmholtz-Endpunkt. Kleinere Werte setzen die kissenförmige, Werte über 1 die tonnenförmige Richtung fort.")]
@@ -97,6 +101,7 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         public float AngularDiameterDegrees => angularDiameterDegrees;
+        public float ApertureEdgeSoftnessDegrees => apertureEdgeSoftnessDegrees;
         public float VisualSpaceL => visualSpaceL;
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
         public bool IsVisible => isVisible;
@@ -173,6 +178,13 @@ namespace GlobeEffect.VRCheckerboard
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
+        public void SetApertureEdgeSoftness(float value)
+        {
+            apertureEdgeSoftnessDegrees = Mathf.Clamp(value, 0f, 10f);
+            ApplyMaterialProperties();
+            ParametersChanged?.Invoke(CaptureSnapshot());
+        }
+
         public void SetVisualSpaceL(float value)
         {
             visualSpaceL = Mathf.Clamp(value, 0f, 1.4f);
@@ -224,6 +236,7 @@ namespace GlobeEffect.VRCheckerboard
                 visible = isVisible,
                 checkerboardVisible = checkerboardVisible,
                 angularDiameterDegrees = angularDiameterDegrees,
+                apertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees,
                 visualSpaceL = visualSpaceL,
                 checksAcrossDiameter = checksAcrossDiameter,
                 eyePresentation = eyePresentation
@@ -262,6 +275,8 @@ namespace GlobeEffect.VRCheckerboard
             meshRenderer.GetPropertyBlock(propertyBlock);
             propertyBlock.SetFloat("_ApparentHalfAngleRad",
                 0.5f * angularDiameterDegrees * Mathf.Deg2Rad);
+            propertyBlock.SetFloat("_ApertureEdgeSoftnessRad",
+                apertureEdgeSoftnessDegrees * Mathf.Deg2Rad);
             propertyBlock.SetFloat("_VisualSpaceL", visualSpaceL);
             propertyBlock.SetFloat("_ChecksAcrossDiameter", checksAcrossDiameter);
             propertyBlock.SetColor("_DarkColor", darkColor);
@@ -380,6 +395,10 @@ namespace GlobeEffect.VRCheckerboard
         private void ValidateSerializedFields()
         {
             angularDiameterDegrees = Mathf.Clamp(angularDiameterDegrees, 1f, 170f);
+            apertureEdgeSoftnessDegrees = Mathf.Clamp(
+                apertureEdgeSoftnessDegrees,
+                0f,
+                10f);
             visualSpaceL = Mathf.Clamp(visualSpaceL, 0f, 1.4f);
             checksAcrossDiameter = Mathf.Clamp(checksAcrossDiameter, 2, 80);
             fixationTargetSizeDegrees = Mathf.Clamp(fixationTargetSizeDegrees, 0.05f, 5f);

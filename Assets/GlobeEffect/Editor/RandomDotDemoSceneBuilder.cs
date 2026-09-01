@@ -93,8 +93,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
             try
             {
-                // Der Sweep-Monitor sitzt direkt am Punktfeld, verwendet aber die
-                // getrackte Kamera als Kopfpose. Eye Tracking bleibt ein eigenes Modul.
+                // Der Sweep-Monitor sitzt direkt am Punktfeld. In der
+                // Hauptbedingung protokolliert er die simulierte Bewegung; die
+                // Kamera braucht er nur für den optionalen HeadTracked-Modus.
                 Camera camera = CreateXrOrigin();
                 RandomDotFieldStimulus stimulus = CreateStimulus(camera.transform);
                 RandomDotHeadSweepMonitor sweepMonitor =
@@ -205,11 +206,13 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 stimulusObject.AddComponent<RandomDotFieldStimulus>();
             stimulus.Observer = observer;
             stimulus.SetAngularDiameter(70f);
+            stimulus.SetApertureEdgeSoftness(1f);
             stimulus.SetMagnification(10f);
             stimulus.SetMerlitzK(0.7f);
             stimulus.SetEyePresentation(CheckerboardEyePresentation.BothEyes);
-            stimulus.SetMotionMode(RandomDotMotionMode.HeadTracked);
-            stimulus.SetSimulatedSweep(4f, 0.5f);
+            stimulus.SetMotionMode(RandomDotMotionMode.SimulatedYaw);
+            stimulus.SetSimulatedSweep(5f, 5f);
+            stimulus.SetSweepDirection(RandomDotSweepDirection.RightFirst);
             stimulus.ConfigurePointField(4000, 20260828, 20f);
             stimulus.PlaceAroundObserver();
             stimulusObject.AddComponent<RandomDotKeyboardController>();

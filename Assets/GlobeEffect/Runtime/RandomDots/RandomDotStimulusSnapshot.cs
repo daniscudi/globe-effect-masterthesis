@@ -12,7 +12,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     {
         public double timestampSeconds;
         public bool visible;
+        public bool pointsVisible;
         public float angularDiameterDegrees;
+        public float apertureEdgeSoftnessDegrees;
         public float fieldRadiusMeters;
         public float worldCoverageDiameterDegrees;
         public int dotCount;
@@ -21,6 +23,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public float magnification;
         public CheckerboardEyePresentation eyePresentation;
         public RandomDotMotionMode motionMode;
+        public RandomDotSweepDirection sweepDirection;
+        public float sweepAmplitudeDegrees;
+        public float sweepSpeedDegreesPerSecond;
         public float simulatedYawDegrees;
     }
 }

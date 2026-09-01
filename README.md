@@ -1,10 +1,9 @@
 # Globe Effect – Masterarbeit
 
 In diesem Unity-Projekt entsteht der Versuchsaufbau für meine Masterarbeit zum
-Globe Effect. Der aktuelle Schwerpunkt ist ein statischer Checkerboard-Test in
-VR, der sich an Helmholtz und Oomes et al. (2009) orientiert. Der spätere
-Random-Dot- und Bewegungsteil liegt weiterhin im Projekt, ist aber vom
-statischen Checkerboard getrennt.
+Globe Effect. Der statische Checkerboard-Test orientiert sich an Helmholtz und
+Oomes et al. (2009). Daneben gibt es einen getrennten Random-Dot-Test für die
+Wahrnehmung während einer simulierten Schwenkbewegung.
 
 ## Was der Checkerboard-Test macht
 
@@ -23,6 +22,26 @@ Der Test kann beidäugig, nur links oder nur rechts gezeigt werden. Die
 gewünschten Bedingungen werden am `Checkerboard Trial Session` im Inspector
 eingestellt.
 
+## Was der Random-Dot-Test macht
+
+Die Versuchsperson fixiert ein rotes Kreuz in der Mitte einer runden Öffnung.
+Schwarze und weiße Punkte bewegen sich dahinter automatisch von links nach
+rechts und wieder zurück. Die Öffnung und das Fixationskreuz bleiben dabei
+kopffest. Eine tatsächliche Kopfbewegung ist für die Hauptbedingung nicht nötig.
+
+Vor jedem Durchgang setzt Unity einen festen Merlitz-Parameter `k`. Dieser Wert
+wird nicht angezeigt und kann von der Versuchsperson nicht verändert werden.
+Nach der festgelegten Bewegungsdauer verschwindet das Punktfeld und es folgt
+wieder nur die Entscheidung:
+
+- Pfeil links: Die Bewegung beziehungsweise Fläche wirkt konkav.
+- Pfeil rechts: Die Bewegung beziehungsweise Fläche wirkt konvex.
+
+Aus `P(konvex | k)` kann später der Übergang bestimmt werden, an dem konkav und
+konvex gleich häufig geantwortet werden. Dieser dynamische `k`-PSE kann mit dem
+PSE des statischen `l`-Tests verglichen werden. Er wird aber nicht automatisch
+als derselbe Parameter bezeichnet.
+
 ## Warum der statische Test jetzt l verwendet
 
 Im ersten Prototyp wurde die Instrumentengleichung von Merlitz benutzt:
@@ -31,10 +50,12 @@ Im ersten Prototyp wurde die Instrumentengleichung von Merlitz benutzt:
 tan(k · a) = m · tan(k · A)
 ```
 
-Hier beschreibt `k` die Abbildung eines optischen Instruments und hängt mit der
-Vergrößerung `m` zusammen. Das ist für den späteren Fernglas- und Bewegungsteil
-wichtig. Beim statischen Checkerboard ohne Fernglas wäre diese Kopplung aber
-unnötig und schwer zu erklären.
+Hier beschreibt `k` die Form der Abbildung eines optischen Instruments. `m` ist
+daneben ein eigener, unabhängiger Parameter. Beide stehen in derselben
+Gleichung, aber `k` wird nicht aus `m` berechnet und verändert sich nicht, wenn
+nur die Vergrößerung geändert wird. Die sichtbare Wirkung eines festen `k` kann
+sich mit `m` trotzdem ändern. Beim statischen Checkerboard ohne simuliertes
+Fernglas wären `m` und diese Instrumentengleichung unnötig.
 
 Merlitz führt zusätzlich den Parameter `l` für eine radiale Abbildung des
 visuellen Raums ein:
@@ -102,6 +123,24 @@ visual-space-l-tangent-normalized-v1
 
 Sie wird in jeder Plan- und Trialdatei mitgeschrieben.
 
+## Runde Öffnung und weicher Rand
+
+Das Checkerboard wird intern weiterhin als quadratisches Muster berechnet. Eine
+davon getrennte Kreisblende entscheidet erst danach, welcher Ausschnitt davon
+sichtbar ist. Dadurch kann das FOV geändert werden, ohne gleichzeitig die
+Verzerrungsformel umzudefinieren.
+
+Am `Checkerboard Stimulus` und am `Random Dot Field` gibt es den Wert
+`Aperture Edge Softness Degrees`:
+
+- `0`: harter, klar abgeschnittener Rand
+- kleiner positiver Wert: kurzer transparenter Übergang
+- größerer Wert: breiterer weicher Verlauf nach innen
+
+Die Angabe erfolgt in Winkelgrad und nicht in Pixeln. Dadurch bleibt die
+Randbreite auch bei anderer Auflösung oder auf der XR-4 vergleichbar. Für den
+ersten technischen Test ist `1°` eingetragen.
+
 ## Verhältnis zur α-Skala von Oomes
 
 Oomes et al. verwendeten eine Skala von `α = -0,8` bis `α = 2`. Dabei gilt:
@@ -145,6 +184,12 @@ Der Stimulus verhält sich damit wie ein Objekt in virtueller Unendlichkeit bzw.
 ohne Nahdisparität. Die Akkommodationsentfernung bleibt trotzdem durch die Optik
 der Varjo XR-4 vorgegeben und wird durch Unity nicht tatsächlich unendlich.
 
+Das Random-Dot-Feld verwendet inzwischen dasselbe Richtungsprinzip. Sein
+`Field Radius Meters` ist nur noch die technische Größe des erzeugten Meshes und
+keine wahrgenommene Entfernung. Das zentrale Kreuz bleibt unverzerrt und
+unbewegt, während ausschließlich die Punkte durch die simulierte Schwenkung
+laufen.
+
 ## Ablauf eines Durchgangs
 
 1. Auf neutralem Hintergrund erscheint zunächst nur das Fixationskreuz.
@@ -175,6 +220,11 @@ stattdessen eine Obergrenze.
 - Pfeil rechts: konvex
 - `C`: Eye-Tracking-Kalibrierung der vorhandenen Toolbox
 
+Beim Random-Dot-Test werden die Pfeiltasten erst angenommen, nachdem die
+Bewegungsphase beendet und das Punktfeld ausgeblendet wurde. Das frühere
+Verändern von `k` mit den Pfeiltasten und die Bestätigung mit Enter gehören
+nicht mehr zum Versuchsablauf.
+
 Am `Checkerboard Keyboard Controller` kann `Swap Response Keys` aktiviert
 werden. Dadurch lässt sich die Bedeutung der beiden Pfeiltasten zwischen
 Versuchspersonen ausbalancieren. Der Experimenter Monitor zeigt automatisch die
@@ -200,16 +250,36 @@ technischen Pilotlauf gedacht. Sie sind noch keine festgelegten Bedingungen der
 Masterarbeit. Die Listen können im Inspector vollständig geändert werden, ohne
 den Code anzupassen.
 
-Am Objekt `Checkerboard Stimulus` werden Aussehen, Felderzahl, Farben und Größe
-des Fixationskreuzes eingestellt. Während einer Sitzung setzt die Trialsteuerung
-FOV, `l` und Augenmodus automatisch.
+Am Objekt `Checkerboard Stimulus` werden Aussehen, Felderzahl, Farben, Größe des
+Fixationskreuzes und die weiche Blendenkante eingestellt. Während einer Sitzung
+setzt die Trialsteuerung FOV, `l` und Augenmodus automatisch.
+
+Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
+`Random Dot Trial Session`:
+
+- `Stimulus K Values`: alle fest vorgegebenen k-Werte
+- `Repetitions Per Condition`: Wiederholungen jeder Kombination
+- `Motion Duration Seconds`: sichtbare Dauer der Bewegung
+- `Sweep Amplitude Degrees`: Schwenkweite je Seite
+- `Sweep Speed Degrees Per Second`: Winkelgeschwindigkeit
+- `Motion Modes`: für den Haupttest `Simulated Yaw`
+- `Eye Presentations`: beide, nur linkes oder nur rechtes Auge
+- Fixations- und Wiederholungsgrenzen wie beim Checkerboard
+
+Die Richtung des ersten Schwenks wird über die Wiederholungen möglichst gleich
+auf links und rechts verteilt. Die Reihenfolge wird anschließend mit dem Seed
+gemischt. Gleiche Wiederholungen verschiedener `k`-Stufen verwenden
+vergleichbare Punkt-Seeds, damit nicht eine bestimmte Punktverteilung nur mit
+einem einzigen `k` verbunden ist.
 
 ## Eye Tracking und Messdateien
 
 Die Eye-Tracking-Toolbox aus dem Lab bleibt die Grundlage der Rohdaten. Ihre
 vorhandenen Blickspalten mit Augenstatus, Pupillendurchmesser, Ursprung und
-Blickrichtung werden weiterhin geschrieben. Im Toolbox-Code wurde für diesen
-Test nur der Stimulusmarker auf `visual_space_l`, FOV und Augenmodus angepasst.
+Blickrichtung werden weiterhin geschrieben. Im Toolbox-Code wurde für den
+Checkerboard-Test nur der Stimulusmarker um `visual_space_l`, FOV, Augenmodus
+und die Breite der Blendenkante ergänzt. Der Random-Dot-Ablauf schreibt seine
+Trialmarker über dieselbe vorhandene Nachrichtenfunktion.
 
 Pro Sitzung entsteht ein eigener Ordner unter
 `Application.persistentDataPath/Measurements`, sofern im Inspector kein anderer
@@ -233,6 +303,16 @@ In `*_trials.csv` stehen unter anderem:
 
 Marker wie `TrialStart`, `TrialResponse`, `TrialInvalid` und
 `TrialRepeatQueued` verbinden den Versuchsablauf zeitlich mit den Rohdaten.
+
+Beim Random-Dot-Test werden zusätzlich unter anderem festgehalten:
+
+- der vorgegebene Wert `stimulus_k`
+- Schwenkrichtung, Amplitude und Geschwindigkeit
+- Bewegungsdauer und Reaktionszeit nach dem Ausblenden
+- Dot-Seed und Punktanzahl
+- Breite der weichen Blendenkante
+- Antwort konkav/konvex und `valid_for_analysis`
+- Fixationswerte und Grund einer ungültigen Wiederholung
 
 ## Varjo- und Unity-Einstellungen
 
@@ -259,6 +339,13 @@ Falls sie neu aufgebaut werden soll:
 Tools → Globe Effect → Create or Reset Demo Scene
 ```
 
+Die Random-Dot-Szene wird über folgenden Menüpunkt erstellt beziehungsweise
+zurückgesetzt:
+
+```text
+Tools → Globe Effect → Create or Reset Random Dot Demo Scene
+```
+
 Für einen reinen visuellen Test am Laptop kann die Szene auch ohne Headset im
 Play Mode geöffnet werden. Das Muster folgt dann der normalen `Main Camera`. Um
 einen kompletten Tastaturdurchlauf ohne gültige Eye-Tracking-Daten zu testen,
@@ -271,19 +358,28 @@ und darf bei einer Messung nicht ausgeschaltet bleiben.
 ```text
 Assets/GlobeEffect/
 ├── Demo/
-│   └── CheckerboardDemo.unity
+│   ├── CheckerboardDemo.unity
+│   └── RandomDotMotionDemo.unity
 ├── Runtime/
 │   ├── Scripts/
 │   │   ├── VisualSpaceRadialMapping.cs
 │   │   ├── VrCheckerboardStimulus.cs
 │   │   └── CheckerboardKeyboardController.cs
 │   ├── Resources/
-│   │   └── GlobeEffectHelmholtzCheckerboard.shader
+│   │   ├── GlobeEffectHelmholtzCheckerboard.shader
+│   │   └── GlobeEffectMerlitzRandomDots.shader
 │   ├── Experiment/
 │   │   ├── CheckerboardTrialPlanner.cs
 │   │   ├── CheckerboardTrialQueue.cs
 │   │   ├── CheckerboardTrialSessionController.cs
-│   │   └── CheckerboardExperimentFiles.cs
+│   │   ├── CheckerboardExperimentFiles.cs
+│   │   ├── RandomDotTrialPlanner.cs
+│   │   ├── RandomDotTrialQueue.cs
+│   │   └── RandomDotTrialSessionController.cs
+│   ├── RandomDots/
+│   │   ├── RandomDotFieldStimulus.cs
+│   │   ├── RandomDotSimulatedSweep.cs
+│   │   └── RandomDotKeyboardController.cs
 │   └── EyeTracking/
 │       └── CheckerboardFixationMonitor.cs
 ├── Editor/
@@ -298,25 +394,27 @@ Assets/GlobeEffect/
 `VisualSpaceRadialMapping.cs` enthält die C#-Referenzrechnung. Der Shader führt
 dieselbe Abbildung für jeden sichtbaren Pixel aus.
 
-## Abgrenzung zum Random-Dot- und Bewegungsteil
+## Trennung der beiden Tests
 
-Die Dateien `MerlitzCheckerboardMath.cs`, `GlobeEffectCoordinateMapping2D.cs`
-und die Random-Dot-Szene bleiben im Projekt. Dort spielen Vergrößerung,
-Instrumentenabbildung, Bewegung und der Merlitz-Parameter `k` weiterhin eine
-Rolle. Diese Fragen sollen nicht unbemerkt in den statischen Checkerboard-Test
-hineinrutschen.
+Im Random-Dot-Teil spielen Vergrößerung, Instrumentenabbildung, Bewegung und der
+Merlitz-Parameter `k` eine Rolle. Diese Fragen sollen nicht unbemerkt in den
+statischen Checkerboard-Test hineinrutschen. Umgekehrt wird im Bewegungstest
+kein zusätzliches angenommenes Visual-Space-`l` in das Bild eingerechnet: Die
+Wahrnehmung stammt dort von der echten Versuchsperson.
 
 Kurz gesagt:
 
 - Statisches Checkerboard: Visual-Space-`l`, feste Reize,
   konkav/konvex und head-locked.
-- Bewegungs- und Random-Dot-Teil: Instrumentenmodell mit `k`, Vergrößerung und
-  mögliche Globe-Effect-Fragestellungen.
+- Random-Dot-Teil: feste `k`-Reize, kontrollierte Bewegung,
+  konkav/konvex und ein dynamischer PSE.
 
 ## Noch offen
 
 - Die endgültigen `l`-Stufen und die Wiederholungszahl werden mit dem Betreuer
   festgelegt.
+- Dasselbe gilt für `k`-Stufen, Schwenkweite, Geschwindigkeit und Dauer des
+  Random-Dot-Tests. Die aktuellen Werte sind Pilotwerte.
 - Es muss entschieden werden, welche Augenbedingungen Teil des Hauptversuchs
   werden.
 - Shader, Monokularmaskierung und Darstellung ohne Nahdisparität müssen auf der

@@ -5,15 +5,14 @@ using UnityEngine.Rendering;
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
-    /// Erzeugt ein Schwarz-Weiß-Punktfeld auf einer gekrümmten Fläche um die
-    /// Startposition der Versuchsperson. Mit demselben Seed entstehen jedes Mal
-    /// dieselben Punktpositionen und Farben.
+    /// Erzeugt ein Schwarz-Weiß-Punktfeld, dessen Punkte wie Richtungen in großer
+    /// Entfernung gerendert werden. Dadurch entsteht zwischen linkem und rechtem
+    /// Auge keine künstliche Konvergenz auf eine nahe Unity-Fläche.
     ///
-    /// Im echten HeadTracked-Modus bleiben die Punkte im Raum stehen. Die
-    /// sichtbare Bewegung entsteht nur dadurch, dass die Versuchsperson den Kopf
-    /// dreht. Der Shader verändert die Blickrichtungen mit derselben
-    /// Merlitz-Gleichung wie beim Checkerboard. Der Test mit Bewegung bleibt
-    /// trotzdem eine eigene Szene und eine eigene Aufgabe.
+    /// Im Hauptversuch folgt die runde Öffnung der HMD-Blickrichtung, während
+    /// Unity das Punktfeld kontrolliert nach links und rechts schwenkt. k bleibt
+    /// während einer Präsentation fest. Der optionale HeadTracked-Modus verankert
+    /// das Feld dagegen im Raum und bleibt nur für Vergleichstests erhalten.
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
@@ -33,8 +32,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [Tooltip("Kreisförmiger sichtbarer Winkeldurchmesser des Punktfelds.")]
         private float angularDiameterDegrees = 70f;
 
+        [SerializeField, Range(0f, 10f)]
+        [Tooltip("Breite des weichen Übergangs am inneren Rand der runden Öffnung. 0 ergibt eine harte Kante.")]
+        private float apertureEdgeSoftnessDegrees = 1f;
+
         [SerializeField, Min(MinimumRadiusMeters)]
-        [Tooltip("Radius der weltfesten Punktkappe um die Startposition in Metern.")]
+        [Tooltip("Technischer Radius des Trägermeshes. Der Shader rendert Richtungen, daher erzeugt dieser Wert keine wahrgenommene Betrachtungsentfernung.")]
         private float fieldRadiusMeters = 5f;
 
         [SerializeField, Range(20f, 170f)]
@@ -87,15 +90,20 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         [Header("Bewegung")]
         [SerializeField]
-        private RandomDotMotionMode motionMode = RandomDotMotionMode.HeadTracked;
+        private RandomDotMotionMode motionMode = RandomDotMotionMode.SimulatedYaw;
 
         [SerializeField, Range(0.1f, 30f)]
-        [Tooltip("Nur im Debug-Modus: maximale simulierte Gierbewegung je Seite.")]
-        private float simulatedYawAmplitudeDegrees = 3f;
+        [Tooltip("Maximaler simulierter Schwenkwinkel zu jeder Seite.")]
+        private float simulatedYawAmplitudeDegrees = 5f;
 
-        [SerializeField, Range(0.05f, 2f)]
-        [Tooltip("Nur im Debug-Modus: vollständige Links-Rechts-Zyklen pro Sekunde.")]
-        private float simulatedYawFrequencyHz = 0.5f;
+        [SerializeField, Range(0.1f, 60f)]
+        [Tooltip("Winkelgeschwindigkeit des simulierten Schwenks in Grad pro Sekunde.")]
+        private float simulatedYawSpeedDegreesPerSecond = 5f;
+
+        [SerializeField]
+        [Tooltip("Seite, zu der das Punktfeld nach dem Start zuerst läuft.")]
+        private RandomDotSweepDirection sweepDirection =
+            RandomDotSweepDirection.RightFirst;
 
         [Header("Darstellung und Technik")]
         [SerializeField]
@@ -111,6 +119,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private Material ownedMaterial;
         private MaterialPropertyBlock propertyBlock;
         private bool isVisible = true;
+        private bool pointsVisible = true;
         private double simulatedMotionStartSeconds;
 
         public event Action<RandomDotStimulusSnapshot> StimulusPresented;
@@ -128,6 +137,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         }
 
         public float AngularDiameterDegrees => angularDiameterDegrees;
+        public float ApertureEdgeSoftnessDegrees => apertureEdgeSoftnessDegrees;
         public float FieldRadiusMeters => fieldRadiusMeters;
         public float WorldCoverageDiameterDegrees => worldCoverageDiameterDegrees;
         public int DotCount => dotCount;
@@ -136,7 +146,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public float Magnification => magnification;
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
         public RandomDotMotionMode MotionMode => motionMode;
+        public RandomDotSweepDirection SweepDirection => sweepDirection;
+        public float SweepAmplitudeDegrees => simulatedYawAmplitudeDegrees;
+        public float SweepSpeedDegreesPerSecond =>
+            simulatedYawSpeedDegreesPerSecond;
         public bool IsVisible => isVisible;
+        public bool ArePointsVisible => isVisible && pointsVisible;
 
         /// <summary>
         /// Momentaner technischer Schwenkwinkel. Bei realer Kopfbewegung ist
@@ -154,19 +169,21 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
                 double elapsed = Time.realtimeSinceStartupAsDouble -
                     simulatedMotionStartSeconds;
-                double phase = 2.0 * Math.PI * simulatedYawFrequencyHz * elapsed;
-                return simulatedYawAmplitudeDegrees * (float)Math.Sin(phase);
+                return RandomDotSimulatedSweep.EvaluateYawDegrees(
+                    elapsed,
+                    simulatedYawAmplitudeDegrees,
+                    simulatedYawSpeedDegreesPerSecond,
+                    sweepDirection);
             }
         }
 
-        public Vector3 FixationWorldPosition => transform.TransformPoint(
-            Vector3.forward * fieldRadiusMeters);
+        public Vector3 FixationWorldPosition => observer != null
+            ? observer.position + observer.forward * fieldRadiusMeters
+            : transform.position + transform.forward * fieldRadiusMeters;
 
         /// <summary>
-        /// Berechnet den tatsächlich auf dem Display dargestellten Strahl zum
-        /// Fixationspunkt. Bei einem verzerrten, seitlich liegenden Weltpunkt
-        /// unterscheidet er sich bewusst vom geometrischen Strahl zum Punkt.
-        /// Eye-Tracking muss gegen diese dargestellte Richtung geprüft werden.
+        /// Das Fixationskreuz ist eine eigene, unverzerrte Ebene des Shaders. Es
+        /// bleibt in der Mitte, während sich ausschließlich die Punkte bewegen.
         /// </summary>
         public bool TryGetRenderedFixationWorldDirection(
             Vector3 gazeOriginWorld,
@@ -178,55 +195,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 return false;
             }
 
-            Vector3 worldVector = FixationWorldPosition - gazeOriginWorld;
-            if (worldVector.sqrMagnitude <= 1e-8f)
-            {
-                return false;
-            }
-
-            Vector3 localDirection = observer.InverseTransformDirection(
-                worldVector.normalized);
-            if (motionMode == RandomDotMotionMode.SimulatedYaw)
-            {
-                localDirection = Quaternion.Euler(
-                    0f,
-                    -CurrentSimulatedYawDegrees,
-                    0f) * localDirection;
-            }
-
-            if (localDirection.z <= 1e-6f)
-            {
-                return false;
-            }
-
-            Vector2 objectPosition = new Vector2(
-                localDirection.x / localDirection.z,
-                localDirection.y / localDirection.z);
-            float objectRadius = objectPosition.magnitude;
-            if (objectRadius <= 1e-7f)
-            {
-                renderedDirectionWorld = observer.forward;
-                return true;
-            }
-
-            double objectAngle = Math.Atan(objectRadius);
-            double apparentAngle = MerlitzCheckerboardMath.ApparentAngleFromObject(
-                objectAngle,
-                magnification,
-                merlitzK);
-            if (apparentAngle >= Math.PI / 2.0 - 0.01)
-            {
-                return false;
-            }
-
-            Vector2 displayedPosition = objectPosition.normalized *
-                (float)Math.Tan(apparentAngle);
-            Vector3 displayedLocalDirection = new Vector3(
-                displayedPosition.x,
-                displayedPosition.y,
-                1f).normalized;
-            renderedDirectionWorld = observer.TransformDirection(
-                displayedLocalDirection).normalized;
+            renderedDirectionWorld = observer.forward.normalized;
             return true;
         }
 
@@ -238,9 +207,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         private void OnEnable()
         {
+            Application.onBeforeRender -= HandleBeforeRender;
+            Application.onBeforeRender += HandleBeforeRender;
             ValidateSerializedFields();
             EnsureResources(rebuildMesh: true);
             isVisible = Application.isPlaying ? visibleAtStart : true;
+            pointsVisible = true;
             simulatedMotionStartSeconds = Time.realtimeSinceStartupAsDouble;
             if (observer != null)
             {
@@ -266,15 +238,28 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         private void LateUpdate()
         {
+            FollowObserverInSimulatedMode();
             ApplyFrameProperties();
+        }
+
+        private void OnDisable()
+        {
+            Application.onBeforeRender -= HandleBeforeRender;
         }
 
         private void OnDestroy()
         {
+            Application.onBeforeRender -= HandleBeforeRender;
             DestroyOwnedObject(ownedMesh);
             DestroyOwnedObject(ownedMaterial);
             ownedMesh = null;
             ownedMaterial = null;
+        }
+
+        private void HandleBeforeRender()
+        {
+            FollowObserverInSimulatedMode();
+            ApplyFrameProperties();
         }
 
         public void SetMerlitzK(float value)
@@ -298,6 +283,13 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
+        public void SetApertureEdgeSoftness(float value)
+        {
+            apertureEdgeSoftnessDegrees = Mathf.Clamp(value, 0f, 10f);
+            ApplyMaterialProperties();
+            ParametersChanged?.Invoke(CaptureSnapshot());
+        }
+
         public void SetEyePresentation(CheckerboardEyePresentation value)
         {
             eyePresentation = value;
@@ -313,10 +305,22 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
-        public void SetSimulatedSweep(float amplitudeDegrees, float frequencyHz)
+        public void SetSimulatedSweep(
+            float amplitudeDegrees,
+            float speedDegreesPerSecond)
         {
             simulatedYawAmplitudeDegrees = Mathf.Clamp(amplitudeDegrees, 0.1f, 30f);
-            simulatedYawFrequencyHz = Mathf.Clamp(frequencyHz, 0.05f, 2f);
+            simulatedYawSpeedDegreesPerSecond = Mathf.Clamp(
+                speedDegreesPerSecond,
+                0.1f,
+                60f);
+            RestartMotionPhase();
+            ParametersChanged?.Invoke(CaptureSnapshot());
+        }
+
+        public void SetSweepDirection(RandomDotSweepDirection value)
+        {
+            sweepDirection = value;
             RestartMotionPhase();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
@@ -337,8 +341,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         }
 
         /// <summary>
-        /// Verankert das Feld an der aktuellen Kopfposition und -richtung.
-        /// Danach folgt es dem Kopf nicht mehr.
+        /// Verankert das Feld an der aktuellen Kopfposition und -richtung. Im
+        /// SimulatedYaw-Modus wird diese Pose danach in jedem Renderframe
+        /// aktualisiert; im HeadTracked-Modus bleibt sie stehen.
         /// </summary>
         public void PlaceAroundObserver()
         {
@@ -354,6 +359,18 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             ApplyFrameProperties();
         }
 
+        private void FollowObserverInSimulatedMode()
+        {
+            if (observer == null || motionMode != RandomDotMotionMode.SimulatedYaw)
+            {
+                return;
+            }
+
+            transform.SetPositionAndRotation(
+                observer.position,
+                Quaternion.LookRotation(observer.forward, observer.up));
+        }
+
         public void RestartMotionPhase()
         {
             simulatedMotionStartSeconds = Time.realtimeSinceStartupAsDouble;
@@ -362,8 +379,22 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public void Show()
         {
             isVisible = true;
+            pointsVisible = true;
+            ApplyMaterialProperties();
             ApplyVisibility();
             StimulusPresented?.Invoke(CaptureSnapshot());
+        }
+
+        /// <summary>
+        /// Zeigt vor dem Trial nur das zentrale Fixationskreuz. Das Punktmuster
+        /// und damit auch der noch nicht präsentierte k-Wert bleiben verborgen.
+        /// </summary>
+        public void ShowFixationOnly()
+        {
+            isVisible = true;
+            pointsVisible = false;
+            ApplyMaterialProperties();
+            ApplyVisibility();
         }
 
         public void Hide()
@@ -379,7 +410,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             {
                 timestampSeconds = Time.realtimeSinceStartupAsDouble,
                 visible = isVisible,
+                pointsVisible = pointsVisible,
                 angularDiameterDegrees = angularDiameterDegrees,
+                apertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees,
                 fieldRadiusMeters = fieldRadiusMeters,
                 worldCoverageDiameterDegrees = worldCoverageDiameterDegrees,
                 dotCount = dotCount,
@@ -388,6 +421,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 magnification = magnification,
                 eyePresentation = eyePresentation,
                 motionMode = motionMode,
+                sweepDirection = sweepDirection,
+                sweepAmplitudeDegrees = simulatedYawAmplitudeDegrees,
+                sweepSpeedDegreesPerSecond = simulatedYawSpeedDegreesPerSecond,
                 simulatedYawDegrees = CurrentSimulatedYawDegrees
             };
         }
@@ -471,6 +507,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                     dotIndex,
                     direction,
                     1f,
+                    false,
                     color,
                     vertices,
                     uv,
@@ -485,6 +522,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                     dotCount,
                     Vector3.forward,
                     fixationTargetSizeDegrees / dotAngularDiameterDegrees,
+                    true,
                     fixationColor,
                     vertices,
                     uv,
@@ -514,6 +552,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             int dotIndex,
             Vector3 direction,
             float sizeMultiplier,
+            bool isFixationTarget,
             Color color,
             Vector3[] vertices,
             Vector2[] uv,
@@ -535,7 +574,11 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             uv[vertexIndex + 1] = new Vector2(1f, -1f);
             uv[vertexIndex + 2] = new Vector2(1f, 1f);
             uv[vertexIndex + 3] = new Vector2(-1f, 1f);
-            Vector2 sizeData = new Vector2(sizeMultiplier, 0f);
+            // uv2.y unterscheidet das zentrale Fixationskreuz von den Punkten.
+            // Der Shader lässt dieses Element unverzerrt in der Mitte stehen.
+            Vector2 sizeData = new Vector2(
+                sizeMultiplier,
+                isFixationTarget ? 1f : 0f);
             uv2[vertexIndex] = sizeData;
             uv2[vertexIndex + 1] = sizeData;
             uv2[vertexIndex + 2] = sizeData;
@@ -567,9 +610,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             meshRenderer.GetPropertyBlock(propertyBlock);
             propertyBlock.SetFloat("_ApertureHalfAngleRad",
                 0.5f * angularDiameterDegrees * Mathf.Deg2Rad);
+            propertyBlock.SetFloat("_ApertureEdgeSoftnessRad",
+                apertureEdgeSoftnessDegrees * Mathf.Deg2Rad);
             propertyBlock.SetFloat("_MerlitzK", merlitzK);
             propertyBlock.SetFloat("_Magnification", magnification);
             propertyBlock.SetFloat("_EyeMode", (float)eyePresentation);
+            propertyBlock.SetFloat("_DotsEnabled", pointsVisible ? 1f : 0f);
             propertyBlock.SetFloat("_DotHalfSizeRad",
                 0.5f * dotAngularDiameterDegrees * Mathf.Deg2Rad);
             meshRenderer.SetPropertyBlock(propertyBlock);
@@ -608,6 +654,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private void ValidateSerializedFields()
         {
             angularDiameterDegrees = Mathf.Clamp(angularDiameterDegrees, 5f, 170f);
+            apertureEdgeSoftnessDegrees = Mathf.Clamp(
+                apertureEdgeSoftnessDegrees,
+                0f,
+                10f);
             fieldRadiusMeters = Mathf.Max(MinimumRadiusMeters, fieldRadiusMeters);
             worldCoverageDiameterDegrees = Mathf.Clamp(
                 worldCoverageDiameterDegrees,
@@ -623,7 +673,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 simulatedYawAmplitudeDegrees,
                 0.1f,
                 30f);
-            simulatedYawFrequencyHz = Mathf.Clamp(simulatedYawFrequencyHz, 0.05f, 2f);
+            simulatedYawSpeedDegreesPerSecond = Mathf.Clamp(
+                simulatedYawSpeedDegreesPerSecond,
+                0.1f,
+                60f);
         }
 
         private static void DestroyOwnedObject(UnityEngine.Object ownedObject)
