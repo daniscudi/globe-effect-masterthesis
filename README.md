@@ -5,6 +5,8 @@ Globe Effect. Der statische Checkerboard-Test orientiert sich an Helmholtz und
 Oomes et al. (2009). Daneben gibt es einen getrennten Random-Dot-Test für die
 Wahrnehmung während einer simulierten Schwenkbewegung.
 
+Eine kurze Bedienungs- und Arbeitsübersicht steht in `AKTUELLER_STAND.md`.
+
 ## Was der Checkerboard-Test macht
 
 Die Versuchsperson sieht ein kreisrundes Schachbrett mit einem roten
@@ -44,7 +46,7 @@ als derselbe Parameter bezeichnet.
 
 ## Warum der statische Test jetzt l verwendet
 
-Im ersten Prototyp wurde die Instrumentengleichung von Merlitz benutzt:
+In der ersten Version wurde die Instrumentengleichung von Merlitz benutzt:
 
 ```text
 tan(k · a) = m · tan(k · A)

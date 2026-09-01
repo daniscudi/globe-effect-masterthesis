@@ -14,7 +14,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 {
     /// <summary>
     /// Zentrale Eye-Tracking-Toolbox nach dem Aufbau der Lab-Version.
-    /// Sie waehlt den Provider, transformiert HMD-lokale Rays in Weltkoordinaten
+    /// Sie wählt den Provider, transformiert HMD-lokale Rays in Weltkoordinaten
     /// und schreibt Blick- sowie Transformdaten in getrennte CSV-Dateien.
     /// </summary>
     [DisallowMultipleComponent]
@@ -237,7 +237,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
             if (Application.isPlaying && value != provider)
             {
                 Debug.LogWarning(
-                    "Eye-Tracking-Provider nur ausserhalb des Play Mode wechseln.",
+                    "Eye-Tracking-Provider nur außerhalb des Play Mode wechseln.",
                     this);
                 return;
             }
@@ -555,15 +555,23 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private static string BuildGazeHeader()
         {
-            return "unity_timestamp_s,device_timestamp_ns,frame_number," +
-                "tracking_status,combined_valid," +
-                "left_tracking_status,left_valid,left_eye_openness,left_pupil_diameter_mm," +
-                "left_origin_x,left_origin_y,left_origin_z,left_direction_x,left_direction_y,left_direction_z," +
-                "right_tracking_status,right_valid,right_eye_openness,right_pupil_diameter_mm," +
-                "right_origin_x,right_origin_y,right_origin_z,right_direction_x,right_direction_y,right_direction_z," +
-                "combined_origin_x,combined_origin_y,combined_origin_z," +
-                "combined_direction_x,combined_direction_y,combined_direction_z," +
-                "focus_distance_m,ipd_mm,message";
+            // Der erste Block behält bewusst die Spaltennamen und Reihenfolge
+            // aus dem PLACES-Projekt. Dadurch können vorhandene Lab-Skripte
+            // dieselben Blickspalten weiter einlesen. Auch "validata" bleibt
+            // deshalb so geschrieben, obwohl "validity" sprachlich richtiger
+            // wäre. Die für Varjo hilfreichen Zusatzwerte stehen erst danach.
+            return "unity_timestamp,eye_timestamp," +
+                "left_validata,left_eye_openness,left_eye_pupil_diameter," +
+                "left_eye_origin.x,left_eye_origin.y,left_eye_origin.z," +
+                "left_eye_gaze.x,left_eye_gaze.y,left_eye_gaze.z," +
+                "right_validata,right_eye_openness,right_eye_pupil_diameter," +
+                "right_eye_origin.x,right_eye_origin.y,right_eye_origin.z," +
+                "right_eye_gaze.x,right_eye_gaze.y,right_eye_gaze.z," +
+                "combined_eye_origin.x,combined_eye_origin.y,combined_eye_origin.z," +
+                "combined_eye_gaze.x,combined_eye_gaze.y,combined_eye_gaze.z," +
+                "gaze_distance," +
+                "frame_number,tracking_status,combined_validata," +
+                "left_tracking_status,right_tracking_status,ipd_mm,messages";
         }
 
         private static void AppendTrackedObjectHeader(
@@ -653,21 +661,19 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         {
             GazeData data = record.Data;
             var builder = new StringBuilder(640);
+
+            // Diese Reihenfolge gehört zum Header oben. Der PLACES-Block steht
+            // zuerst; zusätzliche Geräteinformationen folgen danach. So bleibt
+            // direkt erkennbar, welche Werte aus der Lab-Toolbox stammen.
             AppendDouble(builder, data.unityTimestamp);
             AppendLong(builder, data.deviceTimestamp);
-            AppendLong(builder, data.frameNumber);
-            AppendInt(builder, data.trackingStatus);
-            AppendBool(builder, data.combinedValidity);
-
-            AppendInt(builder, data.leftTrackingStatus);
-            AppendBool(builder, data.leftValidity);
+            AppendBoolText(builder, data.leftValidity);
             AppendFloat(builder, data.leftEyeOpenness);
             AppendFloat(builder, data.leftPupilDiameter);
             AppendVector3(builder, data.leftRayLocal.origin);
             AppendVector3(builder, data.leftRayLocal.direction);
 
-            AppendInt(builder, data.rightTrackingStatus);
-            AppendBool(builder, data.rightValidity);
+            AppendBoolText(builder, data.rightValidity);
             AppendFloat(builder, data.rightEyeOpenness);
             AppendFloat(builder, data.rightPupilDiameter);
             AppendVector3(builder, data.rightRayLocal.origin);
@@ -676,6 +682,12 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
             AppendVector3(builder, data.combinedRayLocal.origin);
             AppendVector3(builder, data.combinedRayLocal.direction);
             AppendFloat(builder, data.gazeDistance);
+
+            AppendLong(builder, data.frameNumber);
+            AppendInt(builder, data.trackingStatus);
+            AppendBoolText(builder, data.combinedValidity);
+            AppendInt(builder, data.leftTrackingStatus);
+            AppendInt(builder, data.rightTrackingStatus);
             AppendFloat(builder, data.interPupillaryDistanceMillimeters);
             AppendCsv(builder, record.Message, terminateRow: true);
             return builder.ToString();
@@ -873,9 +885,11 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
             builder.Append(value.ToString(CultureInfo.InvariantCulture)).Append(',');
         }
 
-        private static void AppendBool(StringBuilder builder, bool value)
+        private static void AppendBoolText(StringBuilder builder, bool value)
         {
-            builder.Append(value ? '1' : '0').Append(',');
+            // Die ältere Toolbox schrieb C#-Boolwerte als True/False. Für die
+            // bekannten Validitätsspalten behalten wir genau dieses Format bei.
+            builder.Append(value ? "True" : "False").Append(',');
         }
 
         private static void AppendCsv(
