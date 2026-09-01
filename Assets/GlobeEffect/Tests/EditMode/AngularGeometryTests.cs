@@ -2,6 +2,10 @@ using NUnit.Framework;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
+    /// <summary>
+    /// Sichert die Umrechnung zwischen Winkeldurchmesser, Abstand und physischem
+    /// Durchmesser ab. Besonders wichtig ist die lineare Skalierung mit dem Abstand.
+    /// </summary>
     public sealed class AngularGeometryTests
     {
         [Test]

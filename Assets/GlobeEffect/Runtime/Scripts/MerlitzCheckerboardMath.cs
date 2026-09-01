@@ -9,7 +9,7 @@ namespace GlobeEffect.VRCheckerboard
     ///     tan(k a) = m tan(k A)
     ///
     /// A ist der objektseitige Winkel, a der scheinbare Winkel und m die
-    /// paraxiale Vergroesserung. Der Grenzfall k = 0 ist a = m A.
+    /// paraxiale Vergrößerung. Der Grenzfall k = 0 ist a = m A.
     /// </summary>
     public static class MerlitzCheckerboardMath
     {
@@ -48,10 +48,10 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Inverse Abtastung fuer den Shader.
+        /// Inverse Abtastung für den Shader.
         ///
         /// Ein Radius r im dargestellten Kreis wird in den Radius s des
-        /// urspruenglich regelmaessigen Wandgitters zurueckgerechnet. Beide
+        /// ursprünglich regelmäßigen Wandgitters zurückgerechnet. Beide
         /// Radien sind auf den jeweiligen Kreisrand normiert.
         /// </summary>
         public static double NormalizedSourceRadius(
@@ -92,7 +92,7 @@ namespace GlobeEffect.VRCheckerboard
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(magnification),
-                    "Die Vergroesserung muss positiv sein.");
+                    "Die Vergrößerung muss positiv sein.");
             }
 
             if (k < 0.0 || k > 1.0)

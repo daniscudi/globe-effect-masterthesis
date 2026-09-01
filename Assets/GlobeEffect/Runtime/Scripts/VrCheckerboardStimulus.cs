@@ -1,12 +1,13 @@
 using System;
 using UnityEngine;
+using UnityEngine.XR;
 
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
     /// Erzeugt und steuert einen kreisrunden Merlitz-Checkerboard-Stimulus.
     /// Das Muster wird im Shader analytisch berechnet und bleibt daher auch
-    /// bei Laufzeit-Aenderungen von k, Abstand und FOV scharf.
+    /// bei Laufzeit-Änderungen von k, Abstand und FOV scharf.
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
@@ -16,6 +17,7 @@ namespace GlobeEffect.VRCheckerboard
         private const string ShaderResourceName = "GlobeEffectMerlitzCheckerboard";
         private const string ShaderFallbackName = "GlobeEffect/Merlitz Checkerboard";
         private const float MinimumDistanceMeters = 0.05f;
+        private const int MaximumInitialPoseWaitFrames = 120;
 
         [Header("Geometrie")]
         [SerializeField]
@@ -27,12 +29,16 @@ namespace GlobeEffect.VRCheckerboard
         private float angularDiameterDegrees = 70f;
 
         [SerializeField, Min(MinimumDistanceMeters)]
-        [Tooltip("Abstand vom Observer zum Mittelpunkt der ebenen Stimulusflaeche in Metern.")]
+        [Tooltip("Abstand vom Observer zum Mittelpunkt der ebenen Stimulusfläche in Metern.")]
         private float viewingDistanceMeters = 1f;
 
         [SerializeField]
-        [Tooltip("Platziert den Stimulus in jedem Frame erneut vor dem Observer. Fuer einen weltfesten Versuch deaktiviert lassen.")]
+        [Tooltip("Platziert den Stimulus in jedem Frame erneut vor dem Observer. Für einen weltfesten Versuch deaktiviert lassen.")]
         private bool followObserverEveryFrame;
+
+        [SerializeField]
+        [Tooltip("Wartet im Play Mode bis zum ersten LateUpdate, damit die initiale HMD-Pose bereits vorliegt. Danach bleibt der Stimulus weltfest.")]
+        private bool placeOnFirstTrackedPose = true;
 
         [Header("Merlitz-Stimulus")]
         [SerializeField, Range(0f, 1f)]
@@ -40,11 +46,11 @@ namespace GlobeEffect.VRCheckerboard
         private float merlitzK = 0.7f;
 
         [SerializeField, Min(0.01f)]
-        [Tooltip("Paraxiale Instrumentvergroesserung m. Die Referenzkonfiguration des Papers verwendet m = 10.")]
+        [Tooltip("Paraxiale Instrumentvergrößerung m. Die Referenzkonfiguration des Papers verwendet m = 10.")]
         private float magnification = 10f;
 
         [SerializeField, Range(2, 80)]
-        [Tooltip("Anzahl der Schachfelder ueber den Durchmesser des unverzerrten Ausgangsgitters.")]
+        [Tooltip("Anzahl der Schachfelder über den Durchmesser des unverzerrten Ausgangsgitters.")]
         private int checksAcrossDiameter = 16;
 
         [SerializeField]
@@ -64,7 +70,7 @@ namespace GlobeEffect.VRCheckerboard
         private bool showFixationTarget = true;
 
         [SerializeField, Range(0.05f, 5f)]
-        [Tooltip("Gesamte Winkelgroesse des Fixationskreuzes in Grad.")]
+        [Tooltip("Gesamte Winkelgröße des Fixationskreuzes in Grad.")]
         private float fixationTargetSizeDegrees = 0.5f;
 
         [SerializeField]
@@ -76,7 +82,7 @@ namespace GlobeEffect.VRCheckerboard
 
         [Header("Technik")]
         [SerializeField, Range(32, 256)]
-        [Tooltip("Segmentzahl des kreisrunden Traegermeshes.")]
+        [Tooltip("Segmentzahl des kreisrunden Trägermeshes.")]
         private int diskSegments = 128;
 
         [SerializeField]
@@ -89,14 +95,16 @@ namespace GlobeEffect.VRCheckerboard
         private Material ownedMaterial;
         private MaterialPropertyBlock propertyBlock;
         private bool isVisible = true;
+        private bool initialPlacementPending;
+        private int initialPlacementWaitFrames;
 
-        /// <summary>Wird nach Show() mit dem aktuellen Parametersatz ausgeloest.</summary>
+        /// <summary>Wird nach Show() mit dem aktuellen Parametersatz ausgelöst.</summary>
         public event Action<CheckerboardStimulusSnapshot> StimulusPresented;
 
-        /// <summary>Wird nach Hide() mit dem aktuellen Parametersatz ausgeloest.</summary>
+        /// <summary>Wird nach Hide() mit dem aktuellen Parametersatz ausgelöst.</summary>
         public event Action<CheckerboardStimulusSnapshot> StimulusHidden;
 
-        /// <summary>Wird nach einer Aenderung ueber die oeffentliche API ausgeloest.</summary>
+        /// <summary>Wird nach einer Änderung über die öffentliche API ausgelöst.</summary>
         public event Action<CheckerboardStimulusSnapshot> ParametersChanged;
 
         public Transform Observer
@@ -130,7 +138,15 @@ namespace GlobeEffect.VRCheckerboard
             ValidateSerializedFields();
             EnsureResources();
             isVisible = Application.isPlaying ? visibleAtStart : true;
-            ApplyAll(placeAtObserver: observer != null);
+
+            // Der Tracked Pose Driver übernimmt die HMD-Pose erst während des
+            // ersten Frames. Eine sofortige Platzierung in OnEnable würde den
+            // Stimulus deshalb häufig relativ zur Editor-Pose (0, 0, 0)
+            // positionieren, bevor die reale Kopfpose bekannt ist.
+            initialPlacementPending = Application.isPlaying &&
+                placeOnFirstTrackedPose && observer != null;
+            initialPlacementWaitFrames = 0;
+            ApplyAll(placeAtObserver: observer != null && !initialPlacementPending);
         }
 
         private void OnValidate()
@@ -149,10 +165,30 @@ namespace GlobeEffect.VRCheckerboard
 
         private void LateUpdate()
         {
-            if (followObserverEveryFrame && observer != null)
+            if (observer == null)
+            {
+                return;
+            }
+
+            bool initialPoseReady = initialPlacementPending &&
+                (HasTrackedCenterEyePose() ||
+                 initialPlacementWaitFrames >= MaximumInitialPoseWaitFrames);
+
+            if (followObserverEveryFrame || initialPoseReady)
             {
                 ApplyTransform(placeAtObserver: true);
+                initialPlacementPending = false;
             }
+
+            if (initialPlacementPending)
+            {
+                initialPlacementWaitFrames++;
+            }
+
+            // Im Varjo-Multi-Pass-Modus werden Context- und Focus-Ansicht in
+            // getrennten Durchläufen gerendert. Die aktuelle Center-Eye-Pose
+            // dient dem Shader als robuste Links-/Rechts-Referenz.
+            ApplyObserverMaterialProperties();
         }
 
         private void OnDestroy()
@@ -164,7 +200,7 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Setzt Winkelgroesse und Abstand gemeinsam. Dadurch gibt es keinen
+        /// Setzt Winkelgröße und Abstand gemeinsam. Dadurch gibt es keinen
         /// Zwischenframe mit inkonsistenter Geometrie.
         /// </summary>
         public void SetGeometry(float newAngularDiameterDegrees, float newDistanceMeters)
@@ -211,7 +247,7 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Platziert die Flaeche orthogonal zur aktuellen Blickrichtung.
+        /// Platziert die Fläche orthogonal zur aktuellen Blickrichtung.
         /// Diese Methode kann explizit am Trial-Anfang aufgerufen werden.
         /// </summary>
         public void PlaceInFrontOfObserver()
@@ -257,7 +293,7 @@ namespace GlobeEffect.VRCheckerboard
                 ? transform.parent.lossyScale
                 : Vector3.one;
 
-            // Kompensiert uebliche gleichmaessige Parent-Skalierung. Fuer eine
+            // Kompensiert übliche gleichmäßige Parent-Skalierung. Für eine
             // exakte Versuchsanordnung sollte die Parent-Skalierung (1,1,1) sein.
             transform.localScale = new Vector3(
                 diameter / SafeScale(parentScale.x),
@@ -286,7 +322,56 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetFloat("_FixationHalfSizeRad",
                 0.5f * fixationTargetSizeDegrees * Mathf.Deg2Rad);
             propertyBlock.SetColor("_FixationColor", fixationColor);
+
+            if (observer != null)
+            {
+                propertyBlock.SetVector("_ObserverWorldPosition", observer.position);
+                propertyBlock.SetVector("_ObserverWorldRight", observer.right);
+            }
+
             meshRenderer.SetPropertyBlock(propertyBlock);
+        }
+
+        private void ApplyObserverMaterialProperties()
+        {
+            if (meshRenderer == null || observer == null)
+            {
+                return;
+            }
+
+            propertyBlock ??= new MaterialPropertyBlock();
+            meshRenderer.GetPropertyBlock(propertyBlock);
+            propertyBlock.SetVector("_ObserverWorldPosition", observer.position);
+            propertyBlock.SetVector("_ObserverWorldRight", observer.right);
+            meshRenderer.SetPropertyBlock(propertyBlock);
+        }
+
+        private static bool HasTrackedCenterEyePose()
+        {
+            InputDevice centerEye = InputDevices.GetDeviceAtXRNode(XRNode.CenterEye);
+            if (!centerEye.isValid)
+            {
+                return false;
+            }
+
+            if (centerEye.TryGetFeatureValue(CommonUsages.isTracked, out bool isTracked))
+            {
+                return isTracked;
+            }
+
+            if (centerEye.TryGetFeatureValue(
+                CommonUsages.trackingState,
+                out InputTrackingState trackingState))
+            {
+                const InputTrackingState required =
+                    InputTrackingState.Position | InputTrackingState.Rotation;
+                return (trackingState & required) == required;
+            }
+
+            // Manche Provider melden eine gültige Center-Eye-Einheit, aber
+            // keinen separaten Tracking-State. Dann ist die gültige Einheit
+            // die beste verfügbare Startfreigabe.
+            return true;
         }
 
         private void ApplyVisibility()

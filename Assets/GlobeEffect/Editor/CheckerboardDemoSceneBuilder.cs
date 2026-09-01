@@ -7,12 +7,14 @@ using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.XR;
 using UnityEngine.SceneManagement;
 using Unity.XR.CoreUtils;
+using GlobeEffect.VRCheckerboard.EyeTracking;
+using GlobeEffect.VRCheckerboard.Experiment;
 
 namespace GlobeEffect.VRCheckerboard.Editor
 {
     /// <summary>
     /// Erstellt eine sofort nutzbare Referenzszene. Die Szene wird beim ersten
-    /// Import automatisch angelegt und kann ueber das Tools-Menue zurueckgesetzt
+    /// Import automatisch angelegt und kann über das Tools-Menü zurückgesetzt
     /// werden. Dadurch bleibt der eigentliche Stimulus frei von XR-Rig-Details.
     /// </summary>
     [InitializeOnLoad]
@@ -26,6 +28,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         static CheckerboardDemoSceneBuilder()
         {
+            // Beim ersten Import sind noch nicht immer alle Unity-Pakete fertig
+            // geladen. delayCall verschiebt die Prüfung bis zum nächsten Editor-Takt.
             EditorApplication.delayCall += CreateSceneOnFirstImport;
         }
 
@@ -59,9 +63,14 @@ namespace GlobeEffect.VRCheckerboard.Editor
             Directory.CreateDirectory(Path.GetDirectoryName(DemoScenePath));
 
             Scene previousActiveScene = SceneManager.GetActiveScene();
+            // Eine bereits geöffnete Arbeitsszene soll nicht ungefragt geschlossen
+            // werden. Nur eine leere Startszene oder die Demoszene selbst wird ersetzt.
             bool replaceUntitledScene = string.IsNullOrEmpty(previousActiveScene.path);
+            bool replaceOpenDemoScene = replaceExistingScene &&
+                previousActiveScene.path == DemoScenePath;
+            bool replaceActiveScene = replaceUntitledScene || replaceOpenDemoScene;
 
-            if (replaceUntitledScene && previousActiveScene.isDirty &&
+            if (replaceActiveScene && previousActiveScene.isDirty &&
                 previousActiveScene.rootCount > 0)
             {
                 if (Application.isBatchMode)
@@ -78,17 +87,28 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
             Scene demoScene = EditorSceneManager.NewScene(
                 NewSceneSetup.EmptyScene,
-                replaceUntitledScene ? NewSceneMode.Single : NewSceneMode.Additive);
+                replaceActiveScene ? NewSceneMode.Single : NewSceneMode.Additive);
             SceneManager.SetActiveScene(demoScene);
 
             try
             {
+                // Die Reihenfolge entspricht den Abhängigkeiten in der Szene:
+                // Kamera -> Stimulus -> Eye Tracking -> Trialsteuerung.
                 Camera camera = CreateXrOrigin();
-                CreateStimulus(camera.transform);
+                VrCheckerboardStimulus stimulus = CreateStimulus(camera.transform);
+                EyeTrackingToolbox toolbox = CreateEyeTracking(
+                    camera,
+                    stimulus,
+                    out CheckerboardFixationMonitor fixationMonitor);
+                CreateTrialController(stimulus, toolbox, fixationMonitor);
                 CreateEnvironment();
 
                 EditorSceneManager.MarkSceneDirty(demoScene);
-                EditorSceneManager.SaveScene(demoScene, DemoScenePath);
+                if (!EditorSceneManager.SaveScene(demoScene, DemoScenePath))
+                {
+                    throw new InvalidOperationException(
+                        $"Demoszene konnte nicht gespeichert werden: {DemoScenePath}");
+                }
                 EnsureSceneIsInBuildSettings();
                 AssetDatabase.SaveAssets();
                 AssetDatabase.Refresh();
@@ -97,7 +117,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
             finally
             {
-                if (!replaceUntitledScene &&
+                if (!replaceActiveScene &&
                     previousActiveScene.IsValid() && previousActiveScene.isLoaded)
                 {
                     SceneManager.SetActiveScene(previousActiveScene);
@@ -108,6 +128,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private static Camera CreateXrOrigin()
         {
+            // Diese Hierarchie entspricht der üblichen XRI-Struktur. Der Tracked
+            // Pose Driver bewegt nur die Kamera; der XR Origin bleibt der Weltbezug.
             GameObject originObject = new GameObject("XR Origin");
             XROrigin xrOrigin = originObject.AddComponent<XROrigin>();
 
@@ -119,6 +141,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
             cameraObject.transform.SetParent(cameraOffset.transform, false);
 
             Camera camera = cameraObject.AddComponent<Camera>();
+            // Wird nur für die flache Game-View-Vorschau verwendet. Im XR-Betrieb
+            // liefert das Headset seine eigenen Projektionsmatrizen und Winkel.
+            camera.fieldOfView = 90f;
             camera.nearClipPlane = 0.01f;
             camera.farClipPlane = 100f;
             camera.clearFlags = CameraClearFlags.SolidColor;
@@ -139,8 +164,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private static void ConfigureTrackedPoseDriver(TrackedPoseDriver driver)
         {
-            // Direkte Actions vermeiden eine Abhaengigkeit von einem bestimmten
-            // Controller- oder Headset-Profil. Sie lesen nur die Center-Eye-Pose.
+            // Direkte Actions vermeiden eine Abhängigkeit von einem bestimmten
+            // Controller- oder Headset-Profil. Sie lesen ausschließlich die
+            // Center-Eye-Pose und funktionieren deshalb auch ohne Controller.
             InputAction position = new InputAction(
                 name: "HMD Position",
                 type: InputActionType.Value,
@@ -167,7 +193,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             driver.trackingStateInput = new InputActionProperty(trackingState);
         }
 
-        private static void CreateStimulus(Transform observer)
+        private static VrCheckerboardStimulus CreateStimulus(Transform observer)
         {
             GameObject stimulusObject = new GameObject("Checkerboard Stimulus");
             VrCheckerboardStimulus stimulus =
@@ -180,8 +206,51 @@ namespace GlobeEffect.VRCheckerboard.Editor
             stimulus.SetMagnification(10f);
             stimulus.SetEyePresentation(CheckerboardEyePresentation.BothEyes);
             stimulus.PlaceInFrontOfObserver();
+            stimulusObject.AddComponent<CheckerboardKeyboardController>();
 
             Selection.activeGameObject = stimulusObject;
+            return stimulus;
+        }
+
+        private static EyeTrackingToolbox CreateEyeTracking(
+            Camera camera,
+            VrCheckerboardStimulus stimulus,
+            out CheckerboardFixationMonitor fixationMonitor)
+        {
+            // Kamera und Stimulus werden getrennt aufgezeichnet. Damit lässt sich
+            // später rekonstruieren, ob eine Änderung vom Kopf oder vom Recenter kam.
+            GameObject toolboxObject = new GameObject("Eye Tracking Toolbox");
+            EyeTrackingToolbox toolbox =
+                toolboxObject.AddComponent<EyeTrackingToolbox>();
+            toolbox.SetProvider(EyeTrackingToolbox.ETProvider.Varjo);
+            toolbox.SetMainCameraTransform(camera.transform);
+            toolbox.SetStimulusForMarkers(stimulus);
+            toolbox.AddTrackedObject(
+                camera.gameObject,
+                EyeTrackingToolbox.TrackingOptions.LocalTransform);
+            toolbox.AddTrackedObject(
+                stimulus.gameObject,
+                EyeTrackingToolbox.TrackingOptions.GlobalTransform);
+
+            fixationMonitor =
+                toolboxObject.AddComponent<CheckerboardFixationMonitor>();
+            fixationMonitor.Configure(toolbox, stimulus);
+            return toolbox;
+        }
+
+        private static void CreateTrialController(
+            VrCheckerboardStimulus stimulus,
+            EyeTrackingToolbox toolbox,
+            CheckerboardFixationMonitor fixationMonitor)
+        {
+            GameObject controllerObject = new GameObject("Checkerboard Trial Session");
+            CheckerboardTrialSessionController controller =
+                controllerObject.AddComponent<CheckerboardTrialSessionController>();
+            controller.Configure(
+                stimulus,
+                stimulus.GetComponent<CheckerboardKeyboardController>(),
+                toolbox,
+                fixationMonitor);
         }
 
         private static void CreateEnvironment()
@@ -200,6 +269,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private static void EnsureSceneIsInBuildSettings()
         {
+            // Unity startet XR-Szenen außerhalb des Editors nur zuverlässig, wenn
+            // sie in den Build Settings stehen. Vorhandene Einträge bleiben erhalten.
             EditorBuildSettingsScene[] currentScenes = EditorBuildSettings.scenes;
             foreach (EditorBuildSettingsScene scene in currentScenes)
             {

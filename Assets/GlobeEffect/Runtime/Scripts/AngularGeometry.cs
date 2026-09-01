@@ -29,7 +29,7 @@ namespace GlobeEffect.VRCheckerboard
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(angularDiameterDegrees),
-                    "Die Winkelgroesse muss zwischen 0 und 180 Grad liegen.");
+                    "Die Winkelgröße muss zwischen 0 und 180 Grad liegen.");
             }
 
             double halfAngleRadians = 0.5 * angularDiameterDegrees * DegreesToRadians;

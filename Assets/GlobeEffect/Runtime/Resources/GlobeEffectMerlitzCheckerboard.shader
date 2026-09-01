@@ -12,6 +12,8 @@ Shader "GlobeEffect/Merlitz Checkerboard"
         _EyeMode ("Eye Mode", Float) = 0
         _FixationEnabled ("Fixation Enabled", Float) = 1
         _FixationHalfSizeRad ("Fixation Half Size [rad]", Float) = 0.0043633
+        [HideInInspector] _ObserverWorldPosition ("Observer World Position", Vector) = (0, 0, 0, 1)
+        [HideInInspector] _ObserverWorldRight ("Observer World Right", Vector) = (1, 0, 0, 0)
     }
 
     SubShader
@@ -55,6 +57,8 @@ Shader "GlobeEffect/Merlitz Checkerboard"
             float _EyeMode;
             float _FixationEnabled;
             float _FixationHalfSizeRad;
+            float4 _ObserverWorldPosition;
+            float4 _ObserverWorldRight;
 
             VertexToFragment Vert(AppData input)
             {
@@ -79,13 +83,32 @@ Shader "GlobeEffect/Merlitz Checkerboard"
                     / _MerlitzK;
             }
 
+            float ResolveEyeIndex()
+            {
+                // In instanzierten Stereo-Modi ist Unitys Eye-Index die
+                // vorgesehene Quelle. Im Multi-Pass-Modus ist er je nach
+                // Unity-/XR-Provider nicht in jedem separaten Focus-Pass
+                // verlaesslich gesetzt. Dort bestimmen wir das Auge anhand
+                // der aktuellen Renderkamera relativ zur Center-Eye-Pose.
+                #if defined(UNITY_SINGLE_PASS_STEREO) || \
+                    defined(UNITY_STEREO_INSTANCING_ENABLED) || \
+                    defined(UNITY_STEREO_MULTIVIEW_ENABLED)
+                    return (float)unity_StereoEyeIndex;
+                #else
+                    float lateralEyeOffset = dot(
+                        _WorldSpaceCameraPos.xyz - _ObserverWorldPosition.xyz,
+                        _ObserverWorldRight.xyz);
+                    return lateralEyeOffset > 0.0001 ? 1.0 : 0.0;
+                #endif
+            }
+
             fixed4 Frag(VertexToFragment input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
-                // unity_StereoEyeIndex: 0 = links, 1 = rechts. Im nicht-XR
-                // Game-View verhaelt sich die Vorschau wie das linke Auge.
-                float eyeIndex = (float)unity_StereoEyeIndex;
+                // 0 = links, 1 = rechts. Im nicht-XR-Game-View verhaelt sich
+                // die Vorschau wie das linke Auge.
+                float eyeIndex = ResolveEyeIndex();
                 float visibleForEye = 1.0;
                 if (_EyeMode > 0.5 && _EyeMode < 1.5)
                 {

@@ -3,6 +3,10 @@ using NUnit.Framework;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
+    /// <summary>
+    /// Sichert Merlitz' belegte Gleichung, ihre Inverse, den Grenzfall k=0 und
+    /// die für den Shader verwendete normierte Rückabbildung ab.
+    /// </summary>
     public sealed class MerlitzCheckerboardMathTests
     {
         [TestCase(0.0)]
