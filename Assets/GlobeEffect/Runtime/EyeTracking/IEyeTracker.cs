@@ -4,9 +4,9 @@ using UnityEngine;
 namespace GlobeEffect.VRCheckerboard.EyeTracking
 {
     /// <summary>
-    /// Einheitliches Datenformat fuer reale und simulierte Eye Tracker.
+    /// Einheitliches Datenformat für reale und simulierte Eye Tracker.
     /// Die lokalen Rays liegen im Koordinatensystem der HMD-Kamera; die
-    /// World-Rays werden von der EyeTrackingToolbox ergaenzt.
+    /// World-Rays werden von der EyeTrackingToolbox ergänzt.
     /// </summary>
     [Serializable]
     public struct GazeData
@@ -34,8 +34,8 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         public bool leftValidity;
         public bool rightValidity;
 
-        // Die Rohstatuswerte bleiben erhalten, damit spaetere Auswertungen
-        // strengere oder lockerere Qualitaetskriterien anwenden koennen.
+        // Die Rohstatuswerte bleiben erhalten, damit spätere Auswertungen
+        // strengere oder lockerere Qualitätskriterien anwenden können.
         public int trackingStatus;
         public int leftTrackingStatus;
         public int rightTrackingStatus;
@@ -43,7 +43,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
     /// <summary>
     /// Provider-Abstraktion aus der Lab-Toolbox. Experiment- und Logging-Code
-    /// bleiben dadurch unabhaengig vom verwendeten Headset.
+    /// bleiben dadurch unabhängig vom verwendeten Headset.
     /// </summary>
     public interface IEyeTracker
     {

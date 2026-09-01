@@ -3,7 +3,7 @@ using System;
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
     /// <summary>
-    /// Vollstaendige, unveraenderliche Bedingung eines Checkerboard-Trials.
+    /// Vollständige, unveränderliche Bedingung eines Checkerboard-Trials.
     /// Alle gemeinsam randomisierten Werte bleiben dadurch als Einheit erhalten.
     /// </summary>
     [Serializable]

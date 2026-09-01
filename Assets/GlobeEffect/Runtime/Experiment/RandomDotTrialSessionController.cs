@@ -20,8 +20,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     }
 
     /// <summary>
-    /// Fuehrt den dynamischen Random-Dot-Einstelltest durch. Die Person
-    /// schwenkt den Kopf, veraendert k und bestaetigt den Wert, bei dem das
+    /// Führt den dynamischen Random-Dot-Einstelltest durch. Die Person
+    /// schwenkt den Kopf, verändert k und bestätigt den Wert, bei dem das
     /// weltfeste Punktfeld subjektiv stabil erscheint.
     /// </summary>
     [DisallowMultipleComponent]
@@ -76,14 +76,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         };
 
         [SerializeField]
-        [Tooltip("Zwei Richtungen pruefen Anker- und Hystereseeffekte der Einstellung.")]
+        [Tooltip("Zwei Richtungen prüfen Anker- und Hystereseeffekte der Einstellung.")]
         private List<float> startingKValues = new() { 0.3f, 0.9f };
 
         [SerializeField]
         private List<float> magnifications = new() { 10f };
 
         [SerializeField]
-        [Tooltip("HeadTracked ist die Versuchsbedingung; SimulatedYaw dient der Technikpruefung.")]
+        [Tooltip("HeadTracked ist die Versuchsbedingung; SimulatedYaw dient der Technikprüfung.")]
         private List<RandomDotMotionMode> motionModes = new()
         {
             RandomDotMotionMode.HeadTracked
@@ -104,7 +104,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private bool requireHeadSweepsBeforeConfirmation = true;
 
         [SerializeField]
-        [Tooltip("Optional: Enter wird nur bei erfuellter Fixationsdauer angenommen.")]
+        [Tooltip("Optional: Enter wird nur bei erfüllter Fixationsdauer angenommen.")]
         private bool requireFixationBeforeConfirmation;
 
         [Header("Tasten")]
@@ -179,6 +179,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void Update()
         {
+            // Start, Abbruch und Antwort gehören zur Sitzung. Änderungen von k und
+            // Recenter kommen als Ereignisse aus der separaten Tastatursteuerung.
             Keyboard keyboard = Keyboard.current;
             if (keyboard == null)
             {
@@ -236,7 +238,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             if (IsSessionActive)
             {
-                Debug.LogWarning("Eine Random-Dot-Sitzung laeuft bereits.", this);
+                Debug.LogWarning("Eine Random-Dot-Sitzung läuft bereits.", this);
                 return false;
             }
 
@@ -245,7 +247,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             if (stimulus == null || keyboardController == null || sweepMonitor == null)
             {
                 Debug.LogError(
-                    "Random-Dot-Stimulus, Tastatursteuerung und Sweep-Monitor muessen zugewiesen sein.",
+                    "Random-Dot-Stimulus, Tastatursteuerung und Sweep-Monitor müssen zugewiesen sein.",
                     this);
                 return false;
             }
@@ -260,6 +262,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             try
             {
+                // Der komplette Plan und die CSV-Köpfe entstehen vor dem ersten
+                // sichtbaren Trial. Ein Fehler hinterlässt damit keine laufende Messung.
                 trialPlan = RandomDotTrialPlanner.CreateRandomizedPlan(
                     angularDiametersDegrees,
                     eyePresentations,
@@ -285,6 +289,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
                 if (eyeTrackingToolbox != null)
                 {
+                    // Eye Tracking schreibt in denselben Sitzungsordner. Marker
+                    // ordnen k-Schritte und Kopfseitenwechsel den Gaze-Samples zu.
                     if (eyeTrackingToolbox.IsRecording)
                     {
                         eyeTrackingToolbox.StopRecording();
@@ -302,7 +308,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 }
                 else
                 {
-                    Debug.LogWarning("Sitzung laeuft ohne Eye-Tracking-Aufzeichnung.", this);
+                    Debug.LogWarning("Sitzung läuft ohne Eye-Tracking-Aufzeichnung.", this);
                 }
             }
             catch (Exception exception)
@@ -337,6 +343,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             if (requireHeadSweepsBeforeConfirmation &&
                 (sweepMonitor == null || !sweepMonitor.RequirementMet))
             {
+                // Die abgewiesene Antwort wird mit erreichtem und gefordertem
+                // Sweep-Stand gespeichert, statt nur eine Warnung anzuzeigen.
                 WriteMarker(string.Format(
                     CultureInfo.InvariantCulture,
                     "TrialConfirmationRejected;sequence={0};reason=head_sweeps;completed={1};required={2}",
@@ -344,7 +352,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     sweepMonitor?.CompletedHalfSweeps ?? 0,
                     sweepMonitor?.RequiredHalfSweeps ?? 0));
                 Debug.LogWarning(
-                    "Antwort noch nicht angenommen: Kopf-Schwenkkriterium ist nicht erfuellt.",
+                    "Antwort noch nicht angenommen: Kopf-Schwenkkriterium ist nicht erfüllt.",
                     this);
                 return false;
             }
@@ -355,7 +363,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 WriteMarker(
                     $"TrialConfirmationRejected;sequence={currentTrial.SequenceIndex};reason=fixation");
                 Debug.LogWarning(
-                    "Antwort noch nicht angenommen: Fixationskriterium ist nicht erfuellt.",
+                    "Antwort noch nicht angenommen: Fixationskriterium ist nicht erfüllt.",
                     this);
                 return false;
             }
@@ -441,6 +449,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             currentTrial = trialPlan[currentPlanIndex];
             currentTrialNumber = currentTrial.SequenceIndex;
+            // Alle Trialwerte werden im unsichtbaren Zustand gesetzt. Das verhindert,
+            // dass ein Frame mit Parametern des vorherigen Trials gezeigt wird.
             stimulus.Hide();
             stimulus.SetAngularDiameter(currentTrial.AngularDiameterDegrees);
             stimulus.SetMagnification(currentTrial.Magnification);
@@ -471,7 +481,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             Debug.Log(string.Format(
                 CultureInfo.InvariantCulture,
                 "Random-Dot-Trial {0}/{1}: {2}, m={3:F2}, Start-k={4:F2}. " +
-                "Kopf links/rechts schwenken, k mit Pfeiltasten einstellen, Enter bestaetigt.",
+                "Kopf links/rechts schwenken, k mit Pfeiltasten einstellen, Enter bestätigt.",
                 currentTrial.SequenceIndex,
                 totalTrials,
                 currentTrial.MotionMode,
@@ -488,6 +498,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private RandomDotTrialResult CaptureCurrentResult(string status)
         {
+            // Hier werden Planwerte, aktuelle Einstellung, beobachtete Kopfbewegung
+            // und Fixationszustand zu genau einer Trialzeile zusammengeführt.
             double endTime = Time.realtimeSinceStartupAsDouble;
             return new RandomDotTrialResult(
                 currentTrial,
@@ -551,6 +563,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return;
             }
 
+            // Nach einem Recenter beziehen sich alte Gierwinkel und alte
+            // Fixationsdauer nicht mehr auf denselben Mittelpunkt und werden verworfen.
             recenterCount++;
             sweepMonitor?.ResetForTrial();
             fixationMonitor?.ResetFixationWindow();

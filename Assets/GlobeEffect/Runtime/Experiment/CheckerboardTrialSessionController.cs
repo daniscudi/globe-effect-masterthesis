@@ -19,7 +19,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     }
 
     /// <summary>
-    /// Steuert eine vollstaendige Pilot-Sitzung: reproduzierbare
+    /// Steuert eine vollständige Pilot-Sitzung: reproduzierbare
     /// Randomisierung, Stimulusparameter, k-Antwort, Recenter, Fixationsstatus,
     /// Eye-Tracking-Marker und fortlaufend gesicherte CSV-Dateien.
     /// </summary>
@@ -92,7 +92,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private float interTrialSeconds = 0.5f;
 
         [SerializeField]
-        [Tooltip("Wenn aktiv, nimmt Enter die Antwort erst nach erfuelltem Fixationskriterium an.")]
+        [Tooltip("Wenn aktiv, nimmt Enter die Antwort erst nach erfülltem Fixationskriterium an.")]
         private bool requireFixationBeforeConfirmation;
 
         [Header("Tasten")]
@@ -165,6 +165,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void Update()
         {
+            // Diese Klasse wertet nur Start, Abbruch und Bestätigung aus. Die
+            // Pfeiltasten und Recenter-Taste bleiben im KeyboardController, dessen
+            // Ereignisse hier lediglich gezählt und protokolliert werden.
             Keyboard keyboard = Keyboard.current;
             if (keyboard == null)
             {
@@ -223,7 +226,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             if (IsSessionActive)
             {
-                Debug.LogWarning("Eine Checkerboard-Sitzung laeuft bereits.", this);
+                Debug.LogWarning("Eine Checkerboard-Sitzung läuft bereits.", this);
                 return false;
             }
 
@@ -232,7 +235,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             if (stimulus == null || keyboardController == null)
             {
                 Debug.LogError(
-                    "Stimulus und Checkerboard Keyboard Controller muessen zugewiesen sein.",
+                    "Stimulus und Checkerboard Keyboard Controller müssen zugewiesen sein.",
                     this);
                 return false;
             }
@@ -247,6 +250,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             try
             {
+                // Plan und Ausgabedateien werden vollständig vorbereitet, bevor
+                // Trial 1 sichtbar wird. Bei einem Fehler startet keine halbe Sitzung.
                 trialPlan = CheckerboardTrialPlanner.CreateRandomizedPlan(
                     angularDiametersDegrees,
                     viewingDistancesMeters,
@@ -271,6 +276,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
                 if (eyeTrackingToolbox != null)
                 {
+                    // Gaze-, Head- und Trialdateien verwenden denselben Ordner und
+                    // Basisnamen. Die Marker verbinden Ereignisse mit den Samples.
                     if (eyeTrackingToolbox.IsRecording)
                     {
                         eyeTrackingToolbox.StopRecording();
@@ -289,7 +296,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 else
                 {
                     Debug.LogWarning(
-                        "Sitzung laeuft ohne Eye-Tracking-Aufzeichnung.",
+                        "Sitzung läuft ohne Eye-Tracking-Aufzeichnung.",
                         this);
                 }
             }
@@ -330,10 +337,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             if (requireFixationBeforeConfirmation &&
                 (fixationMonitor == null || !fixationMonitor.RequirementMet))
             {
+                // Auch eine abgewiesene Enter-Eingabe wird markiert. Dadurch ist
+                // später sichtbar, dass eine Antwort wegen Fixation verzögert wurde.
                 WriteEyeTrackingMarker(
                     $"TrialConfirmationRejected;sequence={currentTrial.SequenceIndex};reason=fixation");
                 Debug.LogWarning(
-                    "Antwort noch nicht angenommen: Fixationskriterium ist nicht erfuellt.",
+                    "Antwort noch nicht angenommen: Fixationskriterium ist nicht erfüllt.",
                     this);
                 return false;
             }
@@ -419,6 +428,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             currentTrial = trialPlan[currentPlanIndex];
             currentTrialNumber = currentTrial.SequenceIndex;
+            // Der Stimulus bleibt während der Parameteränderung unsichtbar. Erst
+            // nach Recenter, Zähler-Reset und TrialStart-Marker wird er eingeblendet.
             stimulus.Hide();
             stimulus.SetGeometry(
                 currentTrial.AngularDiameterDegrees,
@@ -446,7 +457,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             Debug.Log(string.Format(
                 CultureInfo.InvariantCulture,
                 "Trial {0}/{1}: {2}, FOV={3:F1} deg, d={4:F2} m, Start-k={5:F2}. " +
-                "Mit Pfeiltasten einstellen, mit Enter bestaetigen.",
+                "Mit Pfeiltasten einstellen, mit Enter bestätigen.",
                 currentTrial.SequenceIndex,
                 totalTrials,
                 currentTrial.EyePresentation,
@@ -464,6 +475,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private CheckerboardTrialResult CaptureCurrentResult(string status)
         {
+            // Der Snapshot kommt direkt vom Stimulus, damit in der Ergebnisdatei
+            // wirklich die dargestellten Laufzeitwerte und nicht nur der Plan stehen.
             CheckerboardStimulusSnapshot snapshot = stimulus.CaptureSnapshot();
             bool fixationSampleValid = fixationMonitor != null &&
                 fixationMonitor.CurrentSampleValid;
@@ -507,7 +520,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             SessionFinished?.Invoke(sessionState);
 
             Debug.Log(
-                "Checkerboard-Sitzung vollstaendig gespeichert:\n" +
+                "Checkerboard-Sitzung vollständig gespeichert:\n" +
                 activeSessionFolder,
                 this);
         }
@@ -533,6 +546,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return;
             }
 
+            // Gezählt wird jeder tatsächlich vom Controller gemeldete Schritt.
+            // Der Marker enthält zusätzlich alten und neuen Wert.
             kAdjustmentCount++;
             WriteEyeTrackingMarker(string.Format(
                 CultureInfo.InvariantCulture,

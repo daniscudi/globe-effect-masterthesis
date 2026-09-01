@@ -4,7 +4,7 @@ using GlobeEffect.VRCheckerboard.RandomDots;
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
     /// <summary>
-    /// Unveraenderliche Bedingung eines dynamischen Random-Dot-k-Trials.
+    /// Unveränderliche Bedingung eines dynamischen Random-Dot-k-Trials.
     /// </summary>
     [Serializable]
     public sealed class RandomDotTrial
@@ -56,7 +56,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         }
     }
 
-    /// <summary>Gespeicherte Antwort und Qualitaetswerte eines Trials.</summary>
+    /// <summary>Gespeicherte Antwort und Qualitätswerte eines Trials.</summary>
     public sealed class RandomDotTrialResult
     {
         public RandomDotTrial Trial { get; }

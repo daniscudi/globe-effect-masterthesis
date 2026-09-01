@@ -5,6 +5,10 @@ using NUnit.Framework;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
+    /// <summary>
+    /// Prüft die reproduzierbare Reihenfolge und die stabilen Punkt-Seeds des
+    /// Random-Dot-Plans sowie die Anzahl der vollfaktoriellen Bedingungen.
+    /// </summary>
     public sealed class RandomDotTrialPlannerTests
     {
         [Test]

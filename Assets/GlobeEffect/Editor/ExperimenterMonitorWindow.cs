@@ -8,10 +8,10 @@ using UnityEngine;
 namespace GlobeEffect.VRCheckerboard.Editor
 {
     /// <summary>
-    /// Versuchsleiteranzeige fuer beide Tests. Als EditorWindow wird sie nur
+    /// Versuchsleiteranzeige für beide Tests. Als EditorWindow wird sie nur
     /// auf dem Kontrollmonitor dargestellt und nicht in das XR-Bild gerendert.
-    /// Sie veraendert keine Trialparameter und dient ausschliesslich der
-    /// laufenden Qualitaetskontrolle.
+    /// Sie verändert keine Trialparameter und dient ausschließlich der
+    /// laufenden Qualitätskontrolle.
     /// </summary>
     public sealed class ExperimenterMonitorWindow : EditorWindow
     {
@@ -94,13 +94,16 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "PLAY MODE STOPPED",
                     new Color(0.27f, 0.32f, 0.38f));
                 EditorGUILayout.HelpBox(
-                    "Das Fenster liest die Fixationsdaten automatisch, sobald der Play Mode laeuft.",
+                    "Das Fenster liest die Fixationsdaten automatisch, sobald der Play Mode läuft.",
                     MessageType.Info);
                 DrawAutoOpenSetting();
                 return;
             }
 
             RefreshReferences(force: false);
+            // Normalerweise enthält eine Demoszene genau einen Fixationsmonitor.
+            // Falls beide vorhanden sind, hat das Checkerboard Vorrang, damit die
+            // Anzeige auch in einer versehentlich kombinierten Szene eindeutig bleibt.
             if (randomDotFixation != null && checkerboardFixation == null)
             {
                 DrawRandomDotMonitor();
@@ -119,7 +122,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "NO FIXATION MONITOR",
                     new Color(0.65f, 0.36f, 0.08f));
                 EditorGUILayout.HelpBox(
-                    "In der geoeffneten Szene wurde kein Checkerboard- oder Random-Dot-Fixationsmonitor gefunden.",
+                    "In der geöffneten Szene wurde kein Checkerboard- oder Random-Dot-Fixationsmonitor gefunden.",
                     MessageType.Warning);
             }
 
@@ -267,7 +270,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
                         requiredSeconds));
                 EditorGUILayout.LabelField(
                     "Fixationskriterium",
-                    requirementMet ? "ERFUELLT" : "NICHT ERFUELLT");
+                    requirementMet ? "ERFÜLLT" : "NICHT ERFÜLLT");
             }
         }
 
@@ -297,7 +300,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
         {
             EditorGUILayout.Space(6f);
             EditorGUILayout.LabelField(
-                "Automatisch bei Play oeffnen",
+                "Automatisch bei Play öffnen",
                 AutoOpenEnabled ? "JA" : "NEIN");
         }
 
@@ -321,6 +324,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
         private void RefreshReferences(bool force)
         {
             double now = EditorApplication.timeSinceStartup;
+            // FindAnyObjectByType durchsucht die geladene Szene. Eine Aktualisierung
+            // zweimal pro Sekunde reicht für Referenzwechsel und entlastet den Editor.
             if (!force && now < nextReferenceRefresh)
             {
                 return;
@@ -345,7 +350,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
     }
 
     /// <summary>
-    /// Oeffnet die reine Editoranzeige automatisch, nachdem die Szene in den
+    /// Öffnet die reine Editoranzeige automatisch, nachdem die Szene in den
     /// Play Mode gewechselt ist. Dadurch kann die Statusanzeige im Labor nicht
     /// versehentlich vergessen werden.
     /// </summary>
@@ -375,8 +380,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 Object.FindAnyObjectByType<RandomDotFixationMonitor>() != null;
             if (hasFixationMonitor)
             {
-                // Automatisches Oeffnen darf der Game View nicht den
-                // Tastaturfokus fuer F5, Pfeiltasten oder Enter nehmen.
+                // Automatisches Öffnen darf der Game View nicht den
+                // Tastaturfokus für F5, Pfeiltasten oder Enter nehmen.
                 ExperimenterMonitorWindow.OpenWindow(focus: false);
             }
         }

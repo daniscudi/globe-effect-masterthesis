@@ -4,12 +4,12 @@ using UnityEngine;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Gemeinsame 2D-Koordinatenbasis fuer die Schwenk-Plots und spaetere
+    /// Gemeinsame 2D-Koordinatenbasis für die Schwenk-Plots und spätere
     /// dynamische Globe-Effect-Stimuli.
     ///
     /// Objektseitig gelten die gnomonischen Richtungskoordinaten
     /// x = X/Z und y = Y/Z. Der lineare Bildraum ist u = m*x, v = m*y.
-    /// Dieser Raum ist die gemeinsame Eingabe, bevor Schoens separable oder
+    /// Dieser Raum ist die gemeinsame Eingabe, bevor Schöns separable oder
     /// Merlitz' radiale Winkelabbildung angewendet wird.
     /// </summary>
     public static class GlobeEffectCoordinateMapping2D
@@ -39,7 +39,7 @@ namespace GlobeEffect.VRCheckerboard
         /// <summary>
         /// Instrumentelle Merlitz-Abbildung eines objektseitigen 2D-Strahls.
         /// Bei k=1 ist das Ergebnis exakt der lineare Bildraum (u,v)=m(x,y).
-        /// Fuer andere k bleibt der Azimut erhalten und nur der Radius aendert
+        /// Für andere k bleibt der Azimut erhalten und nur der Radius ändert
         /// sich nach tan(k*a)=m*tan(k*A).
         /// </summary>
         public static Vector2 ObjectToMerlitzInstrumentImage(
@@ -66,7 +66,7 @@ namespace GlobeEffect.VRCheckerboard
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(objectGnomonic),
-                    "Die Abbildung liegt ausserhalb des frontalen planaren Bildraums.");
+                    "Die Abbildung liegt außerhalb des frontalen planaren Bildraums.");
             }
 
             double imageRadius = Math.Tan(apparentAngle);
@@ -96,7 +96,7 @@ namespace GlobeEffect.VRCheckerboard
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(panRadians),
-                    "Der Punkt liegt fuer diesen Schwenkwinkel in der Projektionsebene.");
+                    "Der Punkt liegt für diesen Schwenkwinkel in der Projektionsebene.");
             }
 
             double x = (objectAtZero.x * cos - sin) / denominator;
@@ -122,8 +122,8 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Separable 2D-Fortsetzung der Schoen-Regel: (atan(u), atan(v)).
-        /// Die Rueckgabe besteht aus Winkelkomponenten in Radiant.
+        /// Separable 2D-Fortsetzung der Schön-Regel: (atan(u), atan(v)).
+        /// Die Rückgabe besteht aus Winkelkomponenten in Radiant.
         /// </summary>
         public static Vector2 LinearImageToSchoenAngular(Vector2 linearImage)
         {
@@ -133,7 +133,7 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Radiale Merlitz-Winkelkoordinaten fuer den Plotfall k=1, l=0:
+        /// Radiale Merlitz-Winkelkoordinaten für den Plotfall k=1, l=0:
         /// q = atan(r)/r * (u,v). Diese nachgeschaltete Winkelabbildung ist
         /// nicht mit dem einstellbaren Instrumentparameter k zu verwechseln.
         /// </summary>
@@ -160,7 +160,7 @@ namespace GlobeEffect.VRCheckerboard
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(magnification),
-                    "Die Vergroesserung muss positiv sein.");
+                    "Die Vergrößerung muss positiv sein.");
             }
         }
     }

@@ -113,6 +113,8 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
                     return;
                 }
 
+                // GetGazeList liefert alle seit der letzten Abfrage gepufferten
+                // Samples. GetGaze würde bei hoher Abtastrate Zwischenwerte verlieren.
                 int sampleCount = VarjoEyeTracking.GetGazeList(
                     out List<VarjoEyeTracking.GazeData> gazeSamples,
                     out List<VarjoEyeTracking.EyeMeasurements> measurements);
@@ -160,6 +162,8 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
             VarjoEyeTracking.GazeData sample,
             VarjoEyeTracking.EyeMeasurements measurements)
         {
+            // Die Rohstatuswerte bleiben zusätzlich erhalten. Die booleschen Werte
+            // sind die unmittelbar verwendbare Lab-Definition für gültige Strahlen.
             bool combinedValid = sample.status == VarjoEyeTracking.GazeStatus.Valid;
 
             return new GazeData
@@ -196,8 +200,8 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
             apiFailureReported = true;
             Debug.LogWarning(
-                $"Varjo Eye Tracking: {operation} nicht verfuegbar. " +
-                $"Der Checkerboard-Stimulus laeuft weiter. {exception.Message}",
+                $"Varjo Eye Tracking: {operation} nicht verfügbar. " +
+                $"Der Checkerboard-Stimulus läuft weiter. {exception.Message}",
                 this);
         }
     }

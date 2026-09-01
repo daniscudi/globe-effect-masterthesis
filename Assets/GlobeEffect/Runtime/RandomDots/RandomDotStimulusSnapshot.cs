@@ -3,9 +3,9 @@ using System;
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
-    /// Vollstaendiger Parametersatz eines Random-Dot-Stimulus zu einem
+    /// Vollständiger Parametersatz eines Random-Dot-Stimulus zu einem
     /// bestimmten Zeitpunkt. Der Snapshot kann direkt in Trialdateien und
-    /// Eye-Tracking-Marker uebernommen werden.
+    /// Eye-Tracking-Marker übernommen werden.
     /// </summary>
     [Serializable]
     public struct RandomDotStimulusSnapshot

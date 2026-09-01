@@ -4,6 +4,10 @@ using UnityEngine;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
+    /// <summary>
+    /// Prüft die Koordinatentransformation der Blickstrahlen und die sichere
+    /// Aufbereitung von Kennungen für CSV-Spalten und Dateinamen.
+    /// </summary>
     public sealed class EyeTrackingToolboxTests
     {
         [Test]

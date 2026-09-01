@@ -14,7 +14,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
 {
     /// <summary>
     /// Erstellt eine sofort nutzbare Referenzszene. Die Szene wird beim ersten
-    /// Import automatisch angelegt und kann ueber das Tools-Menue zurueckgesetzt
+    /// Import automatisch angelegt und kann über das Tools-Menü zurückgesetzt
     /// werden. Dadurch bleibt der eigentliche Stimulus frei von XR-Rig-Details.
     /// </summary>
     [InitializeOnLoad]
@@ -28,6 +28,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         static CheckerboardDemoSceneBuilder()
         {
+            // Beim ersten Import sind noch nicht immer alle Unity-Pakete fertig
+            // geladen. delayCall verschiebt die Prüfung bis zum nächsten Editor-Takt.
             EditorApplication.delayCall += CreateSceneOnFirstImport;
         }
 
@@ -61,6 +63,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
             Directory.CreateDirectory(Path.GetDirectoryName(DemoScenePath));
 
             Scene previousActiveScene = SceneManager.GetActiveScene();
+            // Eine bereits geöffnete Arbeitsszene soll nicht ungefragt geschlossen
+            // werden. Nur eine leere Startszene oder die Demoszene selbst wird ersetzt.
             bool replaceUntitledScene = string.IsNullOrEmpty(previousActiveScene.path);
             bool replaceOpenDemoScene = replaceExistingScene &&
                 previousActiveScene.path == DemoScenePath;
@@ -88,6 +92,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
             try
             {
+                // Die Reihenfolge entspricht den Abhängigkeiten in der Szene:
+                // Kamera -> Stimulus -> Eye Tracking -> Trialsteuerung.
                 Camera camera = CreateXrOrigin();
                 VrCheckerboardStimulus stimulus = CreateStimulus(camera.transform);
                 EyeTrackingToolbox toolbox = CreateEyeTracking(
@@ -122,6 +128,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private static Camera CreateXrOrigin()
         {
+            // Diese Hierarchie entspricht der üblichen XRI-Struktur. Der Tracked
+            // Pose Driver bewegt nur die Kamera; der XR Origin bleibt der Weltbezug.
             GameObject originObject = new GameObject("XR Origin");
             XROrigin xrOrigin = originObject.AddComponent<XROrigin>();
 
@@ -133,7 +141,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             cameraObject.transform.SetParent(cameraOffset.transform, false);
 
             Camera camera = cameraObject.AddComponent<Camera>();
-            // Wird nur fuer die flache Game-View-Vorschau verwendet. Im XR-Betrieb
+            // Wird nur für die flache Game-View-Vorschau verwendet. Im XR-Betrieb
             // liefert das Headset seine eigenen Projektionsmatrizen und Winkel.
             camera.fieldOfView = 90f;
             camera.nearClipPlane = 0.01f;
@@ -156,8 +164,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private static void ConfigureTrackedPoseDriver(TrackedPoseDriver driver)
         {
-            // Direkte Actions vermeiden eine Abhaengigkeit von einem bestimmten
-            // Controller- oder Headset-Profil. Sie lesen nur die Center-Eye-Pose.
+            // Direkte Actions vermeiden eine Abhängigkeit von einem bestimmten
+            // Controller- oder Headset-Profil. Sie lesen ausschließlich die
+            // Center-Eye-Pose und funktionieren deshalb auch ohne Controller.
             InputAction position = new InputAction(
                 name: "HMD Position",
                 type: InputActionType.Value,
@@ -208,6 +217,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
             VrCheckerboardStimulus stimulus,
             out CheckerboardFixationMonitor fixationMonitor)
         {
+            // Kamera und Stimulus werden getrennt aufgezeichnet. Damit lässt sich
+            // später rekonstruieren, ob eine Änderung vom Kopf oder vom Recenter kam.
             GameObject toolboxObject = new GameObject("Eye Tracking Toolbox");
             EyeTrackingToolbox toolbox =
                 toolboxObject.AddComponent<EyeTrackingToolbox>();
@@ -258,6 +269,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private static void EnsureSceneIsInBuildSettings()
         {
+            // Unity startet XR-Szenen außerhalb des Editors nur zuverlässig, wenn
+            // sie in den Build Settings stehen. Vorhandene Einträge bleiben erhalten.
             EditorBuildSettingsScene[] currentScenes = EditorBuildSettings.scenes;
             foreach (EditorBuildSettingsScene scene in currentScenes)
             {

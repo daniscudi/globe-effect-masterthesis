@@ -3,6 +3,10 @@ using NUnit.Framework;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
+    /// <summary>
+    /// Prüft, dass nur vollständige Seitenwechsel zählen und wiederholte Samples
+    /// an derselben Kopfposition den Zähler nicht künstlich erhöhen.
+    /// </summary>
     public sealed class AlternatingHeadSweepCounterTests
     {
         [Test]

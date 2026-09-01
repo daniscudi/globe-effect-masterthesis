@@ -4,9 +4,9 @@ using UnityEngine;
 namespace GlobeEffect.VRCheckerboard.EyeTracking
 {
     /// <summary>
-    /// Uebertraegt die Fixationskontrolle aus dem Lab-Projekt auf den aktuellen
+    /// Überträgt die Fixationskontrolle aus dem Lab-Projekt auf den aktuellen
     /// Checkerboard-Mittelpunkt. Es gibt keine fest codierte Weltposition oder
-    /// Distanz; auch der aktive mono-/binokulare Augenmodus wird beruecksichtigt.
+    /// Distanz; auch der aktive mono-/binokulare Augenmodus wird berücksichtigt.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class CheckerboardFixationMonitor : MonoBehaviour
@@ -107,6 +107,8 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
                 return;
             }
 
+            // Gemessen wird die Winkelabweichung am Auge, nicht ein Abstand auf der
+            // Stimulusfläche. Dadurch bleibt die Toleranz bei jedem Abstand gleich.
             Vector3 targetDirection = stimulus.transform.position - gazeRay.origin;
             if (targetDirection.sqrMagnitude <= 1e-8f)
             {
@@ -126,8 +128,8 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
                 : 0d;
             previousSampleTime = gazeData.unityTimestamp;
 
-            // Lange Datenluecken duerfen nicht als kontinuierliche Fixation
-            // gewertet werden. 100 ms ist bewusst konservativ gewaehlt.
+            // Lange Datenlücken dürfen nicht als kontinuierliche Fixation
+            // gewertet werden. 100 ms ist bewusst konservativ gewählt.
             if (isInsideTolerance && previousState &&
                 sampleInterval >= 0d && sampleInterval <= 0.1d)
             {
@@ -147,6 +149,8 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private bool TrySelectGazeRay(GazeData gazeData, out Ray gazeRay)
         {
+            // Bei monokularer Darbietung muss dasselbe Auge für die Kontrolle
+            // verwendet werden. Nur im binokularen Modus gilt der kombinierte Strahl.
             switch (stimulus.EyePresentation)
             {
                 case CheckerboardEyePresentation.LeftEyeOnly:

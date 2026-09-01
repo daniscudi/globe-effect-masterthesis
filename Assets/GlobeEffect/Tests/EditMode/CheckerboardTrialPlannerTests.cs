@@ -4,6 +4,10 @@ using NUnit.Framework;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
+    /// <summary>
+    /// Prüft Vollständigkeit, Balance und reproduzierbare Randomisierung des
+    /// Checkerboard-Plans. Einzelne Parameter dürfen beim Mischen nicht zerfallen.
+    /// </summary>
     public sealed class CheckerboardTrialPlannerTests
     {
         [Test]

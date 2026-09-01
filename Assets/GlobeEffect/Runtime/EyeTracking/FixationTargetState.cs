@@ -1,8 +1,8 @@
 namespace GlobeEffect.VRCheckerboard.EyeTracking
 {
     /// <summary>
-    /// Eindeutiger Status fuer die Versuchsleiteranzeige. Ein ungueltiges
-    /// Gaze-Sample wird bewusst nicht mit einer gueltigen Fehlfixation
+    /// Eindeutiger Status für die Versuchsleiteranzeige. Ein ungültiges
+    /// Gaze-Sample wird bewusst nicht mit einer gültigen Fehlfixation
     /// zusammengefasst.
     /// </summary>
     public enum FixationTargetState

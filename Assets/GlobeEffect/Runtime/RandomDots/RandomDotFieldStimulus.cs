@@ -5,14 +5,14 @@ using UnityEngine.Rendering;
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
-    /// Erzeugt ein reproduzierbares, weltfestes Schwarz-Weiss-Punktfeld auf
+    /// Erzeugt ein reproduzierbares, weltfestes Schwarz-Weiß-Punktfeld auf
     /// einer sphärischen Kappe um die Ausgangsposition des Beobachters.
     ///
     /// Die Punkte selbst werden nicht animiert. Bei realer Kopfrotation
-    /// entsteht ihre Bewegung ausschliesslich aus der veraenderten Blickpose.
-    /// Der Shader bildet die momentanen Blickrichtungen anschliessend mit der
+    /// entsteht ihre Bewegung ausschließlich aus der veränderten Blickpose.
+    /// Der Shader bildet die momentanen Blickrichtungen anschließend mit der
     /// instrumentellen Merlitz-Gleichung ab. So bleibt der statische
-    /// Checkerboard-Test von diesem dynamischen Stabilitaetstest getrennt.
+    /// Checkerboard-Test von diesem dynamischen Stabilitätstest getrennt.
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
@@ -29,7 +29,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private Transform observer;
 
         [SerializeField, Range(5f, 170f)]
-        [Tooltip("Kreisfoermiger sichtbarer Winkeldurchmesser des Punktfelds.")]
+        [Tooltip("Kreisförmiger sichtbarer Winkeldurchmesser des Punktfelds.")]
         private float angularDiameterDegrees = 70f;
 
         [SerializeField, Min(MinimumRadiusMeters)]
@@ -58,7 +58,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private Color lightColor = Color.white;
 
         [SerializeField, Range(0f, 1f)]
-        [Tooltip("Anteil heller Punkte; 0.5 ergibt gleich viele schwarze und weisse Punkte.")]
+        [Tooltip("Anteil heller Punkte; 0.5 ergibt gleich viele schwarze und weiße Punkte.")]
         private float lightDotFraction = 0.5f;
 
         [Header("Merlitz-Abbildung")]
@@ -67,7 +67,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private float merlitzK = 0.7f;
 
         [SerializeField, Min(0.01f)]
-        [Tooltip("Paraxiale Vergroesserung m. Ohne Vergroesserung (m = 1) hat k keine Wirkung.")]
+        [Tooltip("Paraxiale Vergrößerung m. Ohne Vergrößerung (m = 1) hat k keine Wirkung.")]
         private float magnification = 10f;
 
         [SerializeField]
@@ -93,7 +93,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private float simulatedYawAmplitudeDegrees = 3f;
 
         [SerializeField, Range(0.05f, 2f)]
-        [Tooltip("Nur im Debug-Modus: vollstaendige Links-Rechts-Zyklen pro Sekunde.")]
+        [Tooltip("Nur im Debug-Modus: vollständige Links-Rechts-Zyklen pro Sekunde.")]
         private float simulatedYawFrequencyHz = 0.5f;
 
         [Header("Darstellung und Technik")]
@@ -162,10 +162,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             Vector3.forward * fieldRadiusMeters);
 
         /// <summary>
-        /// Berechnet den tatsaechlich auf dem Display dargestellten Strahl zum
+        /// Berechnet den tatsächlich auf dem Display dargestellten Strahl zum
         /// Fixationspunkt. Bei einem verzerrten, seitlich liegenden Weltpunkt
         /// unterscheidet er sich bewusst vom geometrischen Strahl zum Punkt.
-        /// Eye-Tracking muss gegen diese dargestellte Richtung geprueft werden.
+        /// Eye-Tracking muss gegen diese dargestellte Richtung geprüft werden.
         /// </summary>
         public bool TryGetRenderedFixationWorldDirection(
             Vector3 gazeOriginWorld,
@@ -521,8 +521,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             int vertexIndex = dotIndex * 4;
             // Alle vier Vertices tragen dasselbe weltfeste Zentrum. Erst nach
             // der radialen Abbildung erweitert der Shader daraus einen Kreis
-            // in konstanten Winkelkoordinaten. Dadurch veraendert k nicht
-            // unbeabsichtigt die Punktgroesse.
+            // in konstanten Winkelkoordinaten. Dadurch verändert k nicht
+            // unbeabsichtigt die Punktgröße.
             vertices[vertexIndex] = center;
             vertices[vertexIndex + 1] = center;
             vertices[vertexIndex + 2] = center;

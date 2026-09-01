@@ -5,9 +5,9 @@ using GlobeEffect.VRCheckerboard.RandomDots;
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
     /// <summary>
-    /// Erzeugt und randomisiert vollstaendige Random-Dot-Bedingungen. Die
-    /// Punkt-Seeds haengen von Bedingung und Wiederholung ab, nicht von der
-    /// spaeter gemischten Reihenfolge.
+    /// Erzeugt und randomisiert vollständige Random-Dot-Bedingungen. Die
+    /// Punkt-Seeds hängen von Bedingung und Wiederholung ab, nicht von der
+    /// später gemischten Reihenfolge.
     /// </summary>
     public static class RandomDotTrialPlanner
     {
@@ -57,6 +57,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             var trials = new List<RandomDotTrial>();
             int conditionIndex = 0;
+            // Jede Kombination aus FOV, Auge, Start-k, Vergrößerung und Bewegung
+            // wird für jede Wiederholung genau einmal angelegt.
             foreach (float angularDiameter in angularDiametersDegrees)
             {
                 foreach (CheckerboardEyePresentation eye in eyePresentations)
@@ -72,6 +74,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                                 {
                                     int dotSeed = unchecked(
                                         dotSeedBase + conditionIndex * 1009 + repetition * 9176);
+                                    // Der Punkt-Seed hängt von der fachlichen Bedingung
+                                    // ab und ändert sich daher nicht durch die Mischung.
                                     trials.Add(new RandomDotTrial(
                                         sequenceIndex: 0,
                                         conditionIndex,
@@ -90,6 +94,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             var random = new Random(randomSeed);
+            // Reproduzierbare Fisher-Yates-Mischung der vollständigen Trials.
             for (int index = trials.Count - 1; index > 0; index--)
             {
                 int swapIndex = random.Next(index + 1);

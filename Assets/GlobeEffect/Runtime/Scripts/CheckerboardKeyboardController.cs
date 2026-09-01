@@ -5,8 +5,8 @@ using UnityEngine.InputSystem;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Einfache Bedienung fuer technische Tests im Unity Play Mode.
-    /// Die Klasse ist bewusst von einer spaeteren Trial-Steuerung getrennt.
+    /// Einfache Bedienung für technische Tests im Unity Play Mode.
+    /// Die Klasse ist bewusst von einer späteren Trial-Steuerung getrennt.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(VrCheckerboardStimulus))]
@@ -22,23 +22,23 @@ namespace GlobeEffect.VRCheckerboard
         private Key decreaseKKey = Key.LeftArrow;
 
         [SerializeField]
-        [Tooltip("Taste zum Erhoehen des Merlitz-Parameters k.")]
+        [Tooltip("Taste zum Erhöhen des Merlitz-Parameters k.")]
         private Key increaseKKey = Key.RightArrow;
 
         [SerializeField, Range(0.001f, 0.1f)]
-        [Tooltip("Aenderung von k pro Tastendruck. Mit Shift wird die Schrittweite verfuenffacht.")]
+        [Tooltip("Änderung von k pro Tastendruck. Mit Shift wird die Schrittweite verfünffacht.")]
         private float kStep = 0.01f;
 
         [SerializeField]
-        [Tooltip("Schreibt Recenter- und k-Aenderungen in die Unity Console.")]
+        [Tooltip("Schreibt Recenter- und k-Änderungen in die Unity Console.")]
         private bool logChanges = true;
 
         private VrCheckerboardStimulus stimulus;
 
-        /// <summary>Wird nach einer manuellen k-Aenderung ausgeloest.</summary>
+        /// <summary>Wird nach einer manuellen k-Änderung ausgelöst.</summary>
         public event Action<float, float> KChanged;
 
-        /// <summary>Wird nach einer manuellen Neupositionierung ausgeloest.</summary>
+        /// <summary>Wird nach einer manuellen Neupositionierung ausgelöst.</summary>
         public event Action Recentered;
 
         public float KStep => kStep;
@@ -75,7 +75,7 @@ namespace GlobeEffect.VRCheckerboard
 
         /// <summary>
         /// Platziert den Stimulus in der aktuellen Center-Eye-Blickrichtung.
-        /// Die laufende Follow-Einstellung wird dadurch nicht veraendert.
+        /// Die laufende Follow-Einstellung wird dadurch nicht verändert.
         /// </summary>
         public void Recenter()
         {

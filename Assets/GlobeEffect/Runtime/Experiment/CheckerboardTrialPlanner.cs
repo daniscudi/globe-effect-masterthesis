@@ -29,6 +29,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             var trials = new List<CheckerboardTrial>();
             int conditionIndex = 0;
 
+            // Die verschachtelten Schleifen bilden das kartesische Produkt aller
+            // Inspector-Listen. Eine Bedingung bleibt dabei immer als Ganzes erhalten.
             foreach (float angularDiameter in angularDiametersDegrees)
             {
                 foreach (float distance in viewingDistancesMeters)
@@ -56,6 +58,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             var random = new Random(randomSeed);
+            // Fisher-Yates mischt gleichverteilt und ist mit demselben Seed exakt
+            // reproduzierbar. Erst nach dem Mischen werden die Laufnummern vergeben.
             for (int index = trials.Count - 1; index > 0; index--)
             {
                 int swapIndex = random.Next(index + 1);
@@ -100,7 +104,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 {
                     throw new ArgumentOutOfRangeException(
                         nameof(angularDiametersDegrees),
-                        "Winkeldurchmesser muessen zwischen 1 und 170 Grad liegen.");
+                        "Winkeldurchmesser müssen zwischen 1 und 170 Grad liegen.");
                 }
             }
 
@@ -110,7 +114,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 {
                     throw new ArgumentOutOfRangeException(
                         nameof(viewingDistancesMeters),
-                        "Abstaende muessen mindestens 0.05 Meter betragen.");
+                        "Abstände müssen mindestens 0.05 Meter betragen.");
                 }
             }
 
@@ -120,7 +124,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 {
                     throw new ArgumentOutOfRangeException(
                         nameof(startingKValues),
-                        "Startwerte fuer k muessen zwischen 0 und 1 liegen.");
+                        "Startwerte für k müssen zwischen 0 und 1 liegen.");
                 }
             }
         }

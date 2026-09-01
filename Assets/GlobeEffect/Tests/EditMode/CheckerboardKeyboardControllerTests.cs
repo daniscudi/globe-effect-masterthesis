@@ -3,6 +3,10 @@ using UnityEngine;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
+    /// <summary>
+    /// Testet die öffentliche Tastatur-API ohne reale Tastendrücke. Dabei werden
+    /// Wertebegrenzung und Recenter-Ereignis unabhängig vom Headset geprüft.
+    /// </summary>
     public sealed class CheckerboardKeyboardControllerTests
     {
         [Test]

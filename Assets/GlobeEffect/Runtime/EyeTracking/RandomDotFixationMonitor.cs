@@ -5,9 +5,9 @@ using UnityEngine;
 namespace GlobeEffect.VRCheckerboard.EyeTracking
 {
     /// <summary>
-    /// Prueft, ob der Blick beim Kopfschwenk auf dem weltfesten roten
+    /// Prüft, ob der Blick beim Kopfschwenk auf dem weltfesten roten
     /// Fixationspunkt des Random-Dot-Felds bleibt. Die Augenwahl folgt der
-    /// tatsaechlichen mono-/binokularen Darbietung.
+    /// tatsächlichen mono-/binokularen Darbietung.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RandomDotFixationMonitor : MonoBehaviour
@@ -106,6 +106,9 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
                 return;
             }
 
+            // Beim verzerrten Punktfeld stimmt die unverzerrte Vorwärtsrichtung
+            // nicht zwingend mit dem gerenderten Fixationspunkt überein. Der Stimulus
+            // liefert deshalb selbst die tatsächlich dargestellte Zielrichtung.
             if (!stimulus.TryGetRenderedFixationWorldDirection(
                 gazeRay.origin,
                 out Vector3 targetDirection))
@@ -126,6 +129,8 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
                 : 0d;
             previousSampleTime = gazeData.unityTimestamp;
 
+            // Eine Unterbrechung oder Datenlücke startet das Zeitfenster neu. So
+            // werden getrennte kurze Blicke nicht zu einer langen Fixation addiert.
             if (isInsideTolerance && previousState &&
                 sampleInterval >= 0d && sampleInterval <= 0.1d)
             {
@@ -145,6 +150,8 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private bool TrySelectGazeRay(GazeData gazeData, out Ray gazeRay)
         {
+            // Augenwahl und sichtbarer Stimulus müssen übereinstimmen; andernfalls
+            // könnte das verdeckte Auge die Fixationsfreigabe auslösen.
             switch (stimulus.EyePresentation)
             {
                 case CheckerboardEyePresentation.LeftEyeOnly:

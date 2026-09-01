@@ -64,6 +64,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             string folderStem = safeSession + "_" + timestamp;
             string sessionFolder = Path.Combine(participantFolder, folderStem);
             int suffix = 1;
+            // Falls zwei Sitzungen dieselbe Sekundenangabe besitzen, verhindert
+            // der Suffix ein Überschreiben der ersten Messung.
             while (Directory.Exists(sessionFolder))
             {
                 sessionFolder = Path.Combine(
@@ -85,6 +87,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public void WritePlan(IReadOnlyList<RandomDotTrial> trials)
         {
+            // Der vollständige randomisierte Plan wird vor der Messung gesichert.
+            // Dot-Seed und Bedingungsnummer sind damit unabhängig rekonstruierbar.
             var builder = new StringBuilder(2048);
             builder.AppendLine(
                 "participant_id,session_label,session_start_utc,random_seed," +
@@ -113,6 +117,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public void AppendResult(RandomDotTrialResult result, int totalTrials)
         {
+            // Pro abgeschlossenem Trial wird genau eine Zeile geschrieben. Neben
+            // der Antwort enthält sie Bewegungsumfang, Sweep-Zahl und Fixationswerte.
             var builder = new StringBuilder(1024);
             RandomDotTrial trial = result.Trial;
             AppendSessionPrefix(builder);
@@ -214,6 +220,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             string value,
             bool terminateRow = false)
         {
+            // Felder werden nur dann in Anführungszeichen gesetzt, wenn CSV-Syntax
+            // oder ein Zeilenumbruch es erfordern. Eingebettete Anführungszeichen
+            // müssen nach CSV-Regel doppelt geschrieben werden.
             string safeValue = value ?? string.Empty;
             bool quote = safeValue.IndexOf(',') >= 0 ||
                 safeValue.IndexOf('"') >= 0 ||

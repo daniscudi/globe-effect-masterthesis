@@ -3,7 +3,7 @@ using System;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Unveraenderlicher Parameter-Snapshot fuer Trial-Logging und spaetere
+    /// Unveränderlicher Parameter-Snapshot für Trial-Logging und spätere
     /// Eye-Tracking-Integration. Die Zeit basiert auf Unitys Realtime-Uhr.
     /// </summary>
     [Serializable]

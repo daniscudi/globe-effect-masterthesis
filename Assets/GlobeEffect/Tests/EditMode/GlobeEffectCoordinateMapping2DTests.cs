@@ -4,6 +4,10 @@ using UnityEngine;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
+    /// <summary>
+    /// Vergleicht Vorwärts-/Rückabbildung, Schwenkbahn und die separable sowie
+    /// radiale 2D-Darstellung mit ihren analytischen Sonderfällen.
+    /// </summary>
     public sealed class GlobeEffectCoordinateMapping2DTests
     {
         [Test]

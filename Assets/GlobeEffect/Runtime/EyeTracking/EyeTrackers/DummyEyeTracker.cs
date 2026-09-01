@@ -6,7 +6,7 @@ using Stopwatch = System.Diagnostics.Stopwatch;
 namespace GlobeEffect.VRCheckerboard.EyeTracking
 {
     /// <summary>
-    /// Simulierter Provider fuer Editor-Tests ohne Headset. Der Blick folgt
+    /// Simulierter Provider für Editor-Tests ohne Headset. Der Blick folgt
     /// der Mausposition in der Game View oder, ohne Maus, der Kameramitte.
     /// </summary>
     [DisallowMultipleComponent]

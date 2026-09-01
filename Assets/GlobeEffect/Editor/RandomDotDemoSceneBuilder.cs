@@ -14,7 +14,7 @@ using Unity.XR.CoreUtils;
 namespace GlobeEffect.VRCheckerboard.Editor
 {
     /// <summary>
-    /// Erstellt eine eigenstaendige Referenzszene fuer den dynamischen
+    /// Erstellt eine eigenständige Referenzszene für den dynamischen
     /// Random-Dot-k-Test. Checkerboard und Punktfeld bleiben in getrennten
     /// Szenen, teilen aber XR-Rig, Eye-Tracking-Toolbox und Datenformat.
     /// </summary>
@@ -29,6 +29,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         static RandomDotDemoSceneBuilder()
         {
+            // Die Prüfung läuft verzögert, weil Unity während des ersten Imports
+            // noch Skripte und Pakete laden kann.
             EditorApplication.delayCall += CreateSceneOnFirstImport;
         }
 
@@ -62,6 +64,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
             Directory.CreateDirectory(Path.GetDirectoryName(DemoScenePath));
 
             Scene previousActiveScene = SceneManager.GetActiveScene();
+            // Eigene geöffnete Szenen bleiben unangetastet. Die Demo wird dann
+            // additiv erstellt, gespeichert und anschließend wieder geschlossen.
             bool replaceUntitledScene = string.IsNullOrEmpty(previousActiveScene.path);
             bool replaceOpenDemoScene = replaceExistingScene &&
                 previousActiveScene.path == DemoScenePath;
@@ -89,6 +93,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
             try
             {
+                // Der Sweep-Monitor sitzt direkt am Punktfeld, verwendet aber die
+                // getrackte Kamera als Kopfpose. Eye Tracking bleibt ein eigenes Modul.
                 Camera camera = CreateXrOrigin();
                 RandomDotFieldStimulus stimulus = CreateStimulus(camera.transform);
                 RandomDotHeadSweepMonitor sweepMonitor =
@@ -132,6 +138,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private static Camera CreateXrOrigin()
         {
+            // XR Origin und Camera Offset bilden den stabilen Weltbezug; nur die
+            // Main Camera erhält in Play Mode die Center-Eye-Pose des Headsets.
             GameObject originObject = new GameObject("XR Origin");
             XROrigin xrOrigin = originObject.AddComponent<XROrigin>();
 
@@ -162,6 +170,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private static void ConfigureTrackedPoseDriver(TrackedPoseDriver driver)
         {
+            // Es werden nur HMD-Pose und Trackingstatus benötigt. Deshalb kann die
+            // Demoszene ohne Controller-Actions oder eigenes Input-Asset auskommen.
             InputAction position = new InputAction(
                 name: "HMD Position",
                 type: InputActionType.Value,
@@ -188,6 +198,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private static RandomDotFieldStimulus CreateStimulus(Transform observer)
         {
+            // Diese Werte sind technische Startwerte für die Funktionsprüfung und
+            // noch keine festgelegten Bedingungen des späteren Experiments.
             GameObject stimulusObject = new GameObject("Random Dot Field");
             RandomDotFieldStimulus stimulus =
                 stimulusObject.AddComponent<RandomDotFieldStimulus>();
@@ -210,6 +222,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
             RandomDotFieldStimulus stimulus,
             out RandomDotFixationMonitor fixationMonitor)
         {
+            // Die Toolbox schreibt Blickdaten und die Transformationen von Kopf
+            // und Punktfeld in zeitlich zuordenbare CSV-Dateien.
             GameObject toolboxObject = new GameObject("Eye Tracking Toolbox");
             EyeTrackingToolbox toolbox =
                 toolboxObject.AddComponent<EyeTrackingToolbox>();
@@ -257,6 +271,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private static void EnsureSceneIsInBuildSettings()
         {
+            // Bestehende Build-Szenen werden übernommen; die Demo wird höchstens
+            // einmal und standardmäßig aktiviert ergänzt.
             EditorBuildSettingsScene[] currentScenes = EditorBuildSettings.scenes;
             foreach (EditorBuildSettingsScene scene in currentScenes)
             {

@@ -3,9 +3,9 @@ using System;
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
-    /// Zaehlt nur echte Wechsel zwischen linker und rechter Winkelschwelle.
-    /// Mehrere Frames auf derselben Seite duerfen keinen weiteren Sweep
-    /// erzeugen. Die Klasse ist unabhaengig von Unity-Transforms testbar.
+    /// Zählt nur echte Wechsel zwischen linker und rechter Winkelschwelle.
+    /// Mehrere Frames auf derselben Seite dürfen keinen weiteren Sweep
+    /// erzeugen. Die Klasse ist unabhängig von Unity-Transforms testbar.
     /// </summary>
     public sealed class AlternatingHeadSweepCounter
     {

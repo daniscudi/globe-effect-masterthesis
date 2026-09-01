@@ -6,7 +6,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     /// <summary>
     /// Misst horizontale Kopfbewegungen relativ zur Trial-Startpose. Im
     /// simulierten Debug-Modus wird stattdessen der technische Shader-Schwenk
-    /// ausgewertet. Dadurch bleibt die Trialsteuerung fuer beide Modi gleich.
+    /// ausgewertet. Dadurch bleibt die Trialsteuerung für beide Modi gleich.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RandomDotHeadSweepMonitor : MonoBehaviour

@@ -124,6 +124,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             string folderStem = timestamp + "_" + safeSession;
             string sessionFolder = Path.Combine(participantFolder, folderStem);
             int suffix = 1;
+            // Ein vorhandener Ordner wird nie überschrieben. Das ist besonders
+            // wichtig, wenn am selben Rechner mehrere kurze Testläufe stattfinden.
             while (Directory.Exists(sessionFolder))
             {
                 sessionFolder = Path.Combine(
@@ -151,6 +153,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 throw new ArgumentNullException(nameof(trials));
             }
 
+            // Der Plan wird vor dem ersten Trial vollständig geschrieben. So ist
+            // die vorgesehene Reihenfolge auch nach einem Programmabbruch erhalten.
             var builder = new StringBuilder(2048);
             builder.AppendLine(
                 "participant_id,session_label,session_start_utc,random_seed," +
@@ -183,6 +187,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 throw new ArgumentNullException(nameof(result));
             }
 
+            // Jede bestätigte oder abgebrochene Antwort wird sofort angehängt.
+            // Bereits erhobene Trials bleiben dadurch bei einem Absturz lesbar.
             var builder = new StringBuilder(768);
             CheckerboardTrial trial = result.Trial;
             AppendSessionPrefix(builder);
@@ -215,6 +221,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public static string SanitizeIdentifier(string value, string fallback)
         {
+            // Teilnehmer- und Sitzungskennung werden Teil eines Dateipfads. Andere
+            // Zeichen werden daher vereinheitlicht, der fachliche Wert in der CSV
+            // bleibt aber anhand der bereinigten Kennung eindeutig nachvollziehbar.
             string source = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
             var builder = new StringBuilder(source.Length);
             bool previousWasSeparator = false;
@@ -310,6 +319,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             string value,
             bool terminateRow = false)
         {
+            // Standardmäßiges CSV-Escaping: Felder mit Komma, Anführungszeichen
+            // oder Zeilenumbruch werden zitiert; Anführungszeichen werden verdoppelt.
             string safeValue = value ?? string.Empty;
             bool quote = safeValue.IndexOf(',') >= 0 ||
                 safeValue.IndexOf('"') >= 0 ||

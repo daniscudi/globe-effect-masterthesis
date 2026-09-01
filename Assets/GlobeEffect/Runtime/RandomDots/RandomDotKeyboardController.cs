@@ -6,7 +6,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
     /// Technische und experimentelle Tastaturbedienung des Punktfelds. Die
-    /// Trialsteuerung hoert nur auf die Ereignisse und bleibt dadurch spaeter
+    /// Trialsteuerung hört nur auf die Ereignisse und bleibt dadurch später
     /// problemlos durch Controller-Eingaben oder eine UI ersetzbar.
     /// </summary>
     [DisallowMultipleComponent]
@@ -24,7 +24,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private Key increaseKKey = Key.RightArrow;
 
         [SerializeField, Range(0.001f, 0.1f)]
-        [Tooltip("Aenderung pro Tastendruck; Shift verfuenffacht die Schrittweite.")]
+        [Tooltip("Änderung pro Tastendruck; Shift verfünffacht die Schrittweite.")]
         private float kStep = 0.01f;
 
         [SerializeField]

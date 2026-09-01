@@ -3,6 +3,10 @@ using NUnit.Framework;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
+    /// <summary>
+    /// Hält die drei Anzeigezustände auseinander: ungültiges Sample, gültiger
+    /// Blick außerhalb der Toleranz und gültiger Blick auf dem Ziel.
+    /// </summary>
     public sealed class FixationTargetStateTests
     {
         [TestCase(false, false, FixationTargetState.NoValidGaze)]
