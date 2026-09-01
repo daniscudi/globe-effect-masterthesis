@@ -164,18 +164,47 @@ namespace GlobeEffect.VRCheckerboard.Editor
                         checkerboardSession?.CurrentTrialNumber ?? 0,
                         checkerboardSession?.TotalTrials ?? 0));
                 EditorGUILayout.LabelField(
-                    "k",
+                    "Gültig abgeschlossen",
+                    checkerboardSession != null
+                        ? checkerboardSession.ValidTrialsCompleted.ToString(
+                            CultureInfo.InvariantCulture)
+                        : "–");
+                EditorGUILayout.LabelField(
+                    "Präsentationen",
+                    checkerboardSession != null
+                        ? checkerboardSession.PresentationCount.ToString(
+                            CultureInfo.InvariantCulture)
+                        : "–");
+                EditorGUILayout.LabelField(
+                    "Visual-Space l",
                     checkerboardStimulus != null
-                        ? checkerboardStimulus.MerlitzK.ToString("F3", CultureInfo.InvariantCulture)
+                        ? checkerboardStimulus.VisualSpaceL.ToString(
+                            "F3",
+                            CultureInfo.InvariantCulture)
+                        : "–");
+                EditorGUILayout.LabelField(
+                    "FOV",
+                    checkerboardStimulus != null
+                        ? checkerboardStimulus.AngularDiameterDegrees.ToString(
+                            "F1",
+                            CultureInfo.InvariantCulture) + "°"
                         : "–");
                 EditorGUILayout.LabelField(
                     "Augenmodus",
                     checkerboardStimulus != null
                         ? checkerboardStimulus.EyePresentation.ToString()
                         : "–");
-                DrawConfirmationGate(
+                EditorGUILayout.LabelField(
+                    "Antwort",
                     checkerboardSession != null &&
-                    checkerboardSession.RequireFixationBeforeConfirmation);
+                    checkerboardSession.ResponseKeysSwapped
+                        ? "← konvex   |   konkav →"
+                        : "← konkav   |   konvex →");
+                EditorGUILayout.LabelField(
+                    "Fixationsbruch",
+                    checkerboardSession != null && checkerboardSession.RequireFixation
+                        ? "Trial ungültig, Wiederholung hinten"
+                        : "Kontrolle ausgeschaltet");
             }
         }
 

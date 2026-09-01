@@ -3,8 +3,9 @@ using System;
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
     /// <summary>
-    /// Vollständige, unveränderliche Bedingung eines Checkerboard-Trials.
-    /// Alle gemeinsam randomisierten Werte bleiben dadurch als Einheit erhalten.
+    /// Eine vorab geplante Checkerboard-Bedingung. SequenceIndex bezeichnet die
+    /// Stelle im ursprünglichen randomisierten Plan. Wenn die Fixation ungültig
+    /// war, bleibt diese Nummer gleich und nur AttemptNumber wird erhöht.
     /// </summary>
     [Serializable]
     public sealed class CheckerboardTrial
@@ -12,30 +13,27 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public int SequenceIndex { get; }
         public int ConditionIndex { get; }
         public int Repetition { get; }
+        public int AttemptNumber { get; }
         public float AngularDiameterDegrees { get; }
-        public float ViewingDistanceMeters { get; }
         public CheckerboardEyePresentation EyePresentation { get; }
-        public float StartingK { get; }
-        public float Magnification { get; }
+        public float VisualSpaceL { get; }
 
         public CheckerboardTrial(
             int sequenceIndex,
             int conditionIndex,
             int repetition,
+            int attemptNumber,
             float angularDiameterDegrees,
-            float viewingDistanceMeters,
             CheckerboardEyePresentation eyePresentation,
-            float startingK,
-            float magnification)
+            float visualSpaceL)
         {
             SequenceIndex = sequenceIndex;
             ConditionIndex = conditionIndex;
             Repetition = repetition;
+            AttemptNumber = attemptNumber;
             AngularDiameterDegrees = angularDiameterDegrees;
-            ViewingDistanceMeters = viewingDistanceMeters;
             EyePresentation = eyePresentation;
-            StartingK = startingK;
-            Magnification = magnification;
+            VisualSpaceL = visualSpaceL;
         }
 
         internal CheckerboardTrial WithSequenceIndex(int sequenceIndex)
@@ -44,11 +42,22 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 sequenceIndex,
                 ConditionIndex,
                 Repetition,
+                AttemptNumber,
                 AngularDiameterDegrees,
-                ViewingDistanceMeters,
                 EyePresentation,
-                StartingK,
-                Magnification);
+                VisualSpaceL);
+        }
+
+        public CheckerboardTrial CreateRepeatedAttempt()
+        {
+            return new CheckerboardTrial(
+                SequenceIndex,
+                ConditionIndex,
+                Repetition,
+                AttemptNumber + 1,
+                AngularDiameterDegrees,
+                EyePresentation,
+                VisualSpaceL);
         }
     }
 }

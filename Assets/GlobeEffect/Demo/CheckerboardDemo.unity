@@ -152,12 +152,8 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.VrCheckerboardStimulus
   observer: {fileID: 799610645}
-  angularDiameterDegrees: 70
-  viewingDistanceMeters: 1
-  followObserverEveryFrame: 0
-  placeOnFirstTrackedPose: 1
-  merlitzK: 0.7
-  magnification: 10
+  angularDiameterDegrees: 90
+  visualSpaceL: 0.5
   checksAcrossDiameter: 16
   darkColor: {r: 0, g: 0, b: 0, a: 1}
   lightColor: {r: 1, g: 1, b: 1, a: 1}
@@ -165,8 +161,8 @@ MonoBehaviour:
   showFixationTarget: 1
   fixationTargetSizeDegrees: 0.5
   fixationColor: {r: 1, g: 0, b: 0, a: 1}
+  fixationBackgroundColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   visibleAtStart: 1
-  diskSegments: 128
   materialOverride: {fileID: 0}
 --- !u!114 &607094979
 MonoBehaviour:
@@ -180,11 +176,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 62c8d71bc1444a74b2df18cfc08695e4, type: 3}
   m_Name:
   m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.CheckerboardKeyboardController
-  recenterKey: 32
-  decreaseKKey: 61
-  increaseKKey: 62
-  kStep: 0.01
-  logChanges: 1
+  concaveKey: 61
+  convexKey: 62
+  logResponses: 0
+  swapResponseKeys: 0
 --- !u!23 &607094976
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -784,31 +779,35 @@ MonoBehaviour:
   fixationMonitor: {fileID: 1800000004}
   participantId: pilot_001
   sessionLabel: checkerboard_pilot
-  randomSeed: 20260827
+  randomSeed: 20260901
   outputRoot:
   autoStartOnPlay: 0
   angularDiametersDegrees:
-  - 70
-  viewingDistancesMeters:
-  - 1
+  - 90
   eyePresentations:
   - 0
+  visualSpaceLValues:
+  - 1.2
   - 1
-  - 2
-  startingKValues:
-  - 0.3
-  - 0.9
-  magnification: 10
-  repetitionsPerCondition: 1
-  recenterAtTrialStart: 1
+  - 0.8
+  - 0.6
+  - 0.5
+  - 0.4
+  - 0.2
+  repetitionsPerCondition: 3
+  requireFixation: 1
+  maximumOffTargetSeconds: 0.15
+  maximumInvalidGazeSeconds: 0.2
+  maximumGazeSampleAgeSeconds: 0.1
+  maximumAttemptsPerTrial: 0
   interTrialSeconds: 0.5
-  requireFixationBeforeConfirmation: 0
   startSessionKey: 98
-  confirmTrialKey: 2
   abortSessionKey: 99
   sessionState: 0
   currentTrialNumber: 0
   totalTrials: 0
+  validTrialsCompleted: 0
+  presentationCount: 0
   activeSessionFolder:
 --- !u!1660057539 &9223372036854775807
 SceneRoots:

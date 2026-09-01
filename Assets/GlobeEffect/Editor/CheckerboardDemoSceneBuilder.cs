@@ -199,13 +199,12 @@ namespace GlobeEffect.VRCheckerboard.Editor
             VrCheckerboardStimulus stimulus =
                 stimulusObject.AddComponent<VrCheckerboardStimulus>();
 
-            // Referenzwerte aus der dokumentierten Ausgangskonfiguration.
+            // Startwerte für einen kurzen technischen Pilottest. Der eigentliche
+            // Trialplan wird am Session Controller im Inspector eingestellt.
             stimulus.Observer = observer;
-            stimulus.SetGeometry(70f, 1f);
-            stimulus.SetMerlitzK(0.7f);
-            stimulus.SetMagnification(10f);
+            stimulus.SetAngularDiameter(90f);
+            stimulus.SetVisualSpaceL(0.5f);
             stimulus.SetEyePresentation(CheckerboardEyePresentation.BothEyes);
-            stimulus.PlaceInFrontOfObserver();
             stimulusObject.AddComponent<CheckerboardKeyboardController>();
 
             Selection.activeGameObject = stimulusObject;
@@ -217,8 +216,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
             VrCheckerboardStimulus stimulus,
             out CheckerboardFixationMonitor fixationMonitor)
         {
-            // Kamera und Stimulus werden getrennt aufgezeichnet. Damit lässt sich
-            // später rekonstruieren, ob eine Änderung vom Kopf oder vom Recenter kam.
+            // Kamera und Stimulus werden weiterhin getrennt aufgezeichnet. Die
+            // Toolbox-Struktur aus dem Lab bleibt dadurch erhalten.
             GameObject toolboxObject = new GameObject("Eye Tracking Toolbox");
             EyeTrackingToolbox toolbox =
                 toolboxObject.AddComponent<EyeTrackingToolbox>();

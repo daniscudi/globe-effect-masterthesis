@@ -3,31 +3,27 @@ using UnityEngine;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
-    /// <summary>
-    /// Testet die öffentliche Tastatur-API ohne reale Tastendrücke. Dabei werden
-    /// Wertebegrenzung und Recenter-Ereignis unabhängig vom Headset geprüft.
-    /// </summary>
     public sealed class CheckerboardKeyboardControllerTests
     {
-        [Test]
-        public void ChangeK_ClampsToDocumentedRange()
+        [TestCase(CheckerboardCurvatureResponse.Concave)]
+        [TestCase(CheckerboardCurvatureResponse.Convex)]
+        public void SubmitResponse_RaisesSelectedAnswer(
+            CheckerboardCurvatureResponse expected)
         {
             GameObject gameObject = new GameObject("Keyboard controller test");
 
             try
             {
-                VrCheckerboardStimulus stimulus =
-                    gameObject.AddComponent<VrCheckerboardStimulus>();
+                gameObject.AddComponent<VrCheckerboardStimulus>();
                 CheckerboardKeyboardController controller =
                     gameObject.AddComponent<CheckerboardKeyboardController>();
+                CheckerboardCurvatureResponse received =
+                    CheckerboardCurvatureResponse.None;
+                controller.ResponseSubmitted += response => received = response;
 
-                stimulus.SetMerlitzK(0.99f);
-                controller.ChangeK(0.05f);
-                Assert.That(stimulus.MerlitzK, Is.EqualTo(1f));
+                controller.SubmitResponse(expected);
 
-                stimulus.SetMerlitzK(0.01f);
-                controller.ChangeK(-0.05f);
-                Assert.That(stimulus.MerlitzK, Is.EqualTo(0f));
+                Assert.That(received, Is.EqualTo(expected));
             }
             finally
             {
@@ -36,41 +32,25 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [Test]
-        public void Recenter_PlacesStimulusOnCurrentViewAxis()
+        public void SubmitNone_DoesNotRaiseAnswer()
         {
-            GameObject observerObject = new GameObject("Observer");
-            GameObject stimulusObject = new GameObject("Stimulus");
+            GameObject gameObject = new GameObject("Keyboard controller test");
 
             try
             {
-                observerObject.transform.SetPositionAndRotation(
-                    new Vector3(1f, 1.7f, -2f),
-                    Quaternion.Euler(8f, 25f, 0f));
-
-                VrCheckerboardStimulus stimulus =
-                    stimulusObject.AddComponent<VrCheckerboardStimulus>();
-                stimulus.Observer = observerObject.transform;
-                stimulus.SetGeometry(70f, 1.5f);
-
+                gameObject.AddComponent<VrCheckerboardStimulus>();
                 CheckerboardKeyboardController controller =
-                    stimulusObject.AddComponent<CheckerboardKeyboardController>();
-                stimulusObject.transform.position = Vector3.zero;
-                controller.Recenter();
+                    gameObject.AddComponent<CheckerboardKeyboardController>();
+                int eventCount = 0;
+                controller.ResponseSubmitted += _ => eventCount++;
 
-                Vector3 expectedPosition = observerObject.transform.position +
-                    observerObject.transform.forward * 1.5f;
-                Assert.That(
-                    Vector3.Distance(stimulusObject.transform.position, expectedPosition),
-                    Is.LessThan(1e-5f));
-                Assert.That(
-                    Vector3.Angle(stimulusObject.transform.forward,
-                        observerObject.transform.forward),
-                    Is.LessThan(1e-4f));
+                controller.SubmitResponse(CheckerboardCurvatureResponse.None);
+
+                Assert.That(eventCount, Is.Zero);
             }
             finally
             {
-                Object.DestroyImmediate(stimulusObject);
-                Object.DestroyImmediate(observerObject);
+                Object.DestroyImmediate(gameObject);
             }
         }
     }

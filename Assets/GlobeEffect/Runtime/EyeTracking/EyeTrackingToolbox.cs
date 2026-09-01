@@ -729,11 +729,10 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         {
             return string.Format(
                 CultureInfo.InvariantCulture,
-                "{0};k={1:F3};fov={2:F2};distance={3:F3};eye={4}",
+                "{0};visual_space_l={1:F3};fov_deg={2:F2};eye={3}",
                 eventName,
-                snapshot.merlitzK,
+                snapshot.visualSpaceL,
                 snapshot.angularDiameterDegrees,
-                snapshot.viewingDistanceMeters,
                 snapshot.eyePresentation);
         }
 

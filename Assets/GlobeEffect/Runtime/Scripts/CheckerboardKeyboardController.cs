@@ -5,8 +5,9 @@ using UnityEngine.InputSystem;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Einfache Bedienung für technische Tests im Unity Play Mode.
-    /// Die Klasse ist bewusst von einer späteren Trial-Steuerung getrennt.
+    /// Nimmt die beiden Antworten des Checkerboard-Tests entgegen. Die Person
+    /// verändert l nicht selbst. Sie entscheidet nur, ob das gerade gezeigte
+    /// Muster konkav oder konvex wirkt.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(VrCheckerboardStimulus))]
@@ -14,34 +15,26 @@ namespace GlobeEffect.VRCheckerboard
     {
         [Header("Tastensteuerung")]
         [SerializeField]
-        [Tooltip("Taste, die den Stimulus vor der aktuellen HMD-Blickrichtung neu platziert.")]
-        private Key recenterKey = Key.R;
+        [Tooltip("Antwort: Das Muster wirkt konkav.")]
+        private Key concaveKey = Key.LeftArrow;
 
         [SerializeField]
-        [Tooltip("Taste zum Verringern des Merlitz-Parameters k.")]
-        private Key decreaseKKey = Key.LeftArrow;
+        [Tooltip("Antwort: Das Muster wirkt konvex.")]
+        private Key convexKey = Key.RightArrow;
 
         [SerializeField]
-        [Tooltip("Taste zum Erhöhen des Merlitz-Parameters k.")]
-        private Key increaseKKey = Key.RightArrow;
-
-        [SerializeField, Range(0.001f, 0.1f)]
-        [Tooltip("Änderung von k pro Tastendruck. Mit Shift wird die Schrittweite verfünffacht.")]
-        private float kStep = 0.01f;
+        [Tooltip("Schreibt die Antwort zusätzlich in die Unity Console.")]
+        private bool logResponses;
 
         [SerializeField]
-        [Tooltip("Schreibt Recenter- und k-Änderungen in die Unity Console.")]
-        private bool logChanges = true;
+        [Tooltip("Vertauscht die Bedeutung der beiden Tasten. Das kann zwischen Versuchspersonen ausbalanciert werden.")]
+        private bool swapResponseKeys;
 
         private VrCheckerboardStimulus stimulus;
 
-        /// <summary>Wird nach einer manuellen k-Änderung ausgelöst.</summary>
-        public event Action<float, float> KChanged;
+        public event Action<CheckerboardCurvatureResponse> ResponseSubmitted;
 
-        /// <summary>Wird nach einer manuellen Neupositionierung ausgelöst.</summary>
-        public event Action Recentered;
-
-        public float KStep => kStep;
+        public bool SwapResponseKeys => swapResponseKeys;
 
         private void Awake()
         {
@@ -56,49 +49,39 @@ namespace GlobeEffect.VRCheckerboard
                 return;
             }
 
-            if (keyboard[recenterKey].wasPressedThisFrame)
+            if (keyboard[concaveKey].wasPressedThisFrame)
             {
-                Recenter();
+                SubmitResponse(swapResponseKeys
+                    ? CheckerboardCurvatureResponse.Convex
+                    : CheckerboardCurvatureResponse.Concave);
             }
 
-            float step = IsShiftPressed(keyboard) ? kStep * 5f : kStep;
-            if (keyboard[decreaseKKey].wasPressedThisFrame)
+            if (keyboard[convexKey].wasPressedThisFrame)
             {
-                ChangeK(-step);
-            }
-
-            if (keyboard[increaseKKey].wasPressedThisFrame)
-            {
-                ChangeK(step);
+                SubmitResponse(swapResponseKeys
+                    ? CheckerboardCurvatureResponse.Concave
+                    : CheckerboardCurvatureResponse.Convex);
             }
         }
 
-        /// <summary>
-        /// Platziert den Stimulus in der aktuellen Center-Eye-Blickrichtung.
-        /// Die laufende Follow-Einstellung wird dadurch nicht verändert.
-        /// </summary>
-        public void Recenter()
+        public void SetSwapResponseKeys(bool value)
         {
-            EnsureStimulus();
-            stimulus.PlaceInFrontOfObserver();
-            Recentered?.Invoke();
-
-            if (logChanges)
-            {
-                Debug.Log("Checkerboard in aktueller Blickrichtung neu platziert.", stimulus);
-            }
+            swapResponseKeys = value;
         }
 
-        public void ChangeK(float delta)
+        public void SubmitResponse(CheckerboardCurvatureResponse response)
         {
             EnsureStimulus();
-            float previousK = stimulus.MerlitzK;
-            stimulus.SetMerlitzK(stimulus.MerlitzK + delta);
-            KChanged?.Invoke(previousK, stimulus.MerlitzK);
-
-            if (logChanges)
+            if (response == CheckerboardCurvatureResponse.None)
             {
-                Debug.Log($"Checkerboard: k = {stimulus.MerlitzK:F3}", stimulus);
+                return;
+            }
+
+            ResponseSubmitted?.Invoke(response);
+
+            if (logResponses)
+            {
+                Debug.Log("Checkerboard-Antwort: " + response, stimulus);
             }
         }
 
@@ -108,16 +91,6 @@ namespace GlobeEffect.VRCheckerboard
             {
                 stimulus = GetComponent<VrCheckerboardStimulus>();
             }
-        }
-
-        private static bool IsShiftPressed(Keyboard keyboard)
-        {
-            return keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed;
-        }
-
-        private void OnValidate()
-        {
-            kStep = Mathf.Clamp(kStep, 0.001f, 0.1f);
         }
     }
 }

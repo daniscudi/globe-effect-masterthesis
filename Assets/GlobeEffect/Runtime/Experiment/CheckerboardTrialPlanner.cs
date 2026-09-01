@@ -4,62 +4,53 @@ using System.Collections.Generic;
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
     /// <summary>
-    /// Erzeugt einen balancierten vollfaktoriellen Plan und mischt komplette
-    /// Trialbedingungen mit einem dokumentierten Seed.
+    /// Baut alle im Inspector gewählten Kombinationen auf und mischt sie mit
+    /// einem festen Seed. Dadurch lässt sich ein genauer Trialplan später erneut
+    /// erzeugen, ohne die Reihenfolge von Hand speichern zu müssen.
     /// </summary>
     public static class CheckerboardTrialPlanner
     {
         public static IReadOnlyList<CheckerboardTrial> CreateRandomizedPlan(
             IReadOnlyList<float> angularDiametersDegrees,
-            IReadOnlyList<float> viewingDistancesMeters,
             IReadOnlyList<CheckerboardEyePresentation> eyePresentations,
-            IReadOnlyList<float> startingKValues,
-            float magnification,
+            IReadOnlyList<float> visualSpaceLValues,
             int repetitions,
             int randomSeed)
         {
             ValidateValues(
                 angularDiametersDegrees,
-                viewingDistancesMeters,
                 eyePresentations,
-                startingKValues,
-                magnification,
+                visualSpaceLValues,
                 repetitions);
 
             var trials = new List<CheckerboardTrial>();
             int conditionIndex = 0;
 
-            // Die verschachtelten Schleifen bilden das kartesische Produkt aller
-            // Inspector-Listen. Eine Bedingung bleibt dabei immer als Ganzes erhalten.
             foreach (float angularDiameter in angularDiametersDegrees)
             {
-                foreach (float distance in viewingDistancesMeters)
+                foreach (CheckerboardEyePresentation eye in eyePresentations)
                 {
-                    foreach (CheckerboardEyePresentation eye in eyePresentations)
+                    foreach (float visualSpaceL in visualSpaceLValues)
                     {
-                        foreach (float startingK in startingKValues)
+                        conditionIndex++;
+                        for (int repetition = 1;
+                            repetition <= repetitions;
+                            repetition++)
                         {
-                            conditionIndex++;
-                            for (int repetition = 1; repetition <= repetitions; repetition++)
-                            {
-                                trials.Add(new CheckerboardTrial(
-                                    sequenceIndex: 0,
-                                    conditionIndex,
-                                    repetition,
-                                    angularDiameter,
-                                    distance,
-                                    eye,
-                                    startingK,
-                                    magnification));
-                            }
+                            trials.Add(new CheckerboardTrial(
+                                sequenceIndex: 0,
+                                conditionIndex: conditionIndex,
+                                repetition: repetition,
+                                attemptNumber: 1,
+                                angularDiameterDegrees: angularDiameter,
+                                eyePresentation: eye,
+                                visualSpaceL: visualSpaceL));
                         }
                     }
                 }
             }
 
             var random = new Random(randomSeed);
-            // Fisher-Yates mischt gleichverteilt und ist mit demselben Seed exakt
-            // reproduzierbar. Erst nach dem Mischen werden die Laufnummern vergeben.
             for (int index = trials.Count - 1; index > 0; index--)
             {
                 int swapIndex = random.Next(index + 1);
@@ -77,21 +68,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private static void ValidateValues(
             IReadOnlyList<float> angularDiametersDegrees,
-            IReadOnlyList<float> viewingDistancesMeters,
             IReadOnlyList<CheckerboardEyePresentation> eyePresentations,
-            IReadOnlyList<float> startingKValues,
-            float magnification,
+            IReadOnlyList<float> visualSpaceLValues,
             int repetitions)
         {
             RequireNonEmpty(angularDiametersDegrees, nameof(angularDiametersDegrees));
-            RequireNonEmpty(viewingDistancesMeters, nameof(viewingDistancesMeters));
             RequireNonEmpty(eyePresentations, nameof(eyePresentations));
-            RequireNonEmpty(startingKValues, nameof(startingKValues));
-
-            if (magnification <= 0f)
-            {
-                throw new ArgumentOutOfRangeException(nameof(magnification));
-            }
+            RequireNonEmpty(visualSpaceLValues, nameof(visualSpaceLValues));
 
             if (repetitions < 1)
             {
@@ -100,31 +83,24 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             foreach (float value in angularDiametersDegrees)
             {
-                if (value < 1f || value > 170f)
-                {
-                    throw new ArgumentOutOfRangeException(
-                        nameof(angularDiametersDegrees),
-                        "Winkeldurchmesser müssen zwischen 1 und 170 Grad liegen.");
-                }
+                VisualSpaceRadialMapping.ValidateAngularDiameter(value);
             }
 
-            foreach (float value in viewingDistancesMeters)
+            foreach (float value in visualSpaceLValues)
             {
-                if (value < 0.05f)
-                {
-                    throw new ArgumentOutOfRangeException(
-                        nameof(viewingDistancesMeters),
-                        "Abstände müssen mindestens 0.05 Meter betragen.");
-                }
+                VisualSpaceRadialMapping.ValidateVisualSpaceL(value);
             }
 
-            foreach (float value in startingKValues)
+            // Die Tangensfunktion muss über den gesamten sichtbaren Winkel
+            // monoton bleiben. Bei sehr großem FOV kann deshalb nicht jeder
+            // extrapolierte l-Wert verwendet werden.
+            foreach (float angularDiameter in angularDiametersDegrees)
             {
-                if (value < 0f || value > 1f)
+                foreach (float visualSpaceL in visualSpaceLValues)
                 {
-                    throw new ArgumentOutOfRangeException(
-                        nameof(startingKValues),
-                        "Startwerte für k müssen zwischen 0 und 1 liegen.");
+                    VisualSpaceRadialMapping.ValidateParameters(
+                        angularDiameter,
+                        visualSpaceL);
                 }
             }
         }
@@ -133,9 +109,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             if (values == null || values.Count == 0)
             {
-                throw new ArgumentException(
-                    "Mindestens ein Wert ist erforderlich.",
-                    name);
+                throw new ArgumentException("Mindestens ein Wert ist erforderlich.", name);
             }
         }
     }

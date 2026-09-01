@@ -4,10 +4,6 @@ using NUnit.Framework;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
-    /// <summary>
-    /// Prüft Vollständigkeit, Balance und reproduzierbare Randomisierung des
-    /// Checkerboard-Plans. Einzelne Parameter dürfen beim Mischen nicht zerfallen.
-    /// </summary>
     public sealed class CheckerboardTrialPlannerTests
     {
         [Test]
@@ -23,20 +19,20 @@ namespace GlobeEffect.VRCheckerboard.Tests
                     Is.EqualTo(first[index].ConditionIndex));
                 Assert.That(second[index].Repetition,
                     Is.EqualTo(first[index].Repetition));
-                Assert.That(second[index].StartingK,
-                    Is.EqualTo(first[index].StartingK));
+                Assert.That(second[index].VisualSpaceL,
+                    Is.EqualTo(first[index].VisualSpaceL));
                 Assert.That(second[index].EyePresentation,
                     Is.EqualTo(first[index].EyePresentation));
             }
         }
 
         [Test]
-        public void FullFactorialPlan_ContainsEveryCombinationAndRepetition()
+        public void AllInspectorCombinations_AppearEquallyOften()
         {
             IReadOnlyList<CheckerboardTrial> plan = CreatePlan(seed: 7);
 
-            // 2 FOV x 2 Distanzen x 2 Augenmodi x 2 Startwerte x 2 Wiederholungen.
-            Assert.That(plan.Count, Is.EqualTo(32));
+            // 2 FOV x 2 Augenmodi x 2 l-Werte x 2 Wiederholungen.
+            Assert.That(plan.Count, Is.EqualTo(16));
 
             var occurrenceByCondition = new Dictionary<int, int>();
             foreach (CheckerboardTrial trial in plan)
@@ -45,9 +41,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 occurrenceByCondition[trial.ConditionIndex] = count + 1;
                 Assert.That(trial.SequenceIndex, Is.InRange(1, plan.Count));
                 Assert.That(trial.Repetition, Is.InRange(1, 2));
+                Assert.That(trial.AttemptNumber, Is.EqualTo(1));
             }
 
-            Assert.That(occurrenceByCondition.Count, Is.EqualTo(16));
+            Assert.That(occurrenceByCondition.Count, Is.EqualTo(8));
             foreach (int count in occurrenceByCondition.Values)
             {
                 Assert.That(count, Is.EqualTo(2));
@@ -55,15 +52,13 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [Test]
-        public void InvalidKValue_IsRejectedBeforeSessionStarts()
+        public void LOutsideConfiguredRange_IsRejected()
         {
             Assert.Throws<System.ArgumentOutOfRangeException>(() =>
                 CheckerboardTrialPlanner.CreateRandomizedPlan(
-                    new[] { 70f },
-                    new[] { 1f },
+                    new[] { 90f },
                     new[] { CheckerboardEyePresentation.BothEyes },
-                    new[] { 1.1f },
-                    10f,
+                    new[] { 1.5f },
                     1,
                     1));
         }
@@ -81,15 +76,13 @@ namespace GlobeEffect.VRCheckerboard.Tests
         private static IReadOnlyList<CheckerboardTrial> CreatePlan(int seed)
         {
             return CheckerboardTrialPlanner.CreateRandomizedPlan(
-                new[] { 40f, 70f },
-                new[] { 1f, 2f },
+                new[] { 70f, 90f },
                 new[]
                 {
                     CheckerboardEyePresentation.BothEyes,
                     CheckerboardEyePresentation.LeftEyeOnly
                 },
-                new[] { 0.3f, 0.9f },
-                10f,
+                new[] { 0.5f, 1f },
                 2,
                 seed);
         }
