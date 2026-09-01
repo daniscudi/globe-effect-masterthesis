@@ -73,7 +73,10 @@ Shader "GlobeEffect/Merlitz Checkerboard"
 
             float ObjectAngleFromApparent(float apparentAngle)
             {
-                // Exakter Grenzfall der Winkelbedingung fuer k -> 0.
+                // Diese Funktion löst die Merlitz-Gleichung rückwärts. Aus dem
+                // sichtbaren Winkel wird also wieder der ursprüngliche Winkel.
+                // Für k gegen null gilt direkt A = a / m. Dieser eigene Fall
+                // verhindert außerdem eine Division durch einen sehr kleinen Wert.
                 if (_MerlitzK < 1e-5)
                 {
                     return apparentAngle / _Magnification;
@@ -85,11 +88,11 @@ Shader "GlobeEffect/Merlitz Checkerboard"
 
             float ResolveEyeIndex()
             {
-                // In instanzierten Stereo-Modi ist Unitys Eye-Index die
-                // vorgesehene Quelle. Im Multi-Pass-Modus ist er je nach
-                // Unity-/XR-Provider nicht in jedem separaten Focus-Pass
-                // verlaesslich gesetzt. Dort bestimmen wir das Auge anhand
-                // der aktuellen Renderkamera relativ zur Center-Eye-Pose.
+                // In den normalen Stereo-Modi teilt Unity direkt mit, für welches
+                // Auge gerade gerendert wird. Bei Varjo Multi Pass war dieser Wert
+                // nicht in jedem einzelnen Focus-Pass zuverlässig. In diesem Fall
+                // wird links oder rechts aus der Position der Renderkamera relativ
+                // zur Center-Eye-Pose bestimmt.
                 #if defined(UNITY_SINGLE_PASS_STEREO) || \
                     defined(UNITY_STEREO_INSTANCING_ENABLED) || \
                     defined(UNITY_STEREO_MULTIVIEW_ENABLED)
@@ -106,7 +109,7 @@ Shader "GlobeEffect/Merlitz Checkerboard"
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
-                // 0 = links, 1 = rechts. Im nicht-XR-Game-View verhaelt sich
+                // 0 = links, 1 = rechts. Im normalen Game View verhält sich
                 // die Vorschau wie das linke Auge.
                 float eyeIndex = ResolveEyeIndex();
                 float visibleForEye = 1.0;
@@ -123,8 +126,14 @@ Shader "GlobeEffect/Merlitz Checkerboard"
                 float2 displayPosition = input.uv * 2.0 - 1.0;
                 float displayRadius = length(displayPosition);
 
-                // Inverse radiale Abbildung: angezeigter Radius -> regulaeres
-                // Ausgangsgitter auf der gedachten Wand.
+                // displayPosition liegt im fertigen Kreis. Die Mitte ist (0,0),
+                // der Kreisrand liegt bei einem Radius von 1.
+                //
+                // Jetzt wird rückwärts berechnet, welche Stelle des ursprünglich
+                // geraden Schachbretts zu diesem sichtbaren Pixel gehört:
+                // 1. sichtbaren Radius in einen sichtbaren Winkel umrechnen,
+                // 2. Merlitz-Gleichung rückwärts anwenden,
+                // 3. Ergebnis wieder auf den Bereich von Mitte bis Rand skalieren.
                 float tangentAtBoundary = tan(_ApparentHalfAngleRad);
                 float apparentAngle = atan(displayRadius * tangentAtBoundary);
                 float objectAngle = ObjectAngleFromApparent(apparentAngle);
@@ -135,11 +144,15 @@ Shader "GlobeEffect/Merlitz Checkerboard"
                 float2 radialDirection = displayRadius > 1e-6
                     ? displayPosition / displayRadius
                     : float2(1.0, 0.0);
+                // Die Richtung von der Mitte zum Pixel bleibt gleich. Nur der
+                // Abstand zur Mitte wird durch die Merlitz-Abbildung verändert.
                 float2 sourcePosition = radialDirection * sourceRadius;
 
                 // Das Sinusprodukt wechselt an jeder ganzzahligen Gitterlinie
-                // sein Vorzeichen. fwidth glaettet nur die Pixelkante, nicht
-                // die mathematische Verzeichnung.
+                // sein Vorzeichen. Dadurch entstehen abwechselnd schwarze und
+                // weiße Felder, ohne dass eine Bildtextur benötigt wird. fwidth
+                // glättet nur die Pixelkante und verändert nicht die eigentliche
+                // Form des Musters.
                 float2 gridPosition = (sourcePosition + 1.0) * 0.5
                     * _ChecksAcrossDiameter;
                 float checkerSignal = sin(UNITY_PI * gridPosition.x)
@@ -151,8 +164,9 @@ Shader "GlobeEffect/Merlitz Checkerboard"
                     checkerSignal);
                 fixed4 color = lerp(_DarkColor, _LightColor, checkerMix);
 
-                // Fixationskreuz in Winkelkoordinaten, damit seine Groesse bei
-                // einer Distanz- oder FOV-Aenderung konstant bleibt.
+                // Das Fixationskreuz wird über seinen Winkel definiert. Deshalb
+                // erscheint es bei einem anderen Abstand oder FOV weiterhin gleich
+                // groß und wächst nicht einfach mit der physischen Fläche mit.
                 float2 angularPosition = atan(
                     displayPosition * tangentAtBoundary);
                 float crossThickness = max(_FixationHalfSizeRad * 0.18, 1e-5);

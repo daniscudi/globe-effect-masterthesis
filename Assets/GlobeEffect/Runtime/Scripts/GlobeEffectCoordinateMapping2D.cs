@@ -4,13 +4,14 @@ using UnityEngine;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Gemeinsame 2D-Koordinatenbasis für die Schwenk-Plots und spätere
-    /// dynamische Globe-Effect-Stimuli.
+    /// Enthält dieselben Koordinaten und Schwenkgleichungen, die auch in den
+    /// begleitenden Python-Plots verwendet werden. Dadurch rechnen Plot und
+    /// Unity-Projekt nicht mit zwei unterschiedlichen Definitionen.
     ///
-    /// Objektseitig gelten die gnomonischen Richtungskoordinaten
-    /// x = X/Z und y = Y/Z. Der lineare Bildraum ist u = m*x, v = m*y.
-    /// Dieser Raum ist die gemeinsame Eingabe, bevor Schöns separable oder
-    /// Merlitz' radiale Winkelabbildung angewendet wird.
+    /// Ein 3D-Punkt (X,Y,Z) wird zuerst durch die perspektivische Teilung zu
+    /// x = X/Z und y = Y/Z. Mit der Vergrößerung m entsteht daraus der lineare
+    /// Bildpunkt u = m*x und v = m*y. Erst danach wird verglichen, wie Schön
+    /// oder Merlitz denselben Punkt in Winkelkoordinaten umrechnen.
     /// </summary>
     public static class GlobeEffectCoordinateMapping2D
     {
@@ -37,10 +38,10 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Instrumentelle Merlitz-Abbildung eines objektseitigen 2D-Strahls.
-        /// Bei k=1 ist das Ergebnis exakt der lineare Bildraum (u,v)=m(x,y).
-        /// Für andere k bleibt der Azimut erhalten und nur der Radius ändert
-        /// sich nach tan(k*a)=m*tan(k*A).
+        /// Wendet die Merlitz-Gleichung auf einen zweidimensionalen Punkt an.
+        /// Die Richtung von der Bildmitte zum Punkt bleibt gleich. Verändert
+        /// wird nur sein Abstand zur Mitte. Bei k = 1 ist das Ergebnis genau
+        /// der normale lineare Bildpunkt (u,v) = m(x,y).
         /// </summary>
         public static Vector2 ObjectToMerlitzInstrumentImage(
             Vector2 objectGnomonic,
@@ -77,8 +78,9 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Lineare Bahn eines ruhenden fernen Punktes bei horizontalem
-        /// Kameraschwenk psi. Die Eingabe bei psi=0 liegt bereits in (u,v).
+        /// Berechnet die neue lineare Bildposition eines ruhenden fernen Punktes,
+        /// nachdem die Kamera horizontal um psi gedreht wurde. Die Ausgangsposition
+        /// bei psi = 0 wird bereits als (u,v) übergeben.
         /// </summary>
         public static Vector2 LinearImageAfterHorizontalPan(
             Vector2 linearImageAtZero,
@@ -107,7 +109,8 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Momentane Ableitung d(u,v)/d(psi) im linearen Bildraum.
+        /// Berechnet, wie schnell und in welche Richtung sich der lineare
+        /// Bildpunkt in diesem Moment pro Radiant Kameradrehung bewegt.
         /// </summary>
         public static Vector2 LinearImageVelocityForHorizontalPan(
             Vector2 linearImage,
@@ -122,8 +125,9 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Separable 2D-Fortsetzung der Schön-Regel: (atan(u), atan(v)).
-        /// Die Rückgabe besteht aus Winkelkomponenten in Radiant.
+        /// Schöns Regel wird getrennt auf die horizontale und vertikale Achse
+        /// angewendet: (atan(u), atan(v)). Horizontal kennt dabei nur u und
+        /// vertikal nur v. Das Ergebnis wird in Radiant zurückgegeben.
         /// </summary>
         public static Vector2 LinearImageToSchoenAngular(Vector2 linearImage)
         {
@@ -133,9 +137,11 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Radiale Merlitz-Winkelkoordinaten für den Plotfall k=1, l=0:
-        /// q = atan(r)/r * (u,v). Diese nachgeschaltete Winkelabbildung ist
-        /// nicht mit dem einstellbaren Instrumentparameter k zu verwechseln.
+        /// Radiale Winkelkoordinaten für den Plotfall k = 1 und l = 0. Hier wird
+        /// zuerst der gemeinsame Radius r aus u und v berechnet und anschließend
+        /// mit atan(r) in einen Winkel umgerechnet. Die Richtung bleibt erhalten.
+        /// Das ist die Plotdarstellung und nicht der einstellbare k-Regler des
+        /// Checkerboard-Trials.
         /// </summary>
         public static Vector2 LinearImageToMerlitzAngular(Vector2 linearImage)
         {

@@ -59,7 +59,9 @@ Shader "GlobeEffect/Merlitz Random Dots"
 
             float ApparentAngleFromObject(float objectAngle)
             {
-                // Grenzfall der Merlitz-Gleichung tan(k*a)=m*tan(k*A).
+                // Hier wird die Merlitz-Gleichung vorwärts verwendet: Aus dem
+                // ursprünglichen Winkel A wird der sichtbare Winkel a. Für k gegen
+                // null gilt direkt a = m A, damit nicht durch k geteilt werden muss.
                 if (_MerlitzK < 1e-5)
                 {
                     return _Magnification * objectAngle;
@@ -93,8 +95,9 @@ Shader "GlobeEffect/Merlitz Random Dots"
                 float4 worldPosition = mul(unity_ObjectToWorld, input.vertex);
                 float3 viewPosition = mul(UNITY_MATRIX_V, worldPosition).xyz;
 
-                // Technische Vorschau einer Kameradrehung. Im realen Versuch
-                // ist dieser Winkel null und ausschliesslich die HMD-Pose wirkt.
+                // Mit SimulatedYaw kann die Bewegung ohne Headset in Unity geprüft
+                // werden. Im echten Versuch ist dieser Winkel null; dann kommt die
+                // gesamte Bewegung ausschließlich von der getrackten HMD-Pose.
                 float cosine = cos(_SimulatedYawRad);
                 float sine = sin(_SimulatedYawRad);
                 viewPosition.xz = float2(
@@ -116,9 +119,10 @@ Shader "GlobeEffect/Merlitz Random Dots"
                 float2 displayedPosition = objectPosition * radialScale;
                 viewPosition.xy = displayedPosition * forwardDistance;
 
-                // Die Punktflaeche wird erst nach der Merlitz-Abbildung in
-                // Winkelkoordinaten erzeugt. So bleibt ihre sichtbare Groesse
-                // bei allen k-Werten konstant und nur die Punktbahn aendert sich.
+                // Zuerst wird die Position des Punktes mit Merlitz verschoben. Erst
+                // danach wird um diese Position die kleine runde Punktfläche gebaut.
+                // Dadurch bleibt die sichtbare Punktgröße bei allen k-Werten gleich;
+                // nur die Position beziehungsweise die Punktbahn ändert sich.
                 float angularHalfSize = _DotHalfSizeRad * input.sizeData.x;
                 viewPosition.xy += input.uv * forwardDistance * tan(angularHalfSize);
 
