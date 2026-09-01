@@ -14,7 +14,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 {
     /// <summary>
     /// Zentrale Eye-Tracking-Toolbox nach dem Aufbau der Lab-Version.
-    /// Sie wählt den Provider, transformiert HMD-lokale Rays in Weltkoordinaten
+    /// Sie waehlt den Provider, transformiert HMD-lokale Rays in Weltkoordinaten
     /// und schreibt Blick- sowie Transformdaten in getrennte CSV-Dateien.
     /// </summary>
     [DisallowMultipleComponent]
@@ -109,8 +109,6 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private readonly ConcurrentQueue<GazeRecord> gazeTrackingQueue = new();
         private readonly ConcurrentQueue<string> trackingDataQueue = new();
-        // Unity-Objekte dürfen nur im Hauptthread gelesen werden. Deshalb werden
-        // dort fertige Textzeilen erzeugt und erst danach vom Schreibthread gespeichert.
         private readonly object markerLock = new();
         private readonly AutoResetEvent writerWakeUp = new(false);
 
@@ -139,8 +137,6 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private void Awake()
         {
-            // Es darf nur eine Toolbox aktiv sein, weil Provider-Events sonst
-            // doppelt verarbeitet und dieselben Samples mehrfach gespeichert würden.
             if (Instance != null && Instance != this)
             {
                 Debug.Log("EyeTrackingToolbox-Instanz existiert bereits.", this);
@@ -241,7 +237,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
             if (Application.isPlaying && value != provider)
             {
                 Debug.LogWarning(
-                    "Eye-Tracking-Provider nur außerhalb des Play Mode wechseln.",
+                    "Eye-Tracking-Provider nur ausserhalb des Play Mode wechseln.",
                     this);
                 return;
             }
@@ -316,8 +312,6 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
             string folder = OutputFolder;
             Directory.CreateDirectory(folder);
             string baseName = NormalizeFileName(outputFileName);
-            // Dateinamen werden vor dem Start eindeutig gewählt und die Kopfzeilen
-            // synchron geschrieben. Erst danach dürfen Samples in die Queues gelangen.
             ResolveAvailableFileNames(folder, baseName);
             ClearQueues();
             WriteHeaders();
@@ -369,8 +363,6 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
             lock (markerLock)
             {
-                // Derselbe Marker wird einmal an die nächste Gaze-Zeile und einmal
-                // an die nächste Head-Zeile gehängt. Mehrere Marker werden mit | verbunden.
                 pendingHeadMessage = AppendMarker(pendingHeadMessage, message);
                 pendingGazeMessage = AppendMarker(pendingGazeMessage, message);
             }
@@ -424,8 +416,6 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         private void HandleProviderData(GazeData gazeData)
         {
             EnsureMainCamera();
-            // Der Varjo-Provider liefert Strahlen im HMD-lokalen Raum. Für Fixation
-            // benötigen wir zusätzlich die Weltstrahlen der aktuellen Main Camera.
             gazeData.unityTimestamp = Time.realtimeSinceStartupAsDouble;
             gazeData.leftRayWorld = TransformRayToWorld(
                 gazeData.leftRayLocal,
@@ -450,8 +440,6 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private void QueueTrackingData()
         {
-            // Transformdaten werden einmal pro Unity-Frame aufgenommen. Die Gaze-
-            // Datei kann dagegen mehrere Varjo-Samples desselben Frames enthalten.
             var builder = new StringBuilder(768);
             AppendDouble(builder, Time.realtimeSinceStartupAsDouble);
             AppendLong(builder, currentGazeData.deviceTimestamp);
@@ -533,8 +521,6 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
             string candidate = baseName;
             int counter = 0;
 
-            // Weder Gaze- noch Head-Datei darf eine frühere Messung überschreiben.
-            // Beide erhalten immer gemeinsam denselben nummerierten Basisnamen.
             do
             {
                 objectTrackingFile = Path.Combine(folder, candidate + "_head.csv");
@@ -609,8 +595,6 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
                 return;
             }
 
-            // Langsame Dateizugriffe sollen die Render- und Eye-Tracking-Schleife
-            // nicht anhalten. Der Thread verarbeitet ausschließlich fertige Daten.
             writerThreadRunning = true;
             savingThread = new Thread(BackgroundWriterLoop)
             {
@@ -622,8 +606,6 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private void BackgroundWriterLoop()
         {
-            // Spätestens alle 250 ms wird geschrieben. Beim Stoppen folgt ein
-            // letzter Flush, damit die Abschlussmarker nicht in der Queue bleiben.
             while (writerThreadRunning)
             {
                 FlushQueues();

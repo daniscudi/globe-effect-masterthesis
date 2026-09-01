@@ -1,45 +1,34 @@
 # Globe Effect Master Thesis
 
-Aktueller Projektstand: Unity/C#-Implementierung eines kreisrunden, radial
-verzeichneten Checkerboard-Stimulus und eines dynamischen Random-Dot-k-Tests
-für die Untersuchung des Globe Effects. Stimulusgeometrie, Merlitz-Abbildung,
-Versuchssteuerung und Eye-Tracking-Anbindung sind modular getrennt.
+Dieses Unity-Projekt ist der aktuelle Arbeitsstand für die Untersuchung des
+Globe Effects in VR. Im Moment gibt es zwei Testszenen: ein kreisrundes
+Checkerboard und ein Random-Dot-Punktfeld für Kopfbewegungen. Die Mathematik,
+die Darstellung, der Versuchsablauf und das Eye Tracking liegen in getrennten
+Skripten, damit einzelne Teile später leichter geändert werden können.
 
-## Stand
+## Was aktuell funktioniert
 
-- kreisrunde Stimulusfläche;
-- Winkeldurchmesser/FOV und Abstand getrennt einstellbar;
-- physischer Durchmesser wird mit dem Abstand skaliert;
-- Merlitz-Parameter `k` im belegten Bereich 0 bis 1;
-- Instrumentvergrößerung `m` separat einstellbar, Default `m = 10`;
-- beidseitige, nur linke oder nur rechte XR-Darbietung;
-- winkelkonstantes zentrales Fixationskreuz;
-- Laufzeit-API, Parameter-Snapshot und Events für spätere Trial-/Eye-Tracking-Anbindung;
-- vorkonfigurierte Demo-Szene mit XR Origin und getrackter Center-Eye-Kamera;
-- Input System, XR Interaction Toolkit und XR Plugin Management als fest
-  versionierte Unity-Pakete;
-- Varjo Unity XR Plugin `3.7.3` und gespeicherter Varjo-Loader für die
-  Varjo XR-4;
-- Varjo-Rendering im auf dem Laborrechner funktionsfähigen `Multi Pass`-Modus;
-- Tastatursteuerung für Recenter und schrittweise Änderung von `k`;
-- übernommene Provider-Struktur der Lab-Eye-Tracking-Toolbox;
-- Varjo-XR-4-Provider mit vollständiger Abfrage der Gaze-Sample-Queue;
-- Dummy-Provider für Tests ohne Headset;
-- getrennte CSV-Dateien für Gaze- und Transformdaten sowie Ereignismarker;
-- Fixationskontrolle relativ zum aktuellen Checkerboard-Mittelpunkt;
-- gemeinsame Versuchsleiteranzeige mit `ON TARGET`, `OFF TARGET` und
-  `NO VALID GAZE` für beide Tests;
-- vollfaktorieller Trialplan mit reproduzierbarer Seed-Randomisierung;
-- automatische Sitzungsordner, Plan-, Antwort-, Gaze- und Head-CSV-Dateien;
-- Trialsteuerung für Start, k-Einstellung, Bestätigung, Recenter und Abbruch;
-- explizites 2D-Koordinatenmodul für den linearen `(u,v)`-Bildraum und die
-  Schwenkgleichungen der begleitenden Plots;
-- reproduzierbares, weltfestes Schwarz-Weiß-Punktfeld mit realer
-  Kopfbewegung und separatem simuliertem Debug-Schwenk;
-- dynamischer Einstelltest, bei dem `k` während wiederholter Links-Rechts-
-  Kopfbewegungen auf subjektive Stabilität eingestellt wird;
-- automatische Erkennung und Protokollierung gültiger Kopf-Seitenwechsel;
-- EditMode-Tests für Winkelgeometrie und Merlitz-Abbildung.
+- Das Checkerboard ist kreisrund. Winkeldurchmesser, Abstand, `k`,
+  Vergrößerung `m` und die Darstellung für beide, nur das linke oder nur das
+  rechte Auge können im Inspector eingestellt werden.
+- Wenn der Abstand verdoppelt wird, verdoppelt sich auch der physische
+  Durchmesser. Dadurch bleibt das Checkerboard aus Sicht der Versuchsperson
+  gleich groß.
+- Mit `R` kann der Stimulus in der aktuellen Blickrichtung neu platziert
+  werden. `k` lässt sich während Play mit den Pfeiltasten verändern.
+- Die Varjo XR-4 läuft mit dem Varjo Unity XR Plugin `3.7.3`. Auf dem bisher
+  verwendeten Laborrechner funktioniert die Darstellung im Modus `Multi Pass`.
+- Eye Tracking, Fixationskontrolle und CSV-Aufzeichnung sind eingebaut. Das
+  Fenster `Experiment Monitor` zeigt `ON TARGET`, `OFF TARGET` oder
+  `NO VALID GAZE` nur auf dem Kontrollmonitor.
+- Der Sitzungscontroller kombiniert alle im Inspector eingetragenen
+  Bedingungen, mischt die fertigen Trials und speichert Plan, Antworten,
+  Gaze-Daten und Kopfbewegung getrennt ab.
+- Die zweite Szene enthält ein fest im Raum stehendes Schwarz-Weiß-Punktfeld.
+  Hier kann `k` während einer echten Links-Rechts-Kopfbewegung eingestellt
+  werden. Für Tests ohne HMD gibt es zusätzlich einen simulierten Schwenk.
+- Die Gleichungen für Merlitz, Winkelgröße und die `(x,y)`-/`(u,v)`-Plots liegen
+  in eigenen Mathematikdateien und werden durch EditMode-Tests geprüft.
 
 ## Schnellstart
 
@@ -61,24 +50,55 @@ Versuchssteuerung und Eye-Tracking-Anbindung sind modular getrennt.
 6. Vor Eye-Tracking-Tests in Varjo Base `Allow eye tracking` aktivieren und mit
    `C` die Blickkalibrierung starten. Die XR-4 sollte nach jedem erneuten
    Aufsetzen für die betreffende Person neu kalibriert werden.
-7. Für eine zusammenhängende Pilot-Sitzung am Objekt
-   `Checkerboard Trial Session` eine pseudonymisierte `Participant Id`, das
-   `Session Label` und die Bedingungslisten kontrollieren. Danach im Play Mode
-   mit `F5` starten.
+7. Für einen kompletten Testdurchlauf am Objekt `Checkerboard Trial Session`
+   einen Teilnehmercode ohne Klarnamen, das `Session Label` und die gewünschten
+   Bedingungslisten kontrollieren. Danach im Play Mode mit `F5` starten.
 
-Die Referenzszene kann bei Bedarf über
-`Tools > Globe Effect > Create or Reset Demo Scene` reproduzierbar neu erstellt
-werden. Dabei werden die Ausgangswerte 70 Grad, 1 Meter, `k = 0.7` und `m = 10`
-gesetzt.
+Die Checkerboard-Szene kann bei Bedarf über
+`Tools > Globe Effect > Create or Reset Demo Scene` neu aufgebaut werden.
+Dabei werden die Startwerte 70 Grad, 1 Meter, `k = 0.7` und `m = 10` gesetzt.
 
 Unity-Einheit ist hier gleich ein Meter. Für exakte Skalierung sollte das
-Stimulusobjekt keinen nicht-uniform skalierten Parent besitzen.
+Stimulusobjekt kein übergeordnetes Objekt mit unterschiedlich skalierten Achsen
+besitzen.
+
+## Wie die Unity-Szene aufgebaut wurde
+
+Die Szenen sind normale `.unity`-Szenen und können ganz normal in der Hierarchy
+angesehen und im Inspector verändert werden. Die benötigten Objekte wurden aber
+nicht jedes Mal einzeln per Hand angelegt. Dafür gibt es zwei Editor-Skripte:
+
+- `CheckerboardDemoSceneBuilder.cs` baut die Checkerboard-Szene auf;
+- `RandomDotDemoSceneBuilder.cs` baut die Random-Dot-Szene auf.
+
+Wenn eine Demoszene nach einem neuen Pull noch fehlt, legt das jeweilige Skript
+sie beim ersten Import an. Dasselbe kann über das `Tools > Globe Effect`-Menü
+von Hand ausgelöst werden. Danach liegt eine ganz normale gespeicherte Szene im
+Projekt. Das Checkerboard wird ungefähr so aufgebaut:
+
+```text
+XR Origin
+  Camera Offset
+    Main Camera
+Checkerboard Stimulus
+Eye Tracking Toolbox
+Checkerboard Trial Session
+Environment
+```
+
+Der Scene Builder verbindet auch die Referenzen. Die Main Camera wird zum
+Beispiel als Observer beim Checkerboard eingetragen, und die Trial Session
+bekommt den Stimulus, die Tastatursteuerung, die Eye-Tracking-Toolbox und den
+Fixationsmonitor zugewiesen. Das ist im Prinzip dasselbe, was man sonst per
+Drag-and-drop im Inspector machen würde. Die eigentliche Merlitz-Mathematik
+steckt nicht im Scene Builder, sondern in den weiter unten genannten
+Mathematik- und Stimulusdateien.
 
 ## Vorschau und XR-Diagnose
 
 Die normale Unity Game View zeigt das Checkerboard auch ohne angeschlossene
 Brille als flache Vorschau. Kopfbewegung, Stereo-Augenauswahl und die reale
-Winkelgröße lassen sich damit nicht validieren. Für einen vollständigen
+Winkelgröße lassen sich damit nicht prüfen. Für einen vollständigen
 Test ohne angeschlossene XR-4 stellt Varjo Base einen Headset-Simulator bereit.
 
 Bei einem schwarzen Bild zuerst die Game View vor und während des Play Mode
@@ -115,18 +135,18 @@ Sitzung benutzt werden.
 
 ## Pilot-Sitzung
 
-Die Komponente `Checkerboard Trial Session` bildet aus allen Einträgen in
+Die Komponente `Checkerboard Trial Session` kombiniert alle Einträge aus
 `Angular Diameters Degrees`, `Viewing Distances Meters`, `Eye Presentations`
-und `Starting K Values` einen vollfaktoriellen Plan. Jede Kombination kommt pro
-`Repetitions Per Condition` gleich oft vor. Es werden immer komplette
-Bedingungen gemischt, sodass FOV, Abstand, Augenmodus und Startwert nicht
-versehentlich auseinanderfallen. Derselbe `Random Seed` erzeugt bei denselben
-Listen dieselbe Reihenfolge.
+und `Starting K Values` miteinander. Jede mögliche Kombination kommt pro
+`Repetitions Per Condition` gleich oft vor. Beim Mischen bleibt ein Trial mit
+allen seinen Werten zusammen. FOV, Abstand, Augenmodus und Startwert können
+also nicht versehentlich getrennt werden. Mit demselben `Random Seed` und
+denselben Listen entsteht wieder dieselbe Reihenfolge.
 
-Die Demoszene enthält als kurzen technischen Startplan sechs Trials: drei
-Augenmodi mal zwei Startwerte für `k`. Diese Werte sind noch kein festgelegtes
-Studienprotokoll. Weitere FOV- oder Abstandswerte können direkt als neue
-Listeneinträge im Inspector ergänzt werden.
+Die Demoszene enthält zum Ausprobieren sechs Trials: drei Augenmodi mal zwei
+Startwerte für `k`. Diese Werte sind noch keine endgültigen Bedingungen für die
+Studie. Weitere FOV- oder Abstandswerte können direkt im Inspector ergänzt
+werden.
 
 - `F5`: neue Sitzung starten;
 - Pfeiltasten links/rechts: `k` einstellen;
@@ -157,30 +177,30 @@ nicht die bereits bestätigten Antworten.
 ## Dynamischer Random-Dot-k-Test
 
 Die separate Szene
-`Assets/GlobeEffect/Demo/RandomDotMotionDemo.unity` setzt den dynamischen Teil
-des Globe-Effect-Tests um. Falls die Szene nach einem frischen Pull noch nicht
-vorhanden ist, wird sie beim ersten Unity-Import automatisch erstellt. Sie kann
-außerdem über
-`Tools > Globe Effect > Create or Reset Random Dot Demo Scene` reproduzierbar
-neu aufgebaut werden.
+`Assets/GlobeEffect/Demo/RandomDotMotionDemo.unity` ist für den Test mit
+Kopfbewegung gedacht. Falls sie nach einem neuen Pull noch fehlt, wird sie beim
+ersten Unity-Import automatisch erstellt. Sie kann außerdem über
+`Tools > Globe Effect > Create or Reset Random Dot Demo Scene` neu aufgebaut
+werden.
 
-Das Punktfeld besteht standardmäßig aus 4000 schwarzen und weißen Punkten
-auf einer weltfesten sphärischen Kappe. Die Punkte werden nicht von selbst
-bewegt. Im vorgesehenen Modus `HeadTracked` dreht die Versuchsperson den Kopf
-abwechselnd nach links und rechts. Der dadurch entstehende optische Fluss wird
-mit der instrumentellen Merlitz-Abbildung verzerrt. Die Aufgabe lautet:
+Das Punktfeld besteht standardmäßig aus 4000 schwarzen und weißen Punkten auf
+einer Art gekrümmter Kuppel um die Versuchsperson. Es bleibt nach dem Start an
+derselben Stelle im Raum und bewegt sich nicht von selbst. Im Modus
+`HeadTracked` dreht die Versuchsperson den Kopf abwechselnd nach links und
+rechts. Auf die dadurch sichtbare Bewegung wird dieselbe Merlitz-Abbildung wie
+beim Checkerboard angewendet. Die Aufgabe lautet:
 
 > Stelle `k` so ein, dass das Punktfeld während der Kopfbewegung möglichst
 > stabil und nicht schwimmend erscheint.
 
-Der technische Startplan umfasst zwei Trials mit `k = 0.3` beziehungsweise
-`k = 0.9` als randomisierte Startwerte. Standardmäßig müssen vor `Enter`
+Zum Ausprobieren gibt es zwei Trials mit `k = 0.3` beziehungsweise `k = 0.9`
+als gemischte Startwerte. Standardmäßig müssen vor `Enter`
 vier Wechsel zwischen linker und rechter Schwelle abgeschlossen sein. Die
-Startschwelle von 2.5 Grad ist ein technischer Wert für `m = 10` und noch
-keine festgelegte Studienbedingung. Die erzeugte Punktkappe umfasst zunächst
-20 Grad im unverzerrten Objektraum; durch `m = 10` füllt dieser Bereich das
-wesentlich größere sichtbare Feld. Dieser Wert ist daher nicht mit dem
-angezeigten Winkeldurchmesser von 70 Grad gleichzusetzen.
+Startschwelle von 2.5 Grad ist nur ein erster Testwert für `m = 10` und noch
+keine festgelegte Studienbedingung. Die Punkte werden zunächst in einem
+unverzerrten Winkelbereich von 20 Grad erzeugt. Durch `m = 10` wird dieser
+Bereich im sichtbaren Bild stark vergrößert. Die 20 Grad beschreiben daher
+nicht dasselbe wie der angezeigte Winkeldurchmesser von 70 Grad.
 
 - `F5`: Random-Dot-Sitzung starten;
 - Pfeiltasten links/rechts: `k` verändern;
@@ -205,22 +225,33 @@ mit Gaze- und Head-Samples.
 
 ## Mathematik
 
-Merlitz fasst die instrumentelle radiale Abbildung als
+Die Merlitz-Gleichung sagt vereinfacht, an welchem sichtbaren Winkel `a` ein
+Punkt erscheint, der ursprünglich am Winkel `A` liegt:
 
 ```text
 tan(k a) = m tan(k A)
 a(A) = atan(m tan(k A)) / k
 ```
 
-zusammen. `A` ist der wahre Objektwinkel, `a` der scheinbare Bildwinkel und `m`
-die paraxiale Vergrößerung. Die belegten Spezialfälle sind:
+`A` ist der Winkel im ursprünglichen Objekt, `a` der Winkel im dargestellten
+Bild und `m` die Vergrößerung nahe der Bildmitte. `k` verändert, wie stark sich
+diese Abbildung zum Rand hin krümmt. Wichtige Fälle sind:
 
 - `k = 1`: Tangensbedingung; ein planes Gitter bleibt im Bildraum geradlinig;
 - `k = 0.5`: Kreisbedingung nach Slevogt/Helmholtz;
 - `k -> 0`: Winkelbedingung mit dem Grenzwert `a = m A`.
 
-Der Shader tastet die Abbildung invers ab. Für einen normierten angezeigten
-Radius `r` und den scheinbaren Halbwinkel `alpha` gilt:
+### Was mit der Rückwärtsrechnung im Shader gemeint ist
+
+Der Shader geht für jeden sichtbaren Bildpunkt rückwärts vor. Er nimmt also
+nicht ein Feld aus dem ursprünglichen Schachbrett und schiebt es nach außen.
+Stattdessen fragt er für jeden Pixel im fertigen Kreis: **Von welcher Stelle im
+ursprünglich geraden Schachbrett muss die Farbe kommen?** Diese Rückwärtsrechnung
+verhindert Lücken oder überlappende Flächen im Muster.
+
+Dabei bedeutet `r`, wie weit der aktuelle Pixel von der Kreismitte entfernt
+ist: `r = 0` ist die Mitte und `r = 1` der Rand. `alpha` ist die Hälfte des
+eingestellten Winkeldurchmessers. Die Rechnung lautet:
 
 ```text
 a(r) = atan(r tan(alpha))
@@ -228,12 +259,16 @@ A(a) = atan(tan(k a) / m) / k
 s(r) = tan(A(a(r))) / tan(A(alpha))
 ```
 
-`s` ist der normierte Radius im ursprünglich regelmäßigen Wandgitter. Die
-Richtung um die Bildmitte bleibt erhalten. Diese Randnormierung ist eine
-bewusste VR-Designentscheidung: Der angezeigte Winkeldurchmesser bleibt für
-alle `k` exakt gleich. Merlitz' Paper hielt dagegen ein wahres Feld von 7 Grad
-bei 10-facher Vergrößerung fest und erhielt ein scheinbares Feld von ungefähr
-70 Grad.
+Das Ergebnis `s` sagt, wie weit die passende Stelle im ursprünglichen geraden
+Schachbrett von dessen Mitte entfernt ist. Die Richtung bleibt gleich; nur der
+Abstand zur Mitte wird umgerechnet. Am Rand wird die Rechnung so skaliert, dass
+`r = 1` immer wieder am Rand des ursprünglichen Musters landet. Deshalb bleibt
+der eingestellte Winkeldurchmesser bei jedem `k` gleich. Nur die Linien im
+Inneren verändern ihre Form.
+
+Das ist eine Entscheidung für unseren VR-Test. Merlitz hielt in seinem Paper
+stattdessen ein wahres Feld von 7 Grad bei 10-facher Vergrößerung fest und kam
+dadurch auf ein scheinbares Feld von ungefähr 70 Grad.
 
 Die physische Größe der ebenen Kreisfläche ist
 
@@ -254,30 +289,29 @@ Merlitz verwendet zwei verschiedene Parameter:
   menschlichen visuellen Raums: `y = tan(l a) / l`.
 
 Diese Implementierung rechnet `l` **nicht** in den Stimulus. Im
-Checkerboard-Versuch stellt die Versuchsperson die Stimuluskrummung
-beziehungsweise `k` so ein, dass
-das Gitter subjektiv gerade erscheint. Der gewählte Stimuluswert dient dann –
-unter den Modellannahmen – als Schätzung der visuellen Kompensation. `k` und
-`l` im Code gleichzusetzen, bevor die Versuchsperson geantwortet hat, wäre ein
-Zirkelschluss.
+Checkerboard-Versuch stellt die Versuchsperson `k` so ein, dass das Gitter für
+sie gerade erscheint. Erst dieser eingestellte Wert kann später mit Merlitz'
+Modell verglichen werden. Würden wir `k` und `l` schon vorher im Code
+gleichsetzen, würden wir das Ergebnis des Versuchs vorwegnehmen.
 
 Oomes et al. ließen 20 stationäre, monokular beobachtende Personen die
 Krummung eines Checkerboards zwischen Tonnen- und Kissenform einstellen. Sie
 verglichen zentrale Fixation mit freiem Blick. Die meisten Personen stellten
-eine Kissenverzeichnung als subjektiv gerade ein; die mittlere Wirkung war etwa
-halb so stark wie von Helmholtz behauptet, mit großen interindividuellen
-Unterschieden. Oomes verwendete dabei nicht Merlitz' späteren `k`-Regler als
-solchen. Die Übersetzung des Resultats auf ungefähr `k = 0.8` ist Merlitz'
+eine Kissenverzeichnung als subjektiv gerade ein. Im Mittel war der Effekt etwa
+halb so stark wie von Helmholtz behauptet, allerdings mit großen Unterschieden
+zwischen den Personen. Oomes verwendete dabei nicht Merlitz' späteren
+`k`-Regler als solchen. Die Übersetzung des Resultats auf ungefähr `k = 0.8`
+ist Merlitz'
 Modellinterpretation; sein eigener einfacher Online-Test ergab eher Werte um
 `k = 0.7`.
 
 ## Verbindung zu den x-y-/u-v-Plots
 
-Der statische Checkerboard-Test und die Schwenk-Plots beantworten verwandte,
-aber nicht identische Fragen. Im Checkerboard-Trial wird die radiale
-Instrumentabbildung über `k` eingestellt. Die Plots beginnen dagegen mit der
-Bahn eines ruhenden Fernpunkts bei einem horizontalen Kameraschwenk im linearen
-Bildraum:
+Der Checkerboard-Test und die Schwenk-Plots gehören zum selben Thema, machen
+aber nicht dasselbe. Beim Checkerboard wird ein stehendes Muster über `k`
+eingestellt. Die Plots zeigen dagegen, wie sich ein ruhender Punkt im Bild
+bewegt, wenn die Kamera horizontal geschwenkt wird. Ausgangspunkt ist der
+lineare `(u,v)`-Bildraum:
 
 ```text
 x = X/Z,  y = Y/Z
@@ -295,31 +329,33 @@ Schön:   (x_S, y_S) = (atan(u), atan(v))
 Merlitz:  (x_M, y_M) = atan(r)/r * (u, v),  r = sqrt(u^2+v^2)
 ```
 
-`GlobeEffectCoordinateMapping2D` enthält diese Definitionen jetzt auch in C#.
-Außerdem ist dort geprüft, dass die instrumentelle Merlitz-Abbildung bei
+`GlobeEffectCoordinateMapping2D` enthält dieselben Definitionen auch in C#.
+Außerdem ist dort geprüft, dass die Merlitz-Abbildung bei
 `k = 1` genau in die lineare Abbildung `(u,v)=m(x,y)` übergeht. Damit besitzen
-Plot und Unity-Projekt nun dieselbe explizite Koordinatenbasis.
+Plot und Unity-Projekt dieselbe mathematische Grundlage.
 
 Die Plotpfeile steuern den sichtbaren Checkerboard-Trial weiterhin nicht: Sie
 beschreiben eine **dynamische Schwenkgeschwindigkeit**, während das
 Checkerboard ein **statischer Einstelltest** ist. Der Random-Dot-Test setzt die
-dynamische Fragestellung deshalb als eigenes Stimulusmodul um. Beide verwenden
-dieselbe instrumentelle Merlitz-Gleichung, ohne die Aufgaben zu vermischen.
+dynamische Frage deshalb in einer eigenen Szene um. Beide verwenden dieselbe
+Merlitz-Gleichung, aber mit unterschiedlichen Aufgaben für die Versuchsperson.
 
 ## Eye Tracking
 
-Die Eye-Tracking-Schicht folgt der im Lab verwendeten Toolbox-Struktur:
-`IEyeTracker` definiert den gemeinsamen Provider-Vertrag,
-`EyeTrackingEvent` leitet neue Samples weiter und `EyeTrackingToolbox`
-übernimmt Weltkoordinaten, Aufzeichnung und Ereignismarker. Der bisherige
-Vive-/SRanipal-Provider wird in diesem Projekt durch `VarjoEyeTracker` ersetzt.
+Die Grundstruktur stammt aus der im Lab verwendeten Eye-Tracking-Toolbox. Dazu
+gehören `IEyeTracker`, `EyeTrackingEvent`, `EyeTrackingToolbox` und der
+`DummyEyeTracker`. Die Originaldateien im PLACES-Projekt bleiben unverändert.
+Im vorliegenden Repository wurde die Kopie an die Varjo XR-4 und unsere
+Messdateien angepasst. Neu für dieses Projekt sind vor allem
+`VarjoEyeTracker`, `CheckerboardFixationMonitor` und
+`RandomDotFixationMonitor`.
 
 Der Varjo-Provider verwendet `VarjoEyeTracking.GetGazeList(...)`. Dadurch
 werden alle seit dem letzten Unity-Frame bereitgestellten Samples abgeholt und
 nicht nur das jeweils letzte Sample. Rohstatus, Zeitstempel, lokale Blickstrahlen,
 Pupillendurchmesser, Augenöffnung, Fokusdistanz und IPD bleiben in der
-Gaze-Datei erhalten. Die Toolbox schreibt parallel die konfigurierten
-Transformationen von Main Camera und Checkerboard in eine Head-Datei.
+Gaze-Datei erhalten. Parallel schreibt die Toolbox Position und Drehung der
+Main Camera und des Checkerboards in eine Head-Datei.
 
 Ohne eigenes Ausgabeverzeichnis liegen technische `F9`-Aufzeichnungen unter:
 
@@ -364,9 +400,33 @@ ausgeschaltet werden. `Require Fixation Before Confirmation` bleibt davon
 getrennt: Ist dieser Inspector-Haken deaktiviert, wird Fixation angezeigt und
 gespeichert, blockiert `Enter` aber nicht.
 
-## Laufzeit-Anbindung
+## Welche C#-Dateien für die Mathematik wichtig sind
 
-Die zentrale Komponente stellt unter anderem bereit:
+Wenn der mathematische Kern gezeigt oder besprochen werden soll, sind vor allem
+diese Dateien relevant:
+
+- `MerlitzCheckerboardMath.cs`: enthält die Merlitz-Gleichung in beide
+  Richtungen und die Rückwärtsrechnung für das Checkerboard;
+- `AngularGeometry.cs`: berechnet aus Abstand und Winkeldurchmesser die nötige
+  physische Größe der Fläche;
+- `GlobeEffectCoordinateMapping2D.cs`: enthält die `(x,y)`-/`(u,v)`-Abbildung,
+  die Schwenkgleichungen sowie den Vergleich zwischen linear, Schön und
+  Merlitz;
+- `VrCheckerboardStimulus.cs`: verbindet die Mathematik mit dem Unity-Objekt,
+  setzt Abstand und Größe und übergibt `k`, `m` und Augenmodus an den Shader;
+- `GlobeEffectMerlitzCheckerboard.shader`: zeichnet das eigentliche Muster für
+  jeden Pixel und enthält auch die kreisrunde Begrenzung und Augenmaskierung;
+- `RandomDotFieldStimulus.cs` und `GlobeEffectMerlitzRandomDots.shader`:
+  übernehmen dieselbe Grundidee für das Punktfeld mit Kopfbewegung.
+
+Für ein Gespräch mit der Betreuung reichen als mathematischer Kern meistens
+die ersten drei C#-Dateien zusammen mit dem Checkerboard-Shader. Der
+`CheckerboardDemoSceneBuilder` ist dagegen nur dafür zuständig, die passenden
+Unity-Objekte anzulegen und miteinander zu verbinden.
+
+## Wie die Skripte zusammenspielen
+
+Der Checkerboard-Stimulus kann zum Beispiel so gesteuert werden:
 
 ```csharp
 stimulus.SetGeometry(70f, 1.5f);
@@ -381,73 +441,74 @@ stimulus.StimulusPresented += snapshot =>
 };
 ```
 
-`CaptureSnapshot()` liefert Zeitstempel, Sichtbarkeit, FOV, Abstand, physischen
-Durchmesser, `k`, `m`, Check-Anzahl und Augenmodus. Der
-`CheckerboardTrialSessionController` verwendet diese API und kann später durch
-eine Bedienoberfläche oder weitere Lab-Komponenten erweitert werden, ohne den
-Stimulus neu zu schreiben.
+`CaptureSnapshot()` liest den aktuell dargestellten Zustand aus: Zeitstempel,
+Sichtbarkeit, FOV, Abstand, physischer Durchmesser, `k`, `m`, Anzahl der Felder
+und Augenmodus. Der `CheckerboardTrialSessionController` verwendet diese Werte
+für die Trialdatei. Eine spätere Bedienoberfläche kann dieselben öffentlichen
+Methoden verwenden, ohne die Mathematik neu zu schreiben.
 
-## Annahmen und offene Validierung
+## Annahmen und Dinge, die noch geprüft werden müssen
 
-- Der Stimulus ist eine frontoparallele **ebene** Fläche, keine Kugel.
+- Der Checkerboard-Stimulus ist eine **ebene** Fläche, die direkt zur
+  Versuchsperson ausgerichtet wird. Er ist keine Kugel.
 - Der Abstand wird vom Center-Eye-/Head-Transform zur Flächenmitte gemessen.
   Wegen der IPD ist der exakte Winkel jedes einzelnen Auges bei einer gemeinsamen
-  realen Ebene minimal verschieden; für eine per-Auge kalibrierte Fläche wäre
-  später eine separate Stereo-Geometrie nötig.
+  Ebene minimal verschieden. Falls die Fläche später für jedes Auge einzeln
+  angepasst werden soll, wäre dafür getrennte Stereo-Geometrie nötig.
 - Der monokulare Modus unterdrückt ein Auge im Shader. Er ersetzt keine
   Messung von Display-Crosstalk und keine klinische Okklusion.
 - Die XR-Augenauswahl benutzt Unitys `unity_StereoEyeIndex`. Für Varjo
   `Multi Pass` verwendet der Shader zusätzlich die Position der jeweiligen
   Renderkamera relativ zur Center-Eye-Pose. Die
-  vollständige Unterdrückung von Context- und Focus-Ansicht muss nach dieser
-  Änderung erneut im Headset geprüft werden. Im normalen Game-View entspricht
+  Unterdrückung in Context- und Focus-Ansicht muss im Headset noch einmal genau
+  geprüft werden. Im normalen Game-View entspricht
   die Vorschau dem linken Auge.
-- Die kreisrunde Apertur und der festgehaltene scheinbare Winkeldurchmesser sind
-  Festlegungen dieses Versuchsdesigns, keine Behauptung einer exakten
-  Replikation des Oomes-Versuchsaufbaus.
+- Die kreisrunde Begrenzung und der gleichbleibende Winkeldurchmesser sind
+  Entscheidungen für unseren VR-Test. Der Aufbau ist keine exakte Kopie des
+  Oomes-Versuchs.
 - Fixation wird angezeigt und pro Trial gespeichert. Eine optionale Freigabe
-  vor `Enter` ist implementiert; die wissenschaftliche Regel für Wiederholung
-  oder Ausschluss ist noch nicht festgelegt.
+  vor `Enter` ist eingebaut. Wann ein Trial wiederholt oder ausgeschlossen
+  wird, muss vor der Studie noch festgelegt werden.
 - `leftValidity` und `rightValidity` akzeptieren Varjos Status `Compensated`
   oder `Tracked`; die exakten Rohstatuswerte werden zusätzlich gespeichert.
-  Das endgültige Qualitätskriterium muss vor der Datenerhebung festgelegt und
-  in der Auswertung dokumentiert werden.
-- Dieser Stand implementiert den statischen Checkerboard-Einstelltest, die
-  mathematische 2D-Basis der Plots und einen separaten dynamischen
-  Random-Dot-k-Prototyp. Die Kopfamplitude, Wiederholungszahl und genaue
-  Instruktion sind noch keine festgelegten Studienparameter.
+  Vor der Datenerhebung muss festgelegt werden, welche Statuswerte später als
+  gültig gelten.
+- Aktuell vorhanden sind der stehende Checkerboard-Test, die mathematische
+  Grundlage der Plots und ein erster Random-Dot-Test mit Kopfbewegung.
+  Kopfamplitude, Wiederholungszahl und genaue Instruktion sind noch nicht final.
 
 ## Roadmap
 
-1. **Stimulusbasis – umgesetzt:** kreisrundes Checkerboard, FOV, Abstand,
+1. **Checkerboard – vorhanden:** kreisrundes Muster, FOV, Abstand,
    winkelkonstante Skalierung, mono/binokular und Merlitz-`k`.
-2. **XR-4-Betrieb – technisch umgesetzt:** Varjo-Loader, Multi Pass,
+2. **XR-4 – technisch lauffähig:** Varjo-Loader, Multi Pass,
    HMD-Tracking, Recenter und XR-Augenauswahl; die Augenmaskierung muss noch
-   systematisch im Headset validiert werden.
-3. **Messpipeline – umgesetzt:** Varjo-Eye-Tracking, Fixationsmonitor,
+   genauer im Headset geprüft werden.
+3. **Messdaten – vorhanden:** Varjo-Eye-Tracking, Fixationsmonitor,
    Marker sowie Gaze-/Head-CSV.
-4. **Pilotablauf – umgesetzt:** reproduzierbarer Trialplan, zwei
+4. **Erster Testablauf – vorhanden:** mit gleichem Seed wiederholbare
+   Reihenfolge, zwei
    Startwert-Richtungen, Antwortbestätigung und automatische Sitzungsdateien.
-5. **Dynamischer Random-Dot-Test – Prototyp umgesetzt:** weltfestes Punktfeld,
-   reale oder simulierte Gierbewegung, Merlitz-`k`-Einstellung, Sweep-Kriterium
-   und vollständige Messdateien; Validierung am XR-4 ist offen.
-6. **Natürliche Szene – offen:** dieselbe kontrollierte Abbildung nach der
-   Punktfeldvalidierung auf eine alltagsnahe 3D-Szene übertragen.
+5. **Random-Dot-Test – erster Prototyp:** festes Punktfeld, echte oder
+   simulierte Kopfbewegung, `k`-Einstellung, Bewegungszähler und Messdateien;
+   der Test am XR-4 steht noch aus.
+6. **Natürliche Szene – offen:** nach dem Punktfeldtest dieselbe Abbildung auf
+   eine alltagsnahe 3D-Szene übertragen.
 7. **Vor Hauptstudie offen:** exakte Bedingungen und Wiederholungszahl mit der
    Betreuung festlegen, Winkel/Fixation/Augenmaskierung am XR-4 messen,
    Test-Retest-Pilot durchführen und Ausschlussregeln einfrieren.
 
-## Qualitätssicherung
+## Technische Prüfungen
 
 - Die EditMode-Tests prüfen die Vorwärts-/Rückabbildung für
-  `k = 0, 0.5, 0.7, 1`, die Randnormierung und die exakte Verdopplung des
+  `k = 0, 0.5, 0.7, 1`, die Skalierung am Rand und die exakte Verdopplung des
   physischen Durchmessers bei doppeltem Abstand.
 - Der aktuelle Stand enthält 39 EditMode-Testfälle für Mathematik,
-  Skalierung, lineare 2D-Koordinaten, reproduzierbare Randomisierung,
+  Skalierung, lineare 2D-Koordinaten, wiederholbare Zufallsreihenfolgen,
   Blickstrahltransformation, Kopf-Sweep-Zähler und technische Steuerung.
 - Runtime- und Testquellen sind für Unity `6000.5.6f1` ausgelegt.
-- Vor der Datenerhebung sind Shader, Augenmaskierung, Render-Pipeline und reale
-  Winkelgröße auf dem Laborrechner mit dem konkreten Headset zu validieren.
+- Vor der Datenerhebung müssen Shader, Augenmaskierung, Rendering und die reale
+  Winkelgröße mit der XR-4 auf dem Laborrechner geprüft werden.
 
 ## Quellen
 
@@ -474,16 +535,16 @@ Stimulus neu zu schreiben.
 ```text
 Assets/GlobeEffect/
   Demo/           getrennte Checkerboard- und Random-Dot-Referenzszenen
-  Editor/         reproduzierbarer Aufbau beider Referenzszenen
+  Editor/         automatischer Aufbau beider Demoszenen
   Runtime/
     EyeTracking/  Provider, CSV-Aufzeichnung und Fixationskontrolle
     Experiment/   Trialplan, Sitzungssteuerung und Ergebnisdateien
     RandomDots/   weltfestes Punktfeld, k-Bedienung und Sweep-Messung
-    Scripts/      reine Mathematik, Stimulussteuerung, Integrations-API
+    Scripts/      Mathematik und Steuerung des Checkerboards
     Resources/    XR-fähige Checkerboard- und Random-Dot-Shader
   Tests/EditMode/ Mathematik- und Skalierungstests
 Assets/XR/        versionierte Varjo-/XR-Management-Einstellungen und Loader
 Assets/XRI/       Einstellungen des XR Interaction Toolkit
-Packages/         fest versionierte Unity-, Test- und XR-Abhängigkeiten
+Packages/         verwendete Unity-, Test- und XR-Pakete
 ProjectSettings/  Unity-Projektversion
 ```
