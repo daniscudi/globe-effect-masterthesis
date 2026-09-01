@@ -5,14 +5,15 @@ using UnityEngine.Rendering;
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
-    /// Erzeugt ein reproduzierbares, weltfestes Schwarz-Weiß-Punktfeld auf
-    /// einer sphärischen Kappe um die Ausgangsposition des Beobachters.
+    /// Erzeugt ein Schwarz-Weiß-Punktfeld auf einer gekrümmten Fläche um die
+    /// Startposition der Versuchsperson. Mit demselben Seed entstehen jedes Mal
+    /// dieselben Punktpositionen und Farben.
     ///
-    /// Die Punkte selbst werden nicht animiert. Bei realer Kopfrotation
-    /// entsteht ihre Bewegung ausschließlich aus der veränderten Blickpose.
-    /// Der Shader bildet die momentanen Blickrichtungen anschließend mit der
-    /// instrumentellen Merlitz-Gleichung ab. So bleibt der statische
-    /// Checkerboard-Test von diesem dynamischen Stabilitätstest getrennt.
+    /// Im echten HeadTracked-Modus bleiben die Punkte im Raum stehen. Die
+    /// sichtbare Bewegung entsteht nur dadurch, dass die Versuchsperson den Kopf
+    /// dreht. Der Shader verändert die Blickrichtungen mit derselben
+    /// Merlitz-Gleichung wie beim Checkerboard. Der Test mit Bewegung bleibt
+    /// trotzdem eine eigene Szene und eine eigene Aufgabe.
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
@@ -452,7 +453,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             float minimumCosine = Mathf.Cos(halfCoverage);
             for (int dotIndex = 0; dotIndex < dotCount; dotIndex++)
             {
-                // Gleichverteilung nach Raumwinkel auf einer sphärischen Kappe.
+                // Für eine gleichmäßige Verteilung auf der gekrümmten Fläche darf
+                // der Polarwinkel nicht einfach gleichverteilt gezogen werden.
+                // Eine Gleichverteilung von cos(Winkel) ergibt überall ungefähr
+                // dieselbe Punktdichte pro sichtbarem Flächenanteil.
                 float cosine = 1f - (1f - minimumCosine) * (float)random.NextDouble();
                 float sine = Mathf.Sqrt(Mathf.Max(0f, 1f - cosine * cosine));
                 float azimuth = 2f * Mathf.PI * (float)random.NextDouble();
@@ -519,10 +523,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         {
             Vector3 center = direction * fieldRadiusMeters;
             int vertexIndex = dotIndex * 4;
-            // Alle vier Vertices tragen dasselbe weltfeste Zentrum. Erst nach
-            // der radialen Abbildung erweitert der Shader daraus einen Kreis
-            // in konstanten Winkelkoordinaten. Dadurch verändert k nicht
-            // unbeabsichtigt die Punktgröße.
+            // Jeder Punkt besteht technisch aus einem kleinen Viereck. Seine vier
+            // Ecken starten zunächst am selben Mittelpunkt. Erst der Shader zieht
+            // daraus nach der Merlitz-Verschiebung einen Kreis mit fester
+            // Winkelgröße. So verändert k die Punktbahn, aber nicht die Punktgröße.
             vertices[vertexIndex] = center;
             vertices[vertexIndex + 1] = center;
             vertices[vertexIndex + 2] = center;

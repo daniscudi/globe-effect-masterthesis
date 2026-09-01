@@ -5,9 +5,11 @@ using UnityEngine.XR;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Erzeugt und steuert einen kreisrunden Merlitz-Checkerboard-Stimulus.
-    /// Das Muster wird im Shader analytisch berechnet und bleibt daher auch
-    /// bei Laufzeit-Änderungen von k, Abstand und FOV scharf.
+    /// Steuert das sichtbare Checkerboard-Objekt in Unity. Diese Klasse setzt
+    /// Position und echte Größe der runden Fläche und übergibt k, m, FOV,
+    /// Felderzahl und Augenmodus an den Shader. Das Schwarz-Weiß-Muster selbst
+    /// wird erst im Shader für jeden Pixel berechnet. Deshalb bleibt es auch
+    /// bei Änderungen während Play scharf.
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
@@ -139,10 +141,10 @@ namespace GlobeEffect.VRCheckerboard
             EnsureResources();
             isVisible = Application.isPlaying ? visibleAtStart : true;
 
-            // Der Tracked Pose Driver übernimmt die HMD-Pose erst während des
-            // ersten Frames. Eine sofortige Platzierung in OnEnable würde den
-            // Stimulus deshalb häufig relativ zur Editor-Pose (0, 0, 0)
-            // positionieren, bevor die reale Kopfpose bekannt ist.
+            // Beim Start kennt Unity die echte Kopfposition manchmal erst nach
+            // dem ersten Frame. Würde das Checkerboard sofort platziert, könnte
+            // es noch an der alten Editor-Kameraposition ausgerichtet werden.
+            // Deshalb wartet es kurz auf eine gültige HMD-Pose.
             initialPlacementPending = Application.isPlaying &&
                 placeOnFirstTrackedPose && observer != null;
             initialPlacementWaitFrames = 0;
@@ -185,9 +187,9 @@ namespace GlobeEffect.VRCheckerboard
                 initialPlacementWaitFrames++;
             }
 
-            // Im Varjo-Multi-Pass-Modus werden Context- und Focus-Ansicht in
-            // getrennten Durchläufen gerendert. Die aktuelle Center-Eye-Pose
-            // dient dem Shader als robuste Links-/Rechts-Referenz.
+            // Varjo rendert im Multi-Pass-Modus mehrere Ansichten pro Auge. Die
+            // aktuelle Center-Eye-Position hilft dem Shader dabei, auch in diesen
+            // einzelnen Durchläufen links und rechts auseinanderzuhalten.
             ApplyObserverMaterialProperties();
         }
 
@@ -200,8 +202,9 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Setzt Winkelgröße und Abstand gemeinsam. Dadurch gibt es keinen
-        /// Zwischenframe mit inkonsistenter Geometrie.
+        /// Ändert Winkelgröße und Abstand zusammen. Die echte Größe der Fläche
+        /// wird direkt neu berechnet, sodass nicht kurz ein Frame mit altem
+        /// Abstand und neuer Größe oder umgekehrt gezeigt wird.
         /// </summary>
         public void SetGeometry(float newAngularDiameterDegrees, float newDistanceMeters)
         {
@@ -247,8 +250,9 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Platziert die Fläche orthogonal zur aktuellen Blickrichtung.
-        /// Diese Methode kann explizit am Trial-Anfang aufgerufen werden.
+        /// Setzt das Checkerboard in die aktuelle Blickrichtung. Der Mittelpunkt
+        /// liegt viewingDistanceMeters vor dem Observer und die Fläche zeigt
+        /// direkt zur aktuellen Kopfpose. Diese Methode wird auch mit R aufgerufen.
         /// </summary>
         public void PlaceInFrontOfObserver()
         {
@@ -293,8 +297,9 @@ namespace GlobeEffect.VRCheckerboard
                 ? transform.parent.lossyScale
                 : Vector3.one;
 
-            // Kompensiert übliche gleichmäßige Parent-Skalierung. Für eine
-            // exakte Versuchsanordnung sollte die Parent-Skalierung (1,1,1) sein.
+            // Falls ein übergeordnetes Unity-Objekt skaliert wurde, wird diese
+            // Skalierung hier gegengerechnet. Am sichersten bleibt trotzdem eine
+            // Parent-Skalierung von (1,1,1), besonders vor echten Messungen.
             transform.localScale = new Vector3(
                 diameter / SafeScale(parentScale.x),
                 diameter / SafeScale(parentScale.y),
@@ -368,9 +373,9 @@ namespace GlobeEffect.VRCheckerboard
                 return (trackingState & required) == required;
             }
 
-            // Manche Provider melden eine gültige Center-Eye-Einheit, aber
-            // keinen separaten Tracking-State. Dann ist die gültige Einheit
-            // die beste verfügbare Startfreigabe.
+            // Manche XR-Provider liefern eine gültige Center-Eye-Einheit, aber
+            // keinen eigenen Trackingstatus. In diesem Fall reicht die gültige
+            // Einheit als Zeichen, dass die erste Platzierung stattfinden kann.
             return true;
         }
 

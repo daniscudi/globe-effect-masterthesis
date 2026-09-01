@@ -3,18 +3,29 @@ using System;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Belegte radiale Abbildung aus Merlitz (JOSA A 27, 50-57, 2010).
+    /// Hier steht die Merlitz-Gleichung, die wir für das Checkerboard und das
+    /// Random-Dot-Feld verwenden. Die Gleichung stammt aus Merlitz
+    /// (JOSA A 27, 50-57, 2010):
     ///
-    /// Instrumentelle Abbildung:
     ///     tan(k a) = m tan(k A)
     ///
-    /// A ist der objektseitige Winkel, a der scheinbare Winkel und m die
-    /// paraxiale Vergrößerung. Der Grenzfall k = 0 ist a = m A.
+    /// A ist der ursprüngliche Winkel eines Punktes und a der Winkel, unter dem
+    /// der Punkt nach der Abbildung erscheint. m ist die Vergrößerung in der
+    /// Nähe der Bildmitte. k bestimmt, wie sich die Abbildung zum Rand hin
+    /// verhält. Für k = 0 wird der Grenzfall a = m A verwendet.
+    ///
+    /// In dieser Datei steht nur die Mathematik. Position, Größe und Material
+    /// des Unity-Objekts werden in VrCheckerboardStimulus gesteuert.
     /// </summary>
     public static class MerlitzCheckerboardMath
     {
         private const double KLimitEpsilon = 1e-7;
 
+        /// <summary>
+        /// Vorwärtsrichtung der Gleichung: Zu einem ursprünglichen Objektwinkel
+        /// A wird berechnet, bei welchem sichtbaren Winkel a der Punkt landet.
+        /// Diese Richtung wird zum Beispiel beim Random-Dot-Feld benötigt.
+        /// </summary>
         public static double ApparentAngleFromObject(
             double objectAngleRadians,
             double magnification,
@@ -22,6 +33,8 @@ namespace GlobeEffect.VRCheckerboard
         {
             Validate(magnification, k);
 
+            // Direkt durch k zu teilen wäre bei k = 0 nicht möglich. Der hier
+            // verwendete Grenzfall ist genau das Ergebnis für k gegen null.
             if (k < KLimitEpsilon)
             {
                 return magnification * objectAngleRadians;
@@ -31,6 +44,12 @@ namespace GlobeEffect.VRCheckerboard
                 magnification * Math.Tan(k * objectAngleRadians)) / k;
         }
 
+        /// <summary>
+        /// Rückwärtsrichtung der Gleichung: Zu einem bereits sichtbaren Winkel a
+        /// wird der ursprüngliche Objektwinkel A gesucht. Das Checkerboard nutzt
+        /// diese Richtung, weil der Shader für jeden fertigen Pixel wissen muss,
+        /// welche Stelle des geraden Ausgangsmusters dort hingehört.
+        /// </summary>
         public static double ObjectAngleFromApparent(
             double apparentAngleRadians,
             double magnification,
@@ -48,11 +67,18 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Inverse Abtastung für den Shader.
+        /// Rechnet die Position eines sichtbaren Pixels zurück auf das gerade
+        /// Ausgangsmuster des Checkerboards.
         ///
-        /// Ein Radius r im dargestellten Kreis wird in den Radius s des
-        /// ursprünglich regelmäßigen Wandgitters zurückgerechnet. Beide
-        /// Radien sind auf den jeweiligen Kreisrand normiert.
+        /// normalizedDisplayRadius beschreibt die Stelle im fertigen Kreis:
+        /// 0 ist die Mitte und 1 ist der Rand. Die Rückgabe beschreibt die
+        /// passende Stelle im ursprünglichen geraden Schachbrett ebenfalls von
+        /// 0 bis 1. Der Shader liest anschließend an dieser Stelle ab, ob das
+        /// Feld schwarz oder weiß ist.
+        ///
+        /// Die Teilung durch den Wert am äußeren Rand sorgt dafür, dass der Rand
+        /// bei jedem k an derselben Stelle bleibt. Dadurch ändert k die Form der
+        /// Linien, aber nicht den eingestellten Winkeldurchmesser des Kreises.
         /// </summary>
         public static double NormalizedSourceRadius(
             double normalizedDisplayRadius,
@@ -71,13 +97,21 @@ namespace GlobeEffect.VRCheckerboard
                 throw new ArgumentOutOfRangeException(nameof(apparentHalfAngleRadians));
             }
 
+            // Schritt 1: Position im fertigen Kreis in einen sichtbaren Winkel
+            // umrechnen. Der Halbwinkel entspricht dem eingestellten FOV-Rand.
             double tangentAtBoundary = Math.Tan(apparentHalfAngleRadians);
             double apparentAngle = Math.Atan(
                 normalizedDisplayRadius * tangentAtBoundary);
+
+            // Schritt 2: Mit der rückwärts gelösten Merlitz-Gleichung bestimmen,
+            // von welchem ursprünglichen Winkel dieser sichtbare Winkel kommt.
             double objectAngle = ObjectAngleFromApparent(
                 apparentAngle,
                 magnification,
                 k);
+
+            // Schritt 3: Auch den äußeren Rand zurückrechnen. Durch die anschließende
+            // Teilung wird die gesuchte Position wieder auf den Bereich 0 bis 1 gesetzt.
             double maximumObjectAngle = ObjectAngleFromApparent(
                 apparentHalfAngleRadians,
                 magnification,
@@ -88,6 +122,8 @@ namespace GlobeEffect.VRCheckerboard
 
         private static void Validate(double magnification, double k)
         {
+            // Ungültige Werte würden keine sinnvolle Winkelabbildung ergeben und
+            // sollen deshalb früh mit einer klaren Meldung auffallen.
             if (magnification <= 0.0)
             {
                 throw new ArgumentOutOfRangeException(

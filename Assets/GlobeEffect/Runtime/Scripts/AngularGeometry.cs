@@ -3,8 +3,9 @@ using System;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Geometrie eines ebenen, frontal betrachteten Stimulus.
-    /// Alle Längen verwenden dieselbe Einheit; im Unity-Projekt ist das Meter.
+    /// Rechnet zwischen der sichtbaren Winkelgröße und der echten Größe der
+    /// ebenen Checkerboard-Fläche um. Im Unity-Projekt werden alle Längen in
+    /// Metern angegeben.
     /// </summary>
     public static class AngularGeometry
     {
@@ -12,7 +13,13 @@ namespace GlobeEffect.VRCheckerboard
         private const double RadiansToDegrees = 180.0 / Math.PI;
 
         /// <summary>
-        /// Berechnet den physischen Durchmesser D = 2 d tan(theta / 2).
+        /// Berechnet, welchen echten Durchmesser die Fläche bei einem bestimmten
+        /// Abstand und Winkeldurchmesser haben muss:
+        ///
+        ///     D = 2 d tan(theta / 2)
+        ///
+        /// Deshalb wird die Fläche bei doppeltem Abstand auch doppelt so groß.
+        /// Für die Versuchsperson bleibt die sichtbare Winkelgröße trotzdem gleich.
         /// </summary>
         public static double PhysicalDiameter(
             double viewingDistance,
@@ -37,7 +44,9 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Inverse Beziehung zu <see cref="PhysicalDiameter"/>.
+        /// Macht die Rechnung in die andere Richtung: Aus Abstand und echtem
+        /// Durchmesser wird bestimmt, wie groß die Fläche als Winkel erscheint.
+        /// Diese Methode wird vor allem für Tests und Kontrollen verwendet.
         /// </summary>
         public static double AngularDiameterDegrees(
             double viewingDistance,
