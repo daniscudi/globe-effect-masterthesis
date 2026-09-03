@@ -2,17 +2,16 @@
 
 Stand: 1. September 2026
 
-## Worum es gerade geht
+## Worum geht es
 
 Das Unity-Projekt enthält im Moment zwei getrennte VR-Tests. Beide sollen den
 Übergang finden, bei dem eine Verzerrung weder klar konkav noch klar konvex
-wirkt. Die Versuchsperson stellt den Wert nicht selbst ein, sondern bekommt
-feste, zufällig gemischte Werte gezeigt und antwortet nur mit einer von zwei
+wirkt. Die Versuchsperson bekommt
+feste, zufällig gemischte l-Werte gezeigt und antwortet nur mit einer von zwei
 Möglichkeiten.
 
 Das ist noch nicht das endgültige Hauptexperiment. Es ist eine technische und
-methodische Grundlage, mit der wir zuerst prüfen können, welche Bedingungen in
-der XR-4 sauber funktionieren und welche Werte überhaupt sinnvoll sind.
+methodische Grundlage, mit der wir Oomes' und Merlitz' Versuche in VR nachbilden möchten.
 
 ## Was aktuell vorhanden ist
 
@@ -20,8 +19,8 @@ der XR-4 sauber funktionieren und welche Werte überhaupt sinnvoll sind.
 
 - Szene: `Assets/GlobeEffect/Demo/CheckerboardDemo.unity`
 - quadratisches Schachbrett hinter einer getrennten runden Öffnung
-- einstellbarer Winkeldurchmesser und einstellbar weicher Rand
-- kopffeste Darstellung ohne Nahdisparität, also wie in virtueller Unendlichkeit
+- einstellbarer Winkeldurchmesser und einstellbarer Rand der Öffnung
+- kopffeste Darstellung ohne Nahdisparität, also virtuelle Unendlichkeit
 - Darstellung für beide Augen, nur links oder nur rechts
 - feste `l`-Werte, Wiederholungen und Reihenfolge über den Inspector
 - Antwort: Pfeil links = konkav, Pfeil rechts = konvex
@@ -45,8 +44,6 @@ Rekonstruktion der in Oomes et al. nicht angegebenen Zwischenformel.
 - Antwort erst nach der Bewegung: Pfeil links = konkav, Pfeil rechts = konvex
 - dieselbe Fixationskontrolle und Wiedervorlage wie beim Checkerboard
 
-Die momentanen `l`-, `k`-, FOV-, Zeit- und Wiederholungswerte sind nur
-Pilotwerte. Sie sind noch keine festgelegten Bedingungen der Masterarbeit.
 
 ## So wird ein Test bedient
 
@@ -103,14 +100,10 @@ oder einer Versuchsauswertung verbunden.
 
 1. Beide Szenen einmal vollständig auf der XR-4 testen: Rand, Monokularmodus,
    Fixation, virtuelle Unendlichkeit, Bewegungsrichtung und gespeicherte CSV.
-2. Mit dem Betreuer endgültige Reizwerte, FOV, Zeiten, Wiederholungen und
+2. Endgültige Reizwerte, FOV, Zeiten, Wiederholungen und
    Augenbedingungen festlegen.
 3. Einen kleinen Pilottest mit wenigen Personen durchführen und prüfen, ob die
    Antworten über die gewählten Werte tatsächlich von konkav zu konvex wechseln.
 4. Eine Auswertung für die psychometrischen Funktionen und PSEs ergänzen.
-5. Danach entscheiden, ob noch eine natürliche Szene, echte Kopfbewegung oder
-   ein eigener Test für eine mögliche zylindrische Komponente benötigt wird.
-6. Erst nach diesen Entscheidungen die Hauptversuchsversion festschreiben.
 
-Die ausführliche technische Erklärung und die wichtigsten Quelldateien stehen
-weiterhin in `README.md`.
+
