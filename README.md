@@ -1,4 +1,4 @@
-# Globe Effect – Masterarbeit
+# Globe Effect
 
 In diesem Unity-Projekt entsteht der Versuchsaufbau für meine Masterarbeit zum
 Globe Effect. Der statische Checkerboard-Test orientiert sich an Helmholtz und
@@ -11,14 +11,15 @@ Eine kurze Bedienungs- und Arbeitsübersicht steht in `AKTUELLER_STAND.md`.
 
 Die Versuchsperson sieht ein kreisrundes Schachbrett mit einem roten
 Fixationskreuz. Vor jedem Durchgang wird ein fester Verzerrungswert eingestellt.
-Die Person verändert diesen Wert nicht selbst, sondern antwortet nur:
+Die Versuchsperson antwortet:
 
-- Pfeil links: Das Muster wirkt konkav.
-- Pfeil rechts: Das Muster wirkt konvex.
+* Pfeil links: Muster wirkt konkav.
+
+* Pfeil rechts: Muster wirkt konvex.
 
 Aus mehreren Antworten pro Verzerrungsstufe kann später der Wert geschätzt
 werden, bei dem beide Antworten gleich häufig vorkommen. Das ist der Punkt, an
-dem das Muster subjektiv geradlinig erscheint.
+dem das Muster subjektiv geradlinig erscheint (PSE).
 
 Der Test kann beidäugig, nur links oder nur rechts gezeigt werden. Die
 gewünschten Bedingungen werden am `Checkerboard Trial Session` im Inspector
@@ -36,15 +37,16 @@ wird nicht angezeigt und kann von der Versuchsperson nicht verändert werden.
 Nach der festgelegten Bewegungsdauer verschwindet das Punktfeld und es folgt
 wieder nur die Entscheidung:
 
-- Pfeil links: Die Bewegung beziehungsweise Fläche wirkt konkav.
-- Pfeil rechts: Die Bewegung beziehungsweise Fläche wirkt konvex.
+* Pfeil links: Bewegung wirkt konkav.
+
+* Pfeil rechts: Bewegung wirkt konvex.
 
 Aus `P(konvex | k)` kann später der Übergang bestimmt werden, an dem konkav und
 konvex gleich häufig geantwortet werden. Dieser dynamische `k`-PSE kann mit dem
 PSE des statischen `l`-Tests verglichen werden. Er wird aber nicht automatisch
 als derselbe Parameter bezeichnet.
 
-## Warum der statische Test jetzt l verwendet
+## l und k
 
 In der ersten Version wurde die Instrumentengleichung von Merlitz benutzt:
 
@@ -71,10 +73,13 @@ statischen Test als eigentlicher Verzerrungsparameter verwendet.
 
 Die wichtigen Referenzpunkte sind:
 
-- `l = 1`: gnomonische Abbildung und gerades kartesisches Gitter
-- `l = 0,5`: stereografische Abbildung und Helmholtz-Endpunkt
-- `l → 0`: äquidistanter Grenzfall
-- `l > 1`: Fortsetzung in die tonnenförmige Richtung
+* `l = 1`: gnomonische Abbildung und gerades kartesisches Gitter
+
+* `l = 0,5`: stereografische Abbildung und Helmholtz-Endpunkt
+
+* `l → 0`: äquidistanter Grenzfall
+
+* `l > 1`: Fortsetzung in die tonnenförmige Richtung
 
 Damit bleiben die Helmholtz- und Oomes-Fragestellung erhalten, ohne die
 Verzerrung an eine Fernglasvergrößerung zu koppeln.
@@ -135,20 +140,22 @@ Verzerrungsformel umzudefinieren.
 Am `Checkerboard Stimulus` und am `Random Dot Field` gibt es den Wert
 `Aperture Edge Softness Degrees`:
 
-- `0`: harter, klar abgeschnittener Rand
-- kleiner positiver Wert: kurzer transparenter Übergang
-- größerer Wert: breiterer weicher Verlauf nach innen
+* `0`: harter, klar abgeschnittener Rand
+
+* kleiner positiver Wert: kurzer transparenter Übergang
+
+* größerer Wert: breiterer weicher Verlauf nach innen
 
 Die Angabe erfolgt in Winkelgrad und nicht in Pixeln. Dadurch bleibt die
-Randbreite auch bei anderer Auflösung oder auf der XR-4 vergleichbar. Für den
-ersten technischen Test ist `1°` eingetragen.
+Randbreite auch bei anderer Auflösung oder auf der XR-4 vergleichbar. 
 
 ## Verhältnis zur α-Skala von Oomes
 
 Oomes et al. verwendeten eine Skala von `α = -0,8` bis `α = 2`. Dabei gilt:
 
-- `α = 0`: gerades Gitter
-- `α = 1`: Helmholtz-Muster
+* `α = 0`: gerades Gitter
+
+* `α = 1`: Helmholtz-Muster
 
 Die Veröffentlichung enthält aber keine Formel, mit der die Zwischenwerte
 erzeugt wurden. Deshalb wird `α` nicht mehr als eigentlicher Inspectorparameter
@@ -162,10 +169,13 @@ oomes_endpoint_equivalent = 2 · (1 - l)
 
 Damit stimmen die gemeinsamen Endpunkte überein:
 
-- `l = 1` entspricht `0`
-- `l = 0,5` entspricht `1`
-- `l = 0` entspricht `2`
-- `l = 1,4` entspricht `-0,8`
+* `l = 1` entspricht `0`
+
+* `l = 0,5` entspricht `1`
+
+* `l = 0` entspricht `2`
+
+* `l = 1,4` entspricht `-0,8`
 
 Diese zusätzliche Zahl ist ausdrücklich keine Rekonstruktion der
 Originalinterpolation von Oomes. Der primär ausgewertete und berichtete
@@ -216,16 +226,18 @@ stattdessen eine Obergrenze.
 
 ## Bedienung
 
-- `F5`: Sitzung starten
-- `F6`: Sitzung abbrechen
-- Pfeil links: konkav
-- Pfeil rechts: konvex
-- `C`: Eye-Tracking-Kalibrierung der vorhandenen Toolbox
+* `F5`: Sitzung starten
+
+* `F6`: Sitzung abbrechen
+
+* Pfeil links: konkav
+
+* Pfeil rechts: konvex
+
+* `C`: Eye-Tracking-Kalibrierung der vorhandenen Toolbox
 
 Beim Random-Dot-Test werden die Pfeiltasten erst angenommen, nachdem die
-Bewegungsphase beendet und das Punktfeld ausgeblendet wurde. Das frühere
-Verändern von `k` mit den Pfeiltasten und die Bestätigung mit Enter gehören
-nicht mehr zum Versuchsablauf.
+Bewegungsphase beendet und das Punktfeld ausgeblendet wurde.
 
 Am `Checkerboard Keyboard Controller` kann `Swap Response Keys` aktiviert
 werden. Dadurch lässt sich die Bedeutung der beiden Pfeiltasten zwischen
@@ -237,20 +249,27 @@ gerade gültige Belegung an.
 Die wichtigsten Einstellungen befinden sich am Objekt
 `Checkerboard Trial Session`:
 
-- `Angular Diameters Degrees`: ein oder mehrere FOV-/Winkeldurchmesser
-- `Eye Presentations`: Both Eyes, Left Eye Only oder Right Eye Only
-- `Visual Space L Values`: alle zu präsentierenden Verzerrungswerte
-- `Repetitions Per Condition`: Wiederholungen jeder Kombination
-- `Require Fixation`: Vorfixation und Kontrolle während des Musters
-- `Maximum Off Target Seconds`: erlaubte zusammenhängende Blickabweichung
-- `Maximum Invalid Gaze Seconds`: erlaubte Dauer fehlender oder ungültiger Daten
-- `Maximum Attempts Per Trial`: 0 für unbegrenzte Wiedervorlage
-- `Random Seed`: macht die zufällige Reihenfolge reproduzierbar
+* `Angular Diameters Degrees`: ein oder mehrere FOV-/Winkeldurchmesser
+
+* `Eye Presentations`: Both Eyes, Left Eye Only oder Right Eye Only
+
+* `Visual Space L Values`: alle zu präsentierenden Verzerrungswerte
+
+* `Repetitions Per Condition`: Wiederholungen jeder Kombination
+
+* `Require Fixation`: Vorfixation und Kontrolle während des Musters
+
+* `Maximum Off Target Seconds`: erlaubte zusammenhängende Blickabweichung
+
+* `Maximum Invalid Gaze Seconds`: erlaubte Dauer fehlender oder ungültiger Daten
+
+* `Maximum Attempts Per Trial`: 0 für unbegrenzte Wiedervorlage
+
+* `Random Seed`: macht die zufällige Reihenfolge reproduzierbar
 
 Die aktuell eingetragenen `l`-Werte und drei Wiederholungen sind nur für einen
 technischen Pilotlauf gedacht. Sie sind noch keine festgelegten Bedingungen der
-Masterarbeit. Die Listen können im Inspector vollständig geändert werden, ohne
-den Code anzupassen.
+Masterarbeit. Die Listen können im Inspector vollständig geändert werden.
 
 Am Objekt `Checkerboard Stimulus` werden Aussehen, Felderzahl, Farben, Größe des
 Fixationskreuzes und die weiche Blendenkante eingestellt. Während einer Sitzung
@@ -259,14 +278,21 @@ setzt die Trialsteuerung FOV, `l` und Augenmodus automatisch.
 Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
 `Random Dot Trial Session`:
 
-- `Stimulus K Values`: alle fest vorgegebenen k-Werte
-- `Repetitions Per Condition`: Wiederholungen jeder Kombination
-- `Motion Duration Seconds`: sichtbare Dauer der Bewegung
-- `Sweep Amplitude Degrees`: Schwenkweite je Seite
-- `Sweep Speed Degrees Per Second`: Winkelgeschwindigkeit
-- `Motion Modes`: für den Haupttest `Simulated Yaw`
-- `Eye Presentations`: beide, nur linkes oder nur rechtes Auge
-- Fixations- und Wiederholungsgrenzen wie beim Checkerboard
+* `Stimulus K Values`: alle fest vorgegebenen k-Werte
+
+* `Repetitions Per Condition`: Wiederholungen jeder Kombination
+
+* `Motion Duration Seconds`: sichtbare Dauer der Bewegung
+
+* `Sweep Amplitude Degrees`: Schwenkweite je Seite
+
+* `Sweep Speed Degrees Per Second`: Winkelgeschwindigkeit
+
+* `Motion Modes`: für den Haupttest `Simulated Yaw`
+
+* `Eye Presentations`: beide, nur linkes oder nur rechtes Auge
+
+* Fixations- und Wiederholungsgrenzen wie beim Checkerboard
 
 Die Richtung des ersten Schwenks wird über die Wiederholungen möglichst gleich
 auf links und rechts verteilt. Die Reihenfolge wird anschließend mit dem Seed
@@ -287,44 +313,63 @@ Pro Sitzung entsteht ein eigener Ordner unter
 `Application.persistentDataPath/Measurements`, sofern im Inspector kein anderer
 Ausgabeordner gesetzt wurde. Darin liegen unter anderem:
 
-- `*_plan.csv`: der vorher erzeugte und zufällig gemischte Plan
-- `*_trials.csv`: jede tatsächliche Präsentation, auch ungültige Wiederholungen
-- die Rohdaten-CSV-Dateien der Eye-Tracking-Toolbox
+* `*_plan.csv`: der vorher erzeugte und zufällig gemischte Plan
+
+* `*_trials.csv`: jede tatsächliche Präsentation, auch ungültige Wiederholungen
+
+* die Rohdaten-CSV-Dateien der Eye-Tracking-Toolbox
 
 In `*_trials.csv` stehen unter anderem:
 
-- ursprüngliche Plannummer und aktuelle Präsentationsnummer
-- `visual_space_l`, FOV und Augenmodus
-- `oomes_endpoint_equivalent` als zusätzliche Orientierung
-- Antwort und Reaktionszeit
-- `valid_for_analysis`
-- aktueller Fixationswinkel und Anteil gültiger Samples
-- längste zusammenhängende Off-Target- und Invalid-Gaze-Dauer
-- Grund für einen Ausschluss
-- Versionskennung der verwendeten Abbildung
+* ursprüngliche Plannummer und aktuelle Präsentationsnummer
+
+* `visual_space_l`, FOV und Augenmodus
+
+* `oomes_endpoint_equivalent` als zusätzliche Orientierung
+
+* Antwort und Reaktionszeit
+
+* `valid_for_analysis`
+
+* aktueller Fixationswinkel und Anteil gültiger Samples
+
+* längste zusammenhängende Off-Target- und Invalid-Gaze-Dauer
+
+* Grund für einen Ausschluss
+
+* Versionskennung der verwendeten Abbildung
 
 Marker wie `TrialStart`, `TrialResponse`, `TrialInvalid` und
 `TrialRepeatQueued` verbinden den Versuchsablauf zeitlich mit den Rohdaten.
 
 Beim Random-Dot-Test werden zusätzlich unter anderem festgehalten:
 
-- der vorgegebene Wert `stimulus_k`
-- Schwenkrichtung, Amplitude und Geschwindigkeit
-- Bewegungsdauer und Reaktionszeit nach dem Ausblenden
-- Dot-Seed und Punktanzahl
-- Breite der weichen Blendenkante
-- Antwort konkav/konvex und `valid_for_analysis`
-- Fixationswerte und Grund einer ungültigen Wiederholung
+* der vorgegebene Wert `stimulus_k`
+
+* Schwenkrichtung, Amplitude und Geschwindigkeit
+
+* Bewegungsdauer und Reaktionszeit nach dem Ausblenden
+
+* Dot-Seed und Punktanzahl
+
+* Breite der weichen Blendenkante
+
+* Antwort konkav/konvex und `valid_for_analysis`
+
+* Fixationswerte und Grund einer ungültigen Wiederholung
 
 ## Varjo- und Unity-Einstellungen
 
 Getestet wird mit der Varjo XR-4. Im bisherigen Projekt funktionierte die
 Darbietung mit:
 
-- Varjo als XR Provider unter Windows/Standalone
-- `Initialize XR on Startup`
-- Stereo Rendering Mode `Multi Pass`
-- `XR Origin` mit `Main Camera` und Tracked Pose Driver
+* Varjo als XR Provider unter Windows/Standalone
+
+* `Initialize XR on Startup`
+
+* Stereo Rendering Mode `Multi Pass`
+
+* `XR Origin` mit `Main Camera` und Tracked Pose Driver
 
 Vor einem echten Durchlauf sollten in Varjo Base Tracking und Eye Tracking
 geprüft und anschließend die Kalibrierung durchgeführt werden.
@@ -406,34 +451,35 @@ Wahrnehmung stammt dort von der echten Versuchsperson.
 
 Kurz gesagt:
 
-- Statisches Checkerboard: Visual-Space-`l`, feste Reize,
+* Statisches Checkerboard: Visual-Space-`l`, feste Reize,
   konkav/konvex und head-locked.
-- Random-Dot-Teil: feste `k`-Reize, kontrollierte Bewegung,
+
+* Random-Dot-Teil: feste `k`-Reize, kontrollierte Bewegung,
   konkav/konvex und ein dynamischer PSE.
 
 ## Noch offen
 
-- Die endgültigen `l`-Stufen und die Wiederholungszahl werden mit dem Betreuer
-  festgelegt.
-- Dasselbe gilt für `k`-Stufen, Schwenkweite, Geschwindigkeit und Dauer des
+* Die endgültigen `l`-Stufen und die Wiederholungszahl 
+
+* Dasselbe gilt für `k`-Stufen, Schwenkweite, Geschwindigkeit und Dauer des
   Random-Dot-Tests. Die aktuellen Werte sind Pilotwerte.
-- Es muss entschieden werden, welche Augenbedingungen Teil des Hauptversuchs
-  werden.
-- Shader, Monokularmaskierung und Darstellung ohne Nahdisparität müssen auf der
-  XR-4 visuell gegengeprüft werden.
-- Für die Auswertung wird später eine psychometrische Funktion für
+
+* Für die Auswertung wird später eine psychometrische Funktion für
   `P(konvex | l)` angepasst; der 50-%-Punkt ist der gesuchte PSE.
-- Falls die Originalimplementierung von Oomes noch verfügbar wird, kann ihre
+
+* Falls die Originalimplementierung von Oomes noch verfügbar wird, kann ihre
   α-Skala nachträglich mit der hier verwendeten l-Familie verglichen werden.
 
 ## Literaturgrundlage
 
-- Oomes, A. H. J., Koenderink, J. J., van Doorn, A. J. und de Ridder, H.
+* Oomes, A. H. J., Koenderink, J. J., van Doorn, A. J. und de Ridder, H.
   (2009). *What are the uncurved lines in our visual field? A fresh look at
   Helmholtz's checkerboard.* Perception, 38, 1284–1294.
-- Helmholtz, H. von: Beschreibung des Checkerboard- bzw.
+
+* Helmholtz, H. von: Beschreibung des Checkerboard- bzw.
   Richtungskreis-Phänomens in der physiologischen Optik.
-- Merlitz, H. (2010). *Panning Distortion of Binoculars and Its Impact on the
+
+* Merlitz, H. (2010). *Panning Distortion of Binoculars and Its Impact on the
   Globe Effect.* Journal of the Optical Society of America A, 27, 50–57.
 
 Die aktuelle Umsetzung ist eine VR-Adaption und keine exakte Replikation des
