@@ -83,11 +83,21 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
                     _ObserverWorldRight.xyz * displayPosition.x * tangentAtBoundary +
                     _ObserverWorldUp.xyz * displayPosition.y * tangentAtBoundary);
 
-                // w = 0 kennzeichnet eine Richtung statt eines Weltpunkts. Damit
-                // hat die Kameraposition keinen Einfluss und beide Augen sehen
-                // denselben Sehwinkel, so wie bei einem Objekt in großer Entfernung.
-                float4 viewDirection = mul(UNITY_MATRIX_V, float4(worldDirection, 0.0));
-                output.position = mul(UNITY_MATRIX_P, viewDirection);
+                // Bei der Umrechnung in Kamerakoordinaten entfernt w = 0 die
+                // Kameratranslation. Linkes und rechtes Auge bekommen dadurch
+                // weiterhin dieselbe Richtung und keine Nahdisparität.
+                float3 viewDirection = mul(
+                    UNITY_MATRIX_V,
+                    float4(worldDirection, 0.0)).xyz;
+
+                // Für die eigentliche Projektion verwenden wir anschließend
+                // w = 1. Die x/y-Position bleibt dieselbe Blickrichtung, aber
+                // der Punkt erhält eine gültige Tiefe. Mit w = 0 konnte der
+                // normale Mono-Game-View das ganze Viereck an der Fern-Ebene
+                // abschneiden, obwohl der Varjo-Multi-Pass-Pfad es noch zeigte.
+                output.position = mul(
+                    UNITY_MATRIX_P,
+                    float4(viewDirection, 1.0));
                 output.uv = input.uv;
                 return output;
             }
