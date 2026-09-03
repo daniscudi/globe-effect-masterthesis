@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using GlobeEffect.VRCheckerboard.EyeTracking;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -56,7 +55,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private int randomSeed = 20260901;
 
         [SerializeField]
-        [Tooltip("Leer = Application.persistentDataPath/Measurements.")]
+        [Tooltip("Leer = measurements-Ordner direkt im Unity-Projekt.")]
         private string outputRoot = string.Empty;
 
         [SerializeField]
@@ -291,9 +290,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 trialQueue = new CheckerboardTrialQueue(trialPlan);
 
                 DateTime sessionStartUtc = DateTime.UtcNow;
-                string resolvedOutputRoot = string.IsNullOrWhiteSpace(outputRoot)
-                    ? Path.Combine(Application.persistentDataPath, "Measurements")
-                    : outputRoot;
+                string resolvedOutputRoot = ExperimentOutputPath.Resolve(outputRoot);
                 experimentFiles = CheckerboardExperimentFiles.Create(
                     resolvedOutputRoot,
                     participantId,
@@ -595,6 +592,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 trialStartUnitySeconds,
                 Time.realtimeSinceStartupAsDouble,
                 stimulus.ApertureEdgeSoftnessDegrees,
+                stimulus.UseCircularAperture,
                 response,
                 validForAnalysis,
                 sampleValid,
@@ -774,7 +772,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             return string.Format(
                 CultureInfo.InvariantCulture,
                 "TrialStart;presentation={0};sequence={1};condition={2};repetition={3};" +
-                "attempt={4};eye={5};fov_deg={6:F3};edge_softness_deg={7:F3};visual_space_l={8:F4}",
+                "attempt={4};eye={5};fov_deg={6:F3};edge_softness_deg={7:F3};" +
+                "circular_aperture={8};visual_space_l={9:F4}",
                 presentationIndex,
                 trial.SequenceIndex,
                 trial.ConditionIndex,
@@ -783,6 +782,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 trial.EyePresentation,
                 trial.AngularDiameterDegrees,
                 stimulus.ApertureEdgeSoftnessDegrees,
+                stimulus.UseCircularAperture,
                 trial.VisualSpaceL);
         }
 

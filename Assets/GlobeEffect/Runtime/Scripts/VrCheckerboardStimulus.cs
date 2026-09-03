@@ -33,6 +33,10 @@ namespace GlobeEffect.VRCheckerboard
         [Tooltip("Breite des weichen Übergangs am inneren Rand der Kreisblende. 0 ergibt eine harte Kante.")]
         private float apertureEdgeSoftnessDegrees = 1f;
 
+        [SerializeField]
+        [Tooltip("Schaltet die runde Öffnung ein. Zum Kontrollieren des vollständigen quadratischen Gitters kann sie vorübergehend ausgeschaltet werden.")]
+        private bool useCircularAperture = true;
+
         [Header("Visual-Space-/Helmholtz-Gitter")]
         [SerializeField, Range(0f, 1.4f)]
         [Tooltip("l = 1 zeigt ein gerades Gitter, l = 0,5 den Helmholtz-Endpunkt. Kleinere Werte setzen die kissenförmige, Werte über 1 die tonnenförmige Richtung fort.")]
@@ -102,6 +106,7 @@ namespace GlobeEffect.VRCheckerboard
 
         public float AngularDiameterDegrees => angularDiameterDegrees;
         public float ApertureEdgeSoftnessDegrees => apertureEdgeSoftnessDegrees;
+        public bool UseCircularAperture => useCircularAperture;
         public float VisualSpaceL => visualSpaceL;
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
         public bool IsVisible => isVisible;
@@ -185,6 +190,13 @@ namespace GlobeEffect.VRCheckerboard
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
+        public void SetCircularApertureEnabled(bool value)
+        {
+            useCircularAperture = value;
+            ApplyMaterialProperties();
+            ParametersChanged?.Invoke(CaptureSnapshot());
+        }
+
         public void SetVisualSpaceL(float value)
         {
             visualSpaceL = Mathf.Clamp(value, 0f, 1.4f);
@@ -237,6 +249,7 @@ namespace GlobeEffect.VRCheckerboard
                 checkerboardVisible = checkerboardVisible,
                 angularDiameterDegrees = angularDiameterDegrees,
                 apertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees,
+                useCircularAperture = useCircularAperture,
                 visualSpaceL = visualSpaceL,
                 checksAcrossDiameter = checksAcrossDiameter,
                 eyePresentation = eyePresentation
@@ -277,6 +290,8 @@ namespace GlobeEffect.VRCheckerboard
                 0.5f * angularDiameterDegrees * Mathf.Deg2Rad);
             propertyBlock.SetFloat("_ApertureEdgeSoftnessRad",
                 apertureEdgeSoftnessDegrees * Mathf.Deg2Rad);
+            propertyBlock.SetFloat("_UseCircularAperture",
+                useCircularAperture ? 1f : 0f);
             propertyBlock.SetFloat("_VisualSpaceL", visualSpaceL);
             propertyBlock.SetFloat("_ChecksAcrossDiameter", checksAcrossDiameter);
             propertyBlock.SetColor("_DarkColor", darkColor);

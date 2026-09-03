@@ -8,6 +8,7 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
         _FixationColor ("Fixation Color", Color) = (1, 0, 0, 1)
         _ApparentHalfAngleRad ("Apparent Half Angle [rad]", Float) = 0.785398
         _ApertureEdgeSoftnessRad ("Aperture Edge Softness [rad]", Float) = 0.0174533
+        _UseCircularAperture ("Use Circular Aperture", Float) = 1
         _VisualSpaceL ("Visual-space l", Range(0, 1.4)) = 0.5
         _ChecksAcrossDiameter ("Checks Across Diameter", Float) = 16
         _CheckerboardEnabled ("Checkerboard Enabled", Float) = 1
@@ -58,6 +59,7 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
             fixed4 _FixationColor;
             float _ApparentHalfAngleRad;
             float _ApertureEdgeSoftnessRad;
+            float _UseCircularAperture;
             float _VisualSpaceL;
             float _ChecksAcrossDiameter;
             float _CheckerboardEnabled;
@@ -145,14 +147,15 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
                 // berechnet. Diese unabhängige Kreisblende entscheidet erst
                 // danach, welcher Teil davon sichtbar ist. Die Softness gibt
                 // an, über wie viele Winkelgrad der Rand nach innen ausblendet.
-                float apertureAlpha;
-                if (_ApertureEdgeSoftnessRad <= 1e-6)
+                float apertureAlpha = 1.0;
+                if (_UseCircularAperture > 0.5 &&
+                    _ApertureEdgeSoftnessRad <= 1e-6)
                 {
                     apertureAlpha = step(
                         visualAngle,
                         _ApparentHalfAngleRad);
                 }
-                else
+                else if (_UseCircularAperture > 0.5)
                 {
                     float fadeStart = max(
                         0.0,
@@ -162,6 +165,9 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
                         _ApparentHalfAngleRad,
                         visualAngle);
                 }
+                // Ohne Kreisblende bleibt apertureAlpha bei 1 und das ganze
+                // quadratische Gitter wird sichtbar. Das ist nur zur Kontrolle
+                // gedacht; im eigentlichen Versuch bleibt die Öffnung aktiv.
                 clip(apertureAlpha - 0.001);
 
                 float sourceRadius;

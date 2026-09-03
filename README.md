@@ -149,6 +149,12 @@ Am `Checkerboard Stimulus` und am `Random Dot Field` gibt es den Wert
 Die Angabe erfolgt in Winkelgrad und nicht in Pixeln. Dadurch bleibt die
 Randbreite auch bei anderer Auflösung oder auf der XR-4 vergleichbar. 
 
+Am `Checkerboard Stimulus` kann `Use Circular Aperture` für eine technische
+Kontrolle ausgeschaltet werden. Dann sieht man das vollständige quadratische
+Gitter. Für den eigentlichen Versuch bleibt der Haken eingeschaltet. Der
+verwendete Zustand wird in der Trialdatei und in den Eye-Tracking-Markern
+mitgespeichert.
+
 ## Verhältnis zur α-Skala von Oomes
 
 Oomes et al. verwendeten eine Skala von `α = -0,8` bis `α = 2`. Dabei gilt:
@@ -309,15 +315,20 @@ Checkerboard-Test nur der Stimulusmarker um `visual_space_l`, FOV, Augenmodus
 und die Breite der Blendenkante ergänzt. Der Random-Dot-Ablauf schreibt seine
 Trialmarker über dieselbe vorhandene Nachrichtenfunktion.
 
-Pro Sitzung entsteht ein eigener Ordner unter
-`Application.persistentDataPath/Measurements`, sofern im Inspector kein anderer
-Ausgabeordner gesetzt wurde. Darin liegen unter anderem:
+Pro Sitzung entsteht automatisch ein eigener Ordner unter `measurements` direkt
+im Unity-Projekt. Der Pfad wird aus dem aktuellen Projektordner bestimmt und
+funktioniert deshalb auch dann, wenn das Projekt auf dem Labor-PC auf einem
+anderen Laufwerk liegt. Nur wenn im Inspector ausdrücklich ein anderer
+Ausgabeordner eingetragen ist, wird dieser verwendet. Darin liegen unter anderem:
 
 * `*_plan.csv`: der vorher erzeugte und zufällig gemischte Plan
 
 * `*_trials.csv`: jede tatsächliche Präsentation, auch ungültige Wiederholungen
 
 * die Rohdaten-CSV-Dateien der Eye-Tracking-Toolbox
+
+Der Ordner `measurements` wird von Git ignoriert, damit Messdaten nicht
+versehentlich auf GitHub landen.
 
 In `*_trials.csv` stehen unter anderem:
 

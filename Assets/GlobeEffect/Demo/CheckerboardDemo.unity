@@ -154,6 +154,7 @@ MonoBehaviour:
   observer: {fileID: 799610645}
   angularDiameterDegrees: 90
   apertureEdgeSoftnessDegrees: 1
+  useCircularAperture: 1
   visualSpaceL: 0.5
   checksAcrossDiameter: 16
   darkColor: {r: 0, g: 0, b: 0, a: 1}

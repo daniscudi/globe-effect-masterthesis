@@ -20,6 +20,7 @@ methodische Grundlage, mit der wir Oomes' und Merlitz' Versuche in VR nachbilden
 - Szene: `Assets/GlobeEffect/Demo/CheckerboardDemo.unity`
 - quadratisches Schachbrett hinter einer getrennten runden Öffnung
 - einstellbarer Winkeldurchmesser und einstellbarer Rand der Öffnung
+- Öffnung für eine technische Kontrolle abschaltbar; im Versuch bleibt sie an
 - kopffeste Darstellung ohne Nahdisparität, also virtuelle Unendlichkeit
 - Darstellung für beide Augen, nur links oder nur rechts
 - feste `l`-Werte, Wiederholungen und Reihenfolge über den Inspector
@@ -69,8 +70,9 @@ Fixationskontrolle wieder aktiv sein.
 
 ## Welche Dateien gespeichert werden
 
-Wenn kein eigener Ausgabeordner eingetragen ist, liegt jede Sitzung unter
-`Application.persistentDataPath/Measurements`. Gespeichert werden:
+Wenn kein eigener Ausgabeordner eingetragen ist, liegt jede Sitzung automatisch
+unter `measurements` direkt im Unity-Projekt. Das funktioniert unabhängig vom
+Laufwerksbuchstaben und vom Speicherort des Projekts. Gespeichert werden:
 
 - der vorher erzeugte und zufällig gemischte Trialplan
 - alle tatsächlich gezeigten Trials, einschließlich ungültiger Versuche
@@ -81,6 +83,8 @@ Wenn kein eigener Ausgabeordner eingetragen ist, liegt jede Sitzung unter
 Die bekannten PLACES-Spalten von `unity_timestamp` bis `gaze_distance` stehen
 weiterhin in derselben Reihenfolge am Anfang der Gaze-Datei. Zusätzliche
 Varjo-Statuswerte folgen danach.
+
+Der Ordner `measurements` wird nicht zu GitHub hochgeladen.
 
 ## Was das für die Masterarbeit bedeutet
 
@@ -105,5 +109,4 @@ oder einer Versuchsauswertung verbunden.
 3. Einen kleinen Pilottest mit wenigen Personen durchführen und prüfen, ob die
    Antworten über die gewählten Werte tatsächlich von konkav zu konvex wechseln.
 4. Eine Auswertung für die psychometrischen Funktionen und PSEs ergänzen.
-
 

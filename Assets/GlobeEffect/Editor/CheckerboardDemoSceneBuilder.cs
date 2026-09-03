@@ -204,6 +204,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             stimulus.Observer = observer;
             stimulus.SetAngularDiameter(90f);
             stimulus.SetApertureEdgeSoftness(1f);
+            stimulus.SetCircularApertureEnabled(true);
             stimulus.SetVisualSpaceL(0.5f);
             stimulus.SetEyePresentation(CheckerboardEyePresentation.BothEyes);
             stimulusObject.AddComponent<CheckerboardKeyboardController>();

@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using GlobeEffect.VRCheckerboard.EyeTracking;
 using GlobeEffect.VRCheckerboard.RandomDots;
 using UnityEngine;
@@ -64,7 +63,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private int dotSeedBase = 24680;
 
         [SerializeField]
-        [Tooltip("Leer = Application.persistentDataPath/Measurements.")]
+        [Tooltip("Leer = measurements-Ordner direkt im Unity-Projekt.")]
         private string outputRoot = string.Empty;
 
         [SerializeField]
@@ -331,9 +330,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 trialQueue = new RandomDotTrialQueue(trialPlan);
 
                 DateTime sessionStartUtc = DateTime.UtcNow;
-                string resolvedRoot = string.IsNullOrWhiteSpace(outputRoot)
-                    ? Path.Combine(Application.persistentDataPath, "Measurements")
-                    : outputRoot;
+                string resolvedRoot = ExperimentOutputPath.Resolve(outputRoot);
                 experimentFiles = RandomDotExperimentFiles.Create(
                     resolvedRoot,
                     participantId,

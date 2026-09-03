@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Threading;
+using GlobeEffect.VRCheckerboard.Experiment;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -90,7 +91,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         [Header("Aufzeichnung")]
         [SerializeField]
-        [Tooltip("Leer = Application.persistentDataPath/Measurements.")]
+        [Tooltip("Leer = measurements-Ordner direkt im Unity-Projekt.")]
         private string outputFolder = string.Empty;
 
         [SerializeField]
@@ -131,9 +132,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         public bool IsRecording => recording;
         public string ObjectTrackingFile => objectTrackingFile;
         public string GazeTrackingFile => gazeTrackingFile;
-        public string OutputFolder => string.IsNullOrWhiteSpace(outputFolder)
-            ? Path.Combine(Application.persistentDataPath, "Measurements")
-            : outputFolder;
+        public string OutputFolder => ExperimentOutputPath.Resolve(outputFolder);
 
         private void Awake()
         {
@@ -741,11 +740,13 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         {
             return string.Format(
                 CultureInfo.InvariantCulture,
-                "{0};visual_space_l={1:F3};fov_deg={2:F2};edge_softness_deg={3:F2};eye={4}",
+                "{0};visual_space_l={1:F3};fov_deg={2:F2};edge_softness_deg={3:F2};" +
+                "circular_aperture={4};eye={5}",
                 eventName,
                 snapshot.visualSpaceL,
                 snapshot.angularDiameterDegrees,
                 snapshot.apertureEdgeSoftnessDegrees,
+                snapshot.useCircularAperture,
                 snapshot.eyePresentation);
         }
 
