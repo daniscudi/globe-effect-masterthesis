@@ -19,6 +19,8 @@ methodische Grundlage, mit der wir Oomes' und Merlitz' Versuche in VR nachbilden
 
 - Szene: `Assets/GlobeEffect/Demo/CheckerboardDemo.unity`
 - quadratisches Schachbrett hinter einer getrennten runden Öffnung
+- gleichmäßiges u/v-Gitter; seine lineare Weite wird aus dem bei Oomes
+  beschriebenen Abstand von 10 Grad berechnet
 - einstellbarer Winkeldurchmesser und einstellbarer Rand der Öffnung
 - Öffnung für eine technische Kontrolle abschaltbar; im Versuch bleibt sie an
 - kopffeste Darstellung ohne Nahdisparität, also virtuelle Unendlichkeit
@@ -109,4 +111,3 @@ oder einer Versuchsauswertung verbunden.
 3. Einen kleinen Pilottest mit wenigen Personen durchführen und prüfen, ob die
    Antworten über die gewählten Werte tatsächlich von konkav zu konvex wechseln.
 4. Eine Auswertung für die psychometrischen Funktionen und PSEs ergänzen.
-

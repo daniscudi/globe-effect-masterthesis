@@ -10,7 +10,7 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
         _ApertureEdgeSoftnessRad ("Aperture Edge Softness [rad]", Float) = 0.0174533
         _UseCircularAperture ("Use Circular Aperture", Float) = 1
         _VisualSpaceL ("Visual-space l", Range(0, 1.4)) = 0.5
-        _ChecksAcrossDiameter ("Checks Across Diameter", Float) = 16
+        _GridLineSpacingUv ("Grid Line Spacing [u/v]", Float) = 0.176327
         _CheckerboardEnabled ("Checkerboard Enabled", Float) = 1
         _EyeMode ("Eye Mode", Float) = 0
         _FixationEnabled ("Fixation Enabled", Float) = 1
@@ -61,7 +61,7 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
             float _ApertureEdgeSoftnessRad;
             float _UseCircularAperture;
             float _VisualSpaceL;
-            float _ChecksAcrossDiameter;
+            float _GridLineSpacingUv;
             float _CheckerboardEnabled;
             float _EyeMode;
             float _FixationEnabled;
@@ -187,8 +187,13 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
                     : float2(1.0, 0.0);
                 float2 sourcePosition = radialDirection * sourceRadius;
 
-                float2 gridPosition = (sourcePosition + 1.0) * 0.5
-                    * _ChecksAcrossDiameter;
+                // sourcePosition liegt im linearen u/v-Koordinatensystem des
+                // unverzerrten Ausgangsgitters. Die feste Gitterweite wird aus
+                // dem im Inspector eingestellten Winkelabstand berechnet. l
+                // verändert damit nur die radiale Abtastposition und nicht
+                // zusätzlich den Aufbau des zugrunde liegenden Schachbretts.
+                float2 gridPosition = sourcePosition /
+                    max(_GridLineSpacingUv, 1e-6);
                 float checkerSignal = sin(UNITY_PI * gridPosition.x)
                     * sin(UNITY_PI * gridPosition.y);
                 float antialiasWidth = max(fwidth(checkerSignal), 1e-4);

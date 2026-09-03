@@ -297,7 +297,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     sessionLabel,
                     sessionStartUtc,
                     randomSeed);
-                experimentFiles.WritePlan(trialPlan);
+                experimentFiles.WritePlan(
+                    trialPlan,
+                    stimulus.GridLineSpacingDegrees);
                 activeSessionFolder = experimentFiles.SessionFolder;
 
                 StartEyeTracking(sessionStartUtc);
@@ -593,6 +595,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 Time.realtimeSinceStartupAsDouble,
                 stimulus.ApertureEdgeSoftnessDegrees,
                 stimulus.UseCircularAperture,
+                stimulus.GridLineSpacingDegrees,
+                stimulus.GridLineSpacingUv,
                 response,
                 validForAnalysis,
                 sampleValid,
@@ -773,7 +777,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 CultureInfo.InvariantCulture,
                 "TrialStart;presentation={0};sequence={1};condition={2};repetition={3};" +
                 "attempt={4};eye={5};fov_deg={6:F3};edge_softness_deg={7:F3};" +
-                "circular_aperture={8};visual_space_l={9:F4}",
+                "circular_aperture={8};grid_spacing_deg={9:F3};" +
+                "grid_spacing_uv={10:F6};visual_space_l={11:F4}",
                 presentationIndex,
                 trial.SequenceIndex,
                 trial.ConditionIndex,
@@ -783,6 +788,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 trial.AngularDiameterDegrees,
                 stimulus.ApertureEdgeSoftnessDegrees,
                 stimulus.UseCircularAperture,
+                stimulus.GridLineSpacingDegrees,
+                stimulus.GridLineSpacingUv,
                 trial.VisualSpaceL);
         }
 

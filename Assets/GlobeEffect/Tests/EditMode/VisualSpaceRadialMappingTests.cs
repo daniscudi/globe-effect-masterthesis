@@ -63,6 +63,29 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(source, Is.EqualTo(1.0).Within(1e-12));
         }
 
+        [Test]
+        public void TenDegreeSpacingAtNinetyDegreeFov_HasExpectedUvWidth()
+        {
+            double spacingUv = VisualSpaceRadialMapping.NormalizedGridLineSpacing(
+                angularDiameterDegrees: 90.0,
+                gridLineSpacingDegrees: 10.0);
+
+            double expected = Math.Tan(10.0 * Math.PI / 180.0) /
+                Math.Tan(45.0 * Math.PI / 180.0);
+            Assert.That(spacingUv, Is.EqualTo(expected).Within(1e-12));
+        }
+
+        [TestCase(0.0)]
+        [TestCase(-1.0)]
+        [TestCase(90.0)]
+        public void InvalidAngularGridSpacing_IsRejected(double spacingDegrees)
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                VisualSpaceRadialMapping.NormalizedGridLineSpacing(
+                    angularDiameterDegrees: 90.0,
+                    gridLineSpacingDegrees: spacingDegrees));
+        }
+
         [TestCase(1.0, 0.0)]
         [TestCase(0.5, 1.0)]
         [TestCase(0.0, 2.0)]

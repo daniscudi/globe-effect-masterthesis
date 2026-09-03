@@ -30,7 +30,7 @@ namespace GlobeEffect.VRCheckerboard
         /// unterscheidbar, falls die Abbildung später noch erweitert wird.
         /// </summary>
         public const string MappingVersion =
-            "visual-space-l-tangent-normalized-v1";
+            "visual-space-l-tangent-normalized-cartesian-grid-v2";
 
         /// <summary>
         /// Rechnet einen Radius im sichtbaren Kreis auf die Stelle zurück, an
@@ -91,6 +91,34 @@ namespace GlobeEffect.VRCheckerboard
         {
             ValidateVisualSpaceL(visualSpaceL);
             return 2.0 * (1.0 - visualSpaceL);
+        }
+
+        /// <summary>
+        /// Rechnet den gewünschten Winkelabstand der Gitterlinien in die
+        /// lineare Gitterweite des normierten u/v-Koordinatensystems um.
+        /// Der Winkel dient damit nur zur Festlegung der Reizgröße. Das
+        /// Ausgangsgitter selbst bleibt danach kartesisch und gleichmäßig.
+        /// </summary>
+        public static double NormalizedGridLineSpacing(
+            double angularDiameterDegrees,
+            double gridLineSpacingDegrees)
+        {
+            ValidateAngularDiameter(angularDiameterDegrees);
+            ValidateFinite(
+                gridLineSpacingDegrees,
+                nameof(gridLineSpacingDegrees));
+
+            if (gridLineSpacingDegrees <= 0.0 || gridLineSpacingDegrees >= 90.0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(gridLineSpacingDegrees),
+                    "Der Winkelabstand der Gitterlinien muss zwischen " +
+                    "0 und 90 Grad liegen.");
+            }
+
+            double halfAngle = 0.5 * angularDiameterDegrees * Math.PI / 180.0;
+            double spacingRadians = gridLineSpacingDegrees * Math.PI / 180.0;
+            return Math.Tan(spacingRadians) / Math.Tan(halfAngle);
         }
 
         public static void ValidateParameters(

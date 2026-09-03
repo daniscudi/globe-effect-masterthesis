@@ -16,6 +16,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public double TrialEndUnitySeconds { get; }
         public float ApertureEdgeSoftnessDegrees { get; }
         public bool CircularApertureEnabled { get; }
+        public float GridLineSpacingDegrees { get; }
+        public float GridLineSpacingUv { get; }
         public CheckerboardCurvatureResponse Response { get; }
         public bool ValidForAnalysis { get; }
         public bool FixationSampleValid { get; }
@@ -38,6 +40,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             double trialEndUnitySeconds,
             float apertureEdgeSoftnessDegrees,
             bool circularApertureEnabled,
+            float gridLineSpacingDegrees,
+            float gridLineSpacingUv,
             CheckerboardCurvatureResponse response,
             bool validForAnalysis,
             bool fixationSampleValid,
@@ -56,6 +60,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             TrialEndUnitySeconds = trialEndUnitySeconds;
             ApertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees;
             CircularApertureEnabled = circularApertureEnabled;
+            GridLineSpacingDegrees = gridLineSpacingDegrees;
+            GridLineSpacingUv = gridLineSpacingUv;
             Response = response;
             ValidForAnalysis = validForAnalysis;
             FixationSampleValid = fixationSampleValid;
@@ -154,7 +160,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 randomSeed);
         }
 
-        public void WritePlan(IReadOnlyList<CheckerboardTrial> trials)
+        public void WritePlan(
+            IReadOnlyList<CheckerboardTrial> trials,
+            float gridLineSpacingDegrees)
         {
             if (trials == null)
             {
@@ -165,7 +173,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             builder.AppendLine(
                 "participant_id,session_label,session_start_utc,random_seed,mapping_version," +
                 "sequence_index,total_planned_trials,condition_index,repetition," +
-                "eye_presentation,angular_diameter_deg,visual_space_l," +
+                "eye_presentation,angular_diameter_deg,grid_line_spacing_deg," +
+                "grid_line_spacing_uv,visual_space_l," +
                 "oomes_endpoint_equivalent");
 
             foreach (CheckerboardTrial trial in trials)
@@ -177,6 +186,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 AppendInteger(builder, trial.Repetition);
                 AppendCsv(builder, trial.EyePresentation.ToString());
                 AppendFloat(builder, trial.AngularDiameterDegrees);
+                AppendFloat(builder, gridLineSpacingDegrees);
+                AppendDouble(
+                    builder,
+                    VisualSpaceRadialMapping.NormalizedGridLineSpacing(
+                        trial.AngularDiameterDegrees,
+                        gridLineSpacingDegrees));
                 AppendFloat(builder, trial.VisualSpaceL);
                 AppendDouble(
                     builder,
@@ -213,6 +228,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             AppendFloat(builder, trial.AngularDiameterDegrees);
             AppendFloat(builder, result.ApertureEdgeSoftnessDegrees);
             AppendBoolean(builder, result.CircularApertureEnabled);
+            AppendFloat(builder, result.GridLineSpacingDegrees);
+            AppendFloat(builder, result.GridLineSpacingUv);
             AppendFloat(builder, trial.VisualSpaceL);
             AppendDouble(
                 builder,
@@ -265,7 +282,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "condition_index,repetition,attempt_number,trial_start_utc," +
                 "trial_start_unity_s,trial_end_unity_s,response_time_s," +
                 "eye_presentation,angular_diameter_deg,aperture_edge_softness_deg," +
-                "circular_aperture_enabled,visual_space_l," +
+                "circular_aperture_enabled,grid_line_spacing_deg," +
+                "grid_line_spacing_uv,visual_space_l," +
                 "oomes_endpoint_equivalent,response," +
                 "valid_for_analysis,fixation_sample_valid," +
                 "fixation_inside_tolerance,fixation_angle_deg," +

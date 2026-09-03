@@ -125,10 +125,35 @@ oder 90° liegen deutlich innerhalb des erlaubten Bereichs.
 Die Versionskennung dieser Abbildung lautet:
 
 ```text
-visual-space-l-tangent-normalized-v1
+visual-space-l-tangent-normalized-cartesian-grid-v2
 ```
 
 Sie wird in jeder Plan- und Trialdatei mitgeschrieben.
+
+## Winkelabstand der Gitterlinien
+
+Die Dichte des Checkerboards wird nicht mehr als beliebige Anzahl von Feldern
+über den Durchmesser angegeben. Oomes et al. beschreiben einen Abstand von
+10 Grad. Deshalb gibt es am `Checkerboard Stimulus` den Wert
+`Grid Line Spacing Degrees`, der standardmäßig auf `10` steht.
+
+Für die eigentliche Berechnung wird dieser Winkel einmal in die lineare
+Gitterweite des normierten u/v-Koordinatensystems umgerechnet:
+
+```text
+grid_spacing_uv = tan(grid_spacing_deg) / tan(FOV / 2)
+```
+
+Bei 90 Grad FOV und 10 Grad Abstand ergibt das ungefähr `0,176327`. Danach wird
+ein gleichmäßiges kartesisches Gitter mit Linien bei `u = n * 0,176327` und
+`v = n * 0,176327` erzeugt. Die mittlere horizontale und vertikale Linie laufen
+dabei durch das Fixationszeichen. Erst anschließend wird die radiale
+`l`-Abbildung angewendet.
+
+In der Trialdatei und in den Eye-Tracking-Markern werden sowohl
+`grid_spacing_deg` als auch `grid_spacing_uv` gespeichert. Damit bleibt die
+Einstellung in Grad nachvollziehbar, während die mathematische Darstellung in
+linearen u/v-Koordinaten dokumentiert ist.
 
 ## Runde Öffnung und weicher Rand
 
@@ -311,9 +336,10 @@ einem einzigen `k` verbunden ist.
 Die Eye-Tracking-Toolbox aus dem Lab bleibt die Grundlage der Rohdaten. Ihre
 vorhandenen Blickspalten mit Augenstatus, Pupillendurchmesser, Ursprung und
 Blickrichtung werden weiterhin geschrieben. Im Toolbox-Code wurde für den
-Checkerboard-Test nur der Stimulusmarker um `visual_space_l`, FOV, Augenmodus
-und die Breite der Blendenkante ergänzt. Der Random-Dot-Ablauf schreibt seine
-Trialmarker über dieselbe vorhandene Nachrichtenfunktion.
+Checkerboard-Test nur der Stimulusmarker um `visual_space_l`, FOV, Augenmodus,
+Winkelabstand der Gitterlinien und die Breite der Blendenkante ergänzt. Der
+Random-Dot-Ablauf schreibt seine Trialmarker über dieselbe vorhandene
+Nachrichtenfunktion.
 
 Pro Sitzung entsteht automatisch ein eigener Ordner unter `measurements` direkt
 im Unity-Projekt. Der Pfad wird aus dem aktuellen Projektordner bestimmt und

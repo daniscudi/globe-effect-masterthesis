@@ -42,9 +42,9 @@ namespace GlobeEffect.VRCheckerboard
         [Tooltip("l = 1 zeigt ein gerades Gitter, l = 0,5 den Helmholtz-Endpunkt. Kleinere Werte setzen die kissenförmige, Werte über 1 die tonnenförmige Richtung fort.")]
         private float visualSpaceL = 0.5f;
 
-        [SerializeField, Range(2, 80)]
-        [Tooltip("Anzahl der Schachfelder über den gesamten Kreisdurchmesser.")]
-        private int checksAcrossDiameter = 16;
+        [SerializeField, Range(0.5f, 45f)]
+        [Tooltip("Winkelabstand zwischen benachbarten Gitterlinien. Oomes et al. verwendeten 10 Grad.")]
+        private float gridLineSpacingDegrees = 10f;
 
         [SerializeField]
         private Color darkColor = Color.black;
@@ -108,6 +108,8 @@ namespace GlobeEffect.VRCheckerboard
         public float ApertureEdgeSoftnessDegrees => apertureEdgeSoftnessDegrees;
         public bool UseCircularAperture => useCircularAperture;
         public float VisualSpaceL => visualSpaceL;
+        public float GridLineSpacingDegrees => gridLineSpacingDegrees;
+        public float GridLineSpacingUv => CalculateGridLineSpacingUv();
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
         public bool IsVisible => isVisible;
         public bool IsCheckerboardVisible => isVisible && checkerboardVisible;
@@ -204,6 +206,13 @@ namespace GlobeEffect.VRCheckerboard
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
+        public void SetGridLineSpacing(float value)
+        {
+            gridLineSpacingDegrees = Mathf.Clamp(value, 0.5f, 45f);
+            ApplyMaterialProperties();
+            ParametersChanged?.Invoke(CaptureSnapshot());
+        }
+
         public void SetEyePresentation(CheckerboardEyePresentation value)
         {
             eyePresentation = value;
@@ -251,7 +260,8 @@ namespace GlobeEffect.VRCheckerboard
                 apertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees,
                 useCircularAperture = useCircularAperture,
                 visualSpaceL = visualSpaceL,
-                checksAcrossDiameter = checksAcrossDiameter,
+                gridLineSpacingDegrees = gridLineSpacingDegrees,
+                gridLineSpacingUv = CalculateGridLineSpacingUv(),
                 eyePresentation = eyePresentation
             };
         }
@@ -293,7 +303,9 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetFloat("_UseCircularAperture",
                 useCircularAperture ? 1f : 0f);
             propertyBlock.SetFloat("_VisualSpaceL", visualSpaceL);
-            propertyBlock.SetFloat("_ChecksAcrossDiameter", checksAcrossDiameter);
+            propertyBlock.SetFloat(
+                "_GridLineSpacingUv",
+                CalculateGridLineSpacingUv());
             propertyBlock.SetColor("_DarkColor", darkColor);
             propertyBlock.SetColor("_LightColor", lightColor);
             propertyBlock.SetColor("_FixationBackgroundColor", fixationBackgroundColor);
@@ -327,6 +339,13 @@ namespace GlobeEffect.VRCheckerboard
             block.SetVector("_ObserverWorldRight", basis.right);
             block.SetVector("_ObserverWorldUp", basis.up);
             block.SetVector("_ObserverWorldForward", basis.forward);
+        }
+
+        private float CalculateGridLineSpacingUv()
+        {
+            return (float)VisualSpaceRadialMapping.NormalizedGridLineSpacing(
+                angularDiameterDegrees,
+                gridLineSpacingDegrees);
         }
 
         private void ApplyVisibility()
@@ -415,7 +434,7 @@ namespace GlobeEffect.VRCheckerboard
                 0f,
                 10f);
             visualSpaceL = Mathf.Clamp(visualSpaceL, 0f, 1.4f);
-            checksAcrossDiameter = Mathf.Clamp(checksAcrossDiameter, 2, 80);
+            gridLineSpacingDegrees = Mathf.Clamp(gridLineSpacingDegrees, 0.5f, 45f);
             fixationTargetSizeDegrees = Mathf.Clamp(fixationTargetSizeDegrees, 0.05f, 5f);
         }
 

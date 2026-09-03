@@ -17,7 +17,8 @@ namespace GlobeEffect.VRCheckerboard
         public float apertureEdgeSoftnessDegrees;
         public bool useCircularAperture;
         public float visualSpaceL;
-        public int checksAcrossDiameter;
+        public float gridLineSpacingDegrees;
+        public float gridLineSpacingUv;
         public CheckerboardEyePresentation eyePresentation;
     }
 }

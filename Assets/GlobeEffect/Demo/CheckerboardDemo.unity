@@ -156,7 +156,7 @@ MonoBehaviour:
   apertureEdgeSoftnessDegrees: 1
   useCircularAperture: 1
   visualSpaceL: 0.5
-  checksAcrossDiameter: 16
+  gridLineSpacingDegrees: 10
   darkColor: {r: 0, g: 0, b: 0, a: 1}
   lightColor: {r: 1, g: 1, b: 1, a: 1}
   eyePresentation: 0
