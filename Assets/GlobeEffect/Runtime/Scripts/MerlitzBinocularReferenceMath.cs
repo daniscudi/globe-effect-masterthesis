@@ -3,10 +3,11 @@ using System;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Hier steht die Merlitz-Gleichung, die wir für das dynamische
-    /// Random-Dot-Feld und die zugehörigen Vergleichsrechnungen verwenden. Der
-    /// statische Checkerboard-Test besitzt inzwischen eine getrennte
-    /// Visual-Space-l-Abbildung. Die Gleichung stammt aus Merlitz
+    /// Hier steht die Merlitz-Gleichung für eine mögliche spätere Simulation
+    /// eines echten Fernglases und für die Vergleichsplots. Sie wird im Moment
+    /// weder vom Checkerboard noch vom Random-Dot-Piloten aufgerufen. Beide
+    /// Versuchsszenen benutzen derzeit die getrennte Visual-Space-l-Abbildung.
+    /// Die Gleichung stammt aus Merlitz
     /// (JOSA A 27, 50-57, 2010):
     ///
     ///     tan(k a) = m tan(k A)
@@ -16,17 +17,18 @@ namespace GlobeEffect.VRCheckerboard
     /// Nähe der Bildmitte. k bestimmt, wie sich die Abbildung zum Rand hin
     /// verhält. Für k = 0 wird der Grenzfall a = m A verwendet.
     ///
-    /// In dieser Datei steht nur die Mathematik. Position, Bewegung und Material
-    /// des Punktfelds werden in RandomDotFieldStimulus gesteuert.
+    /// In dieser Datei steht nur die Mathematik. Darstellung und Bewegung einer
+    /// späteren Fernglassimulation würden im Stimulus gesteuert.
     /// </summary>
-    public static class MerlitzCheckerboardMath
+    public static class MerlitzBinocularReferenceMath
     {
         private const double KLimitEpsilon = 1e-7;
 
         /// <summary>
         /// Vorwärtsrichtung der Gleichung: Zu einem ursprünglichen Objektwinkel
         /// A wird berechnet, bei welchem sichtbaren Winkel a der Punkt landet.
-        /// Diese Richtung wird zum Beispiel beim Random-Dot-Feld benötigt.
+        /// Diese Richtung wird für die Vergleichsrechnung und später eventuell
+        /// für einen eigenen Fernglasmodus des Random-Dot-Tests benötigt.
         /// </summary>
         public static double ApparentAngleFromObject(
             double objectAngleRadians,

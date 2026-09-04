@@ -58,7 +58,7 @@ namespace GlobeEffect.VRCheckerboard
             }
 
             double objectAngle = Math.Atan(objectRadius);
-            double apparentAngle = MerlitzCheckerboardMath.ApparentAngleFromObject(
+            double apparentAngle = MerlitzBinocularReferenceMath.ApparentAngleFromObject(
                 objectAngle,
                 magnification,
                 k);

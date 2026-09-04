@@ -7,7 +7,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
     /// Sichert Merlitz' belegte Gleichung, ihre Inverse, den Grenzfall k=0 und
     /// die für den Shader verwendete normierte Rückabbildung ab.
     /// </summary>
-    public sealed class MerlitzCheckerboardMathTests
+    public sealed class MerlitzBinocularReferenceMathTests
     {
         [TestCase(0.0)]
         [TestCase(0.5)]
@@ -18,11 +18,11 @@ namespace GlobeEffect.VRCheckerboard.Tests
             const double magnification = 10.0;
             double objectAngle = 3.0 * Math.PI / 180.0;
 
-            double apparent = MerlitzCheckerboardMath.ApparentAngleFromObject(
+            double apparent = MerlitzBinocularReferenceMath.ApparentAngleFromObject(
                 objectAngle,
                 magnification,
                 k);
-            double reconstructed = MerlitzCheckerboardMath.ObjectAngleFromApparent(
+            double reconstructed = MerlitzBinocularReferenceMath.ObjectAngleFromApparent(
                 apparent,
                 magnification,
                 k);
@@ -36,7 +36,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         public void NormalizedMapping_MapsBoundaryToBoundary(double k)
         {
             double halfAngle = 35.0 * Math.PI / 180.0;
-            double sourceRadius = MerlitzCheckerboardMath.NormalizedSourceRadius(
+            double sourceRadius = MerlitzBinocularReferenceMath.NormalizedSourceRadius(
                 1.0,
                 halfAngle,
                 10.0,
@@ -53,7 +53,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             double displayRadius)
         {
             double halfAngle = 35.0 * Math.PI / 180.0;
-            double sourceRadius = MerlitzCheckerboardMath.NormalizedSourceRadius(
+            double sourceRadius = MerlitzBinocularReferenceMath.NormalizedSourceRadius(
                 displayRadius,
                 halfAngle,
                 10.0,

@@ -156,6 +156,7 @@ MonoBehaviour:
   apertureEdgeSoftnessDegrees: 1
   useCircularAperture: 1
   visualSpaceL: 0.5
+  contentZoom: 1
   gridLineSpacingDegrees: 10
   darkColor: {r: 0, g: 0, b: 0, a: 1}
   lightColor: {r: 1, g: 1, b: 1, a: 1}
@@ -744,7 +745,7 @@ GameObject:
   - component: {fileID: 1900000002}
   - component: {fileID: 1900000003}
   m_Layer: 0
-  m_Name: Checkerboard Trial Session
+  m_Name: Checkerboard Experiment Manager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -776,7 +777,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 085f4814d3964a8f96e76bcb22d5340e, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.Experiment.CheckerboardTrialSessionController
+  m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.Experiment.CheckerboardExperimentManager
   stimulus: {fileID: 607094975}
   keyboardController: {fileID: 607094979}
   eyeTrackingToolbox: {fileID: 1800000003}
@@ -797,6 +798,8 @@ MonoBehaviour:
   - 0.5
   - 0.4
   - 0.2
+  contentZoomValues:
+  - 1
   repetitionsPerCondition: 3
   requireFixation: 0
   maximumOffTargetSeconds: 0.15

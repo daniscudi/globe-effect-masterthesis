@@ -188,18 +188,18 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.RandomDots.RandomDotFieldStimulus
   observer: {fileID: 684958492}
-  angularDiameterDegrees: 70
+  angularDiameterDegrees: 90
   apertureEdgeSoftnessDegrees: 1
   fieldRadiusMeters: 5
-  worldCoverageDiameterDegrees: 20
+  worldCoverageDiameterDegrees: 110
   dotCount: 4000
   dotAngularDiameterDegrees: 0.22
   randomSeed: 20260828
   darkColor: {r: 0, g: 0, b: 0, a: 1}
   lightColor: {r: 1, g: 1, b: 1, a: 1}
   lightDotFraction: 0.5
-  merlitzK: 0.7
-  magnification: 10
+  visualSpaceL: 0.5
+  contentZoom: 1
   eyePresentation: 0
   showFixationTarget: 1
   fixationTargetSizeDegrees: 0.5
@@ -624,7 +624,7 @@ GameObject:
   - component: {fileID: 1006624962}
   - component: {fileID: 1006624961}
   m_Layer: 0
-  m_Name: Random Dot Trial Session
+  m_Name: Random Dot Experiment Manager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -641,31 +641,31 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a1fbe1704e594911b52be06af5aa1013, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.Experiment.RandomDotTrialSessionController
+  m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.Experiment.RandomDotExperimentManager
   stimulus: {fileID: 206131110}
   keyboardController: {fileID: 206131109}
   sweepMonitor: {fileID: 206131108}
   eyeTrackingToolbox: {fileID: 1215582095}
   fixationMonitor: {fileID: 1215582094}
   participantId: pilot_001
-  sessionLabel: random_dot_k_pilot
+  sessionLabel: random_dot_l_pilot
   randomSeed: 20260901
   dotSeedBase: 24680
   outputRoot: 
   autoStartOnPlay: 0
   angularDiametersDegrees:
-  - 70
+  - 90
   eyePresentations: 00000000
-  stimulusKValues:
-  - 0
-  - 0.3
-  - 0.5
-  - 0.6
-  - 0.7
-  - 0.85
+  visualSpaceLValues:
+  - 1.2
   - 1
-  magnifications:
-  - 10
+  - 0.8
+  - 0.6
+  - 0.5
+  - 0.4
+  - 0.2
+  contentZoomValues:
+  - 1
   motionModes: 01000000
   repetitionsPerCondition: 3
   motionDurationSeconds: 4

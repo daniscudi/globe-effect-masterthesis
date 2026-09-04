@@ -6,6 +6,7 @@ using GlobeEffect.VRCheckerboard.EyeTracking;
 using GlobeEffect.VRCheckerboard.RandomDots;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
@@ -21,7 +22,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     }
 
     /// <summary>
-    /// Führt den dynamischen Random-Dot-Test mit festen k-Werten aus. Nach
+    /// Führt den dynamischen Random-Dot-Test mit festen l-Werten aus. Nach
     /// stabiler Fixation bewegt Unity das kopffeste Punktfeld für eine feste
     /// Dauer. Erst danach antwortet die Versuchsperson "konkav" oder "konvex".
     /// Ein Fixationsbruch macht die Präsentation ungültig und hängt dieselbe
@@ -29,7 +30,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// </summary>
     [DisallowMultipleComponent]
     [DefaultExecutionOrder(20)]
-    public sealed class RandomDotTrialSessionController : MonoBehaviour
+    public sealed class RandomDotExperimentManager : MonoBehaviour
     {
         [Header("Referenzen")]
         [SerializeField]
@@ -53,7 +54,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private string participantId = "pilot_001";
 
         [SerializeField]
-        private string sessionLabel = "random_dot_k_pilot";
+        private string sessionLabel = "random_dot_l_pilot";
 
         [SerializeField]
         [Tooltip("Gleicher Seed und gleiche Inspector-Werte ergeben dieselbe Reihenfolge.")]
@@ -72,7 +73,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [Header("Trialplan")]
         [SerializeField]
         [Tooltip("Ein oder mehrere Winkeldurchmesser der runden Öffnung.")]
-        private List<float> angularDiametersDegrees = new() { 70f };
+        private List<float> angularDiametersDegrees = new() { 90f };
 
         [SerializeField]
         [Tooltip("Both Eyes, Left Eye Only oder Right Eye Only.")]
@@ -82,21 +83,23 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         };
 
         [SerializeField]
-        [Tooltip("Vorläufige feste k-Pilotwerte. Die Person verändert k nicht selbst.")]
-        private List<float> stimulusKValues = new()
+        [FormerlySerializedAs("stimulusKValues")]
+        [Tooltip("Dieselben festen l-Werte wie beim Checkerboard. Die Person verändert l nicht selbst.")]
+        private List<float> visualSpaceLValues = new()
         {
-            0f,
-            0.3f,
-            0.5f,
+            1.2f,
+            1f,
+            0.8f,
             0.6f,
-            0.7f,
-            0.85f,
-            1f
+            0.5f,
+            0.4f,
+            0.2f
         };
 
         [SerializeField]
-        [Tooltip("m bleibt ein unabhängiger Instrumentparameter. Für einen Versuch normalerweise nur einen festen Wert eintragen.")]
-        private List<float> magnifications = new() { 10f };
+        [FormerlySerializedAs("magnifications")]
+        [Tooltip("Einfacher, von l unabhängiger Zoom. 1 zeigt die ursprüngliche Größe.")]
+        private List<float> contentZoomValues = new() { 1f };
 
         [SerializeField]
         [Tooltip("SimulatedYaw ist die kontrollierte Hauptbedingung. HeadTracked bleibt optional.")]
@@ -106,7 +109,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         };
 
         [SerializeField, Min(1)]
-        [Tooltip("Wie oft jede Kombination aus FOV, Auge, k, m und Bewegungsmodus vorkommt.")]
+        [Tooltip("Wie oft jede Kombination aus FOV, Auge, l, Zoom und Bewegungsmodus vorkommt.")]
         private int repetitionsPerCondition = 3;
 
         [Header("Simulierter Schwenk")]
@@ -115,11 +118,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private float motionDurationSeconds = 4f;
 
         [SerializeField, Range(0.1f, 30f)]
-        [Tooltip("Maximaler Winkel zu jeder Seite.")]
+        [Tooltip("Maximaler simulierter Schwenkwinkel zu jeder Seite. Dieser Sitzungswert überschreibt den Vorschauwert am Random Dot Field.")]
         private float sweepAmplitudeDegrees = 5f;
 
         [SerializeField, Range(0.1f, 60f)]
-        [Tooltip("Gleichbleibende Winkelgeschwindigkeit zwischen den Umkehrpunkten.")]
+        [Tooltip("Gleichbleibende Winkelgeschwindigkeit zwischen den Umkehrpunkten. Dieser Sitzungswert überschreibt den Vorschauwert am Random Dot Field.")]
         private float sweepSpeedDegreesPerSecond = 5f;
 
         [Header("Fixation und Wiederholung")]
@@ -321,8 +324,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 trialPlan = RandomDotTrialPlanner.CreateRandomizedPlan(
                     angularDiametersDegrees,
                     eyePresentations,
-                    stimulusKValues,
-                    magnifications,
+                    visualSpaceLValues,
+                    contentZoomValues,
                     motionModes,
                     repetitionsPerCondition,
                     randomSeed,
@@ -360,7 +363,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             sessionState = RandomDotSessionState.InterTrial;
 
             Debug.Log(
-                $"Random-Dot-k-Sitzung gestartet: {totalTrials} gültige Trials geplant.\n" +
+                $"Random-Dot-Sitzung gestartet: {totalTrials} gültige Trials geplant.\n" +
                 activeSessionFolder,
                 this);
             BeginNextAttempt();
@@ -390,7 +393,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     "aborted:" + (reason ?? string.Empty)));
             }
 
-            WriteMarker("SessionAborted;task=random_dot_k;reason=" +
+            WriteMarker("SessionAborted;task=random_dot_l;reason=" +
                 CheckerboardExperimentFiles.SanitizeIdentifier(reason, "unspecified"));
             stimulus?.Hide();
             StopEyeTrackingRecording();
@@ -412,10 +415,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             currentTrialNumber = validTrialsCompleted + 1;
             stimulus.Hide();
             stimulus.SetAngularDiameter(currentTrial.AngularDiameterDegrees);
-            stimulus.SetMagnification(currentTrial.Magnification);
+            stimulus.SetContentZoom(currentTrial.ContentZoom);
             stimulus.SetEyePresentation(currentTrial.EyePresentation);
             stimulus.SetMotionMode(currentTrial.MotionMode);
-            stimulus.SetMerlitzK(currentTrial.StimulusK);
+            stimulus.SetVisualSpaceL(currentTrial.VisualSpaceL);
             stimulus.SetSimulatedSweep(
                 sweepAmplitudeDegrees,
                 sweepSpeedDegreesPerSecond);
@@ -437,7 +440,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 stimulus.ShowFixationOnly();
                 WriteMarker(string.Format(
                     CultureInfo.InvariantCulture,
-                    "FixationAcquisitionStart;task=random_dot_k;sequence={0};attempt={1}",
+                    "FixationAcquisitionStart;task=random_dot_l;sequence={0};attempt={1}",
                     currentTrial.SequenceIndex,
                     currentTrial.AttemptNumber));
             }
@@ -470,13 +473,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             Debug.Log(string.Format(
                 CultureInfo.InvariantCulture,
-                "Random-Dot-Trial {0}/{1}, Präsentation {2}: k={3:F3}, m={4:F2}, " +
+                "Random-Dot-Trial {0}/{1}, Präsentation {2}: l={3:F3}, Zoom={4:F2}, " +
                 "{5}, zuerst {6}, Versuch {7}. Fixationskreuz anschauen; Antwort folgt nach der Bewegung.",
                 currentTrialNumber,
                 totalTrials,
                 presentationCount,
-                currentTrial.StimulusK,
-                currentTrial.Magnification,
+                currentTrial.VisualSpaceL,
+                currentTrial.ContentZoom,
                 currentTrial.MotionMode,
                 currentTrial.SweepDirection,
                 currentTrial.AttemptNumber),
@@ -503,7 +506,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             sessionState = RandomDotSessionState.WaitingForResponse;
             WriteMarker(string.Format(
                 CultureInfo.InvariantCulture,
-                "StimulusEnded;task=random_dot_k;sequence={0};attempt={1};duration_s={2:F4}",
+                "StimulusEnded;task=random_dot_l;sequence={0};attempt={1};duration_s={2:F4}",
                 currentTrial.SequenceIndex,
                 currentTrial.AttemptNumber,
                 stimulusEndUnitySeconds - trialStartUnitySeconds));
@@ -535,7 +538,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             validTrialsCompleted++;
             WriteMarker(string.Format(
                 CultureInfo.InvariantCulture,
-                "TrialResponse;task=random_dot_k;sequence={0};attempt={1};response={2};response_s={3:F4};valid=1",
+                "TrialResponse;task=random_dot_l;sequence={0};attempt={1};response={2};response_s={3:F4};valid=1",
                 currentTrial.SequenceIndex,
                 currentTrial.AttemptNumber,
                 response,
@@ -611,7 +614,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             WriteMarker(string.Format(
                 CultureInfo.InvariantCulture,
-                "TrialInvalid;task=random_dot_k;sequence={0};attempt={1};reason={2};off_target_s={3:F4};invalid_gaze_s={4:F4}",
+                "TrialInvalid;task=random_dot_l;sequence={0};attempt={1};reason={2};off_target_s={3:F4};invalid_gaze_s={4:F4}",
                 invalidTrial.SequenceIndex,
                 invalidTrial.AttemptNumber,
                 reason,
@@ -624,7 +627,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             if (limitReached)
             {
                 stimulus.Hide();
-                WriteMarker("SessionAborted;task=random_dot_k;reason=maximum_repeat_attempts_reached");
+                WriteMarker("SessionAborted;task=random_dot_l;reason=maximum_repeat_attempts_reached");
                 StopEyeTrackingRecording();
                 currentTrial = null;
                 sessionState = RandomDotSessionState.Aborted;
@@ -638,7 +641,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             RandomDotTrial repeat = trialQueue.AppendRepeatedAttempt(invalidTrial);
             WriteMarker(string.Format(
                 CultureInfo.InvariantCulture,
-                "TrialRepeatQueued;task=random_dot_k;sequence={0};next_attempt={1};queue_position={2}",
+                "TrialRepeatQueued;task=random_dot_l;sequence={0};next_attempt={1};queue_position={2}",
                 repeat.SequenceIndex,
                 repeat.AttemptNumber,
                 trialQueue.Count));
@@ -726,7 +729,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             currentTrialNumber = totalTrials;
             WriteMarker(string.Format(
                 CultureInfo.InvariantCulture,
-                "SessionCompleted;task=random_dot_k;valid_trials={0};presentations={1}",
+                "SessionCompleted;task=random_dot_l;valid_trials={0};presentations={1}",
                 validTrialsCompleted,
                 presentationCount));
             stimulus?.Hide();
@@ -734,7 +737,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             sessionState = RandomDotSessionState.Completed;
             SessionFinished?.Invoke(sessionState);
             Debug.Log(
-                $"Random-Dot-k-Sitzung vollständig gespeichert: {validTrialsCompleted} gültige Trials aus {presentationCount} Präsentationen.\n" +
+                $"Random-Dot-Sitzung vollständig gespeichert: {validTrialsCompleted} gültige Trials aus {presentationCount} Präsentationen.\n" +
                 activeSessionFolder,
                 this);
         }
@@ -749,11 +752,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             WriteMarker(string.Format(
                 CultureInfo.InvariantCulture,
-                "MotionHalfSweep;task=random_dot_k;sequence={0};count={1};yaw={2:F3};k={3:F4}",
+                "MotionHalfSweep;task=random_dot_l;sequence={0};count={1};yaw={2:F3};l={3:F4}",
                 currentTrial.SequenceIndex,
                 count,
                 yawDegrees,
-                currentTrial.StimulusK));
+                currentTrial.VisualSpaceL));
         }
 
         private void StartEyeTracking(DateTime sessionStartUtc)
@@ -773,7 +776,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             eyeTrackingToolbox.StartRecording(experimentFiles.BaseFileName);
             WriteMarker(string.Format(
                 CultureInfo.InvariantCulture,
-                "SessionStart;task=random_dot_k;participant={0};session={1};seed={2};planned_trials={3};utc={4};mapping={5}",
+                "SessionStart;task=random_dot_l;participant={0};session={1};seed={2};planned_trials={3};utc={4};mapping={5}",
                 CheckerboardExperimentFiles.SanitizeIdentifier(participantId, "pilot"),
                 CheckerboardExperimentFiles.SanitizeIdentifier(sessionLabel, "random_dot"),
                 randomSeed,
@@ -786,9 +789,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             return string.Format(
                 CultureInfo.InvariantCulture,
-                "TrialStart;task=random_dot_k;presentation={0};sequence={1};condition={2};repetition={3};" +
+                "TrialStart;task=random_dot_l;presentation={0};sequence={1};condition={2};repetition={3};" +
                 "attempt={4};eye={5};fov_deg={6:F3};edge_softness_deg={7:F3};" +
-                "magnification={8:F4};stimulus_k={9:F4};motion={10};direction={11};" +
+                "visual_space_l={8:F4};content_zoom={9:F4};motion={10};direction={11};" +
                 "duration_s={12:F3};amplitude_deg={13:F3};speed_deg_s={14:F3};dot_seed={15}",
                 presentationCount,
                 trial.SequenceIndex,
@@ -798,8 +801,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 trial.EyePresentation,
                 trial.AngularDiameterDegrees,
                 stimulus.ApertureEdgeSoftnessDegrees,
-                trial.Magnification,
-                trial.StimulusK,
+                trial.VisualSpaceL,
+                trial.ContentZoom,
                 trial.MotionMode,
                 trial.SweepDirection,
                 motionDurationSeconds,
@@ -904,7 +907,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "Random-Dot-Trial konnte nicht gespeichert werden; die Sitzung wird beendet: " +
                 exception.Message,
                 this);
-            WriteMarker("SessionAborted;task=random_dot_k;reason=result_write_error");
+            WriteMarker("SessionAborted;task=random_dot_l;reason=result_write_error");
             StopPendingCoroutines();
             stimulus?.Hide();
             StopEyeTrackingRecording();

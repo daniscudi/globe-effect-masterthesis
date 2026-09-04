@@ -174,7 +174,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "participant_id,session_label,session_start_utc,random_seed,mapping_version," +
                 "sequence_index,total_planned_trials,condition_index,repetition," +
                 "eye_presentation,angular_diameter_deg,grid_line_spacing_deg," +
-                "grid_line_spacing_uv,visual_space_l," +
+                "grid_line_spacing_uv,visual_space_l,content_zoom," +
                 "oomes_endpoint_equivalent");
 
             foreach (CheckerboardTrial trial in trials)
@@ -193,6 +193,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                         trial.AngularDiameterDegrees,
                         gridLineSpacingDegrees));
                 AppendFloat(builder, trial.VisualSpaceL);
+                AppendFloat(builder, trial.ContentZoom);
                 AppendDouble(
                     builder,
                     VisualSpaceRadialMapping.OomesEndpointEquivalent(
@@ -231,6 +232,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             AppendFloat(builder, result.GridLineSpacingDegrees);
             AppendFloat(builder, result.GridLineSpacingUv);
             AppendFloat(builder, trial.VisualSpaceL);
+            AppendFloat(builder, trial.ContentZoom);
             AppendDouble(
                 builder,
                 VisualSpaceRadialMapping.OomesEndpointEquivalent(
@@ -283,7 +285,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "trial_start_unity_s,trial_end_unity_s,response_time_s," +
                 "eye_presentation,angular_diameter_deg,aperture_edge_softness_deg," +
                 "circular_aperture_enabled,grid_line_spacing_deg," +
-                "grid_line_spacing_uv,visual_space_l," +
+                "grid_line_spacing_uv,visual_space_l,content_zoom," +
                 "oomes_endpoint_equivalent,response," +
                 "valid_for_analysis,fixation_sample_valid," +
                 "fixation_inside_tolerance,fixation_angle_deg," +

@@ -42,6 +42,10 @@ namespace GlobeEffect.VRCheckerboard
         [Tooltip("l = 1 zeigt ein gerades Gitter, l = 0,5 den Helmholtz-Endpunkt. Kleinere Werte setzen die kissenförmige, Werte über 1 die tonnenförmige Richtung fort.")]
         private float visualSpaceL = 0.5f;
 
+        [SerializeField, Range(0.25f, 4f)]
+        [Tooltip("Einfacher Zoom des Musters. Ändert die Checkgröße, aber nicht l oder den FOV-Rand.")]
+        private float contentZoom = 1f;
+
         [SerializeField, Range(0.5f, 45f)]
         [Tooltip("Winkelabstand zwischen benachbarten Gitterlinien. Oomes et al. verwendeten 10 Grad.")]
         private float gridLineSpacingDegrees = 10f;
@@ -108,6 +112,7 @@ namespace GlobeEffect.VRCheckerboard
         public float ApertureEdgeSoftnessDegrees => apertureEdgeSoftnessDegrees;
         public bool UseCircularAperture => useCircularAperture;
         public float VisualSpaceL => visualSpaceL;
+        public float ContentZoom => contentZoom;
         public float GridLineSpacingDegrees => gridLineSpacingDegrees;
         public float GridLineSpacingUv => CalculateGridLineSpacingUv();
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
@@ -206,6 +211,13 @@ namespace GlobeEffect.VRCheckerboard
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
+        public void SetContentZoom(float value)
+        {
+            contentZoom = Mathf.Clamp(value, 0.25f, 4f);
+            ApplyMaterialProperties();
+            ParametersChanged?.Invoke(CaptureSnapshot());
+        }
+
         public void SetGridLineSpacing(float value)
         {
             gridLineSpacingDegrees = Mathf.Clamp(value, 0.5f, 45f);
@@ -260,6 +272,7 @@ namespace GlobeEffect.VRCheckerboard
                 apertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees,
                 useCircularAperture = useCircularAperture,
                 visualSpaceL = visualSpaceL,
+                contentZoom = contentZoom,
                 gridLineSpacingDegrees = gridLineSpacingDegrees,
                 gridLineSpacingUv = CalculateGridLineSpacingUv(),
                 eyePresentation = eyePresentation
@@ -303,6 +316,7 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetFloat("_UseCircularAperture",
                 useCircularAperture ? 1f : 0f);
             propertyBlock.SetFloat("_VisualSpaceL", visualSpaceL);
+            propertyBlock.SetFloat("_ContentZoom", contentZoom);
             propertyBlock.SetFloat(
                 "_GridLineSpacingUv",
                 CalculateGridLineSpacingUv());
@@ -434,6 +448,7 @@ namespace GlobeEffect.VRCheckerboard
                 0f,
                 10f);
             visualSpaceL = Mathf.Clamp(visualSpaceL, 0f, 1.4f);
+            contentZoom = Mathf.Clamp(contentZoom, 0.25f, 4f);
             gridLineSpacingDegrees = Mathf.Clamp(gridLineSpacingDegrees, 0.5f, 45f);
             fixationTargetSizeDegrees = Mathf.Clamp(fixationTargetSizeDegrees, 0.05f, 5f);
         }
@@ -454,5 +469,40 @@ namespace GlobeEffect.VRCheckerboard
                 DestroyImmediate(ownedObject);
             }
         }
+    }
+
+    // Diese beiden kurzen Listen stehen hier beim Stimulus, weil sie direkt
+    // festlegen, wie er gezeigt und wie die Antwort gespeichert wird. Dafür
+    // sind keine eigenen Skriptdateien nötig.
+    public enum CheckerboardEyePresentation
+    {
+        BothEyes = 0,
+        LeftEyeOnly = 1,
+        RightEyeOnly = 2
+    }
+
+    public enum CheckerboardCurvatureResponse
+    {
+        None = 0,
+        Concave = 1,
+        Convex = 2
+    }
+
+    // Momentaufnahme der tatsächlich im Shader gesetzten Werte. Diese wird
+    // für die Eye-Tracking-Marker verwendet.
+    [Serializable]
+    public struct CheckerboardStimulusSnapshot
+    {
+        public double timestampSeconds;
+        public bool visible;
+        public bool checkerboardVisible;
+        public float angularDiameterDegrees;
+        public float apertureEdgeSoftnessDegrees;
+        public bool useCircularAperture;
+        public float visualSpaceL;
+        public float contentZoom;
+        public float gridLineSpacingDegrees;
+        public float gridLineSpacingUv;
+        public CheckerboardEyePresentation eyePresentation;
     }
 }

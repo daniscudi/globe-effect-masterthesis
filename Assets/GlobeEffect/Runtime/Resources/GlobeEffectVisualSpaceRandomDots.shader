@@ -1,11 +1,11 @@
-Shader "GlobeEffect/Merlitz Random Dots"
+Shader "GlobeEffect/Visual Space Random Dots"
 {
     Properties
     {
-        _ApertureHalfAngleRad ("Aperture Half Angle [rad]", Float) = 0.610865
+        _ApertureHalfAngleRad ("Aperture Half Angle [rad]", Float) = 0.785398
         _ApertureEdgeSoftnessRad ("Aperture Edge Softness [rad]", Float) = 0.0174533
-        _MerlitzK ("Merlitz k", Range(0, 1)) = 0.7
-        _Magnification ("Magnification", Float) = 10
+        _VisualSpaceL ("Visual-space l", Range(0, 1.4)) = 0.5
+        _ContentZoom ("Content Zoom", Float) = 1
         _EyeMode ("Eye Mode", Float) = 0
         _DotsEnabled ("Dots Enabled", Float) = 1
         _DotHalfSizeRad ("Dot Half Size [rad]", Float) = 0.00191986
@@ -45,7 +45,7 @@ Shader "GlobeEffect/Merlitz Random Dots"
             {
                 float4 position : SV_POSITION;
                 float2 dotUv : TEXCOORD0;
-                float apparentAngle : TEXCOORD1;
+                float displayedAngle : TEXCOORD1;
                 float validProjection : TEXCOORD2;
                 float isFixationTarget : TEXCOORD3;
                 fixed4 color : COLOR;
@@ -54,8 +54,8 @@ Shader "GlobeEffect/Merlitz Random Dots"
 
             float _ApertureHalfAngleRad;
             float _ApertureEdgeSoftnessRad;
-            float _MerlitzK;
-            float _Magnification;
+            float _VisualSpaceL;
+            float _ContentZoom;
             float _EyeMode;
             float _DotsEnabled;
             float _DotHalfSizeRad;
@@ -63,17 +63,36 @@ Shader "GlobeEffect/Merlitz Random Dots"
             float4 _ObserverWorldPosition;
             float4 _ObserverWorldRight;
 
-            float ApparentAngleFromObject(float objectAngle)
+            // Dieselbe normierte l-Abbildung wie beim Checkerboard, diesmal
+            // vorwärts gelöst: Aus der unverzerrten Punktposition wird die
+            // Position berechnet, an der der Punkt im HMD erscheinen soll.
+            float DisplayedAngleFromSource(float sourceAngle)
             {
-                // Merlitz-Vorwärtsabbildung: A ist der ursprüngliche Winkel und
-                // a der dargestellte Winkel. k und m bleiben getrennte Parameter.
-                if (_MerlitzK < 1e-5)
+                float tangentAtBoundary = tan(_ApertureHalfAngleRad);
+                float sourceRadius = tan(sourceAngle) /
+                    max(tangentAtBoundary, 1e-6);
+
+                if (_VisualSpaceL < 1e-6)
                 {
-                    return _Magnification * objectAngle;
+                    return sourceRadius * _ApertureHalfAngleRad;
                 }
 
-                return atan(_Magnification * tan(_MerlitzK * objectAngle))
-                    / _MerlitzK;
+                return atan(
+                    sourceRadius * tan(_VisualSpaceL * _ApertureHalfAngleRad)) /
+                    _VisualSpaceL;
+            }
+
+            float CenterRadialScale()
+            {
+                float tangentAtBoundary = tan(_ApertureHalfAngleRad);
+                if (_VisualSpaceL < 1e-6)
+                {
+                    return _ApertureHalfAngleRad /
+                        max(tangentAtBoundary, 1e-6);
+                }
+
+                return tan(_VisualSpaceL * _ApertureHalfAngleRad) /
+                    max(_VisualSpaceL * tangentAtBoundary, 1e-6);
             }
 
             float ResolveEyeIndex()
@@ -99,9 +118,9 @@ Shader "GlobeEffect/Merlitz Random Dots"
 
                 float isFixation = step(0.5, input.sizeData.y);
 
-                // w = 0 entfernt die Kameratranslation. Die Punkte werden damit
-                // als Richtungen in großer Entfernung statt als nahe Kugelkappe
-                // dargestellt. Beide Augen erhalten dieselben Winkelrichtungen.
+                // Die Punkte werden als Richtungen dargestellt. w = 0 entfernt
+                // die Verschiebung zwischen den beiden Augenkameras und damit
+                // eine künstliche Nahdisparität.
                 float3 worldDirection = normalize(mul(
                     (float3x3)unity_ObjectToWorld,
                     input.vertex.xyz));
@@ -109,8 +128,8 @@ Shader "GlobeEffect/Merlitz Random Dots"
                     UNITY_MATRIX_V,
                     float4(worldDirection, 0.0)).xyz;
 
-                // Das Fixationskreuz bleibt unabhängig von k und vom Schwenk in
-                // der Mitte. Nur die Random Dots bewegen sich dahinter.
+                // Das Kreuz bleibt in der Mitte. Nur das Punktfeld führt den
+                // kontrollierten Links-Rechts-Schwenk aus.
                 if (isFixation > 0.5)
                 {
                     viewPosition = float3(0.0, 0.0, -1.0);
@@ -126,26 +145,28 @@ Shader "GlobeEffect/Merlitz Random Dots"
 
                 float forwardDistance = -viewPosition.z;
                 float validFront = step(1e-4, forwardDistance);
-                float2 objectPosition = viewPosition.xy /
+                float2 sourcePosition = viewPosition.xy /
                     max(forwardDistance, 1e-4);
-                float objectRadius = length(objectPosition);
-                float objectAngle = atan(objectRadius);
-                float apparentAngle = isFixation > 0.5
+                float sourceRadius = length(sourcePosition);
+                float sourceAngle = atan(sourceRadius);
+                float displayedAngle = isFixation > 0.5
                     ? 0.0
-                    : ApparentAngleFromObject(objectAngle);
-                float validAngle = step(apparentAngle, 1.560796);
+                    : DisplayedAngleFromSource(sourceAngle);
+                float validAngle = step(displayedAngle, 1.560796);
 
-                float apparentRadius = tan(min(apparentAngle, 1.560796));
-                float radialScale = objectRadius > 1e-6
-                    ? apparentRadius / objectRadius
-                    : _Magnification;
+                float displayedRadius = tan(min(displayedAngle, 1.560796)) *
+                    _ContentZoom;
+                displayedAngle = atan(displayedRadius);
+                float radialScale = sourceRadius > 1e-6
+                    ? displayedRadius / sourceRadius
+                    : CenterRadialScale() * _ContentZoom;
                 float2 displayedPosition = isFixation > 0.5
                     ? float2(0.0, 0.0)
-                    : objectPosition * radialScale;
+                    : sourcePosition * radialScale;
                 viewPosition.xy = displayedPosition * forwardDistance;
 
-                // Erst die Punktmitte abbilden und danach die sichtbare Größe
-                // ergänzen. k verändert dadurch die Bahn, nicht den Punktumfang.
+                // Erst wird der Punktmittelpunkt verzerrt. Danach wird die
+                // feste Winkelgröße ergänzt, damit l nur die Bahn verändert.
                 float angularHalfSize = _DotHalfSizeRad * input.sizeData.x;
                 viewPosition.xy += input.uv * forwardDistance *
                     tan(angularHalfSize);
@@ -154,7 +175,7 @@ Shader "GlobeEffect/Merlitz Random Dots"
                     UNITY_MATRIX_P,
                     float4(viewPosition, 1.0));
                 output.dotUv = input.uv;
-                output.apparentAngle = apparentAngle;
+                output.displayedAngle = displayedAngle;
                 output.validProjection = validFront * validAngle;
                 output.isFixationTarget = isFixation;
                 output.color = input.color;
@@ -181,8 +202,6 @@ Shader "GlobeEffect/Merlitz Random Dots"
 
                 if (input.isFixationTarget > 0.5)
                 {
-                    // Aus demselben Quadrat entstehen zwei schmale Balken. Das
-                    // Kreuz bleibt scharf, auch wenn der Blendenrand weich ist.
                     float vertical = step(abs(input.dotUv.x), 0.18);
                     float horizontal = step(abs(input.dotUv.y), 0.18);
                     clip(saturate(vertical + horizontal) - 0.5);
@@ -196,7 +215,7 @@ Shader "GlobeEffect/Merlitz Random Dots"
                 if (_ApertureEdgeSoftnessRad <= 1e-6)
                 {
                     apertureAlpha = step(
-                        input.apparentAngle,
+                        input.displayedAngle,
                         _ApertureHalfAngleRad);
                 }
                 else
@@ -207,7 +226,7 @@ Shader "GlobeEffect/Merlitz Random Dots"
                     apertureAlpha = 1.0 - smoothstep(
                         fadeStart,
                         _ApertureHalfAngleRad,
-                        input.apparentAngle);
+                        input.displayedAngle);
                 }
 
                 clip(apertureAlpha - 0.001);

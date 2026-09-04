@@ -13,7 +13,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// </summary>
     public sealed class RandomDotExperimentFiles
     {
-        public const string MappingVersion = "merlitz-instrument-k-directional-v1";
+        public const string MappingVersion =
+            "visual-space-l-directional-content-zoom-v1";
 
         private static readonly UTF8Encoding Utf8WithoutBom = new(false);
 
@@ -106,8 +107,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             builder.AppendLine(
                 "participant_id,session_label,session_start_utc,random_seed,mapping_version," +
                 "sequence_index,total_planned_trials,condition_index,repetition," +
-                "eye_presentation,angular_diameter_deg,magnification," +
-                "motion_mode,stimulus_k,sweep_direction,dot_seed");
+                "eye_presentation,angular_diameter_deg,visual_space_l," +
+                "content_zoom,motion_mode,sweep_direction,dot_seed");
 
             foreach (RandomDotTrial trial in trials)
             {
@@ -118,9 +119,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 AppendInteger(builder, trial.Repetition);
                 AppendCsv(builder, trial.EyePresentation.ToString());
                 AppendFloat(builder, trial.AngularDiameterDegrees);
-                AppendFloat(builder, trial.Magnification);
+                AppendFloat(builder, trial.VisualSpaceL);
+                AppendFloat(builder, trial.ContentZoom);
                 AppendCsv(builder, trial.MotionMode.ToString());
-                AppendFloat(builder, trial.StimulusK);
                 AppendCsv(builder, trial.SweepDirection.ToString());
                 AppendInteger(builder, trial.DotSeed, terminateRow: true);
             }
@@ -154,9 +155,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             AppendCsv(builder, trial.EyePresentation.ToString());
             AppendFloat(builder, trial.AngularDiameterDegrees);
             AppendFloat(builder, result.ApertureEdgeSoftnessDegrees);
-            AppendFloat(builder, trial.Magnification);
+            AppendFloat(builder, trial.VisualSpaceL);
+            AppendFloat(builder, trial.ContentZoom);
             AppendCsv(builder, trial.MotionMode.ToString());
-            AppendFloat(builder, trial.StimulusK);
             AppendCsv(builder, trial.SweepDirection.ToString());
             AppendFloat(builder, result.SweepAmplitudeDegrees);
             AppendFloat(builder, result.SweepSpeedDegreesPerSecond);
@@ -188,8 +189,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "condition_index,repetition,attempt_number,trial_start_utc," +
                 "trial_start_unity_s,stimulus_end_unity_s,response_unity_s," +
                 "stimulus_duration_s,response_time_s,eye_presentation," +
-                "angular_diameter_deg,aperture_edge_softness_deg,magnification," +
-                "motion_mode,stimulus_k,sweep_direction,sweep_amplitude_deg," +
+                "angular_diameter_deg,aperture_edge_softness_deg,visual_space_l," +
+                "content_zoom,motion_mode,sweep_direction,sweep_amplitude_deg," +
                 "sweep_speed_deg_per_s,completed_half_sweeps,min_yaw_deg,max_yaw_deg," +
                 "dot_seed,dot_count,world_coverage_diameter_deg,carrier_radius_m," +
                 "response,valid_for_analysis,fixation_sample_valid," +

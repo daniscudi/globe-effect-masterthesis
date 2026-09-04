@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Serialization;
 
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
@@ -10,17 +11,17 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     /// Auge keine künstliche Konvergenz auf eine nahe Unity-Fläche.
     ///
     /// Im Hauptversuch folgt die runde Öffnung der HMD-Blickrichtung, während
-    /// Unity das Punktfeld kontrolliert nach links und rechts schwenkt. k bleibt
-    /// während einer Präsentation fest. Der optionale HeadTracked-Modus verankert
-    /// das Feld dagegen im Raum und bleibt nur für Vergleichstests erhalten.
+    /// Unity das Punktfeld kontrolliert nach links und rechts schwenkt. Der
+    /// Visual-Space-Parameter l bleibt während einer Präsentation fest. Damit
+    /// verwenden Checkerboard und Punktfeld jetzt dieselbe radiale Abbildung.
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
     public sealed class RandomDotFieldStimulus : MonoBehaviour
     {
-        private const string ShaderResourceName = "GlobeEffectMerlitzRandomDots";
-        private const string ShaderFallbackName = "GlobeEffect/Merlitz Random Dots";
+        private const string ShaderResourceName = "GlobeEffectVisualSpaceRandomDots";
+        private const string ShaderFallbackName = "GlobeEffect/Visual Space Random Dots";
         private const float MinimumRadiusMeters = 0.25f;
 
         [Header("Beobachter und Punktfeld")]
@@ -30,7 +31,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         [SerializeField, Range(5f, 170f)]
         [Tooltip("Kreisförmiger sichtbarer Winkeldurchmesser des Punktfelds.")]
-        private float angularDiameterDegrees = 70f;
+        private float angularDiameterDegrees = 90f;
 
         [SerializeField, Range(0f, 10f)]
         [Tooltip("Breite des weichen Übergangs am inneren Rand der runden Öffnung. 0 ergibt eine harte Kante.")]
@@ -41,8 +42,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private float fieldRadiusMeters = 5f;
 
         [SerializeField, Range(20f, 170f)]
-        [Tooltip("Unverzerrter Weltbereich. Er muss die in das sichtbare FOV abgebildeten Objektwinkel plus Kopfbewegung abdecken.")]
-        private float worldCoverageDiameterDegrees = 20f;
+        [Tooltip("Gesamter Winkelbereich, in dem Punkte erzeugt werden. Er sollte größer als das sichtbare FOV plus der Schwenk zu beiden Seiten sein, damit am Rand keine Lücken entstehen.")]
+        private float worldCoverageDiameterDegrees = 110f;
 
         [SerializeField, Range(100, 12000)]
         private int dotCount = 4000;
@@ -65,14 +66,15 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [Tooltip("Anteil heller Punkte; 0.5 ergibt gleich viele schwarze und weiße Punkte.")]
         private float lightDotFraction = 0.5f;
 
-        [Header("Merlitz-Abbildung")]
-        [SerializeField, Range(0f, 1f)]
-        [Tooltip("Instrumentparameter k: 1 = Tangens-, 0.5 = Kreis-, 0 = Winkelbedingung.")]
-        private float merlitzK = 0.7f;
+        [Header("Radiale Verzerrung")]
+        [FormerlySerializedAs("merlitzK")]
+        [SerializeField, Range(0f, 1.4f)]
+        [Tooltip("Derselbe Visual-Space-Parameter wie beim Checkerboard: l = 1 gerade, l = 0,5 Helmholtz-Referenz.")]
+        private float visualSpaceL = 0.5f;
 
-        [SerializeField, Min(0.01f)]
-        [Tooltip("Paraxiale Vergrößerung m. Ohne Vergrößerung (m = 1) hat k keine Wirkung.")]
-        private float magnification = 10f;
+        [SerializeField, Range(0.25f, 4f)]
+        [Tooltip("Einfacher Zoom des Punktfelds. Ändert den sichtbaren Ausschnitt, aber nicht l.")]
+        private float contentZoom = 1f;
 
         [SerializeField]
         private CheckerboardEyePresentation eyePresentation =
@@ -88,16 +90,16 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [SerializeField]
         private Color fixationColor = Color.red;
 
-        [Header("Bewegung")]
+        [Header("Bewegung (Vorschau und Laufzeitstatus)")]
         [SerializeField]
         private RandomDotMotionMode motionMode = RandomDotMotionMode.SimulatedYaw;
 
         [SerializeField, Range(0.1f, 30f)]
-        [Tooltip("Maximaler simulierter Schwenkwinkel zu jeder Seite.")]
+        [Tooltip("Maximaler simulierter Schwenkwinkel zu jeder Seite. Beim Start einer Sitzung wird dieser Wert vom Random Dot Experiment Manager überschrieben.")]
         private float simulatedYawAmplitudeDegrees = 5f;
 
         [SerializeField, Range(0.1f, 60f)]
-        [Tooltip("Winkelgeschwindigkeit des simulierten Schwenks in Grad pro Sekunde.")]
+        [Tooltip("Winkelgeschwindigkeit des simulierten Schwenks. Beim Start einer Sitzung wird dieser Wert vom Random Dot Experiment Manager überschrieben.")]
         private float simulatedYawSpeedDegreesPerSecond = 5f;
 
         [SerializeField]
@@ -110,7 +112,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private bool visibleAtStart = true;
 
         [SerializeField]
-        [Tooltip("Optionales Material mit dem Shader 'GlobeEffect/Merlitz Random Dots'.")]
+        [Tooltip("Optionales Material mit dem Shader 'GlobeEffect/Visual Space Random Dots'.")]
         private Material materialOverride;
 
         private MeshFilter meshFilter;
@@ -142,8 +144,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public float WorldCoverageDiameterDegrees => worldCoverageDiameterDegrees;
         public int DotCount => dotCount;
         public int RandomSeed => randomSeed;
-        public float MerlitzK => merlitzK;
-        public float Magnification => magnification;
+        public float VisualSpaceL => visualSpaceL;
+        public float ContentZoom => contentZoom;
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
         public RandomDotMotionMode MotionMode => motionMode;
         public RandomDotSweepDirection SweepDirection => sweepDirection;
@@ -262,16 +264,16 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             ApplyFrameProperties();
         }
 
-        public void SetMerlitzK(float value)
+        public void SetVisualSpaceL(float value)
         {
-            merlitzK = Mathf.Clamp01(value);
+            visualSpaceL = Mathf.Clamp(value, 0f, 1.4f);
             ApplyMaterialProperties();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
-        public void SetMagnification(float value)
+        public void SetContentZoom(float value)
         {
-            magnification = Mathf.Max(0.01f, value);
+            contentZoom = Mathf.Clamp(value, 0.25f, 4f);
             ApplyMaterialProperties();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
@@ -417,8 +419,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 worldCoverageDiameterDegrees = worldCoverageDiameterDegrees,
                 dotCount = dotCount,
                 randomSeed = randomSeed,
-                merlitzK = merlitzK,
-                magnification = magnification,
+                visualSpaceL = visualSpaceL,
+                contentZoom = contentZoom,
                 eyePresentation = eyePresentation,
                 motionMode = motionMode,
                 sweepDirection = sweepDirection,
@@ -461,7 +463,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
                     ownedMaterial = new Material(shader)
                     {
-                        name = "Runtime Merlitz Random Dot Material",
+                        name = "Runtime Visual Space Random Dot Material",
                         hideFlags = HideFlags.HideAndDontSave
                     };
                 }
@@ -564,7 +566,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             int vertexIndex = dotIndex * 4;
             // Jeder Punkt besteht technisch aus einem kleinen Viereck. Seine vier
             // Ecken starten zunächst am selben Mittelpunkt. Erst der Shader zieht
-            // daraus nach der Merlitz-Verschiebung einen Kreis mit fester
+            // daraus nach der Visual-Space-l-Abbildung einen Kreis mit fester
             // Winkelgröße. So verändert k die Punktbahn, aber nicht die Punktgröße.
             vertices[vertexIndex] = center;
             vertices[vertexIndex + 1] = center;
@@ -612,8 +614,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 0.5f * angularDiameterDegrees * Mathf.Deg2Rad);
             propertyBlock.SetFloat("_ApertureEdgeSoftnessRad",
                 apertureEdgeSoftnessDegrees * Mathf.Deg2Rad);
-            propertyBlock.SetFloat("_MerlitzK", merlitzK);
-            propertyBlock.SetFloat("_Magnification", magnification);
+            propertyBlock.SetFloat("_VisualSpaceL", visualSpaceL);
+            propertyBlock.SetFloat("_ContentZoom", contentZoom);
             propertyBlock.SetFloat("_EyeMode", (float)eyePresentation);
             propertyBlock.SetFloat("_DotsEnabled", pointsVisible ? 1f : 0f);
             propertyBlock.SetFloat("_DotHalfSizeRad",
@@ -666,8 +668,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             dotCount = Mathf.Clamp(dotCount, 100, 12000);
             dotAngularDiameterDegrees = Mathf.Clamp(dotAngularDiameterDegrees, 0.02f, 2f);
             lightDotFraction = Mathf.Clamp01(lightDotFraction);
-            merlitzK = Mathf.Clamp01(merlitzK);
-            magnification = Mathf.Max(0.01f, magnification);
+            visualSpaceL = Mathf.Clamp(visualSpaceL, 0f, 1.4f);
+            contentZoom = Mathf.Clamp(contentZoom, 0.25f, 4f);
             fixationTargetSizeDegrees = Mathf.Clamp(fixationTargetSizeDegrees, 0.05f, 3f);
             simulatedYawAmplitudeDegrees = Mathf.Clamp(
                 simulatedYawAmplitudeDegrees,
@@ -695,5 +697,40 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 DestroyImmediate(ownedObject);
             }
         }
+    }
+
+    public enum RandomDotMotionMode
+    {
+        HeadTracked = 0,
+        SimulatedYaw = 1
+    }
+
+    public enum RandomDotSweepDirection
+    {
+        LeftFirst = 0,
+        RightFirst = 1
+    }
+
+    // Momentaufnahme des Punktfelds für Protokoll und Eye-Tracking-Marker.
+    [Serializable]
+    public struct RandomDotStimulusSnapshot
+    {
+        public double timestampSeconds;
+        public bool visible;
+        public bool pointsVisible;
+        public float angularDiameterDegrees;
+        public float apertureEdgeSoftnessDegrees;
+        public float fieldRadiusMeters;
+        public float worldCoverageDiameterDegrees;
+        public int dotCount;
+        public int randomSeed;
+        public float visualSpaceL;
+        public float contentZoom;
+        public CheckerboardEyePresentation eyePresentation;
+        public RandomDotMotionMode motionMode;
+        public RandomDotSweepDirection sweepDirection;
+        public float sweepAmplitudeDegrees;
+        public float sweepSpeedDegreesPerSecond;
+        public float simulatedYawDegrees;
     }
 }

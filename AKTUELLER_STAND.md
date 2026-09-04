@@ -1,6 +1,6 @@
 # Aktueller Projektstand
 
-Stand: 1. September 2026
+Stand: 4. September 2026
 
 ## Worum geht es
 
@@ -42,8 +42,8 @@ Rekonstruktion der in Oomes et al. nicht angegebenen Zwischenformel.
 - schwarze und weiße Punkte hinter einer runden Öffnung mit weichem Rand
 - festes, unbewegtes Fixationskreuz in der Mitte
 - automatisch simulierte Schwenkbewegung; die Person muss den Kopf nicht drehen
-- feste `k`-Werte, Wiederholungen und Reihenfolge über den Inspector
-- `m` bleibt ein eigener Instrumentparameter und wird nicht aus `k` berechnet
+- in der aktuellen Pilotfassung feste `l`-Werte und ein davon unabhängiger
+  Content Zoom
 - Antwort erst nach der Bewegung: Pfeil links = konkav, Pfeil rechts = konvex
 - dieselbe Fixationskontrolle und Wiedervorlage wie beim Checkerboard
 
@@ -52,7 +52,7 @@ Rekonstruktion der in Oomes et al. nicht angegebenen Zwischenformel.
 
 1. Aktuellen Stand aus GitHub laden und das Projekt in Unity öffnen.
 2. Eine der beiden Szenen aus `Assets/GlobeEffect/Demo` öffnen.
-3. Am Objekt `Checkerboard Trial Session` oder `Random Dot Trial Session`
+3. Am Objekt `Checkerboard Experiment Manager` oder `Random Dot Experiment Manager`
    Versuchsperson-ID, Reizwerte, Wiederholungen, Augenbedingung und
    Fixationseinstellungen kontrollieren.
 4. Für die XR-4 prüfen: Varjo Provider aktiv, `Initialize XR on Startup` aktiv
@@ -90,13 +90,15 @@ Der Ordner `measurements` wird nicht zu GitHub hochgeladen.
 
 ## Was das für die Masterarbeit bedeutet
 
-Für jeden `l`- beziehungsweise `k`-Wert kann später der Anteil der Antwort
+Für jeden gezeigten Verzerrungswert kann später der Anteil der Antwort
 „konvex“ berechnet werden. Mit einer psychometrischen Funktion lässt sich der
 50-%-Punkt schätzen. Dieser PSE ist der Wert, bei dem konkav und konvex gleich
 häufig wahrgenommen werden.
 
-Der statische `l`-PSE und der dynamische `k`-PSE können anschließend verglichen
-werden. Daraus allein folgt aber noch nicht automatisch, ob die gesamte
+Der statische und der dynamische PSE können anschließend verglichen werden.
+Für den Random-Dot-Test ist noch offen, ob der allgemeine `l`-Pilot bleibt oder
+Merlitz' geschwenktes Fernglas mit getrenntem `m`, `k` und angenommenem `l`
+nachgebildet wird. Daraus allein folgt noch nicht automatisch, ob die gesamte
 Wahrnehmung besser als Globus- oder Zylindereffekt beschrieben wird. Die schon
 vorhandenen linearen x/y- beziehungsweise u/v-Abbildungen sind bisher
 theoretische Vergleichsrechnungen. Sie sind noch nicht direkt mit den Trial-CSV
@@ -106,8 +108,9 @@ oder einer Versuchsauswertung verbunden.
 
 1. Beide Szenen einmal vollständig auf der XR-4 testen: Rand, Monokularmodus,
    Fixation, virtuelle Unendlichkeit, Bewegungsrichtung und gespeicherte CSV.
-2. Endgültige Reizwerte, FOV, Zeiten, Wiederholungen und
-   Augenbedingungen festlegen.
-3. Einen kleinen Pilottest mit wenigen Personen durchführen und prüfen, ob die
+2. Mit dem Betreuer den genauen Random-Dot-Aufbau festlegen: allgemeiner
+   Visual-Space-Test oder Merlitz-Fernglassimulation.
+3. Danach Reizwerte, FOV, Zeiten, Wiederholungen und Augenbedingungen festlegen.
+4. Einen kleinen Pilottest mit wenigen Personen durchführen und prüfen, ob die
    Antworten über die gewählten Werte tatsächlich von konkav zu konvex wechseln.
-4. Eine Auswertung für die psychometrischen Funktionen und PSEs ergänzen.
+5. Eine Auswertung für die psychometrischen Funktionen und PSEs ergänzen.

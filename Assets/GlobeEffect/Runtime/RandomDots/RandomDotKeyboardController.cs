@@ -5,9 +5,9 @@ using UnityEngine.InputSystem;
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
-    /// Nimmt die beiden Antworten des Random-Dot-Tests entgegen. k wird vor dem
-    /// Trial von der Sitzungssteuerung gesetzt und kann von der Versuchsperson
-    /// nicht verändert werden.
+    /// Nimmt die beiden Antworten des Random-Dot-Tests entgegen. Die jeweilige
+    /// Reizbedingung wird vor dem Trial vom Experiment Manager gesetzt und kann
+    /// von der Versuchsperson nicht verändert werden.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(RandomDotFieldStimulus))]

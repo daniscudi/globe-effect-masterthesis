@@ -34,7 +34,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 attemptNumber: 1,
                 angularDiameterDegrees: 90f,
                 eyePresentation: CheckerboardEyePresentation.BothEyes,
-                visualSpaceL: visualSpaceL);
+                visualSpaceL: visualSpaceL,
+                contentZoom: 1f);
         }
     }
 }

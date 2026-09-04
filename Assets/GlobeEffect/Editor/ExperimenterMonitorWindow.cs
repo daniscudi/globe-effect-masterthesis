@@ -25,8 +25,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private CheckerboardFixationMonitor checkerboardFixation;
         private RandomDotFixationMonitor randomDotFixation;
-        private CheckerboardTrialSessionController checkerboardSession;
-        private RandomDotTrialSessionController randomDotSession;
+        private CheckerboardExperimentManager checkerboardSession;
+        private RandomDotExperimentManager randomDotSession;
         private VrCheckerboardStimulus checkerboardStimulus;
         private RandomDotFieldStimulus randomDotStimulus;
         private RandomDotHeadSweepMonitor sweepMonitor;
@@ -190,6 +190,13 @@ namespace GlobeEffect.VRCheckerboard.Editor
                             CultureInfo.InvariantCulture) + "°"
                         : "–");
                 EditorGUILayout.LabelField(
+                    "Content Zoom",
+                    checkerboardStimulus != null
+                        ? checkerboardStimulus.ContentZoom.ToString(
+                            "F2",
+                            CultureInfo.InvariantCulture)
+                        : "–");
+                EditorGUILayout.LabelField(
                     "Augenmodus",
                     checkerboardStimulus != null
                         ? checkerboardStimulus.EyePresentation.ToString()
@@ -221,7 +228,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             EditorGUILayout.Space(6f);
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                EditorGUILayout.LabelField("Test", "Random Dot k");
+                EditorGUILayout.LabelField("Test", "Random Dot l");
                 EditorGUILayout.LabelField(
                     "Session",
                     randomDotSession != null
@@ -233,9 +240,14 @@ namespace GlobeEffect.VRCheckerboard.Editor
                         randomDotSession?.CurrentTrialNumber ?? 0,
                         randomDotSession?.TotalTrials ?? 0));
                 EditorGUILayout.LabelField(
-                    "k",
+                    "Visual Space l",
                     randomDotStimulus != null
-                        ? randomDotStimulus.MerlitzK.ToString("F3", CultureInfo.InvariantCulture)
+                        ? randomDotStimulus.VisualSpaceL.ToString("F3", CultureInfo.InvariantCulture)
+                        : "–");
+                EditorGUILayout.LabelField(
+                    "Content Zoom",
+                    randomDotStimulus != null
+                        ? randomDotStimulus.ContentZoom.ToString("F2", CultureInfo.InvariantCulture)
                         : "–");
                 EditorGUILayout.LabelField(
                     "Gierwinkel",
@@ -367,9 +379,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
             randomDotFixation =
                 Object.FindAnyObjectByType<RandomDotFixationMonitor>();
             checkerboardSession =
-                Object.FindAnyObjectByType<CheckerboardTrialSessionController>();
+                Object.FindAnyObjectByType<CheckerboardExperimentManager>();
             randomDotSession =
-                Object.FindAnyObjectByType<RandomDotTrialSessionController>();
+                Object.FindAnyObjectByType<RandomDotExperimentManager>();
             checkerboardStimulus =
                 Object.FindAnyObjectByType<VrCheckerboardStimulus>();
             randomDotStimulus =

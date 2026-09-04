@@ -10,6 +10,7 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
         _ApertureEdgeSoftnessRad ("Aperture Edge Softness [rad]", Float) = 0.0174533
         _UseCircularAperture ("Use Circular Aperture", Float) = 1
         _VisualSpaceL ("Visual-space l", Range(0, 1.4)) = 0.5
+        _ContentZoom ("Content Zoom", Float) = 1
         _GridLineSpacingUv ("Grid Line Spacing [u/v]", Float) = 0.176327
         _CheckerboardEnabled ("Checkerboard Enabled", Float) = 1
         _EyeMode ("Eye Mode", Float) = 0
@@ -61,6 +62,7 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
             float _ApertureEdgeSoftnessRad;
             float _UseCircularAperture;
             float _VisualSpaceL;
+            float _ContentZoom;
             float _GridLineSpacingUv;
             float _CheckerboardEnabled;
             float _EyeMode;
@@ -192,8 +194,10 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
                 // dem im Inspector eingestellten Winkelabstand berechnet. l
                 // verändert damit nur die radiale Abtastposition und nicht
                 // zusätzlich den Aufbau des zugrunde liegenden Schachbretts.
+                // Der Zoom verändert nur die Größe der Checks. Er bleibt
+                // unabhängig von der radialen l-Abbildung und vom Blendenrand.
                 float2 gridPosition = sourcePosition /
-                    max(_GridLineSpacingUv, 1e-6);
+                    max(_GridLineSpacingUv * _ContentZoom, 1e-6);
                 float checkerSignal = sin(UNITY_PI * gridPosition.x)
                     * sin(UNITY_PI * gridPosition.y);
                 float antialiasWidth = max(fwidth(checkerSignal), 1e-4);

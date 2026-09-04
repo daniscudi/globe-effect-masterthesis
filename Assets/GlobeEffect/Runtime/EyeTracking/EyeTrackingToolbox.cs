@@ -742,7 +742,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
                 CultureInfo.InvariantCulture,
                 "{0};visual_space_l={1:F3};fov_deg={2:F2};edge_softness_deg={3:F2};" +
                 "circular_aperture={4};grid_spacing_deg={5:F2};" +
-                "grid_spacing_uv={6:F6};eye={7}",
+                "grid_spacing_uv={6:F6};content_zoom={7:F3};eye={8}",
                 eventName,
                 snapshot.visualSpaceL,
                 snapshot.angularDiameterDegrees,
@@ -750,6 +750,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
                 snapshot.useCircularAperture,
                 snapshot.gridLineSpacingDegrees,
                 snapshot.gridLineSpacingUv,
+                snapshot.contentZoom,
                 snapshot.eyePresentation);
         }
 

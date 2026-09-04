@@ -22,7 +22,7 @@ werden, bei dem beide Antworten gleich häufig vorkommen. Das ist der Punkt, an
 dem das Muster subjektiv geradlinig erscheint (PSE).
 
 Der Test kann beidäugig, nur links oder nur rechts gezeigt werden. Die
-gewünschten Bedingungen werden am `Checkerboard Trial Session` im Inspector
+gewünschten Bedingungen werden am `Checkerboard Experiment Manager` im Inspector
 eingestellt.
 
 ## Was der Random-Dot-Test macht
@@ -32,8 +32,9 @@ Schwarze und weiße Punkte bewegen sich dahinter automatisch von links nach
 rechts und wieder zurück. Die Öffnung und das Fixationskreuz bleiben dabei
 kopffest. Eine tatsächliche Kopfbewegung ist für die Hauptbedingung nicht nötig.
 
-Vor jedem Durchgang setzt Unity einen festen Merlitz-Parameter `k`. Dieser Wert
-wird nicht angezeigt und kann von der Versuchsperson nicht verändert werden.
+Die aktuelle Pilotfassung setzt vor jedem Durchgang einen festen Visual-Space-
+Wert `l`. Dieser Wert wird nicht angezeigt und kann von der Versuchsperson nicht
+verändert werden.
 Nach der festgelegten Bewegungsdauer verschwindet das Punktfeld und es folgt
 wieder nur die Entscheidung:
 
@@ -41,10 +42,10 @@ wieder nur die Entscheidung:
 
 * Pfeil rechts: Bewegung wirkt konvex.
 
-Aus `P(konvex | k)` kann später der Übergang bestimmt werden, an dem konkav und
-konvex gleich häufig geantwortet werden. Dieser dynamische `k`-PSE kann mit dem
-PSE des statischen `l`-Tests verglichen werden. Er wird aber nicht automatisch
-als derselbe Parameter bezeichnet.
+Aus `P(konvex | l)` kann später der Übergang bestimmt werden, an dem konkav und
+konvex gleich häufig geantwortet werden. Ob dieser allgemeine Bewegungstest
+bleibt oder durch eine genaue Merlitz-Fernglassimulation mit getrenntem `m`, `k`
+und angenommenem `l` ersetzt wird, ist noch mit dem Betreuer festzulegen.
 
 ## l und k
 
@@ -70,6 +71,11 @@ y_l(a) = tan(l · a) / l
 
 In dieser Funktion kommt keine Fernglasvergrößerung vor. Deshalb wird `l` im
 statischen Test als eigentlicher Verzerrungsparameter verwendet.
+
+`Content Zoom` ist in beiden Szenen nur eine zusätzliche Skalierung des Musters
+und bleibt unabhängig von `l`. Der Name `m` wird dafür bewusst nicht benutzt,
+weil Merlitz mit `m` die paraxiale Vergrößerung eines simulierten Fernglases
+meint. Diese Fernglassimulation ist in den aktuellen Versuchsszenen nicht aktiv.
 
 Die wichtigen Referenzpunkte sind:
 
@@ -278,13 +284,15 @@ gerade gültige Belegung an.
 ## Einstellungen im Inspector
 
 Die wichtigsten Einstellungen befinden sich am Objekt
-`Checkerboard Trial Session`:
+`Checkerboard Experiment Manager`:
 
 * `Angular Diameters Degrees`: ein oder mehrere FOV-/Winkeldurchmesser
 
 * `Eye Presentations`: Both Eyes, Left Eye Only oder Right Eye Only
 
 * `Visual Space L Values`: alle zu präsentierenden Verzerrungswerte
+
+* `Content Zoom Values`: unabhängiger Zoom; `1` lässt die Größe unverändert
 
 * `Repetitions Per Condition`: Wiederholungen jeder Kombination
 
@@ -304,12 +312,14 @@ Masterarbeit. Die Listen können im Inspector vollständig geändert werden.
 
 Am Objekt `Checkerboard Stimulus` werden Aussehen, Felderzahl, Farben, Größe des
 Fixationskreuzes und die weiche Blendenkante eingestellt. Während einer Sitzung
-setzt die Trialsteuerung FOV, `l` und Augenmodus automatisch.
+setzt der Experiment Manager FOV, `l`, Content Zoom und Augenmodus automatisch.
 
 Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
-`Random Dot Trial Session`:
+`Random Dot Experiment Manager`:
 
-* `Stimulus K Values`: alle fest vorgegebenen k-Werte
+* `Visual Space L Values`: die festen l-Werte der aktuellen Pilotfassung
+
+* `Content Zoom Values`: unabhängig von `l`; `1` bedeutet kein Zusatzzoom
 
 * `Repetitions Per Condition`: Wiederholungen jeder Kombination
 
@@ -381,7 +391,7 @@ Marker wie `TrialStart`, `TrialResponse`, `TrialInvalid` und
 
 Beim Random-Dot-Test werden zusätzlich unter anderem festgehalten:
 
-* der vorgegebene Wert `stimulus_k`
+* die vorgegebenen Werte `visual_space_l` und `content_zoom`
 
 * Schwenkrichtung, Amplitude und Geschwindigkeit
 
@@ -417,23 +427,20 @@ Die Szene liegt unter:
 Assets/GlobeEffect/Demo/CheckerboardDemo.unity
 ```
 
-Falls sie neu aufgebaut werden soll:
+Die zweite Szene liegt unter:
 
 ```text
-Tools → Globe Effect → Create or Reset Demo Scene
+Assets/GlobeEffect/Demo/RandomDotMotionDemo.unity
 ```
 
-Die Random-Dot-Szene wird über folgenden Menüpunkt erstellt beziehungsweise
-zurückgesetzt:
-
-```text
-Tools → Globe Effect → Create or Reset Random Dot Demo Scene
-```
+Beide Szenen sind als normale Unity-Szenen gespeichert. Die früheren einmaligen
+Builder-Skripte wurden nach dem Aufbau entfernt, damit die Projektstruktur
+übersichtlicher bleibt.
 
 Für einen reinen visuellen Test am Laptop kann die Szene auch ohne Headset im
 Play Mode geöffnet werden. Das Muster folgt dann der normalen `Main Camera`. Um
 einen kompletten Tastaturdurchlauf ohne gültige Eye-Tracking-Daten zu testen,
-muss am `Checkerboard Trial Session` vorübergehend `Require Fixation`
+muss am `Checkerboard Experiment Manager` vorübergehend `Require Fixation`
 deaktiviert werden. Diese Einstellung ist nur für den technischen Test gedacht
 und darf bei einer Messung nicht ausgeschaltet bleiben.
 
@@ -451,15 +458,13 @@ Assets/GlobeEffect/
 │   │   └── CheckerboardKeyboardController.cs
 │   ├── Resources/
 │   │   ├── GlobeEffectHelmholtzCheckerboard.shader
-│   │   └── GlobeEffectMerlitzRandomDots.shader
+│   │   └── GlobeEffectVisualSpaceRandomDots.shader
 │   ├── Experiment/
 │   │   ├── CheckerboardTrialPlanner.cs
-│   │   ├── CheckerboardTrialQueue.cs
-│   │   ├── CheckerboardTrialSessionController.cs
+│   │   ├── CheckerboardExperimentManager.cs
 │   │   ├── CheckerboardExperimentFiles.cs
 │   │   ├── RandomDotTrialPlanner.cs
-│   │   ├── RandomDotTrialQueue.cs
-│   │   └── RandomDotTrialSessionController.cs
+│   │   └── RandomDotExperimentManager.cs
 │   ├── RandomDots/
 │   │   ├── RandomDotFieldStimulus.cs
 │   │   ├── RandomDotSimulatedSweep.cs
@@ -467,7 +472,6 @@ Assets/GlobeEffect/
 │   └── EyeTracking/
 │       └── CheckerboardFixationMonitor.cs
 ├── Editor/
-│   ├── CheckerboardDemoSceneBuilder.cs
 │   └── ExperimenterMonitorWindow.cs
 └── Tests/EditMode/
     ├── VisualSpaceRadialMappingTests.cs
@@ -480,26 +484,27 @@ dieselbe Abbildung für jeden sichtbaren Pixel aus.
 
 ## Trennung der beiden Tests
 
-Im Random-Dot-Teil spielen Vergrößerung, Instrumentenabbildung, Bewegung und der
-Merlitz-Parameter `k` eine Rolle. Diese Fragen sollen nicht unbemerkt in den
-statischen Checkerboard-Test hineinrutschen. Umgekehrt wird im Bewegungstest
-kein zusätzliches angenommenes Visual-Space-`l` in das Bild eingerechnet: Die
-Wahrnehmung stammt dort von der echten Versuchsperson.
+Der statische Test verwendet bewusst keine Fernglassimulation. Beim Random-Dot-
+Teil ist die endgültige Abbildung noch offen. Die aktuelle lauffähige Fassung
+verwendet ebenfalls `l` und einen davon unabhängigen Content Zoom. Merlitz'
+Binokularbeispiel wird später als eigener Modus umgesetzt, falls dieser Aufbau
+für die Fragestellung übernommen wird.
 
 Kurz gesagt:
 
 * Statisches Checkerboard: Visual-Space-`l`, feste Reize,
   konkav/konvex und head-locked.
 
-* Random-Dot-Teil: feste `k`-Reize, kontrollierte Bewegung,
-  konkav/konvex und ein dynamischer PSE.
+* Random-Dot-Pilot: feste `l`-Reize, unabhängiger Zoom, kontrollierte Bewegung
+  und konkav/konvex.
 
 ## Noch offen
 
 * Die endgültigen `l`-Stufen und die Wiederholungszahl 
 
-* Dasselbe gilt für `k`-Stufen, Schwenkweite, Geschwindigkeit und Dauer des
-  Random-Dot-Tests. Die aktuellen Werte sind Pilotwerte.
+* Für den Random-Dot-Test muss entschieden werden, ob der allgemeine l-Pilot
+  bleibt oder Merlitz' geschwenktes Binokular mit getrenntem `m`, `k` und `l`
+  nachgebildet wird. Schwenkweite, Geschwindigkeit und Dauer sind Pilotwerte.
 
 * Für die Auswertung wird später eine psychometrische Funktion für
   `P(konvex | l)` angepasst; der 50-%-Punkt ist der gesuchte PSE.

@@ -6,8 +6,8 @@ using NUnit.Framework;
 namespace GlobeEffect.VRCheckerboard.Tests
 {
     /// <summary>
-    /// Prüft Reihenfolge, feste k-Stufen, ausgeglichene Bewegungsrichtungen und
-    /// die über k hinweg vergleichbaren Punkt-Seeds.
+    /// Prüft Reihenfolge, feste l-Stufen, ausgeglichene Bewegungsrichtungen und
+    /// die über l hinweg vergleichbaren Punkt-Seeds.
     /// </summary>
     public sealed class RandomDotTrialPlannerTests
     {
@@ -31,26 +31,26 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [Test]
-        public void Plan_ContainsEveryFixedKEquallyOften()
+        public void Plan_ContainsEveryFixedLEquallyOften()
         {
             var plan = CreatePlan(7);
 
-            // 2 FOV * 1 Auge * 2 k * 1 m * 1 Bewegung * 4 Wiederholungen.
+            // 2 FOV * 1 Auge * 2 l * 1 Zoom * 1 Bewegung * 4 Wiederholungen.
             Assert.That(plan.Count, Is.EqualTo(16));
-            Assert.That(plan.Count(t => t.StimulusK == 0.3f), Is.EqualTo(8));
-            Assert.That(plan.Count(t => t.StimulusK == 0.9f), Is.EqualTo(8));
+            Assert.That(plan.Count(t => t.VisualSpaceL == 0.5f), Is.EqualTo(8));
+            Assert.That(plan.Count(t => t.VisualSpaceL == 1f), Is.EqualTo(8));
             Assert.That(plan.All(t => t.AttemptNumber == 1), Is.True);
         }
 
         [Test]
-        public void DirectionsAreBalancedAndSeedsAreMatchedAcrossK()
+        public void DirectionsAreBalancedAndSeedsAreMatchedAcrossL()
         {
             var plan = CreatePlan(17);
 
             foreach (var group in plan.GroupBy(t => new
                      {
                          t.AngularDiameterDegrees,
-                         t.StimulusK
+                         t.VisualSpaceL
                      }))
             {
                 Assert.That(group.Count(
@@ -63,17 +63,17 @@ namespace GlobeEffect.VRCheckerboard.Tests
 
             foreach (float fov in new[] { 40f, 70f })
             {
-                int[] lowKSeeds = plan
-                    .Where(t => t.AngularDiameterDegrees == fov && t.StimulusK == 0.3f)
+                int[] helmholtzSeeds = plan
+                    .Where(t => t.AngularDiameterDegrees == fov && t.VisualSpaceL == 0.5f)
                     .OrderBy(t => t.Repetition)
                     .Select(t => t.DotSeed)
                     .ToArray();
-                int[] highKSeeds = plan
-                    .Where(t => t.AngularDiameterDegrees == fov && t.StimulusK == 0.9f)
+                int[] straightSeeds = plan
+                    .Where(t => t.AngularDiameterDegrees == fov && t.VisualSpaceL == 1f)
                     .OrderBy(t => t.Repetition)
                     .Select(t => t.DotSeed)
                     .ToArray();
-                Assert.That(highKSeeds, Is.EqualTo(lowKSeeds));
+                Assert.That(straightSeeds, Is.EqualTo(helmholtzSeeds));
             }
         }
 
@@ -83,8 +83,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
             return RandomDotTrialPlanner.CreateRandomizedPlan(
                 new[] { 40f, 70f },
                 new[] { CheckerboardEyePresentation.BothEyes },
-                new[] { 0.3f, 0.9f },
-                new[] { 10f },
+                new[] { 0.5f, 1f },
+                new[] { 1f },
                 new[] { RandomDotMotionMode.SimulatedYaw },
                 repetitions: 4,
                 randomSeed,

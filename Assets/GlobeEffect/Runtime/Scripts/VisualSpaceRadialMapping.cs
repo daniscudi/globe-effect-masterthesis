@@ -36,17 +36,11 @@ namespace GlobeEffect.VRCheckerboard
         /// Rechnet einen Radius im sichtbaren Kreis auf die Stelle zurück, an
         /// der das unverzerrte Ausgangsgitter abgetastet werden muss.
         /// </summary>
-        /// <param name="displayRadius">
-        /// Radius im sichtbaren Kreis: 0 ist die Mitte, 1 der Blendenrand.
-        /// </param>
-        /// <param name="angularDiameterDegrees">
-        /// Gesamter Winkeldurchmesser der kreisrunden Blende.
-        /// </param>
-        /// <param name="visualSpaceL">
-        /// l = 1 ergibt ein gerades gnomonisches Gitter. l = 0,5 ergibt
-        /// den stereografischen Helmholtz-Endpunkt. Für l gegen 0 gilt der
-        /// äquidistante Grenzfall.
-        /// </param>
+        /// displayRadius: 0 ist die Mitte und 1 der Blendenrand.
+        /// angularDiameterDegrees: gesamter Winkeldurchmesser der Blende.
+        /// visualSpaceL: l = 1 ergibt ein gerades gnomonisches Gitter,
+        /// l = 0,5 den stereografischen Helmholtz-Endpunkt und l gegen 0
+        /// den äquidistanten Grenzfall.
         public static double SourceRadius(
             double displayRadius,
             double angularDiameterDegrees,
