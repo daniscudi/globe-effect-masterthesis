@@ -43,6 +43,8 @@ namespace GlobeEffect.VRCheckerboard
 
         private void Update()
         {
+            // Die Zuordnung kann zwischen Personen vertauscht werden, damit nicht
+            // immer dieselbe Hand mit derselben Antwort verbunden ist.
             Keyboard keyboard = Keyboard.current;
             if (keyboard == null)
             {
@@ -71,6 +73,8 @@ namespace GlobeEffect.VRCheckerboard
 
         public void SubmitResponse(CheckerboardCurvatureResponse response)
         {
+            // Der Controller bewertet die Antwort nicht. Er meldet sie nur an den
+            // Experiment Manager, der den aktuellen Trial kennt und speichert.
             EnsureStimulus();
             if (response == CheckerboardCurvatureResponse.None)
             {

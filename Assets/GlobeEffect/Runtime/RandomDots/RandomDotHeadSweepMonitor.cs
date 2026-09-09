@@ -12,6 +12,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     [DisallowMultipleComponent]
     public sealed class RandomDotHeadSweepMonitor : MonoBehaviour
     {
+        // Dieses Skript bewegt nichts. Es beobachtet nur den aktuellen Yaw-Winkel
+        // und zählt, wie oft abwechselnd der linke und rechte Grenzwert erreicht wird.
         [Header("Referenzen")]
         [SerializeField]
         private Transform observer;
@@ -68,6 +70,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             currentYawDegrees = stimulus.MotionMode == RandomDotMotionMode.SimulatedYaw
                 ? stimulus.CurrentSimulatedYawDegrees
                 : CalculateTrackedYaw();
+            // Bei SimulatedYaw kommt der Wert direkt aus der programmierten Bewegung.
+            // Bei HeadTracked wird stattdessen die echte HMD-Drehung gemessen.
 
             counter ??= new AlternatingHeadSweepCounter(yawThresholdDegrees);
             if (counter.Update(currentYawDegrees))
@@ -100,6 +104,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         public void ResetForTrial()
         {
+            // Die momentane Blickrichtung wird als neue Nullrichtung gespeichert.
             ResolveReferences();
             referenceForward = FlattenForward(
                 observer != null ? observer.forward : Vector3.forward);
@@ -117,6 +122,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             }
 
             Vector3 currentForward = FlattenForward(observer.forward);
+            // SignedAngle liefert links und rechts mit unterschiedlichem Vorzeichen.
             return Vector3.SignedAngle(
                 referenceForward,
                 currentForward,
@@ -141,6 +147,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         private static Vector3 FlattenForward(Vector3 direction)
         {
+            // Die vertikale Kopfneigung wird entfernt, weil nur der horizontale
+            // Links-Rechts-Schwenk ausgewertet werden soll.
             direction.y = 0f;
             return direction.sqrMagnitude > 1e-8f
                 ? direction.normalized

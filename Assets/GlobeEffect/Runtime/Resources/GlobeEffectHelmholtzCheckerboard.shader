@@ -1,5 +1,9 @@
 Shader "GlobeEffect/Helmholtz Checkerboard"
 {
+    // Das C#-Skript liefert nur Parameter und eine quadratische Trägerfläche.
+    // Dieser Shader berechnet für jeden Bildpunkt das eigentliche Muster:
+    // Bildschirmposition -> Blickwinkel -> radiale l-Abbildung -> lineares u/v-Gitter
+    // -> Schwarz/Weiß-Farbe -> runde Blende und Fixationskreuz.
     Properties
     {
         _DarkColor ("Dark Color", Color) = (0, 0, 0, 1)
@@ -82,6 +86,10 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
 
                 float2 displayPosition = input.vertex.xy * 2.0;
                 float tangentAtBoundary = tan(_ApparentHalfAngleRad);
+
+                // Aus der Stelle auf dem Träger wird eine Richtung relativ zur
+                // aktuellen Kopfpose. Deshalb bleibt das Bild kopffest und verhält
+                // sich nicht wie eine nahe Ebene im Unity-Raum.
                 float3 worldDirection = normalize(
                     _ObserverWorldForward.xyz +
                     _ObserverWorldRight.xyz * displayPosition.x * tangentAtBoundary +
@@ -129,6 +137,7 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
 
                 float eyeIndex = ResolveEyeIndex();
                 float visibleForEye = 1.0;
+                // 0 = beide Augen, 1 = nur links, 2 = nur rechts.
                 if (_EyeMode > 0.5 && _EyeMode < 1.5)
                 {
                     visibleForEye = 1.0 - eyeIndex;
@@ -142,6 +151,8 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
                 float2 displayPosition = input.uv * 2.0 - 1.0;
                 float displayRadius = length(displayPosition);
 
+                // displayRadius ist linear auf dem quadratischen Träger. atan
+                // macht daraus den tatsächlichen Winkel zur Bildmitte.
                 float tangentAtBoundary = tan(_ApparentHalfAngleRad);
                 float visualAngle = atan(displayRadius * tangentAtBoundary);
 
@@ -180,6 +191,10 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
                 }
                 else
                 {
+                    // Das ist die im Projekt benutzte, am Blendenrand normierte
+                    // Visual-Space-Abbildung:
+                    // s = tan(l * Winkel) / tan(l * halber FOV-Winkel).
+                    // l ist die vorgegebene Bedingung und wird nicht aus Zoom berechnet.
                     sourceRadius = tan(_VisualSpaceL * visualAngle) /
                         tan(_VisualSpaceL * _ApparentHalfAngleRad);
                 }
@@ -200,6 +215,8 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
                     max(_GridLineSpacingUv * _ContentZoom, 1e-6);
                 float checkerSignal = sin(UNITY_PI * gridPosition.x)
                     * sin(UNITY_PI * gridPosition.y);
+                // Das Vorzeichen wechselt an jeder Gitterlinie. Dadurch entstehen
+                // abwechselnd schwarze und weiße Felder, ohne eine Bilddatei zu laden.
                 float antialiasWidth = max(fwidth(checkerSignal), 1e-4);
                 float checkerMix = smoothstep(
                     -antialiasWidth,
@@ -215,6 +232,8 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
                     step(0.5, _CheckerboardEnabled));
 
                 float2 angularPosition = atan(displayPosition * tangentAtBoundary);
+                // Das Kreuz wird erst ganz am Ende ergänzt. Es bleibt dadurch in
+                // der Mitte und wird nicht zusammen mit dem Schachbrett verzerrt.
                 float crossThickness = max(_FixationHalfSizeRad * 0.18, 1e-5);
                 float verticalBar = step(abs(angularPosition.x), crossThickness)
                     * step(abs(angularPosition.y), _FixationHalfSizeRad);

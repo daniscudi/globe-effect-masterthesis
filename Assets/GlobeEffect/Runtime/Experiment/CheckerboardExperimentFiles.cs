@@ -82,6 +82,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// </summary>
     public sealed class CheckerboardExperimentFiles
     {
+        // Pro Sitzung entstehen zwei Dateien:
+        // plan.csv enthält die vorab festgelegte Reihenfolge.
+        // trials.csv erhält nach jeder tatsächlichen Präsentation eine neue Zeile.
+        // Eye-Tracking-Rohdaten werden getrennt von der Lab-Toolbox geschrieben.
         private static readonly UTF8Encoding Utf8WithoutBom = new(false);
 
         private readonly string participantId;
@@ -119,6 +123,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             DateTime sessionStartUtc,
             int randomSeed)
         {
+            // Aus Teilnehmer-ID und Startzeit wird ein eindeutiger Sitzungsordner.
             if (string.IsNullOrWhiteSpace(outputRoot))
             {
                 throw new ArgumentException(
@@ -164,6 +169,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             IReadOnlyList<CheckerboardTrial> trials,
             float gridLineSpacingDegrees)
         {
+            // Der komplette randomisierte Plan wird vor dem ersten Trial geschrieben.
             if (trials == null)
             {
                 throw new ArgumentNullException(nameof(trials));
@@ -207,6 +213,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public void AppendResult(CheckerboardTrialResult result, int plannedTrials)
         {
+            // Nur eine neue Zeile anhängen: frühere Ergebnisse bleiben unverändert.
             if (result == null)
             {
                 throw new ArgumentNullException(nameof(result));
@@ -253,6 +260,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public static string SanitizeIdentifier(string value, string fallback)
         {
+            // Entfernt Zeichen, die in Datei- und Ordnernamen Probleme machen können.
             string source = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
             var builder = new StringBuilder(source.Length);
             bool previousWasSeparator = false;
@@ -344,6 +352,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             string value,
             bool terminateRow = false)
         {
+            // Komma, Anführungszeichen und Zeilenumbruch werden nach CSV-Regeln maskiert.
             string safeValue = value ?? string.Empty;
             bool quote = safeValue.IndexOf(',') >= 0 ||
                 safeValue.IndexOf('"') >= 0 ||

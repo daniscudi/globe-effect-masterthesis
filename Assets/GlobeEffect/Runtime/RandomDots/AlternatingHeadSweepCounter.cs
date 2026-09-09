@@ -34,6 +34,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         /// </summary>
         public bool Update(float yawDegrees)
         {
+            // Diese drei Werte beschreiben den gesamten bisherigen Trial und werden
+            // später zusammen mit dem Ergebnis gespeichert.
             MinimumYawDegrees = Math.Min(MinimumYawDegrees, yawDegrees);
             MaximumYawDegrees = Math.Max(MaximumYawDegrees, yawDegrees);
             MaximumAbsoluteYawDegrees = Math.Max(
@@ -45,6 +47,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 : yawDegrees <= -ThresholdDegrees
                     ? -1
                     : 0;
+            // 1 = rechter Rand erreicht, -1 = linker Rand, 0 = dazwischen.
 
             if (currentExtreme == 0 || currentExtreme == lastExtreme)
             {
@@ -55,6 +58,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             lastExtreme = currentExtreme;
             if (completedAlternation)
             {
+                // Erst links -> rechts oder rechts -> links zählt als Halbschwenk.
                 CompletedHalfSweeps++;
             }
 

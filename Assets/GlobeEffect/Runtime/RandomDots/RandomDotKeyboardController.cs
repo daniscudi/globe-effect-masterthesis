@@ -42,6 +42,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         private void Update()
         {
+            // Je nach Gegenbalancierung kann links/rechts im Inspector vertauscht sein.
             Keyboard keyboard = Keyboard.current;
             if (keyboard == null)
             {
@@ -70,6 +71,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         public void SubmitResponse(CheckerboardCurvatureResponse response)
         {
+            // Das Event gibt nur die gedrückte Antwort weiter. Ob sie gerade erlaubt
+            // ist und zu welchem Trial sie gehört, entscheidet der Experiment Manager.
             if (response == CheckerboardCurvatureResponse.None)
             {
                 return;

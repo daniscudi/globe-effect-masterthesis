@@ -12,6 +12,9 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
     [DisallowMultipleComponent]
     public sealed class RandomDotFixationMonitor : MonoBehaviour
     {
+        // Für jeden Blicksample wird das sichtbare Auge gewählt, der Winkel zum
+        // roten Kreuz berechnet und die ununterbrochene Fixationszeit aktualisiert.
+        // Die hochfrequenten Rohdaten bleiben Aufgabe der Lab-Toolbox.
         [Header("Referenzen")]
         [SerializeField]
         private EyeTrackingToolbox eyeTrackingToolbox;
@@ -69,6 +72,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         public bool HasRecentSample(float maximumAgeSeconds)
         {
+            // Ohne frischen Sample kann kein Trial zuverlässig freigegeben werden.
             if (lastSampleRealtimeSeconds <= 0d)
             {
                 return false;
@@ -110,6 +114,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         public void ResetFixationWindow()
         {
+            // Vor jeder neuen Präsentation beginnt die Fixationsmessung von vorne.
             currentSampleValid = false;
             isInsideTolerance = false;
             currentAngleDegrees = float.NaN;
@@ -122,6 +127,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private void HandleGazeData(GazeData gazeData)
         {
+            // Die EyeTrackingToolbox ruft diese Methode für jeden neuen Sample auf.
             lastSampleRealtimeSeconds = Time.realtimeSinceStartupAsDouble;
             totalSampleCount++;
             bool previousState = isInsideTolerance;
@@ -149,6 +155,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
             currentAngleDegrees = Vector3.Angle(
                 gazeRay.direction,
                 targetDirection);
+            // On target heißt: Die Winkelabweichung liegt innerhalb der Toleranz.
             isInsideTolerance = currentAngleDegrees <= toleranceDegrees;
 
             double sampleInterval = previousSampleTime > 0d
@@ -195,6 +202,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private void ResetInvalidSample(double sampleTime)
         {
+            // Ungültige Daten unterbrechen eine bisher aufgebaute Fixationsdauer.
             currentSampleValid = false;
             isInsideTolerance = false;
             currentAngleDegrees = float.NaN;
@@ -218,6 +226,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private void Subscribe()
         {
+            // Ab jetzt erhält das Skript die neuen Samples als Ereignis.
             if (subscribed || eyeTrackingToolbox == null)
             {
                 return;
@@ -229,6 +238,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private void Unsubscribe()
         {
+            // Beim Deaktivieren lösen, damit kein Sample doppelt ausgewertet wird.
             if (!subscribed || eyeTrackingToolbox == null)
             {
                 subscribed = false;

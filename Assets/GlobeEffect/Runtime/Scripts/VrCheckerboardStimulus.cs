@@ -16,6 +16,15 @@ namespace GlobeEffect.VRCheckerboard
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
     public sealed class VrCheckerboardStimulus : MonoBehaviour
     {
+        // Kurzer Ablauf dieses Skripts:
+        // 1. BuildCarrierQuad erstellt nur eine einfache quadratische Trägerfläche.
+        // 2. Der Shader macht aus dieser Fläche ein Richtungsbild vor beiden Augen.
+        // 3. Die Inspector-Werte werden mit ApplyMaterialProperties an den Shader gegeben.
+        // 4. Die aktuelle HMD-Pose wird in jedem Frame nachgereicht.
+        // 5. Der Experiment Manager blendet über Show, ShowFixationOnly und Hide um.
+        //
+        // Das Schachbrett selbst und die l-Verzerrung entstehen also im Shader,
+        // nicht aus vielen einzelnen schwarzen und weißen Unity-Objekten.
         private const string ShaderResourceName = "GlobeEffectHelmholtzCheckerboard";
         private const string ShaderFallbackName = "GlobeEffect/Helmholtz Checkerboard";
         private const float CarrierDistanceMeters = 1f;
@@ -94,6 +103,8 @@ namespace GlobeEffect.VRCheckerboard
         private bool isVisible = true;
         private bool checkerboardVisible = true;
 
+        // Andere Skripte können hier auf Änderungen reagieren und dabei genau den
+        // Zustand speichern, der in diesem Moment gezeigt wurde.
         public event Action<CheckerboardStimulusSnapshot> StimulusPresented;
         public event Action<CheckerboardStimulusSnapshot> StimulusHidden;
         public event Action<CheckerboardStimulusSnapshot> ParametersChanged;
@@ -124,12 +135,15 @@ namespace GlobeEffect.VRCheckerboard
 
         private void Reset()
         {
+            // Beim Hinzufügen der Komponente wird die Main Camera automatisch als
+            // Beobachter vorgeschlagen. In VR ist das normalerweise die HMD-Kamera.
             Camera mainCamera = Camera.main;
             observer = mainCamera != null ? mainCamera.transform : null;
         }
 
         private void OnEnable()
         {
+            // Hier werden Träger-Mesh, Material und Startdarstellung vorbereitet.
             Application.onBeforeRender -= HandleBeforeRender;
             Application.onBeforeRender += HandleBeforeRender;
             ValidateSerializedFields();
@@ -141,6 +155,8 @@ namespace GlobeEffect.VRCheckerboard
 
         private void OnValidate()
         {
+            // Dadurch werden Änderungen im Inspector schon außerhalb des Play Modes
+            // sichtbar und ungültige Werte sofort auf den erlaubten Bereich begrenzt.
             ValidateSerializedFields();
             if (!isActiveAndEnabled)
             {
@@ -167,6 +183,7 @@ namespace GlobeEffect.VRCheckerboard
 
         private void OnDestroy()
         {
+            // Nur die von diesem Skript erzeugten Laufzeitobjekte werden entfernt.
             Application.onBeforeRender -= HandleBeforeRender;
             DestroyOwnedObject(ownedMesh);
             DestroyOwnedObject(ownedMaterial);
@@ -185,6 +202,7 @@ namespace GlobeEffect.VRCheckerboard
 
         public void SetAngularDiameter(float value)
         {
+            // Winkeldurchmesser der Öffnung von einem Rand bis zum anderen.
             angularDiameterDegrees = Mathf.Clamp(value, 1f, 170f);
             ApplyMaterialProperties();
             ParametersChanged?.Invoke(CaptureSnapshot());
@@ -199,6 +217,8 @@ namespace GlobeEffect.VRCheckerboard
 
         public void SetCircularApertureEnabled(bool value)
         {
+            // Ausgeschaltet sieht man das vollständige quadratische Testgitter.
+            // Im Versuch ist die runde Öffnung normalerweise eingeschaltet.
             useCircularAperture = value;
             ApplyMaterialProperties();
             ParametersChanged?.Invoke(CaptureSnapshot());
@@ -206,6 +226,8 @@ namespace GlobeEffect.VRCheckerboard
 
         public void SetVisualSpaceL(float value)
         {
+            // l wird hier nicht berechnet, sondern als Versuchsbedingung gesetzt.
+            // Die radiale Formel wird anschließend pro Pixel im Shader ausgewertet.
             visualSpaceL = Mathf.Clamp(value, 0f, 1.4f);
             ApplyMaterialProperties();
             ParametersChanged?.Invoke(CaptureSnapshot());
@@ -213,6 +235,8 @@ namespace GlobeEffect.VRCheckerboard
 
         public void SetContentZoom(float value)
         {
+            // Dieser Zoom verändert nur die sichtbare Gittergröße und bleibt
+            // unabhängig von l. Er ist keine Fernglasabbildung.
             contentZoom = Mathf.Clamp(value, 0.25f, 4f);
             ApplyMaterialProperties();
             ParametersChanged?.Invoke(CaptureSnapshot());
@@ -220,6 +244,8 @@ namespace GlobeEffect.VRCheckerboard
 
         public void SetGridLineSpacing(float value)
         {
+            // Die Eingabe erfolgt verständlich in Grad. Vor dem Rendern wird sie
+            // in CalculateGridLineSpacingUv in eine lineare u/v-Weite umgerechnet.
             gridLineSpacingDegrees = Mathf.Clamp(value, 0.5f, 45f);
             ApplyMaterialProperties();
             ParametersChanged?.Invoke(CaptureSnapshot());
@@ -263,6 +289,7 @@ namespace GlobeEffect.VRCheckerboard
 
         public CheckerboardStimulusSnapshot CaptureSnapshot()
         {
+            // Diese Kopie der momentanen Werte wird für Trial-Datei und Marker benutzt.
             return new CheckerboardStimulusSnapshot
             {
                 timestampSeconds = Time.realtimeSinceStartupAsDouble,
@@ -281,6 +308,7 @@ namespace GlobeEffect.VRCheckerboard
 
         private void ApplyAll()
         {
+            // Gemeinsamer Einstieg, wenn die gesamte Darstellung neu aufgebaut wird.
             EnsureResources();
             ApplyObserverPose();
             ApplyMaterialProperties();
@@ -294,6 +322,9 @@ namespace GlobeEffect.VRCheckerboard
                 return;
             }
 
+            // Die Fläche liegt technisch einen Meter vor der Kamera. Ihre Eckpunkte
+            // werden im Shader aber als Richtungen projiziert. Darum entsteht keine
+            // binokulare Tiefe von einem Meter und der Stimulus wirkt unendlich fern.
             transform.SetPositionAndRotation(
                 observer.position + observer.forward * CarrierDistanceMeters,
                 Quaternion.LookRotation(observer.forward, observer.up));
@@ -302,6 +333,8 @@ namespace GlobeEffect.VRCheckerboard
 
         private void ApplyMaterialProperties()
         {
+            // Der MaterialPropertyBlock übergibt die Inspector-Werte an diesen
+            // Renderer, ohne das verwendete Material dauerhaft zu verändern.
             if (meshRenderer == null)
             {
                 return;
@@ -335,6 +368,8 @@ namespace GlobeEffect.VRCheckerboard
 
         private void ApplyObserverMaterialProperties()
         {
+            // Kopfwerte ändern sich ständig, die übrigen Parameter dagegen meist
+            // nur beim Start eines Trials. Deshalb gibt es dafür eine kurze Methode.
             if (meshRenderer == null)
             {
                 return;
@@ -348,6 +383,7 @@ namespace GlobeEffect.VRCheckerboard
 
         private void ApplyObserverProperties(MaterialPropertyBlock block)
         {
+            // Aus diesen vier Angaben baut der Shader sein kopffestes Koordinatensystem.
             Transform basis = observer != null ? observer : transform;
             block.SetVector("_ObserverWorldPosition", basis.position);
             block.SetVector("_ObserverWorldRight", basis.right);
@@ -357,6 +393,8 @@ namespace GlobeEffect.VRCheckerboard
 
         private float CalculateGridLineSpacingUv()
         {
+            // Beispiel: 10 Grad werden bei einem FOV von 90 Grad zu ungefähr
+            // 0,1763 im normierten linearen u/v-Koordinatensystem.
             return (float)VisualSpaceRadialMapping.NormalizedGridLineSpacing(
                 angularDiameterDegrees,
                 gridLineSpacingDegrees);
@@ -372,11 +410,14 @@ namespace GlobeEffect.VRCheckerboard
 
         private void EnsureResources()
         {
+            // MeshFilter hält die Trägerfläche, MeshRenderer zeichnet sie mit dem
+            // Checkerboard-Shader. Beides sitzt am selben GameObject.
             meshFilter ??= GetComponent<MeshFilter>();
             meshRenderer ??= GetComponent<MeshRenderer>();
 
             if (ownedMesh == null)
             {
+                // Die Trägerfläche ist immer gleich und muss nur einmal entstehen.
                 ownedMesh = BuildCarrierQuad();
             }
 
@@ -388,6 +429,8 @@ namespace GlobeEffect.VRCheckerboard
             Material desiredMaterial = materialOverride;
             if (desiredMaterial == null)
             {
+                // Ohne eigenes Inspector-Material erzeugt das Skript automatisch
+                // ein nicht gespeichertes Laufzeitmaterial mit dem richtigen Shader.
                 if (ownedMaterial == null)
                 {
                     Shader shader = Resources.Load<Shader>(ShaderResourceName);
@@ -416,6 +459,9 @@ namespace GlobeEffect.VRCheckerboard
 
         private static Mesh BuildCarrierQuad()
         {
+            // Vier Eckpunkte und zwei Dreiecke ergeben ein Quadrat. Dieses Quadrat
+            // trägt später das pro Pixel berechnete Muster, ist aber nicht selbst
+            // das wissenschaftliche Schachbrett.
             var mesh = new Mesh
             {
                 name = "Runtime Checkerboard Direction Quad",
@@ -442,6 +488,7 @@ namespace GlobeEffect.VRCheckerboard
 
         private void ValidateSerializedFields()
         {
+            // Schutz für manuelle Inspector-Eingaben und ältere gespeicherte Szenen.
             angularDiameterDegrees = Mathf.Clamp(angularDiameterDegrees, 1f, 170f);
             apertureEdgeSoftnessDegrees = Mathf.Clamp(
                 apertureEdgeSoftnessDegrees,
@@ -462,10 +509,12 @@ namespace GlobeEffect.VRCheckerboard
 
             if (Application.isPlaying)
             {
+                // Im Play Mode löscht Unity das Objekt sicher am Ende des Frames.
                 Destroy(ownedObject);
             }
             else
             {
+                // Außerhalb des Play Modes wird die Editor-Vorschau sofort erneuert.
                 DestroyImmediate(ownedObject);
             }
         }

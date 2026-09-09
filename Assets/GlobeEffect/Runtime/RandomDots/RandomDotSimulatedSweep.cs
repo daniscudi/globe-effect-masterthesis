@@ -26,6 +26,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
             float travelledDegrees = (float)elapsedSeconds *
                 speedDegreesPerSecond;
+            // Beispiel: 5 Grad pro Sekunde ergeben nach 2 Sekunden einen
+            // insgesamt zurückgelegten Winkelweg von 10 Grad.
 
             // Durch den Versatz um eine Amplitude beginnt PingPong genau in der
             // Mitte. Nach einer weiteren Amplitude ist die erste Randposition
@@ -48,6 +50,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 return 0f;
             }
 
+            // Von der Mitte über beide Ränder und zurück zur Mitte werden
+            // insgesamt vier Amplituden zurückgelegt.
             return 4f * amplitudeDegrees / speedDegreesPerSecond;
         }
     }

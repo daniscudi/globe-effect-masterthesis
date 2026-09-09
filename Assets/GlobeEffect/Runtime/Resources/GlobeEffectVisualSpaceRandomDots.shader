@@ -1,5 +1,9 @@
 Shader "GlobeEffect/Visual Space Random Dots"
 {
+    // Der C#-Teil erzeugt nur die Richtungen und Farben der Punkte. Dieser Shader
+    // macht daraus das Bild für jedes Auge. Der Ablauf pro Punkt ist:
+    // Richtung in Kamerakoordinaten umrechnen -> Schwenk anwenden -> mit l radial
+    // abbilden -> Content Zoom anwenden -> Punktgröße ergänzen -> Kreis ausschneiden.
     Properties
     {
         _ApertureHalfAngleRad ("Aperture Half Angle [rad]", Float) = 0.785398
@@ -68,12 +72,16 @@ Shader "GlobeEffect/Visual Space Random Dots"
             // Position berechnet, an der der Punkt im HMD erscheinen soll.
             float DisplayedAngleFromSource(float sourceAngle)
             {
+                // Erst wird der unverzerrte Winkel als Radius relativ zum Rand
+                // ausgedrückt. Am eingestellten Öffnungsrand ist dieser Radius 1.
                 float tangentAtBoundary = tan(_ApertureHalfAngleRad);
                 float sourceRadius = tan(sourceAngle) /
                     max(tangentAtBoundary, 1e-6);
 
                 if (_VisualSpaceL < 1e-6)
                 {
+                    // Für l = 0 würde die normale Formel durch null teilen.
+                    // Diese Zeile ist der mathematische Grenzfall für l gegen 0.
                     return sourceRadius * _ApertureHalfAngleRad;
                 }
 
@@ -84,6 +92,9 @@ Shader "GlobeEffect/Visual Space Random Dots"
 
             float CenterRadialScale()
             {
+                // Genau in der Mitte ist der Radius 0 und eine Division durch den
+                // Radius wäre nicht möglich. Diese Funktion liefert dort direkt
+                // die passende lokale Skalierung.
                 float tangentAtBoundary = tan(_ApertureHalfAngleRad);
                 if (_VisualSpaceL < 1e-6)
                 {
@@ -97,6 +108,8 @@ Shader "GlobeEffect/Visual Space Random Dots"
 
             float ResolveEyeIndex()
             {
+                // Unity liefert den Augenindex je nach XR-Renderverfahren anders.
+                // Im Varjo-Multi-Pass-Fall wird er aus der Kameraposition abgeleitet.
                 #if defined(UNITY_SINGLE_PASS_STEREO) || \
                     defined(UNITY_STEREO_INSTANCING_ENABLED) || \
                     defined(UNITY_STEREO_MULTIVIEW_ENABLED)
@@ -145,6 +158,9 @@ Shader "GlobeEffect/Visual Space Random Dots"
 
                 float forwardDistance = -viewPosition.z;
                 float validFront = step(1e-4, forwardDistance);
+
+                // Aus x/z und y/z entsteht die lineare Ausgangsposition. atan
+                // wandelt ihren Radius in den zugehörigen Blickwinkel um.
                 float2 sourcePosition = viewPosition.xy /
                     max(forwardDistance, 1e-4);
                 float sourceRadius = length(sourcePosition);
@@ -156,6 +172,8 @@ Shader "GlobeEffect/Visual Space Random Dots"
 
                 float displayedRadius = tan(min(displayedAngle, 1.560796)) *
                     _ContentZoom;
+                // Content Zoom ist hier eine zusätzliche Vergrößerung nach der
+                // l-Abbildung. Zoom 4 vervierfacht den Tangensradius, nicht l.
                 displayedAngle = atan(displayedRadius);
                 float radialScale = sourceRadius > 1e-6
                     ? displayedRadius / sourceRadius
@@ -188,6 +206,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
 
                 float eyeIndex = ResolveEyeIndex();
                 float visibleForEye = 1.0;
+                // 0 = beide Augen, 1 = nur links, 2 = nur rechts.
                 if (_EyeMode > 0.5 && _EyeMode < 1.5)
                 {
                     visibleForEye = 1.0 - eyeIndex;
@@ -202,6 +221,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
 
                 if (input.isFixationTarget > 0.5)
                 {
+                    // Zwei schmale Rechtecke ergeben zusammen das Fixationskreuz.
                     float vertical = step(abs(input.dotUv.x), 0.18);
                     float horizontal = step(abs(input.dotUv.y), 0.18);
                     clip(saturate(vertical + horizontal) - 0.5);
@@ -209,6 +229,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 }
 
                 clip(_DotsEnabled - 0.5);
+                // Das Viereck jedes Punktes wird hier zu einem Kreis beschnitten.
                 clip(1.0 - length(input.dotUv));
 
                 float apertureAlpha;
@@ -220,6 +241,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 }
                 else
                 {
+                    // Im Softness-Bereich nimmt die Deckkraft bis zum Rand glatt ab.
                     float fadeStart = max(
                         0.0,
                         _ApertureHalfAngleRad - _ApertureEdgeSoftnessRad);

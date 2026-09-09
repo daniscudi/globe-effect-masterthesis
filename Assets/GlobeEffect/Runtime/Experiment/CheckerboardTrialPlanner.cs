@@ -18,6 +18,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             int repetitions,
             int randomSeed)
         {
+            // Zuerst abbrechen, wenn eine Liste leer ist oder einen ungültigen
+            // Wert enthält. So startet keine Sitzung mit einem fehlerhaften Plan.
             ValidateValues(
                 angularDiametersDegrees,
                 eyePresentations,
@@ -30,6 +32,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             foreach (float angularDiameter in angularDiametersDegrees)
             {
+                // Die verschachtelten Schleifen bilden jede mögliche Kombination
+                // der Inspector-Listen. Jede Kombination wird gleich oft wiederholt.
                 foreach (CheckerboardEyePresentation eye in eyePresentations)
                 {
                     foreach (float contentZoom in contentZoomValues)
@@ -57,6 +61,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             var random = new Random(randomSeed);
+            // Fisher-Yates-Mischung: Jeder Trial tauscht einmal mit einer zufälligen
+            // früheren Position. Derselbe Seed ergibt wieder dieselbe Reihenfolge.
             for (int index = trials.Count - 1; index > 0; index--)
             {
                 int swapIndex = random.Next(index + 1);
@@ -66,6 +72,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             for (int index = 0; index < trials.Count; index++)
             {
+                // Die Sequenznummer wird erst nach dem Mischen vergeben.
                 trials[index] = trials[index].WithSequenceIndex(index + 1);
             }
 
@@ -167,6 +174,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         internal CheckerboardTrial WithSequenceIndex(int sequenceIndex)
         {
+            // Die Trialklasse bleibt unveränderlich. Für die neue Sequenznummer
+            // wird deshalb eine Kopie mit ansonsten gleichen Werten angelegt.
             return new CheckerboardTrial(
                 sequenceIndex,
                 ConditionIndex,
@@ -180,6 +189,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public CheckerboardTrial CreateRepeatedAttempt()
         {
+            // Eine Wiederholung behält Bedingung und ursprüngliche Sequenznummer.
+            // Nur AttemptNumber zeigt an, dass es ein neuer Versuch ist.
             return new CheckerboardTrial(
                 SequenceIndex,
                 ConditionIndex,
@@ -215,6 +226,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public bool TryTakeNext(out CheckerboardTrial trial)
         {
+            // Dequeue nimmt immer das vorderste Element aus der Warteschlange.
             if (pending.Count == 0)
             {
                 trial = null;
@@ -233,6 +245,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             CheckerboardTrial repeat = invalidTrial.CreateRepeatedAttempt();
+            // Enqueue hängt das Element hinten an, nicht direkt als nächsten Trial.
             pending.Enqueue(repeat);
             return repeat;
         }

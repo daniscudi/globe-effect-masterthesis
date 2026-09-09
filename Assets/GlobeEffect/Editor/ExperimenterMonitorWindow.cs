@@ -15,6 +15,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
     /// </summary>
     public sealed class ExperimenterMonitorWindow : EditorWindow
     {
+        // Dieses Fenster liest nur die Laufzeitwerte der Manager und Monitore.
+        // Es greift nicht in Trialplan, Antworten oder Stimulus ein.
         internal const string AutoOpenPreference =
             "GlobeEffect.ExperimentMonitor.AutoOpenOnPlay";
 
@@ -79,12 +81,15 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private void OnInspectorUpdate()
         {
+            // Ein Editorfenster hat keinen normalen Unity-Update-Aufruf. Dieser
+            // Callback hält Referenzen und sichtbare Werte aktuell.
             RefreshReferences(force: false);
             Repaint();
         }
 
         private void OnGUI()
         {
+            // OnGUI zeichnet den sichtbaren Inhalt des Fensters neu.
             EnsureStyles();
             DrawHeader();
 
@@ -141,6 +146,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private void DrawCheckerboardMonitor()
         {
+            // Fixation, Trialfortschritt und aktuelle Checkerboard-Bedingung.
             DrawFixationStatus(
                 checkerboardFixation.TargetState,
                 checkerboardFixation.CurrentAngleDegrees,
@@ -217,6 +223,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private void DrawRandomDotMonitor()
         {
+            // Fixation, Trialfortschritt und aktueller Schwenkwinkel des Punktfelds.
             DrawFixationStatus(
                 randomDotFixation.TargetState,
                 randomDotFixation.CurrentAngleDegrees,
@@ -417,6 +424,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private static void OpenIfExperimentSceneIsActive()
         {
+            // Automatisch nur öffnen, wenn die gestartete Szene tatsächlich einen
+            // der beiden Fixationsmonitore enthält.
             bool hasFixationMonitor =
                 Object.FindAnyObjectByType<CheckerboardFixationMonitor>() != null ||
                 Object.FindAnyObjectByType<RandomDotFixationMonitor>() != null;

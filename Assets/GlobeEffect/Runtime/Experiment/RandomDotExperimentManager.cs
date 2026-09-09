@@ -32,6 +32,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     [DefaultExecutionOrder(20)]
     public sealed class RandomDotExperimentManager : MonoBehaviour
     {
+        // Der Ablauf entspricht weitgehend dem Checkerboard-Versuch:
+        // StartSession baut den zufälligen Plan auf.
+        // BeginNextAttempt zeigt zuerst nur das Fixationsziel.
+        // PresentCurrentTrial startet Punktfeld und Bewegung für eine feste Zeit.
+        // Danach wartet der Manager auf konkav/konvex.
+        // Ungültige Fixation wird gespeichert und am Ende erneut gezeigt.
         [Header("Referenzen")]
         [SerializeField]
         private RandomDotFieldStimulus stimulus;
@@ -216,6 +222,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void Awake()
         {
+            // Benötigte Komponenten möglichst früh aus der Szene holen.
             ResolveReferences();
         }
 
@@ -235,6 +242,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void Update()
         {
+            // Start und Abbruch werden direkt gelesen. Während der Bewegung wird
+            // zusätzlich in jedem Frame die Fixation kontrolliert.
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null)
             {
@@ -295,6 +304,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public bool StartSession()
         {
+            // Prüft die Einstellungen, erstellt alle Bedingungskombinationen,
+            // öffnet die Messdateien und startet den ersten Trial.
             if (IsSessionActive)
             {
                 Debug.LogWarning("Eine Random-Dot-Sitzung läuft bereits.", this);
@@ -372,6 +383,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public void AbortSession(string reason = "ManualAbort")
         {
+            // Beendet Bewegung und Aufzeichnung geordnet. Bereits gespeicherte
+            // Ergebnisse bleiben im Sitzungsordner erhalten.
             if (!IsSessionActive)
             {
                 return;
@@ -404,6 +417,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void BeginNextAttempt()
         {
+            // Holt den nächsten Trial aus der Queue. Vor der Bewegung wird nur das
+            // Fixationsziel gezeigt, bis die stabile Fixation erreicht ist.
             interTrialCoroutine = null;
             if (trialQueue == null || !trialQueue.TryTakeNext(out currentTrial))
             {
@@ -452,6 +467,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void PresentCurrentTrial()
         {
+            // Überträgt l, Zoom, FOV, Augenmodus und Bewegungsart des aktuellen
+            // Trials auf das Punktfeld und startet dessen Bewegungsphase neu.
             if (currentTrial == null)
             {
                 return;
@@ -488,6 +505,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private IEnumerator EndMotionAfterDuration()
         {
+            // Die Coroutine wartet, ohne Unity oder das Eye Tracking anzuhalten.
             yield return new WaitForSecondsRealtime(motionDurationSeconds);
             motionCoroutine = null;
             EndMotionPresentation();
@@ -495,6 +513,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void EndMotionPresentation()
         {
+            // Nach der festen Bewegungsdauer wird nur noch auf die Antwort gewartet.
             if (sessionState != RandomDotSessionState.PresentingMotion ||
                 currentTrial == null)
             {
@@ -519,6 +538,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void HandleResponseSubmitted(CheckerboardCurvatureResponse response)
         {
+            // Antworten vor dem Ende der Bewegung werden bewusst nicht übernommen.
             if (sessionState != RandomDotSessionState.WaitingForResponse ||
                 currentTrial == null ||
                 response == CheckerboardCurvatureResponse.None)
@@ -549,6 +569,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void MonitorFixationDuringMotion()
         {
+            // Off target und fehlende/alte Samples haben getrennte Grenzzeiten.
+            // Eine Überschreitung macht nur diese Präsentation ungültig.
             if (fixationMonitor == null)
             {
                 InvalidateCurrentTrial("missing_fixation_monitor");
@@ -594,6 +616,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void InvalidateCurrentTrial(string reason)
         {
+            // Bewegung stoppen, ungültige Zeile speichern und denselben geplanten
+            // Trial mit höherer Attempt Number hinten an die Queue hängen.
             if (sessionState != RandomDotSessionState.PresentingMotion ||
                 currentTrial == null)
             {
@@ -653,6 +677,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             bool validForAnalysis,
             string status)
         {
+            // Bedingung, Antwort, Bewegung, Zeit und Fixationsstatus werden hier
+            // gesammelt. Die Dateiklasse übernimmt danach nur noch das CSV-Format.
             double responseTime = Time.realtimeSinceStartupAsDouble;
             double resolvedStimulusEnd = stimulusEndUnitySeconds > trialStartUnitySeconds
                 ? stimulusEndUnitySeconds
@@ -688,6 +714,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private bool TryAppendResult(RandomDotTrialResult result)
         {
+            // Bei einem Dateifehler wird abgebrochen, statt ohne gespeicherte Daten
+            // unbemerkt weiterzulaufen.
             try
             {
                 experimentFiles.AppendResult(result, totalTrials);
@@ -702,6 +730,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void FinishAttemptAndScheduleNext()
         {
+            // Punktfeld ausblenden und nach der kurzen Pause den nächsten Eintrag holen.
             StopMotionCoroutine();
             stimulus.Hide();
             currentTrial = null;
@@ -725,6 +754,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void CompleteSession()
         {
+            // Abschlussmarker schreiben und die Eye-Tracking-Aufzeichnung beenden.
             currentTrial = null;
             currentTrialNumber = totalTrials;
             WriteMarker(string.Format(
@@ -744,6 +774,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void HandleHalfSweepCompleted(int count, float yawDegrees)
         {
+            // Der Sweep Monitor meldet jeden erreichten Umkehrpunkt. So lässt sich
+            // später kontrollieren, wie viele Halbschwenks gezeigt wurden.
             if (sessionState != RandomDotSessionState.PresentingMotion ||
                 currentTrial == null)
             {
@@ -761,6 +793,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void StartEyeTracking(DateTime sessionStartUtc)
         {
+            // Die Blicksamples schreibt weiterhin die Lab-Toolbox. Dieser Manager
+            // startet die Aufnahme und ergänzt nur Sitzungs- und Trialmarker.
             if (eyeTrackingToolbox == null)
             {
                 Debug.LogWarning("Sitzung läuft ohne Eye-Tracking-Aufzeichnung.", this);
@@ -787,6 +821,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private string BuildTrialStartMarker(RandomDotTrial trial)
         {
+            // Alle wichtigen Bedingungen werden in die Eye-Tracking-Zeitreihe
+            // geschrieben, damit sie später dem Trial zugeordnet werden kann.
             return string.Format(
                 CultureInfo.InvariantCulture,
                 "TrialStart;task=random_dot_l;presentation={0};sequence={1};condition={2};repetition={3};" +
@@ -813,6 +849,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void ResolveReferences()
         {
+            // Nicht eingetragene Inspector-Referenzen werden aus der Szene gesucht.
             stimulus ??= FindAnyObjectByType<RandomDotFieldStimulus>();
             keyboardController ??= stimulus != null
                 ? stimulus.GetComponent<RandomDotKeyboardController>()
@@ -859,6 +896,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void ResetFixationCounters()
         {
+            // Kein Off-target-Wert darf in die nächste Präsentation übernommen werden.
             currentOffTargetSeconds = 0f;
             currentInvalidGazeSeconds = 0f;
             longestOffTargetSeconds = 0f;

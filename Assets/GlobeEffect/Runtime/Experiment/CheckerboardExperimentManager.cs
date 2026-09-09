@@ -29,6 +29,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     [DefaultExecutionOrder(20)]
     public sealed class CheckerboardExperimentManager : MonoBehaviour
     {
+        // Hier läuft der komplette Versuch zusammen:
+        // StartSession erstellt und speichert den zufälligen Trialplan.
+        // BeginNextAttempt holt die nächste Bedingung aus der Warteschlange.
+        // PresentCurrentTrial überträgt die Werte an den Stimulus.
+        // MonitorFixationDuringTrial prüft den Blick während der Präsentation.
+        // Die Antwort wird gespeichert; ein ungültiger Trial kommt hinten dran.
         [Header("Referenzen")]
         [SerializeField]
         private VrCheckerboardStimulus stimulus;
@@ -182,6 +188,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void Awake()
         {
+            // Referenzen werden früh gesucht, damit StartSession sie sicher findet.
             ResolveReferences();
         }
 
@@ -201,6 +208,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void Update()
         {
+            // Hier werden nur Start/Abbruch und die laufende Fixationskontrolle
+            // abgefragt. Die Konkav-/Konvex-Tasten meldet der Keyboard Controller.
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null)
             {
@@ -259,6 +268,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public bool StartSession()
         {
+            // Diese Methode prüft die Szene, erzeugt alle Trialkombinationen,
+            // legt den Messordner an und startet danach die erste Präsentation.
             if (IsSessionActive)
             {
                 Debug.LogWarning("Eine Checkerboard-Sitzung läuft bereits.", this);
@@ -337,6 +348,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public void AbortSession(string reason = "ManualAbort")
         {
+            // Beim Abbruch bleiben bereits geschriebene Zeilen erhalten. Ein gerade
+            // laufender Trial wird zusätzlich als abgebrochen protokolliert.
             if (!IsSessionActive)
             {
                 return;
@@ -364,6 +377,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void BeginNextAttempt()
         {
+            // Die Queue liefert entweder einen neuen Trial oder eine zuvor hinten
+            // angehängte Wiederholung. Ist sie leer, ist die Sitzung fertig.
             interTrialCoroutine = null;
             if (trialQueue == null || !trialQueue.TryTakeNext(out currentTrial))
             {
@@ -400,6 +415,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void PresentCurrentTrial()
         {
+            // Erst hier wird die aktuelle Bedingung sichtbar. Damit zählen
+            // Trialzeit und Fixationsprüfung nicht schon während der Wartephase.
             if (currentTrial == null)
             {
                 return;
@@ -437,6 +454,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void HandleResponseSubmitted(CheckerboardCurvatureResponse response)
         {
+            // Eine Antwort wird nur angenommen, solange wirklich ein Trial läuft.
+            // Danach wird genau ein Ergebnis geschrieben und weitergeschaltet.
             if (sessionState != CheckerboardSessionState.RunningTrial ||
                 currentTrial == null ||
                 response == CheckerboardCurvatureResponse.None)
@@ -477,6 +496,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void MonitorFixationDuringTrial()
         {
+            // Off target und ungültige Blickdaten werden getrennt gezählt. Nur eine
+            // ununterbrochene Überschreitung der erlaubten Zeit macht den Trial ungültig.
             if (fixationMonitor == null)
             {
                 InvalidateCurrentTrial("missing_fixation_monitor");
@@ -522,6 +543,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void InvalidateCurrentTrial(string reason)
         {
+            // Der ungültige Versuch wird gespeichert, aber nicht als gültige Antwort
+            // gezählt. Dieselbe Bedingung erhält eine höhere Attempt Number und wird
+            // am Ende der Queue erneut eingeordnet.
             if (sessionState != CheckerboardSessionState.RunningTrial ||
                 currentTrial == null)
             {
@@ -580,6 +604,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             bool validForAnalysis,
             string status)
         {
+            // Hier werden Trialbedingung, Zeitpunkte und Blickstatus in einem Objekt
+            // gesammelt. Die Dateiklasse schreibt dieses Objekt anschließend als CSV.
             bool sampleValid = fixationMonitor != null &&
                 fixationMonitor.CurrentSampleValid;
             bool inside = fixationMonitor != null &&
@@ -618,6 +644,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private bool TryAppendResult(CheckerboardTrialResult result)
         {
+            // Schreibfehler werden abgefangen, damit nicht unbemerkt ein Versuch
+            // weiterläuft, obwohl keine Ergebnisse gespeichert werden können.
             try
             {
                 experimentFiles.AppendResult(result, totalTrials);
@@ -632,6 +660,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void FinishAttemptAndScheduleNext()
         {
+            // Zwischen zwei Präsentationen wird der Stimulus ausgeblendet und die
+            // eingestellte Inter-Trial-Zeit abgewartet.
             stimulus.Hide();
             currentTrial = null;
             sessionState = CheckerboardSessionState.InterTrial;
@@ -654,6 +684,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void CompleteSession()
         {
+            // Abschlussmarker schreiben, Stimulus ausblenden und Aufzeichnung stoppen.
             currentTrial = null;
             currentTrialNumber = totalTrials;
             WriteEyeTrackingMarker(string.Format(
@@ -688,6 +719,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void StartEyeTracking(DateTime sessionStartUtc)
         {
+            // Die vorhandene Lab-Toolbox übernimmt weiterhin die eigentlichen
+            // Blickdaten. Der Manager startet nur die Aufnahme und schreibt Marker.
             if (eyeTrackingToolbox == null)
             {
                 Debug.LogWarning("Sitzung läuft ohne Eye-Tracking-Aufzeichnung.", this);
@@ -714,6 +747,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void ResolveReferences()
         {
+            // Leere Inspector-Felder werden, soweit eindeutig möglich, aus der
+            // offenen Szene ergänzt. Fest eingetragene Referenzen bleiben erhalten.
             stimulus ??= FindAnyObjectByType<VrCheckerboardStimulus>();
             if (keyboardController == null && stimulus != null)
             {
@@ -780,6 +815,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             CheckerboardTrial trial,
             int presentationIndex)
         {
+            // Der Marker steht zusätzlich in der Eye-Tracking-Datei. Dadurch kann
+            // man Blicksamples später der gerade gezeigten Bedingung zuordnen.
             return string.Format(
                 CultureInfo.InvariantCulture,
                 "TrialStart;presentation={0};sequence={1};condition={2};repetition={3};" +
@@ -803,6 +840,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void ResetTrialFixationCounters()
         {
+            // Jeder Präsentationsversuch beginnt mit eigenen leeren Zeitzählern.
             currentOffTargetSeconds = 0f;
             currentInvalidGazeSeconds = 0f;
             longestOffTargetSeconds = 0f;

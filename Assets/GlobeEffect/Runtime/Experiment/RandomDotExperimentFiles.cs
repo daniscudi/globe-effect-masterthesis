@@ -13,6 +13,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// </summary>
     public sealed class RandomDotExperimentFiles
     {
+        // plan.csv hält die geplante Reihenfolge fest. trials.csv wird nach jeder
+        // Präsentation sofort ergänzt. Ungültige Versuche bleiben damit sichtbar.
         public const string MappingVersion =
             "visual-space-l-directional-content-zoom-v1";
 
@@ -53,6 +55,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             DateTime sessionStartUtc,
             int randomSeed)
         {
+            // Erzeugt einen eigenen Sitzungsordner mit Teilnehmer-ID und Startzeit.
             if (string.IsNullOrWhiteSpace(outputRoot))
             {
                 throw new ArgumentException(
@@ -98,6 +101,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public void WritePlan(IReadOnlyList<RandomDotTrial> trials)
         {
+            // Vor Versuchsbeginn wird die randomisierte Reihenfolge gespeichert.
             if (trials == null)
             {
                 throw new ArgumentNullException(nameof(trials));
@@ -132,6 +136,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public void AppendResult(RandomDotTrialResult result, int plannedTrials)
         {
+            // Pro tatsächlicher Präsentation kommt genau eine neue CSV-Zeile hinzu.
             if (result == null)
             {
                 throw new ArgumentNullException(nameof(result));
@@ -249,6 +254,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             string value,
             bool terminateRow = false)
         {
+            // Sonderzeichen werden nach den üblichen CSV-Regeln geschützt.
             string safeValue = value ?? string.Empty;
             bool quote = safeValue.IndexOf(',') >= 0 ||
                 safeValue.IndexOf('"') >= 0 ||

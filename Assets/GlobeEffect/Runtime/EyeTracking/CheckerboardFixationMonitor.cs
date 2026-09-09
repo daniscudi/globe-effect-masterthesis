@@ -12,6 +12,10 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
     [DisallowMultipleComponent]
     public sealed class CheckerboardFixationMonitor : MonoBehaviour
     {
+        // Pro neuem Blicksample passiert Folgendes:
+        // passendes Auge auswählen -> Winkel zum Kreuz berechnen -> mit Toleranz
+        // vergleichen -> Dauer der ununterbrochenen Fixation aktualisieren.
+        // Dieses Skript speichert keine Rohdaten; das macht die EyeTrackingToolbox.
         [Header("Referenzen")]
         [SerializeField]
         private EyeTrackingToolbox eyeTrackingToolbox;
@@ -72,6 +76,8 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         public bool HasRecentSample(float maximumAgeSeconds)
         {
+            // Ein alter letzter Sample darf nicht so behandelt werden, als würde
+            // die Person weiterhin sicher auf das Kreuz schauen.
             if (lastSampleRealtimeSeconds <= 0d)
             {
                 return false;
@@ -113,6 +119,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         public void ResetFixationWindow()
         {
+            // Vor jedem Trial beginnt die Fixationsmessung wieder bei null.
             currentSampleValid = false;
             isInsideTolerance = false;
             currentAngleDegrees = float.NaN;
@@ -125,6 +132,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private void HandleGazeData(GazeData gazeData)
         {
+            // Diese Methode wird von der Lab-Toolbox bei jedem neuen Sample aufgerufen.
             lastSampleRealtimeSeconds = Time.realtimeSinceStartupAsDouble;
             totalSampleCount++;
             bool previousState = isInsideTolerance;
@@ -150,6 +158,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
             currentAngleDegrees = Vector3.Angle(
                 gazeRay.direction,
                 targetDirection.normalized);
+            // On target heißt ausschließlich: Winkel kleiner oder gleich Toleranz.
             isInsideTolerance = currentAngleDegrees <= toleranceDegrees;
 
             double sampleInterval = previousSampleTime > 0d
@@ -198,6 +207,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private void ResetInvalidSample(double sampleTime)
         {
+            // Fehlende/ungültige Daten unterbrechen die zusammenhängende Fixation.
             currentSampleValid = false;
             isInsideTolerance = false;
             currentAngleDegrees = float.NaN;
@@ -228,6 +238,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private void Subscribe()
         {
+            // Abonnieren verbindet dieses Skript mit den neuen Samples der Toolbox.
             if (subscribed || eyeTrackingToolbox == null)
             {
                 return;
@@ -239,6 +250,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private void Unsubscribe()
         {
+            // Beim Deaktivieren wieder lösen, sonst könnte derselbe Sample mehrfach ankommen.
             if (!subscribed || eyeTrackingToolbox == null)
             {
                 subscribed = false;

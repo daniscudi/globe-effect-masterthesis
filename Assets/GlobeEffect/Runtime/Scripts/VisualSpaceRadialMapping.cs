@@ -17,6 +17,10 @@ namespace GlobeEffect.VRCheckerboard
     /// </summary>
     public static class VisualSpaceRadialMapping
     {
+        // Wichtig: Dieses Skript schätzt l nicht aus Daten und berechnet auch
+        // keinen neuen l-Wert. l wird im Inspector als Versuchsbedingung festgelegt.
+        // Hier steht nur dieselbe radiale Formel noch einmal in C#, damit Werte
+        // geprüft, protokolliert und unabhängig vom Shader getestet werden können.
         private const double LLimitEpsilon = 1e-7;
         private const double SingularityMarginRadians = 1e-5;
 
@@ -60,6 +64,9 @@ namespace GlobeEffect.VRCheckerboard
             }
 
             double halfAngle = 0.5 * angularDiameterDegrees * Math.PI / 180.0;
+
+            // displayRadius ist zunächst ein linearer Radius zwischen Mitte und Rand.
+            // atan übersetzt ihn in den Winkel, den dieser Bildpunkt im HMD einnimmt.
             double visualAngle = Math.Atan(
                 displayRadius * Math.Tan(halfAngle));
 
@@ -71,6 +78,8 @@ namespace GlobeEffect.VRCheckerboard
                 return visualAngle / halfAngle;
             }
 
+            // Das Ergebnis ist wieder normiert: 0 bleibt die Mitte und 1 bleibt
+            // der Rand. Dazwischen verschiebt l die Abtastposition des Gitters.
             return Math.Tan(visualSpaceL * visualAngle) /
                 Math.Tan(visualSpaceL * halfAngle);
         }
@@ -112,6 +121,9 @@ namespace GlobeEffect.VRCheckerboard
 
             double halfAngle = 0.5 * angularDiameterDegrees * Math.PI / 180.0;
             double spacingRadians = gridLineSpacingDegrees * Math.PI / 180.0;
+
+            // Beide Tangenswerte liegen im selben linearen Projektionsraum.
+            // Ihre Division ergibt die Gitterweite relativ zum Blendenradius.
             return Math.Tan(spacingRadians) / Math.Tan(halfAngle);
         }
 
