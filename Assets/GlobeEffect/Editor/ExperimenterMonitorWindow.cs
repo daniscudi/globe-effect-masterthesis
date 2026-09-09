@@ -209,10 +209,12 @@ namespace GlobeEffect.VRCheckerboard.Editor
                         : "–");
                 EditorGUILayout.LabelField(
                     "Antwort",
-                    checkerboardSession != null &&
-                    checkerboardSession.ResponseKeysSwapped
-                        ? "← konvex   |   konkav →"
-                        : "← konkav   |   konvex →");
+                    checkerboardSession != null
+                        ? checkerboardSession.ConvexResponseKeyName +
+                          " Ball   |   " +
+                          checkerboardSession.ConcaveResponseKeyName +
+                          " Schüssel"
+                        : "–");
                 EditorGUILayout.LabelField(
                     "Fixationsbruch",
                     checkerboardSession != null && checkerboardSession.RequireFixation

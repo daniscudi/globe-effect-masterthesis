@@ -21,7 +21,7 @@ namespace GlobeEffect.VRCheckerboard
         // 2. Der Shader macht aus dieser Fläche ein Richtungsbild vor beiden Augen.
         // 3. Die Inspector-Werte werden mit ApplyMaterialProperties an den Shader gegeben.
         // 4. Die aktuelle HMD-Pose wird in jedem Frame nachgereicht.
-        // 5. Der Experiment Manager blendet über Show, ShowFixationOnly und Hide um.
+        // 5. Der Experiment Manager schaltet zwischen Fixation, Muster, Noise und Antwort um.
         //
         // Das Schachbrett selbst und die l-Verzerrung entstehen also im Shader,
         // nicht aus vielen einzelnen schwarzen und weißen Unity-Objekten.
@@ -86,6 +86,23 @@ namespace GlobeEffect.VRCheckerboard
         [Tooltip("Hintergrund während der Fixationsphase vor einem Trial.")]
         private Color fixationBackgroundColor = Color.gray;
 
+        [Header("Noise-Maske")]
+        [SerializeField, Range(0.25f, 10f)]
+        [Tooltip("Winkelgröße eines Noise-Feldes. Die Maske wird nach dem Checkerboard gezeigt.")]
+        private float noiseCellSizeDegrees = 2f;
+
+        [Header("Antwortanzeige")]
+        [SerializeField]
+        private Color responsePromptColor = Color.white;
+
+        [SerializeField, Min(0.5f)]
+        [Tooltip("Technischer Abstand des Antworttexts. Er betrifft nicht das Checkerboard.")]
+        private float responsePromptDistanceMeters = 2f;
+
+        [SerializeField, Range(0.005f, 0.1f)]
+        [Tooltip("Größe der Buchstaben des Antworttexts.")]
+        private float responsePromptCharacterSize = 0.025f;
+
         [SerializeField]
         [Tooltip("Ist der vollständige Stimulus beim Start im Play Mode sichtbar?")]
         private bool visibleAtStart = true;
@@ -102,6 +119,13 @@ namespace GlobeEffect.VRCheckerboard
         private MaterialPropertyBlock propertyBlock;
         private bool isVisible = true;
         private bool checkerboardVisible = true;
+        private bool noiseVisible;
+        private bool fixationVisible = true;
+        private bool responsePromptVisible;
+        private int currentNoiseSeed;
+        private GameObject ownedResponsePromptObject;
+        private TextMesh responseTextMesh;
+        private Material ownedResponsePromptMaterial;
 
         // Andere Skripte können hier auf Änderungen reagieren und dabei genau den
         // Zustand speichern, der in diesem Moment gezeigt wurde.
@@ -129,6 +153,8 @@ namespace GlobeEffect.VRCheckerboard
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
         public bool IsVisible => isVisible;
         public bool IsCheckerboardVisible => isVisible && checkerboardVisible;
+        public bool IsNoiseVisible => isVisible && noiseVisible;
+        public bool IsResponsePromptVisible => isVisible && responsePromptVisible;
         public Vector3 FixationDirectionWorld => observer != null
             ? observer.forward
             : transform.forward;
@@ -150,6 +176,9 @@ namespace GlobeEffect.VRCheckerboard
             EnsureResources();
             isVisible = Application.isPlaying ? visibleAtStart : true;
             checkerboardVisible = true;
+            noiseVisible = false;
+            fixationVisible = true;
+            responsePromptVisible = false;
             ApplyAll();
         }
 
@@ -187,8 +216,13 @@ namespace GlobeEffect.VRCheckerboard
             Application.onBeforeRender -= HandleBeforeRender;
             DestroyOwnedObject(ownedMesh);
             DestroyOwnedObject(ownedMaterial);
+            DestroyOwnedObject(ownedResponsePromptMaterial);
+            DestroyOwnedObject(ownedResponsePromptObject);
             ownedMesh = null;
             ownedMaterial = null;
+            ownedResponsePromptMaterial = null;
+            ownedResponsePromptObject = null;
+            responseTextMesh = null;
         }
 
         private void HandleBeforeRender()
@@ -263,6 +297,9 @@ namespace GlobeEffect.VRCheckerboard
         {
             isVisible = true;
             checkerboardVisible = true;
+            noiseVisible = false;
+            fixationVisible = true;
+            responsePromptVisible = false;
             ApplyMaterialProperties();
             ApplyVisibility();
             StimulusPresented?.Invoke(CaptureSnapshot());
@@ -276,6 +313,43 @@ namespace GlobeEffect.VRCheckerboard
         {
             isVisible = true;
             checkerboardVisible = false;
+            noiseVisible = false;
+            fixationVisible = true;
+            responsePromptVisible = false;
+            ApplyMaterialProperties();
+            ApplyVisibility();
+        }
+
+        // Zeigt direkt nach dem Muster eine neue Schwarz-Weiß-Maske. Der Seed
+        // bestimmt die Verteilung und wird deshalb für jeden Trial neu gesetzt.
+        public void ShowNoise(int noiseSeed)
+        {
+            isVisible = true;
+            checkerboardVisible = false;
+            noiseVisible = true;
+            fixationVisible = false;
+            responsePromptVisible = false;
+            currentNoiseSeed = noiseSeed;
+            ApplyMaterialProperties();
+            ApplyVisibility();
+        }
+
+        // Während der Antwort bleibt der Hintergrund neutral. Der Text wird als
+        // kopffestes TextMesh eingeblendet und ist für beide Augen sichtbar.
+        public void ShowResponsePrompt(string promptText)
+        {
+            isVisible = true;
+            checkerboardVisible = false;
+            noiseVisible = false;
+            fixationVisible = false;
+            responsePromptVisible = true;
+            EnsureResponsePrompt();
+            if (responseTextMesh != null)
+            {
+                responseTextMesh.text = promptText ?? string.Empty;
+                responseTextMesh.color = responsePromptColor;
+            }
+
             ApplyMaterialProperties();
             ApplyVisibility();
         }
@@ -283,6 +357,7 @@ namespace GlobeEffect.VRCheckerboard
         public void Hide()
         {
             isVisible = false;
+            responsePromptVisible = false;
             ApplyVisibility();
             StimulusHidden?.Invoke(CaptureSnapshot());
         }
@@ -295,6 +370,8 @@ namespace GlobeEffect.VRCheckerboard
                 timestampSeconds = Time.realtimeSinceStartupAsDouble,
                 visible = isVisible,
                 checkerboardVisible = checkerboardVisible,
+                noiseVisible = noiseVisible,
+                responsePromptVisible = responsePromptVisible,
                 angularDiameterDegrees = angularDiameterDegrees,
                 apertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees,
                 useCircularAperture = useCircularAperture,
@@ -357,8 +434,17 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetColor("_LightColor", lightColor);
             propertyBlock.SetColor("_FixationBackgroundColor", fixationBackgroundColor);
             propertyBlock.SetFloat("_CheckerboardEnabled", checkerboardVisible ? 1f : 0f);
-            propertyBlock.SetFloat("_EyeMode", (float)eyePresentation);
-            propertyBlock.SetFloat("_FixationEnabled", showFixationTarget ? 1f : 0f);
+            propertyBlock.SetFloat("_NoiseEnabled", noiseVisible ? 1f : 0f);
+            propertyBlock.SetFloat("_NoiseCellSizeUv", CalculateNoiseCellSizeUv());
+            propertyBlock.SetFloat("_NoiseSeed", currentNoiseSeed);
+            propertyBlock.SetFloat(
+                "_EyeMode",
+                responsePromptVisible
+                    ? (float)CheckerboardEyePresentation.BothEyes
+                    : (float)eyePresentation);
+            propertyBlock.SetFloat(
+                "_FixationEnabled",
+                showFixationTarget && fixationVisible ? 1f : 0f);
             propertyBlock.SetFloat("_FixationHalfSizeRad",
                 0.5f * fixationTargetSizeDegrees * Mathf.Deg2Rad);
             propertyBlock.SetColor("_FixationColor", fixationColor);
@@ -400,12 +486,72 @@ namespace GlobeEffect.VRCheckerboard
                 gridLineSpacingDegrees);
         }
 
+        private float CalculateNoiseCellSizeUv()
+        {
+            // Genau wie die Gitterweite wird auch die Noise-Größe von Grad in den
+            // normierten linearen Bildraum umgerechnet.
+            return (float)VisualSpaceRadialMapping.NormalizedGridLineSpacing(
+                angularDiameterDegrees,
+                noiseCellSizeDegrees);
+        }
+
         private void ApplyVisibility()
         {
             if (meshRenderer != null)
             {
                 meshRenderer.enabled = isVisible;
             }
+
+            if (ownedResponsePromptObject != null)
+            {
+                ownedResponsePromptObject.SetActive(
+                    isVisible && responsePromptVisible);
+            }
+        }
+
+        private void EnsureResponsePrompt()
+        {
+            if (ownedResponsePromptObject == null)
+            {
+                // Der Text wird erst beim ersten Antwortbildschirm erzeugt. Dadurch
+                // braucht die Unity-Szene kein zusätzlich vorbereitetes UI-Objekt.
+                ownedResponsePromptObject = new GameObject(
+                    "Runtime Checkerboard Response Prompt")
+                {
+                    hideFlags = HideFlags.HideAndDontSave
+                };
+                ownedResponsePromptObject.transform.SetParent(transform, false);
+                responseTextMesh = ownedResponsePromptObject.AddComponent<TextMesh>();
+                responseTextMesh.anchor = TextAnchor.MiddleCenter;
+                responseTextMesh.alignment = TextAlignment.Center;
+                responseTextMesh.fontSize = 64;
+                responseTextMesh.lineSpacing = 1f;
+                responseTextMesh.richText = false;
+
+                Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                if (font != null)
+                {
+                    responseTextMesh.font = font;
+                    ownedResponsePromptMaterial = new Material(font.material)
+                    {
+                        name = "Runtime Checkerboard Response Text Material",
+                        hideFlags = HideFlags.HideAndDontSave,
+                        renderQueue = 5000
+                    };
+                    MeshRenderer promptRenderer =
+                        ownedResponsePromptObject.GetComponent<MeshRenderer>();
+                    promptRenderer.sharedMaterial = ownedResponsePromptMaterial;
+                    promptRenderer.sortingOrder = short.MaxValue;
+                }
+            }
+
+            responseTextMesh ??= ownedResponsePromptObject.GetComponent<TextMesh>();
+            responseTextMesh.characterSize = responsePromptCharacterSize;
+            responseTextMesh.color = responsePromptColor;
+            ownedResponsePromptObject.transform.localPosition = Vector3.forward *
+                Mathf.Max(0.01f, responsePromptDistanceMeters - CarrierDistanceMeters);
+            ownedResponsePromptObject.transform.localRotation = Quaternion.identity;
+            ownedResponsePromptObject.transform.localScale = Vector3.one;
         }
 
         private void EnsureResources()
@@ -497,7 +643,13 @@ namespace GlobeEffect.VRCheckerboard
             visualSpaceL = Mathf.Clamp(visualSpaceL, 0f, 1.4f);
             contentZoom = Mathf.Clamp(contentZoom, 0.25f, 4f);
             gridLineSpacingDegrees = Mathf.Clamp(gridLineSpacingDegrees, 0.5f, 45f);
+            noiseCellSizeDegrees = Mathf.Clamp(noiseCellSizeDegrees, 0.25f, 10f);
             fixationTargetSizeDegrees = Mathf.Clamp(fixationTargetSizeDegrees, 0.05f, 5f);
+            responsePromptDistanceMeters = Mathf.Max(0.5f, responsePromptDistanceMeters);
+            responsePromptCharacterSize = Mathf.Clamp(
+                responsePromptCharacterSize,
+                0.005f,
+                0.1f);
         }
 
         private static void DestroyOwnedObject(UnityEngine.Object ownedObject)
@@ -545,6 +697,8 @@ namespace GlobeEffect.VRCheckerboard
         public double timestampSeconds;
         public bool visible;
         public bool checkerboardVisible;
+        public bool noiseVisible;
+        public bool responsePromptVisible;
         public float angularDiameterDegrees;
         public float apertureEdgeSoftnessDegrees;
         public bool useCircularAperture;

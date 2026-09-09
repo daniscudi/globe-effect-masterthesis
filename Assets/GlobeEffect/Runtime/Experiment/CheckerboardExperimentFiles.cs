@@ -13,6 +13,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public int PresentationIndex { get; }
         public DateTime TrialStartUtc { get; }
         public double TrialStartUnitySeconds { get; }
+        public double StimulusEndUnitySeconds { get; }
+        public double ResponsePromptUnitySeconds { get; }
         public double TrialEndUnitySeconds { get; }
         public float ApertureEdgeSoftnessDegrees { get; }
         public bool CircularApertureEnabled { get; }
@@ -29,14 +31,22 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public float LongestInvalidGazeSeconds { get; }
         public string Status { get; }
 
+        public double StimulusDurationSeconds =>
+            Math.Max(0d, StimulusEndUnitySeconds - TrialStartUnitySeconds);
+
+        public double NoiseMaskDurationSeconds =>
+            Math.Max(0d, ResponsePromptUnitySeconds - StimulusEndUnitySeconds);
+
         public double ResponseTimeSeconds =>
-            TrialEndUnitySeconds - TrialStartUnitySeconds;
+            Math.Max(0d, TrialEndUnitySeconds - ResponsePromptUnitySeconds);
 
         public CheckerboardTrialResult(
             CheckerboardTrial trial,
             int presentationIndex,
             DateTime trialStartUtc,
             double trialStartUnitySeconds,
+            double stimulusEndUnitySeconds,
+            double responsePromptUnitySeconds,
             double trialEndUnitySeconds,
             float apertureEdgeSoftnessDegrees,
             bool circularApertureEnabled,
@@ -57,6 +67,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             PresentationIndex = presentationIndex;
             TrialStartUtc = trialStartUtc;
             TrialStartUnitySeconds = trialStartUnitySeconds;
+            StimulusEndUnitySeconds = stimulusEndUnitySeconds;
+            ResponsePromptUnitySeconds = responsePromptUnitySeconds;
             TrialEndUnitySeconds = trialEndUnitySeconds;
             ApertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees;
             CircularApertureEnabled = circularApertureEnabled;
@@ -167,7 +179,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public void WritePlan(
             IReadOnlyList<CheckerboardTrial> trials,
-            float gridLineSpacingDegrees)
+            float gridLineSpacingDegrees,
+            float stimulusDurationSeconds,
+            float noiseMaskDurationSeconds,
+            float responseTimeoutSeconds)
         {
             // Der komplette randomisierte Plan wird vor dem ersten Trial geschrieben.
             if (trials == null)
@@ -181,7 +196,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "sequence_index,total_planned_trials,condition_index,repetition," +
                 "eye_presentation,angular_diameter_deg,grid_line_spacing_deg," +
                 "grid_line_spacing_uv,visual_space_l,content_zoom," +
-                "oomes_endpoint_equivalent");
+                "oomes_endpoint_equivalent,stimulus_duration_s," +
+                "noise_mask_duration_s,response_timeout_s");
 
             foreach (CheckerboardTrial trial in trials)
             {
@@ -203,8 +219,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 AppendDouble(
                     builder,
                     VisualSpaceRadialMapping.OomesEndpointEquivalent(
-                        trial.VisualSpaceL),
-                    terminateRow: true);
+                        trial.VisualSpaceL));
+                AppendFloat(builder, stimulusDurationSeconds);
+                AppendFloat(builder, noiseMaskDurationSeconds);
+                AppendFloat(builder, responseTimeoutSeconds, terminateRow: true);
             }
 
             File.WriteAllText(PlanFile, builder.ToString(), Utf8WithoutBom);
@@ -230,7 +248,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             AppendInteger(builder, trial.AttemptNumber);
             AppendCsv(builder, result.TrialStartUtc.ToString("O", CultureInfo.InvariantCulture));
             AppendDouble(builder, result.TrialStartUnitySeconds);
+            AppendDouble(builder, result.StimulusEndUnitySeconds);
+            AppendDouble(builder, result.ResponsePromptUnitySeconds);
             AppendDouble(builder, result.TrialEndUnitySeconds);
+            AppendDouble(builder, result.StimulusDurationSeconds);
+            AppendDouble(builder, result.NoiseMaskDurationSeconds);
             AppendDouble(builder, result.ResponseTimeSeconds);
             AppendCsv(builder, trial.EyePresentation.ToString());
             AppendFloat(builder, trial.AngularDiameterDegrees);
@@ -290,7 +312,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "participant_id,session_label,session_start_utc,random_seed,mapping_version," +
                 "presentation_index,sequence_index,total_planned_trials," +
                 "condition_index,repetition,attempt_number,trial_start_utc," +
-                "trial_start_unity_s,trial_end_unity_s,response_time_s," +
+                "trial_start_unity_s,stimulus_end_unity_s,response_prompt_unity_s," +
+                "trial_end_unity_s,stimulus_duration_s,noise_mask_duration_s,response_time_s," +
                 "eye_presentation,angular_diameter_deg,aperture_edge_softness_deg," +
                 "circular_aperture_enabled,grid_line_spacing_deg," +
                 "grid_line_spacing_uv,visual_space_l,content_zoom," +

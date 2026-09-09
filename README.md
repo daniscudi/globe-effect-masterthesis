@@ -9,13 +9,14 @@ Eine kurze Bedienungs- und Arbeitsübersicht steht in `AKTUELLER_STAND.md`.
 
 ## Was der Checkerboard-Test macht
 
-Die Versuchsperson sieht ein kreisrundes Schachbrett mit einem roten
-Fixationskreuz. Vor jedem Durchgang wird ein fester Verzerrungswert eingestellt.
-Die Versuchsperson antwortet:
+Die Versuchsperson fixiert zuerst das rote Kreuz und sieht danach kurz ein
+kreisrundes Schachbrett mit einem festen Verzerrungswert. Anschließend verdeckt
+eine Schwarz-Weiß-Noise-Maske den Nachbildeffekt. Erst danach erscheint die
+Antwortanzeige:
 
-* Pfeil links: Muster wirkt konkav.
+* Pfeil hoch: Das Muster wölbt sich zu mir, wie ein Ball.
 
-* Pfeil rechts: Muster wirkt konvex.
+* Pfeil runter: Das Muster wölbt sich von mir weg, wie eine Schüssel.
 
 Aus mehreren Antworten pro Verzerrungsstufe kann später der Wert geschätzt
 werden, bei dem beide Antworten gleich häufig vorkommen. Das ist der Punkt, an
@@ -242,11 +243,15 @@ laufen.
 ## Ablauf eines Durchgangs
 
 1. Auf neutralem Hintergrund erscheint zunächst nur das Fixationskreuz.
-2. Erst nach stabiler Fixation wird das Checkerboard eingeblendet.
-3. Die Versuchsperson antwortet konkav oder konvex.
-4. Antwort, Reaktionszeit, `l`, FOV, Augenmodus und Fixationswerte werden sofort
+2. Nach stabiler Fixation wird das Checkerboard für die eingestellte Zeit
+   eingeblendet. Der Startwert beträgt 600 ms.
+3. Direkt danach erscheint eine Schwarz-Weiß-Noise-Maske. Der Startwert beträgt
+   500 ms.
+4. Danach werden die beiden einfachen Antwortmöglichkeiten eingeblendet. Die
+   voreingestellte maximale Antwortzeit beträgt 5 Sekunden.
+5. Antwort, Reaktionszeit, `l`, FOV, Augenmodus und Fixationswerte werden sofort
    gespeichert.
-5. Nach einer kurzen Pause folgt der nächste zufällig gemischte Durchgang.
+6. Nach einer kurzen Pause folgt der nächste zufällig gemischte Durchgang.
 
 Wenn die Fixation während der Darbietung zu lange verloren geht:
 
@@ -267,9 +272,9 @@ stattdessen eine Obergrenze.
 
 * `F6`: Sitzung abbrechen
 
-* Pfeil links: konkav
+* Pfeil hoch: wölbt sich zu mir, wie ein Ball
 
-* Pfeil rechts: konvex
+* Pfeil runter: wölbt sich von mir weg, wie eine Schüssel
 
 * `C`: Eye-Tracking-Kalibrierung der vorhandenen Toolbox
 
@@ -303,6 +308,14 @@ Die wichtigsten Einstellungen befinden sich am Objekt
 * `Maximum Invalid Gaze Seconds`: erlaubte Dauer fehlender oder ungültiger Daten
 
 * `Maximum Attempts Per Trial`: 0 für unbegrenzte Wiedervorlage
+
+* `Stimulus Duration Seconds`: Dauer des Checkerboards; voreingestellt auf 0,6 s
+
+* `Noise Mask Duration Seconds`: Dauer der Maske; voreingestellt auf 0,5 s
+
+* `Response Timeout Seconds`: maximale Antwortzeit; 0 bedeutet ohne Zeitlimit
+
+* `Convex Response Key` und `Concave Response Key`: Tasten der beiden Antworten
 
 * `Random Seed`: macht die zufällige Reihenfolge reproduzierbar
 
@@ -374,7 +387,10 @@ In `*_trials.csv` stehen unter anderem:
 
 * `oomes_endpoint_equivalent` als zusätzliche Orientierung
 
-* Antwort und Reaktionszeit
+* Beginn und Ende des Musters, Beginn der Antwortanzeige sowie die tatsächlich
+  gemessenen Stimulus-, Noise- und Reaktionszeiten
+
+* Antwort
 
 * `valid_for_analysis`
 
@@ -386,8 +402,9 @@ In `*_trials.csv` stehen unter anderem:
 
 * Versionskennung der verwendeten Abbildung
 
-Marker wie `TrialStart`, `TrialResponse`, `TrialInvalid` und
-`TrialRepeatQueued` verbinden den Versuchsablauf zeitlich mit den Rohdaten.
+Marker wie `TrialStart`, `StimulusEnded`, `NoiseMaskStarted`,
+`ResponsePromptShown`, `TrialResponse`, `TrialInvalid` und `TrialRepeatQueued`
+verbinden den Versuchsablauf zeitlich mit den Rohdaten.
 
 Beim Random-Dot-Test werden zusätzlich unter anderem festgehalten:
 

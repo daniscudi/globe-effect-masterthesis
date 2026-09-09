@@ -17,6 +17,9 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
         _ContentZoom ("Content Zoom", Float) = 1
         _GridLineSpacingUv ("Grid Line Spacing [u/v]", Float) = 0.176327
         _CheckerboardEnabled ("Checkerboard Enabled", Float) = 1
+        _NoiseEnabled ("Noise Enabled", Float) = 0
+        _NoiseCellSizeUv ("Noise Cell Size [u/v]", Float) = 0.0349
+        _NoiseSeed ("Noise Seed", Float) = 0
         _EyeMode ("Eye Mode", Float) = 0
         _FixationEnabled ("Fixation Enabled", Float) = 1
         _FixationHalfSizeRad ("Fixation Half Size [rad]", Float) = 0.0043633
@@ -69,6 +72,9 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
             float _ContentZoom;
             float _GridLineSpacingUv;
             float _CheckerboardEnabled;
+            float _NoiseEnabled;
+            float _NoiseCellSizeUv;
+            float _NoiseSeed;
             float _EyeMode;
             float _FixationEnabled;
             float _FixationHalfSizeRad;
@@ -226,10 +232,28 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
                     _DarkColor,
                     _LightColor,
                     checkerMix);
+
+                // Für die kurze Maske wird die angezeigte Fläche in kleine Zellen
+                // geteilt. Aus Zellkoordinate und Seed entsteht reproduzierbar ein
+                // schwarzes oder weißes Feld. Das ist keine weitere l-Verzerrung.
+                float2 noiseCell = floor(
+                    displayPosition / max(_NoiseCellSizeUv, 1e-6));
+                float noiseValue = frac(sin(dot(
+                    noiseCell + float2(_NoiseSeed, _NoiseSeed * 0.731),
+                    float2(12.9898, 78.233))) * 43758.5453);
+                fixed4 noiseColor = lerp(
+                    _DarkColor,
+                    _LightColor,
+                    step(0.5, noiseValue));
+
+                fixed4 visiblePattern = lerp(
+                    checkerColor,
+                    noiseColor,
+                    step(0.5, _NoiseEnabled));
                 fixed4 color = lerp(
                     _FixationBackgroundColor,
-                    checkerColor,
-                    step(0.5, _CheckerboardEnabled));
+                    visiblePattern,
+                    step(0.5, max(_CheckerboardEnabled, _NoiseEnabled)));
 
                 float2 angularPosition = atan(displayPosition * tangentAtBoundary);
                 // Das Kreuz wird erst ganz am Ende ergänzt. Es bleibt dadurch in

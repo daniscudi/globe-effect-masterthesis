@@ -15,12 +15,12 @@ namespace GlobeEffect.VRCheckerboard
     {
         [Header("Tastensteuerung")]
         [SerializeField]
-        [Tooltip("Antwort: Das Muster wirkt konkav.")]
-        private Key concaveKey = Key.LeftArrow;
+        [Tooltip("Antwort: Das Muster wölbt sich von mir weg, wie eine Schüssel.")]
+        private Key concaveKey = Key.DownArrow;
 
         [SerializeField]
-        [Tooltip("Antwort: Das Muster wirkt konvex.")]
-        private Key convexKey = Key.RightArrow;
+        [Tooltip("Antwort: Das Muster wölbt sich zu mir, wie ein Ball.")]
+        private Key convexKey = Key.UpArrow;
 
         [SerializeField]
         [Tooltip("Schreibt die Antwort zusätzlich in die Unity Console.")]
@@ -35,6 +35,36 @@ namespace GlobeEffect.VRCheckerboard
         public event Action<CheckerboardCurvatureResponse> ResponseSubmitted;
 
         public bool SwapResponseKeys => swapResponseKeys;
+
+        // Der Antwortbildschirm fragt diese Methode ab, damit die angezeigte
+        // Taste auch bei vertauschter Zuordnung immer mit der Auswertung übereinstimmt.
+        public Key GetKeyForResponse(CheckerboardCurvatureResponse response)
+        {
+            return response switch
+            {
+                CheckerboardCurvatureResponse.Concave => swapResponseKeys
+                    ? convexKey
+                    : concaveKey,
+                CheckerboardCurvatureResponse.Convex => swapResponseKeys
+                    ? concaveKey
+                    : convexKey,
+                _ => Key.None
+            };
+        }
+
+        public static string GetReadableKeyName(Key key)
+        {
+            return key switch
+            {
+                Key.UpArrow => "PFEIL HOCH",
+                Key.DownArrow => "PFEIL RUNTER",
+                Key.LeftArrow => "PFEIL LINKS",
+                Key.RightArrow => "PFEIL RECHTS",
+                Key.Space => "LEERTASTE",
+                Key.None => "KEINE TASTE",
+                _ => key.ToString().ToUpperInvariant()
+            };
+        }
 
         private void Awake()
         {
@@ -69,6 +99,12 @@ namespace GlobeEffect.VRCheckerboard
         public void SetSwapResponseKeys(bool value)
         {
             swapResponseKeys = value;
+        }
+
+        public void SetResponseKeys(Key concaveResponseKey, Key convexResponseKey)
+        {
+            concaveKey = concaveResponseKey;
+            convexKey = convexResponseKey;
         }
 
         public void SubmitResponse(CheckerboardCurvatureResponse response)
