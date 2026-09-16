@@ -28,8 +28,10 @@ methodische Grundlage, mit der wir Oomes' und Merlitz' Versuche in VR nachbilden
 - feste `l`-Werte, Wiederholungen und Reihenfolge über den Inspector
 - fester Ablauf: Fixation, 600 ms Checkerboard, 500 ms Noise-Maske und danach
   höchstens 5 Sekunden Antwortzeit; alle Zeiten sind im Inspector veränderbar
-- Antwort: Pfeil hoch = wie ein Ball zu mir, Pfeil runter = wie eine Schüssel
-  von mir weg
+- englischer Welcome Screen und Training über `T`; danach Rückkehr zum Anfang
+- neutrale Antworten Category A und Category B statt Ball-/Schüssel-Vergleich
+- Antwortbelegung bleibt innerhalb einer Person fest und kann über
+  `Swap Response Keys` zwischen Personen ausgeglichen werden
 - Fixationskontrolle; ungültige Trials werden gespeichert, ausgeschlossen und
   am Ende erneut gezeigt
 
@@ -60,9 +62,9 @@ Rekonstruktion der in Oomes et al. nicht angegebenen Zwischenformel.
    Fixationseinstellungen kontrollieren.
 4. Für die XR-4 prüfen: Varjo Provider aktiv, `Initialize XR on Startup` aktiv
    und Stereo Rendering Mode auf `Multi Pass`.
-5. Play Mode starten. Mit `C` bei Bedarf das Eye Tracking kalibrieren und mit
-   `F5` die Sitzung starten.
-6. Beim Checkerboard mit Pfeil hoch oder runter antworten. Beim Random-Dot-Test
+5. Play Mode starten. Mit `C` bei Bedarf das Eye Tracking kalibrieren und beim
+   Checkerboard mit `T` das Training durchlaufen. Danach startet `F5` die Sitzung.
+6. Beim Checkerboard mit der angezeigten Category-A-/B-Taste antworten. Beim Random-Dot-Test
    bleiben es vorerst Pfeil links oder rechts. `F6` bricht die Sitzung ab.
 
 Die Eye-Tracking-Aufzeichnung startet und endet zusammen mit der Sitzung. Für

@@ -5,9 +5,10 @@ using UnityEngine.InputSystem;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Nimmt die beiden Antworten des Checkerboard-Tests entgegen. Die Person
-    /// verändert l nicht selbst. Sie entscheidet nur, ob das gerade gezeigte
-    /// Muster konkav oder konvex wirkt.
+    /// Nimmt die beiden Antworten des Checkerboard-Tests entgegen. Für die
+    /// Versuchsperson heißen sie neutral Category A und Category B. Intern
+    /// bleiben die bisherigen Namen erhalten, damit ältere CSV-Auswertungen
+    /// weiterhin funktionieren.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(VrCheckerboardStimulus))]
@@ -15,11 +16,11 @@ namespace GlobeEffect.VRCheckerboard
     {
         [Header("Tastensteuerung")]
         [SerializeField]
-        [Tooltip("Antwort: Das Muster wölbt sich von mir weg, wie eine Schüssel.")]
+        [Tooltip("Antwort für Category B. Die Taste bleibt innerhalb einer Sitzung gleich.")]
         private Key concaveKey = Key.DownArrow;
 
         [SerializeField]
-        [Tooltip("Antwort: Das Muster wölbt sich zu mir, wie ein Ball.")]
+        [Tooltip("Antwort für Category A. Die Taste bleibt innerhalb einer Sitzung gleich.")]
         private Key convexKey = Key.UpArrow;
 
         [SerializeField]
@@ -27,7 +28,7 @@ namespace GlobeEffect.VRCheckerboard
         private bool logResponses;
 
         [SerializeField]
-        [Tooltip("Vertauscht die Bedeutung der beiden Tasten. Das kann zwischen Versuchspersonen ausbalanciert werden.")]
+        [Tooltip("Vertauscht Category A und B zwischen den beiden Antworttasten. Innerhalb einer Sitzung bleibt die Zuordnung fest.")]
         private bool swapResponseKeys;
 
         private VrCheckerboardStimulus stimulus;
@@ -56,12 +57,12 @@ namespace GlobeEffect.VRCheckerboard
         {
             return key switch
             {
-                Key.UpArrow => "PFEIL HOCH",
-                Key.DownArrow => "PFEIL RUNTER",
-                Key.LeftArrow => "PFEIL LINKS",
-                Key.RightArrow => "PFEIL RECHTS",
-                Key.Space => "LEERTASTE",
-                Key.None => "KEINE TASTE",
+                Key.UpArrow => "UP",
+                Key.DownArrow => "DOWN",
+                Key.LeftArrow => "LEFT",
+                Key.RightArrow => "RIGHT",
+                Key.Space => "SPACE",
+                Key.None => "NO KEY",
                 _ => key.ToString().ToUpperInvariant()
             };
         }
@@ -73,8 +74,9 @@ namespace GlobeEffect.VRCheckerboard
 
         private void Update()
         {
-            // Die Zuordnung kann zwischen Personen vertauscht werden, damit nicht
-            // immer dieselbe Hand mit derselben Antwort verbunden ist.
+            // Die Zuordnung wird zwischen Personen über den Inspector vertauscht,
+            // während einer Sitzung aber nicht mehr verändert. Dadurch muss die
+            // Person nicht bei jedem Trial eine neue Tastenbelegung lesen.
             Keyboard keyboard = Keyboard.current;
             if (keyboard == null)
             {

@@ -182,7 +182,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             float gridLineSpacingDegrees,
             float stimulusDurationSeconds,
             float noiseMaskDurationSeconds,
-            float responseTimeoutSeconds)
+            float responseTimeoutSeconds,
+            string categoryAKey,
+            string categoryBKey,
+            bool responseKeysSwapped)
         {
             // Der komplette randomisierte Plan wird vor dem ersten Trial geschrieben.
             if (trials == null)
@@ -197,7 +200,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "eye_presentation,angular_diameter_deg,grid_line_spacing_deg," +
                 "grid_line_spacing_uv,visual_space_l,content_zoom," +
                 "oomes_endpoint_equivalent,stimulus_duration_s," +
-                "noise_mask_duration_s,response_timeout_s");
+                "noise_mask_duration_s,response_timeout_s," +
+                "category_a_key,category_b_key,response_keys_swapped");
 
             foreach (CheckerboardTrial trial in trials)
             {
@@ -222,7 +226,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                         trial.VisualSpaceL));
                 AppendFloat(builder, stimulusDurationSeconds);
                 AppendFloat(builder, noiseMaskDurationSeconds);
-                AppendFloat(builder, responseTimeoutSeconds, terminateRow: true);
+                AppendFloat(builder, responseTimeoutSeconds);
+                AppendCsv(builder, categoryAKey);
+                AppendCsv(builder, categoryBKey);
+                AppendBoolean(builder, responseKeysSwapped, terminateRow: true);
             }
 
             File.WriteAllText(PlanFile, builder.ToString(), Utf8WithoutBom);

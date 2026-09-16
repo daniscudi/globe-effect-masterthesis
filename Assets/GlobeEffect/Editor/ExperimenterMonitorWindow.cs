@@ -211,10 +211,16 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "Antwort",
                     checkerboardSession != null
                         ? checkerboardSession.ConvexResponseKeyName +
-                          " Ball   |   " +
+                          " Category A   |   " +
                           checkerboardSession.ConcaveResponseKeyName +
-                          " Schüssel"
+                          " Category B"
                         : "–");
+                EditorGUILayout.LabelField(
+                    "Training",
+                    checkerboardSession != null &&
+                    checkerboardSession.TrainingCompleted
+                        ? "abgeschlossen"
+                        : "noch nicht abgeschlossen");
                 EditorGUILayout.LabelField(
                     "Fixationsbruch",
                     checkerboardSession != null && checkerboardSession.RequireFixation

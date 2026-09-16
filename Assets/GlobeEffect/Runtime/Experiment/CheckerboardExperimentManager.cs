@@ -11,6 +11,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     public enum CheckerboardSessionState
     {
         Idle,
+        Welcome,
+        TrainingInstructions,
+        TrainingFixation,
+        TrainingExample,
+        TrainingNoise,
+        TrainingWaitingForResponse,
+        TrainingComplete,
         InterTrial,
         WaitingForFixation,
         RunningTrial,
@@ -23,9 +30,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// <summary>
     /// Führt den statischen Checkerboard-Test aus. l wird vorgegeben und nicht
     /// von der Versuchsperson verändert. Nach stabiler Fixation erscheint das
-    /// Muster, eine kurze Noise-Maske und danach eine einfache Ball-/Schüssel-
-    /// Entscheidung. Verlässt der Blick während des Musters das Ziel zu lange,
-    /// wird die Präsentation als ungültig gespeichert und später wiederholt.
+    /// Muster, eine kurze Noise-Maske und danach die Entscheidung zwischen
+    /// Category A und Category B. Vor der eigentlichen Sitzung können dieselben
+    /// Schritte in einem kurzen Training ausprobiert werden.
     /// </summary>
     [DisallowMultipleComponent]
     [DefaultExecutionOrder(20)]
@@ -147,12 +154,41 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private Key concaveResponseKey = Key.DownArrow;
 
         [SerializeField]
-        [Tooltip("Einfache Beschreibung für die konvexe Wahrnehmung.")]
-        private string convexResponseText = "Wölbt sich zu mir (wie ein Ball)";
+        [Tooltip("Neutrale Bezeichnung der intern als Convex gespeicherten Antwort.")]
+        private string categoryAResponseText = "CATEGORY A";
 
         [SerializeField]
-        [Tooltip("Einfache Beschreibung für die konkave Wahrnehmung.")]
-        private string concaveResponseText = "Wölbt sich von mir weg (wie eine Schüssel)";
+        [Tooltip("Neutrale Bezeichnung der intern als Concave gespeicherten Antwort.")]
+        private string categoryBResponseText = "CATEGORY B";
+
+        [Header("Welcome und Training")]
+        [SerializeField]
+        [Tooltip("Startet das Training vom Welcome Screen.")]
+        private Key trainingKey = Key.T;
+
+        [SerializeField]
+        [Tooltip("Geht im Training zur nächsten Erklärung weiter.")]
+        private Key continueTrainingKey = Key.Space;
+
+        [SerializeField]
+        [Tooltip("Wenn aktiv, muss das Training vor F5 einmal vollständig beendet werden.")]
+        private bool requireTrainingBeforeSession = true;
+
+        [SerializeField, Range(0f, 1.4f)]
+        [Tooltip("Deutliches Beispiel für Category A. Der Wert sollte pilotiert werden und im geplanten Versuchsbereich liegen.")]
+        private float trainingCategoryAVisualSpaceL = 1.2f;
+
+        [SerializeField, Range(0f, 1.4f)]
+        [Tooltip("Deutliches Beispiel für Category B. Der Wert sollte pilotiert werden und im geplanten Versuchsbereich liegen.")]
+        private float trainingCategoryBVisualSpaceL = 0.2f;
+
+        [SerializeField, Min(0)]
+        [Tooltip("Anzahl der unbewerteten Übungstrials pro Kategorie. 2 ergibt insgesamt 4 Übungstrials.")]
+        private int trainingTrialsPerCategory = 2;
+
+        [SerializeField, Min(0f)]
+        [Tooltip("Fixationszeit im Training, falls die Eye-Tracking-Kontrolle ausgeschaltet ist.")]
+        private float trainingFixationSecondsWithoutEyeTracking = 0.5f;
 
         [Header("Tasten")]
         [SerializeField]
@@ -194,7 +230,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private float longestInvalidGazeSeconds;
         private Coroutine interTrialCoroutine;
         private Coroutine presentationCoroutine;
+        private Coroutine trainingCoroutine;
         private bool keyboardEventsSubscribed;
+        private bool trainingCompleted;
+        private bool trainingAdvanceRequested;
+        private bool trainingResponseReceived;
         private bool fixationSnapshotAvailable;
         private bool fixationSampleValidAtStimulusEnd;
         private bool fixationInsideAtStimulusEnd;
@@ -217,6 +257,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public float CurrentInvalidGazeSeconds => currentInvalidGazeSeconds;
         public string ActiveSessionFolder => activeSessionFolder;
         public bool RequireFixation => requireFixation;
+        public bool TrainingCompleted => trainingCompleted;
         public bool ResponseKeysSwapped =>
             keyboardController != null && keyboardController.SwapResponseKeys;
         public string ConvexResponseKeyName => keyboardController != null
@@ -235,6 +276,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             sessionState == CheckerboardSessionState.RunningTrial ||
             sessionState == CheckerboardSessionState.ShowingNoise ||
             sessionState == CheckerboardSessionState.WaitingForResponse;
+        public bool IsTrainingActive =>
+            sessionState == CheckerboardSessionState.TrainingInstructions ||
+            sessionState == CheckerboardSessionState.TrainingFixation ||
+            sessionState == CheckerboardSessionState.TrainingExample ||
+            sessionState == CheckerboardSessionState.TrainingNoise ||
+            sessionState == CheckerboardSessionState.TrainingWaitingForResponse ||
+            sessionState == CheckerboardSessionState.TrainingComplete;
 
         private void Awake()
         {
@@ -252,18 +300,44 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             if (autoStartOnPlay)
             {
+                // Auto Start ist nur für technische Tests gedacht und überspringt
+                // deshalb den vorgeschalteten Welcome-/Trainingsschritt.
+                trainingCompleted = true;
                 StartSession();
+                return;
             }
+
+            ShowWelcomeScreen();
         }
 
         private void Update()
         {
-            // Hier werden nur Start/Abbruch und die laufende Fixationskontrolle
-            // abgefragt. Die Konkav-/Konvex-Tasten meldet der Keyboard Controller.
+            // Start, Training und Abbruch werden hier abgefragt. Die Antworten A/B
+            // meldet weiterhin der Keyboard Controller.
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null)
             {
-                if (!IsSessionActive && keyboard[startSessionKey].wasPressedThisFrame)
+                if (IsTrainingActive)
+                {
+                    if (keyboard[abortSessionKey].wasPressedThisFrame)
+                    {
+                        StopTrainingAndReturnToWelcome();
+                        return;
+                    }
+
+                    if (keyboard[continueTrainingKey].wasPressedThisFrame)
+                    {
+                        trainingAdvanceRequested = true;
+                    }
+                }
+                else if (!IsSessionActive &&
+                         keyboard[trainingKey].wasPressedThisFrame)
+                {
+                    StartTraining();
+                    return;
+                }
+                else if (!IsSessionActive &&
+                         keyboard[startSessionKey].wasPressedThisFrame)
                 {
                     StartSession();
                     return;
@@ -293,6 +367,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private void OnDisable()
         {
             UnsubscribeKeyboardEvents();
+            StopTrainingCoroutine();
             if (Application.isPlaying && IsSessionActive)
             {
                 AbortSession("ControllerDisabled");
@@ -316,13 +391,308 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
         }
 
+        public void ShowWelcomeScreen()
+        {
+            ShowWelcomeScreen(string.Empty);
+        }
+
+        private void ShowWelcomeScreen(string notice)
+        {
+            // Der Welcome Screen ist der ruhige Ausgangspunkt vor Training und
+            // Hauptversuch. Hier werden noch keine Dateien oder Blickdaten angelegt.
+            ResolveReferences();
+            if (stimulus == null || keyboardController == null)
+            {
+                return;
+            }
+
+            ApplyResponseKeySettings();
+            sessionState = CheckerboardSessionState.Welcome;
+            stimulus.ShowResponsePrompt(BuildWelcomePrompt(notice));
+        }
+
+        public bool StartTraining()
+        {
+            if (IsSessionActive || IsTrainingActive)
+            {
+                return false;
+            }
+
+            ResolveReferences();
+            SubscribeKeyboardEvents();
+            if (stimulus == null || keyboardController == null)
+            {
+                Debug.LogError(
+                    "Stimulus und Checkerboard Keyboard Controller werden für das Training benötigt.",
+                    this);
+                return false;
+            }
+
+            if (requireFixation && fixationMonitor == null)
+            {
+                Debug.LogError(
+                    "Das Training verlangt Fixation, aber der Fixation Monitor fehlt.",
+                    this);
+                return false;
+            }
+
+            ApplyResponseKeySettings();
+            StopTrainingCoroutine();
+            StopPendingInterTrial();
+            StopPresentationCoroutine();
+            trainingCompleted = false;
+            trainingAdvanceRequested = false;
+            trainingResponseReceived = false;
+            currentTrial = null;
+            trainingCoroutine = StartCoroutine(RunTrainingSequence());
+            return true;
+        }
+
+        public void StopTrainingAndReturnToWelcome()
+        {
+            if (!IsTrainingActive)
+            {
+                return;
+            }
+
+            StopTrainingCoroutine();
+            ShowWelcomeScreen("PRACTICE STOPPED");
+        }
+
+        private IEnumerator RunTrainingSequence()
+        {
+            sessionState = CheckerboardSessionState.TrainingInstructions;
+            stimulus.ShowResponsePrompt(
+                "PRACTICE\n\n" +
+                "Keep looking at the fixation cross.\n" +
+                "You will first see one example of each category.\n" +
+                "Afterwards you can practise the response keys.\n\n" +
+                CheckerboardKeyboardController.GetReadableKeyName(continueTrainingKey) +
+                " = CONTINUE");
+            yield return WaitForTrainingAdvance();
+
+            // Die Reihenfolge der beiden Beispiele wechselt mit dem Seed. Dadurch
+            // wird nicht bei jeder Person automatisch Category A zuerst gezeigt.
+            List<CheckerboardCurvatureResponse> examples = BuildTrainingOrder(
+                repetitionsPerCategory: 1,
+                unchecked(randomSeed ^ 0x147A2D));
+            int presentationIndex = 0;
+            foreach (CheckerboardCurvatureResponse example in examples)
+            {
+                presentationIndex++;
+                yield return ShowTrainingPattern(
+                    example,
+                    unchecked(randomSeed + 50000 + presentationIndex));
+                if (!IsTrainingActive)
+                {
+                    yield break;
+                }
+
+                sessionState = CheckerboardSessionState.TrainingInstructions;
+                stimulus.ShowResponsePrompt(string.Format(
+                    CultureInfo.InvariantCulture,
+                    "THIS WAS {0}\n\n{1} = CONTINUE",
+                    GetCategoryLabel(example),
+                    CheckerboardKeyboardController.GetReadableKeyName(
+                        continueTrainingKey)));
+                yield return WaitForTrainingAdvance();
+            }
+
+            sessionState = CheckerboardSessionState.TrainingInstructions;
+            stimulus.ShowResponsePrompt(
+                "PRACTICE TRIALS\n\n" +
+                "Use the response keys shown after each pattern.\n" +
+                "There is no correct/incorrect feedback.\n\n" +
+                CheckerboardKeyboardController.GetReadableKeyName(continueTrainingKey) +
+                " = CONTINUE");
+            yield return WaitForTrainingAdvance();
+
+            List<CheckerboardCurvatureResponse> practiceTrials = BuildTrainingOrder(
+                trainingTrialsPerCategory,
+                unchecked(randomSeed ^ 0x51F15EED));
+            foreach (CheckerboardCurvatureResponse practiceCondition in practiceTrials)
+            {
+                presentationIndex++;
+                yield return ShowTrainingPattern(
+                    practiceCondition,
+                    unchecked(randomSeed + 60000 + presentationIndex));
+                if (!IsTrainingActive)
+                {
+                    yield break;
+                }
+
+                trainingResponseReceived = false;
+                sessionState = CheckerboardSessionState.TrainingWaitingForResponse;
+                stimulus.ShowResponsePrompt(BuildResponsePrompt());
+
+                double responseDeadline = responseTimeoutSeconds > 0f
+                    ? Time.realtimeSinceStartupAsDouble + responseTimeoutSeconds
+                    : double.PositiveInfinity;
+                while (IsTrainingActive &&
+                       !trainingResponseReceived &&
+                       Time.realtimeSinceStartupAsDouble < responseDeadline)
+                {
+                    yield return null;
+                }
+
+                stimulus.Hide();
+                if (interTrialSeconds > 0f)
+                {
+                    yield return WaitForTrainingSeconds(interTrialSeconds);
+                }
+            }
+
+            trainingCompleted = true;
+            sessionState = CheckerboardSessionState.TrainingComplete;
+            stimulus.ShowResponsePrompt(
+                "PRACTICE COMPLETE\n\n" +
+                CheckerboardKeyboardController.GetReadableKeyName(continueTrainingKey) +
+                " = RETURN TO WELCOME");
+            yield return WaitForTrainingAdvance();
+
+            trainingCoroutine = null;
+            ShowWelcomeScreen();
+        }
+
+        private IEnumerator ShowTrainingPattern(
+            CheckerboardCurvatureResponse category,
+            int noiseSeed)
+        {
+            PrepareTrainingCondition(category);
+            fixationMonitor?.ResetFixationWindow();
+            sessionState = CheckerboardSessionState.TrainingFixation;
+            stimulus.ShowFixationOnly();
+
+            if (requireFixation)
+            {
+                while (IsTrainingActive &&
+                       fixationMonitor != null &&
+                       !fixationMonitor.RequirementMet)
+                {
+                    yield return null;
+                }
+            }
+            else if (trainingFixationSecondsWithoutEyeTracking > 0f)
+            {
+                yield return WaitForTrainingSeconds(
+                    trainingFixationSecondsWithoutEyeTracking);
+            }
+
+            if (!IsTrainingActive)
+            {
+                yield break;
+            }
+
+            sessionState = CheckerboardSessionState.TrainingExample;
+            stimulus.Show();
+            yield return WaitForTrainingSeconds(stimulusDurationSeconds);
+            if (!IsTrainingActive)
+            {
+                yield break;
+            }
+
+            if (noiseMaskDurationSeconds > 0f)
+            {
+                sessionState = CheckerboardSessionState.TrainingNoise;
+                stimulus.ShowNoise(noiseSeed);
+                yield return WaitForTrainingSeconds(noiseMaskDurationSeconds);
+            }
+        }
+
+        private IEnumerator WaitForTrainingAdvance()
+        {
+            trainingAdvanceRequested = false;
+            while (IsTrainingActive && !trainingAdvanceRequested)
+            {
+                yield return null;
+            }
+
+            trainingAdvanceRequested = false;
+        }
+
+        private IEnumerator WaitForTrainingSeconds(float seconds)
+        {
+            double endTime = Time.realtimeSinceStartupAsDouble +
+                Mathf.Max(0f, seconds);
+            while (IsTrainingActive && Time.realtimeSinceStartupAsDouble < endTime)
+            {
+                yield return null;
+            }
+        }
+
+        private void PrepareTrainingCondition(
+            CheckerboardCurvatureResponse category)
+        {
+            // Training und Hauptversuch verwenden dieselbe erste FOV-, Augen- und
+            // Zoom-Bedingung. Nur l wird durch den deutlichen Beispielwert ersetzt.
+            if (angularDiametersDegrees != null && angularDiametersDegrees.Count > 0)
+            {
+                stimulus.SetAngularDiameter(angularDiametersDegrees[0]);
+            }
+
+            if (eyePresentations != null && eyePresentations.Count > 0)
+            {
+                stimulus.SetEyePresentation(eyePresentations[0]);
+            }
+
+            if (contentZoomValues != null && contentZoomValues.Count > 0)
+            {
+                stimulus.SetContentZoom(contentZoomValues[0]);
+            }
+
+            stimulus.SetVisualSpaceL(
+                category == CheckerboardCurvatureResponse.Convex
+                    ? trainingCategoryAVisualSpaceL
+                    : trainingCategoryBVisualSpaceL);
+        }
+
+        private List<CheckerboardCurvatureResponse> BuildTrainingOrder(
+            int repetitionsPerCategory,
+            int seed)
+        {
+            var order = new List<CheckerboardCurvatureResponse>();
+            for (int repetition = 0;
+                 repetition < Mathf.Max(0, repetitionsPerCategory);
+                 repetition++)
+            {
+                order.Add(CheckerboardCurvatureResponse.Convex);
+                order.Add(CheckerboardCurvatureResponse.Concave);
+            }
+
+            var random = new System.Random(seed);
+            for (int index = order.Count - 1; index > 0; index--)
+            {
+                int swapIndex = random.Next(index + 1);
+                CheckerboardCurvatureResponse temporary = order[index];
+                order[index] = order[swapIndex];
+                order[swapIndex] = temporary;
+            }
+
+            return order;
+        }
+
+        private string GetCategoryLabel(CheckerboardCurvatureResponse response)
+        {
+            return response == CheckerboardCurvatureResponse.Convex
+                ? categoryAResponseText
+                : categoryBResponseText;
+        }
+
         public bool StartSession()
         {
             // Diese Methode prüft die Szene, erzeugt alle Trialkombinationen,
             // legt den Messordner an und startet danach die erste Präsentation.
-            if (IsSessionActive)
+            if (IsSessionActive || IsTrainingActive)
             {
-                Debug.LogWarning("Eine Checkerboard-Sitzung läuft bereits.", this);
+                Debug.LogWarning(
+                    "Eine Checkerboard-Sitzung oder ein Training läuft bereits.",
+                    this);
+                return false;
+            }
+
+            if (requireTrainingBeforeSession && !trainingCompleted)
+            {
+                ShowWelcomeScreen("PLEASE COMPLETE THE PRACTICE FIRST");
                 return false;
             }
 
@@ -346,9 +716,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             // Die Tasten stehen bewusst beim Experiment Manager. Dadurch gelten
             // die neuen Hoch-/Runter-Standardwerte auch in bereits vorhandenen Szenen.
-            keyboardController.SetResponseKeys(
-                concaveResponseKey,
-                convexResponseKey);
+            ApplyResponseKeySettings();
 
             try
             {
@@ -374,7 +742,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     stimulus.GridLineSpacingDegrees,
                     stimulusDurationSeconds,
                     noiseMaskDurationSeconds,
-                    responseTimeoutSeconds);
+                    responseTimeoutSeconds,
+                    ConvexResponseKeyName,
+                    ConcaveResponseKeyName,
+                    ResponseKeysSwapped);
                 activeSessionFolder = experimentFiles.SessionFolder;
 
                 StartEyeTracking(sessionStartUtc);
@@ -596,8 +967,17 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void HandleResponseSubmitted(CheckerboardCurvatureResponse response)
         {
-            // Eine Antwort wird nur angenommen, solange wirklich ein Trial läuft.
-            // Danach wird genau ein Ergebnis geschrieben und weitergeschaltet.
+            // Im Training wird die Antwort nur als Tastendruck verwendet. Sie wird
+            // nicht bewertet und nicht in die Ergebnisdateien übernommen.
+            if (sessionState == CheckerboardSessionState.TrainingWaitingForResponse &&
+                response != CheckerboardCurvatureResponse.None)
+            {
+                trainingResponseReceived = true;
+                return;
+            }
+
+            // Im Hauptversuch wird eine Antwort nur während des Antwortbildschirms
+            // angenommen. Danach wird genau ein Ergebnis geschrieben.
             if (sessionState != CheckerboardSessionState.WaitingForResponse ||
                 currentTrial == null ||
                 response == CheckerboardCurvatureResponse.None)
@@ -904,7 +1284,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             WriteEyeTrackingMarker(string.Format(
                 CultureInfo.InvariantCulture,
                 "SessionStart;participant={0};session={1};seed={2};planned_trials={3};utc={4};mapping={5};" +
-                "stimulus_duration_s={6:F4};noise_duration_s={7:F4};response_timeout_s={8:F4}",
+                "stimulus_duration_s={6:F4};noise_duration_s={7:F4};response_timeout_s={8:F4};" +
+                "category_a_key={9};category_b_key={10};response_keys_swapped={11}",
                 CheckerboardExperimentFiles.SanitizeIdentifier(participantId, "pilot"),
                 CheckerboardExperimentFiles.SanitizeIdentifier(sessionLabel, "session"),
                 randomSeed,
@@ -913,7 +1294,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 VisualSpaceRadialMapping.MappingVersion,
                 stimulusDurationSeconds,
                 noiseMaskDurationSeconds,
-                responseTimeoutSeconds));
+                responseTimeoutSeconds,
+                ConvexResponseKeyName,
+                ConcaveResponseKeyName,
+                ResponseKeysSwapped ? 1 : 0));
         }
 
         private void ResolveReferences()
@@ -933,6 +1317,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             fixationMonitor ??= FindAnyObjectByType<CheckerboardFixationMonitor>();
+        }
+
+        private void ApplyResponseKeySettings()
+        {
+            keyboardController?.SetResponseKeys(
+                concaveResponseKey,
+                convexResponseKey);
         }
 
         private void SubscribeKeyboardEvents()
@@ -980,6 +1371,17 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             presentationCoroutine = null;
         }
 
+        private void StopTrainingCoroutine()
+        {
+            if (trainingCoroutine == null)
+            {
+                return;
+            }
+
+            StopCoroutine(trainingCoroutine);
+            trainingCoroutine = null;
+        }
+
         private void StopEyeTrackingRecording()
         {
             if (eyeTrackingToolbox != null && eyeTrackingToolbox.IsRecording)
@@ -1005,7 +1407,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "attempt={4};eye={5};fov_deg={6:F3};edge_softness_deg={7:F3};" +
                 "circular_aperture={8};grid_spacing_deg={9:F3};" +
                 "grid_spacing_uv={10:F6};visual_space_l={11:F4};content_zoom={12:F4};" +
-                "stimulus_duration_s={13:F4};noise_duration_s={14:F4};response_timeout_s={15:F4}",
+                "stimulus_duration_s={13:F4};noise_duration_s={14:F4};response_timeout_s={15:F4};" +
+                "category_a_key={16};category_b_key={17};response_keys_swapped={18}",
                 presentationIndex,
                 trial.SequenceIndex,
                 trial.ConditionIndex,
@@ -1021,7 +1424,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 trial.ContentZoom,
                 stimulusDurationSeconds,
                 noiseMaskDurationSeconds,
-                responseTimeoutSeconds);
+                responseTimeoutSeconds,
+                ConvexResponseKeyName,
+                ConcaveResponseKeyName,
+                ResponseKeysSwapped ? 1 : 0);
         }
 
         private string BuildResponsePrompt()
@@ -1033,11 +1439,39 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             return string.Format(
                 CultureInfo.InvariantCulture,
-                "{0}\n{1}\n\n{2}\n{3}",
+                "{0} = {1}\n\n{2} = {3}",
                 CheckerboardKeyboardController.GetReadableKeyName(convexKey),
-                convexResponseText,
+                categoryAResponseText,
                 CheckerboardKeyboardController.GetReadableKeyName(concaveKey),
-                concaveResponseText);
+                categoryBResponseText);
+        }
+
+        private string BuildWelcomePrompt(string notice)
+        {
+            string practiceState = trainingCompleted
+                ? "PRACTICE: COMPLETE"
+                : requireTrainingBeforeSession
+                    ? "PRACTICE: REQUIRED"
+                    : "PRACTICE: OPTIONAL";
+            string noticeLine = string.IsNullOrWhiteSpace(notice)
+                ? string.Empty
+                : notice.Trim() + "\n\n";
+
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "WELCOME TO THE VISUAL PERCEPTION EXPERIMENT\n\n" +
+                "{0}" +
+                "{1} = PRACTICE\n" +
+                "{2} = START EXPERIMENT\n" +
+                "{3} = ABORT CURRENT RUN\n\n" +
+                "{4}\n\n" +
+                "RESPONSE KEYS\n{5}",
+                noticeLine,
+                CheckerboardKeyboardController.GetReadableKeyName(trainingKey),
+                CheckerboardKeyboardController.GetReadableKeyName(startSessionKey),
+                CheckerboardKeyboardController.GetReadableKeyName(abortSessionKey),
+                practiceState,
+                BuildResponsePrompt());
         }
 
         private void CaptureFixationAtStimulusEnd()
@@ -1088,6 +1522,18 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulusDurationSeconds = Mathf.Max(0.01f, stimulusDurationSeconds);
             noiseMaskDurationSeconds = Mathf.Max(0f, noiseMaskDurationSeconds);
             responseTimeoutSeconds = Mathf.Max(0f, responseTimeoutSeconds);
+            trainingCategoryAVisualSpaceL = Mathf.Clamp(
+                trainingCategoryAVisualSpaceL,
+                0f,
+                1.4f);
+            trainingCategoryBVisualSpaceL = Mathf.Clamp(
+                trainingCategoryBVisualSpaceL,
+                0f,
+                1.4f);
+            trainingTrialsPerCategory = Mathf.Max(0, trainingTrialsPerCategory);
+            trainingFixationSecondsWithoutEyeTracking = Mathf.Max(
+                0f,
+                trainingFixationSecondsWithoutEyeTracking);
             maximumOffTargetSeconds = Mathf.Max(0f, maximumOffTargetSeconds);
             maximumInvalidGazeSeconds = Mathf.Max(0f, maximumInvalidGazeSeconds);
             maximumGazeSampleAgeSeconds = Mathf.Max(0.01f, maximumGazeSampleAgeSeconds);

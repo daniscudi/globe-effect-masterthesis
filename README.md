@@ -11,12 +11,17 @@ Eine kurze Bedienungs- und Arbeitsübersicht steht in `AKTUELLER_STAND.md`.
 
 Die Versuchsperson fixiert zuerst das rote Kreuz und sieht danach kurz ein
 kreisrundes Schachbrett mit einem festen Verzerrungswert. Anschließend verdeckt
-eine Schwarz-Weiß-Noise-Maske den Nachbildeffekt. Erst danach erscheint die
-Antwortanzeige:
+eine Schwarz-Weiß-Noise-Maske den Nachbildeffekt. Erst danach erscheint eine
+kurze, englische Antwortanzeige:
 
-* Pfeil hoch: Das Muster wölbt sich zu mir, wie ein Ball.
+* `UP = CATEGORY A`
 
-* Pfeil runter: Das Muster wölbt sich von mir weg, wie eine Schüssel.
+* `DOWN = CATEGORY B`
+
+Die neutralen Namen vermeiden konkrete Vergleiche wie Ball oder Schüssel. Im
+Training werden die beiden Kategorien vorher mit deutlichen Beispielmustern
+erklärt. Intern bleiben die Antworten als `Convex` und `Concave` gespeichert,
+damit die bestehende Auswertung weiter funktioniert.
 
 Aus mehreren Antworten pro Verzerrungsstufe kann später der Wert geschätzt
 werden, bei dem beide Antworten gleich häufig vorkommen. Das ist der Punkt, an
@@ -253,6 +258,23 @@ laufen.
    gespeichert.
 6. Nach einer kurzen Pause folgt der nächste zufällig gemischte Durchgang.
 
+## Welcome Screen und Training
+
+Nach dem Start des Play Modes erscheint zunächst ein englischer Welcome Screen:
+
+* `T`: Training starten
+
+* `F5`: Hauptversuch starten
+
+* `F6`: laufenden Versuch oder laufendes Training abbrechen
+
+Das Training zeigt zunächst je ein deutliches Beispiel für Category A und B.
+Danach folgen standardmäßig zwei unbewertete Übungstrials pro Kategorie in
+zufälliger Reihenfolge. Es gibt bewusst keine Richtig-/Falsch-Rückmeldung. Nach
+dem Training geht es zurück zum Welcome Screen. Solange `Require Training Before
+Session` aktiv ist, startet `F5` erst nach einem vollständig durchlaufenen
+Training. Trainingsdurchgänge werden nicht in den Messdateien gespeichert.
+
 Wenn die Fixation während der Darbietung zu lange verloren geht:
 
 1. Das Muster wird ausgeblendet.
@@ -272,9 +294,9 @@ stattdessen eine Obergrenze.
 
 * `F6`: Sitzung abbrechen
 
-* Pfeil hoch: wölbt sich zu mir, wie ein Ball
+* Pfeil hoch: Category A
 
-* Pfeil runter: wölbt sich von mir weg, wie eine Schüssel
+* Pfeil runter: Category B
 
 * `C`: Eye-Tracking-Kalibrierung der vorhandenen Toolbox
 
@@ -282,9 +304,12 @@ Beim Random-Dot-Test werden die Pfeiltasten erst angenommen, nachdem die
 Bewegungsphase beendet und das Punktfeld ausgeblendet wurde.
 
 Am `Checkerboard Keyboard Controller` kann `Swap Response Keys` aktiviert
-werden. Dadurch lässt sich die Bedeutung der beiden Pfeiltasten zwischen
-Versuchspersonen ausbalancieren. Der Experimenter Monitor zeigt automatisch die
-gerade gültige Belegung an.
+werden. Dadurch lässt sich die Zuordnung zwischen Versuchspersonen
+ausbalancieren. Innerhalb einer Person bleibt sie für Training und Hauptversuch
+fest, damit nicht bei jedem Trial eine neue Belegung gelesen werden muss. Der
+Experimenter Monitor und alle Antwortanzeigen zeigen automatisch die gerade
+gültige Belegung. Die verwendete Zuordnung steht zusätzlich im Trialplan und in
+den Eye-Tracking-Markern.
 
 ## Einstellungen im Inspector
 
@@ -316,6 +341,12 @@ Die wichtigsten Einstellungen befinden sich am Objekt
 * `Response Timeout Seconds`: maximale Antwortzeit; 0 bedeutet ohne Zeitlimit
 
 * `Convex Response Key` und `Concave Response Key`: Tasten der beiden Antworten
+
+* `Require Training Before Session`: verlangt ein abgeschlossenes Training vor F5
+
+* `Training Category A/B Visual Space L`: deutliche, noch zu pilotierende Beispiele
+
+* `Training Trials Per Category`: unbewertete Übungstrials pro Kategorie
 
 * `Random Seed`: macht die zufällige Reihenfolge reproduzierbar
 
