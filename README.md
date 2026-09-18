@@ -10,17 +10,21 @@ Eine kurze Bedienungs- und Arbeitsübersicht steht in `AKTUELLER_STAND.md`.
 ## Was der Checkerboard-Test macht
 
 Die Versuchsperson fixiert zuerst das rote Kreuz und sieht danach kurz ein
-kreisrundes Schachbrett mit einem festen Verzerrungswert. Anschließend verdeckt
-eine Schwarz-Weiß-Noise-Maske den Nachbildeffekt. Erst danach erscheint eine
-kurze, englische Antwortanzeige:
+kreisrundes Schachbrett mit einem festen Verzerrungswert. Anschließend erscheint
+eine Schwarz-Weiß-Noise-Maske. Sie bleibt zusammen mit dem Fixationskreuz bis
+zur Antwort sichtbar. Im Hauptversuch wird kein zusätzlicher Antworttext mehr
+eingeblendet, damit er nicht vom Reiz oder von der Fixation ablenkt.
+
+Im Training wird die feste Tastenbelegung vorher erklärt:
 
 * `UP = CATEGORY A`
 
 * `DOWN = CATEGORY B`
 
-Die neutralen Namen vermeiden konkrete Vergleiche wie Ball oder Schüssel. Im
-Training werden die beiden Kategorien vorher mit deutlichen Beispielmustern
-erklärt. Intern bleiben die Antworten als `Convex` und `Concave` gespeichert,
+Category A wird dort als nach außen gewölbt und Category B als nach innen
+gewölbt beschrieben. Dazu werden zuerst zwei deutliche Beispiele gezeigt.
+Anschließend folgen zufällig gemischte Übungstrials mit mehreren mittleren
+`l`-Werten. Intern bleiben die Antworten als `Convex` und `Concave` gespeichert,
 damit die bestehende Auswertung weiter funktioniert.
 
 Aus mehreren Antworten pro Verzerrungsstufe kann später der Wert geschätzt
@@ -250,9 +254,9 @@ laufen.
 1. Auf neutralem Hintergrund erscheint zunächst nur das Fixationskreuz.
 2. Nach stabiler Fixation wird das Checkerboard für die eingestellte Zeit
    eingeblendet. Der Startwert beträgt 600 ms.
-3. Direkt danach erscheint eine Schwarz-Weiß-Noise-Maske. Der Startwert beträgt
-   500 ms.
-4. Danach werden die beiden einfachen Antwortmöglichkeiten eingeblendet. Die
+3. Direkt danach erscheint eine statische Schwarz-Weiß-Noise-Maske mit
+   Fixationskreuz. Sie bleibt bis zur Antwort sichtbar.
+4. Die im Training gelernte Antwort wird ohne erneuten Hinweistext gegeben. Die
    voreingestellte maximale Antwortzeit beträgt 5 Sekunden.
 5. Antwort, Reaktionszeit, `l`, FOV, Augenmodus und Fixationswerte werden sofort
    gespeichert.

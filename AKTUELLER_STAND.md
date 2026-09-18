@@ -23,10 +23,14 @@ methodische Grundlage, mit der wir Oomes' und Merlitz' Versuche in VR nachbilden
 - kopffeste Darstellung ohne Nahdisparität, also virtuelle Unendlichkeit
 - Darstellung für beide Augen, nur links oder nur rechts
 - feste `l`-Werte, Wiederholungen und Reihenfolge über den Inspector
-- fester Ablauf: Fixation, 600 ms Checkerboard, 500 ms Noise-Maske und danach
-  höchstens 5 Sekunden Antwortzeit; alle Zeiten sind im Inspector veränderbar
-- englischer Welcome Screen und Training über `T`; danach Rückkehr zum Anfang
-- neutrale Antworten Category A und Category B statt Ball-/Schüssel-Vergleich
+- fester Ablauf: Fixation, 600 ms Checkerboard und danach eine statische
+  Noise-Maske mit Fixationskreuz bis zur Antwort; höchstens 5 Sekunden
+  Antwortzeit
+- englischer Welcome Screen und Training über `T`; zwei deutliche Beispiele
+  erklären die Kategorien, danach folgen die eingetragenen Übungswerte in
+  zufälliger Reihenfolge
+- im Hauptversuch kein Antworttext pro Trial; die feste Category-A-/B-Belegung
+  wird vorher im Training gelernt
 - Antwortbelegung bleibt innerhalb einer Person fest und kann über
   `Swap Response Keys` zwischen Personen ausgeglichen werden
 - Fixationskontrolle; ungültige Trials werden gespeichert, ausgeschlossen und
@@ -60,9 +64,11 @@ Rekonstruktion der in Oomes et al. nicht angegebenen Zwischenformel.
 4. Für die XR-4 prüfen: Varjo Provider aktiv, `Initialize XR on Startup` aktiv
    und Stereo Rendering Mode auf `Multi Pass`.
 5. Play Mode starten. Mit `C` bei Bedarf das Eye Tracking kalibrieren und beim
-   Checkerboard mit `T` das Training durchlaufen. Danach startet `F5` die Sitzung.
-6. Beim Checkerboard mit der angezeigten Category-A-/B-Taste antworten. Beim Random-Dot-Test
-   bleiben es vorerst Pfeil links oder rechts. `F6` bricht die Sitzung ab.
+   Checkerboard mit `T` das Training durchlaufen. Danach bereitet `F5` die
+   Sitzung vor; `SPACE` startet den ersten Trial, sobald die Person bereit ist.
+6. Beim Checkerboard mit der im Training gelernten Category-A-/B-Taste
+   antworten. Beim Random-Dot-Test bleiben es vorerst Pfeil links oder rechts.
+   `F6` bricht die Sitzung ab.
 
 Die Eye-Tracking-Aufzeichnung startet und endet zusammen mit der Sitzung. Für
 einen richtigen Versuch muss deshalb nicht zusätzlich `F9` gedrückt werden.

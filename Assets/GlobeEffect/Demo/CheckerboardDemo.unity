@@ -165,10 +165,10 @@ MonoBehaviour:
   fixationTargetSizeDegrees: 0.5
   fixationColor: {r: 1, g: 0, b: 0, a: 1}
   fixationBackgroundColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-  noiseCellSizeDegrees: 2
+  noiseCellSizeDegrees: 1
   responsePromptColor: {r: 1, g: 1, b: 1, a: 1}
-  responsePromptDistanceMeters: 2
-  responsePromptCharacterSize: 0.025
+  responsePromptDistanceMeters: 4
+  responsePromptCharacterSize: 0.05
   visibleAtStart: 1
   materialOverride: {fileID: 0}
 --- !u!23 &607094976
@@ -811,7 +811,6 @@ MonoBehaviour:
   maximumGazeSampleAgeSeconds: 0.1
   maximumAttemptsPerTrial: 0
   stimulusDurationSeconds: 0.6
-  noiseMaskDurationSeconds: 0.5
   responseTimeoutSeconds: 5
   interTrialSeconds: 0.5
   convexResponseKey: 63
@@ -820,10 +819,16 @@ MonoBehaviour:
   categoryBResponseText: CATEGORY B
   trainingKey: 34
   continueTrainingKey: 1
-  requireTrainingBeforeSession: 0
+  requireTrainingBeforeSession: 1
   trainingCategoryAVisualSpaceL: 1.2
   trainingCategoryBVisualSpaceL: 0.2
-  trainingTrialsPerCategory: 2
+  trainingVisualSpaceLValues:
+  - 0.2
+  - 0.4
+  - 0.8
+  - 1.2
+  trainingRepetitionsPerValue: 3
+  trainingExampleNoiseSeconds: 0.5
   trainingFixationSecondsWithoutEyeTracking: 0.5
   startSessionKey: 98
   abortSessionKey: 99

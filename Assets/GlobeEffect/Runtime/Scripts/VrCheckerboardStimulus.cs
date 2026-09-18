@@ -89,7 +89,7 @@ namespace GlobeEffect.VRCheckerboard
         [Header("Noise-Maske")]
         [SerializeField, Range(0.25f, 10f)]
         [Tooltip("Winkelgröße eines Noise-Feldes. Die Maske wird nach dem Checkerboard gezeigt.")]
-        private float noiseCellSizeDegrees = 2f;
+        private float noiseCellSizeDegrees = 1f;
 
         [Header("Antwortanzeige")]
         [SerializeField]
@@ -97,11 +97,11 @@ namespace GlobeEffect.VRCheckerboard
 
         [SerializeField, Min(0.5f)]
         [Tooltip("Technischer Abstand des Antworttexts. Er betrifft nicht das Checkerboard.")]
-        private float responsePromptDistanceMeters = 2f;
+        private float responsePromptDistanceMeters = 4f;
 
         [SerializeField, Range(0.005f, 0.1f)]
         [Tooltip("Größe der Buchstaben des Antworttexts.")]
-        private float responsePromptCharacterSize = 0.025f;
+        private float responsePromptCharacterSize = 0.05f;
 
         [SerializeField]
         [Tooltip("Ist der vollständige Stimulus beim Start im Play Mode sichtbar?")]
@@ -327,15 +327,17 @@ namespace GlobeEffect.VRCheckerboard
             isVisible = true;
             checkerboardVisible = false;
             noiseVisible = true;
-            fixationVisible = false;
+            // Das Kreuz bleibt auch während der Maske sichtbar. Die Person kann
+            // dadurch bis zur Antwort dieselbe zentrale Blickposition halten.
+            fixationVisible = true;
             responsePromptVisible = false;
             currentNoiseSeed = noiseSeed;
             ApplyMaterialProperties();
             ApplyVisibility();
         }
 
-        // Während der Antwort bleibt der Hintergrund neutral. Der Text wird als
-        // kopffestes TextMesh eingeblendet und ist für beide Augen sichtbar.
+        // Welcome-, Trainings- und Bereitschaftstexte werden als kopffestes
+        // TextMesh eingeblendet und sind für beide Augen sichtbar.
         public void ShowResponsePrompt(string promptText)
         {
             isVisible = true;
