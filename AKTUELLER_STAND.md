@@ -1,6 +1,3 @@
-# Aktueller Projektstand
-
-Stand: 4. September 2026
 
 ## Worum geht es
 
