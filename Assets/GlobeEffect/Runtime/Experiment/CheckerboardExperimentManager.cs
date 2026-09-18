@@ -5,6 +5,7 @@ using System.Globalization;
 using GlobeEffect.VRCheckerboard.EyeTracking;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
@@ -139,8 +140,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [Tooltip("Maximale Antwortzeit ab Beginn der Noise-Maske. 0 bedeutet ohne Zeitlimit.")]
         private float responseTimeoutSeconds = 5f;
 
+        [FormerlySerializedAs("interTrialSeconds")]
         [SerializeField, Min(0f)]
-        private float interTrialSeconds = 0.5f;
+        [Tooltip("Nach der Antwort bleibt eine neue Noise-Maske noch so lange sichtbar. Danach beginnt direkt die Fixation für den nächsten Trial.")]
+        private float postResponseNoiseSeconds = 0.5f;
 
         [Header("Antwortkategorien und Tasten")]
         [SerializeField]
@@ -571,10 +574,15 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     yield return null;
                 }
 
-                stimulus.Hide();
-                if (interTrialSeconds > 0f)
+                // Direkt nach der Antwort wird nicht auf Schwarz geschaltet.
+                // Eine neue Noise-Verteilung überdeckt das Nachbild noch kurz,
+                // bevor die Fixationsphase des nächsten Übungstrials beginnt.
+                int postResponseNoiseSeed = unchecked(
+                    randomSeed + 70000 + presentationIndex * 1879);
+                stimulus.ShowNoise(postResponseNoiseSeed);
+                if (postResponseNoiseSeconds > 0f)
                 {
-                    yield return WaitForTrainingSeconds(interTrialSeconds);
+                    yield return WaitForTrainingSeconds(postResponseNoiseSeconds);
                 }
             }
 
@@ -801,6 +809,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     trialPlan,
                     stimulus.GridLineSpacingDegrees,
                     stimulusDurationSeconds,
+                    postResponseNoiseSeconds,
                     responseTimeoutSeconds,
                     ConvexResponseKeyName,
                     ConcaveResponseKeyName,
@@ -1242,14 +1251,15 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void FinishAttemptAndScheduleNext()
         {
-            // Zwischen zwei Präsentationen wird der Stimulus ausgeblendet und die
-            // eingestellte Inter-Trial-Zeit abgewartet.
+            // Nach der Antwort darf kein schwarzer Zwischenbildschirm erscheinen,
+            // weil dort das Nachbild des Checkerboards besonders deutlich wird.
+            // Stattdessen wird die Noise mit einem neuen Seed noch kurz fortgesetzt.
             StopPresentationCoroutine();
-            stimulus.Hide();
+            ShowPostResponseNoise();
             currentTrial = null;
             sessionState = CheckerboardSessionState.InterTrial;
 
-            if (interTrialSeconds <= 0f)
+            if (postResponseNoiseSeconds <= 0f)
             {
                 BeginNextAttempt();
             }
@@ -1261,8 +1271,28 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private IEnumerator BeginNextAttemptAfterDelay()
         {
-            yield return new WaitForSecondsRealtime(interTrialSeconds);
+            yield return new WaitForSecondsRealtime(postResponseNoiseSeconds);
             BeginNextAttempt();
+        }
+
+        private void ShowPostResponseNoise()
+        {
+            if (stimulus == null)
+            {
+                return;
+            }
+
+            // Der zweite Seed unterscheidet sich bewusst von der Noise während
+            // der Antwort. So bleibt nicht dasselbe Schwarz-Weiß-Muster stehen.
+            int postResponseNoiseSeed = unchecked(
+                randomSeed + presentationCount * 1879 + 0x4A31);
+            stimulus.ShowNoise(postResponseNoiseSeed);
+            WriteEyeTrackingMarker(string.Format(
+                CultureInfo.InvariantCulture,
+                "PostTrialNoiseStarted;presentation={0};duration_s={1:F4};seed={2}",
+                presentationCount,
+                postResponseNoiseSeconds,
+                postResponseNoiseSeed));
         }
 
         private void CompleteSession()
@@ -1322,8 +1352,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             WriteEyeTrackingMarker(string.Format(
                 CultureInfo.InvariantCulture,
                 "SessionStart;participant={0};session={1};seed={2};planned_trials={3};utc={4};mapping={5};" +
-                "stimulus_duration_s={6:F4};noise_until_response=1;response_timeout_s={7:F4};" +
-                "category_a_key={8};category_b_key={9};response_keys_swapped={10}",
+                "stimulus_duration_s={6:F4};noise_until_response=1;post_response_noise_s={7:F4};" +
+                "response_timeout_s={8:F4};category_a_key={9};category_b_key={10};response_keys_swapped={11}",
                 CheckerboardExperimentFiles.SanitizeIdentifier(participantId, "pilot"),
                 CheckerboardExperimentFiles.SanitizeIdentifier(sessionLabel, "session"),
                 randomSeed,
@@ -1331,6 +1361,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 sessionStartUtc.ToString("O", CultureInfo.InvariantCulture),
                 VisualSpaceRadialMapping.MappingVersion,
                 stimulusDurationSeconds,
+                postResponseNoiseSeconds,
                 responseTimeoutSeconds,
                 ConvexResponseKeyName,
                 ConcaveResponseKeyName,
@@ -1444,8 +1475,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "attempt={4};eye={5};fov_deg={6:F3};edge_softness_deg={7:F3};" +
                 "circular_aperture={8};grid_spacing_deg={9:F3};" +
                 "grid_spacing_uv={10:F6};visual_space_l={11:F4};content_zoom={12:F4};" +
-                "stimulus_duration_s={13:F4};noise_until_response=1;response_timeout_s={14:F4};" +
-                "category_a_key={15};category_b_key={16};response_keys_swapped={17}",
+                "stimulus_duration_s={13:F4};noise_until_response=1;post_response_noise_s={14:F4};" +
+                "response_timeout_s={15:F4};category_a_key={16};category_b_key={17};response_keys_swapped={18}",
                 presentationIndex,
                 trial.SequenceIndex,
                 trial.ConditionIndex,
@@ -1460,6 +1491,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 trial.VisualSpaceL,
                 trial.ContentZoom,
                 stimulusDurationSeconds,
+                postResponseNoiseSeconds,
                 responseTimeoutSeconds,
                 ConvexResponseKeyName,
                 ConcaveResponseKeyName,
@@ -1584,7 +1616,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             maximumInvalidGazeSeconds = Mathf.Max(0f, maximumInvalidGazeSeconds);
             maximumGazeSampleAgeSeconds = Mathf.Max(0.01f, maximumGazeSampleAgeSeconds);
             maximumAttemptsPerTrial = Mathf.Max(0, maximumAttemptsPerTrial);
-            interTrialSeconds = Mathf.Max(0f, interTrialSeconds);
+            postResponseNoiseSeconds = Mathf.Max(0f, postResponseNoiseSeconds);
         }
     }
 }

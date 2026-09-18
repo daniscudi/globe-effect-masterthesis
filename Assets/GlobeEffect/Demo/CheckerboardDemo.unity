@@ -812,7 +812,7 @@ MonoBehaviour:
   maximumAttemptsPerTrial: 0
   stimulusDurationSeconds: 0.6
   responseTimeoutSeconds: 5
-  interTrialSeconds: 0.5
+  postResponseNoiseSeconds: 0.5
   convexResponseKey: 63
   concaveResponseKey: 64
   categoryAResponseText: CATEGORY A

@@ -25,7 +25,8 @@ methodische Grundlage, mit der wir Oomes' und Merlitz' Versuche in VR nachbilden
 - feste `l`-Werte, Wiederholungen und Reihenfolge über den Inspector
 - fester Ablauf: Fixation, 600 ms Checkerboard und danach eine statische
   Noise-Maske mit Fixationskreuz bis zur Antwort; höchstens 5 Sekunden
-  Antwortzeit
+  Antwortzeit; anschließend noch 500 ms neue Noise statt eines schwarzen
+  Zwischenbildschirms
 - englischer Welcome Screen und Training über `T`; zwei deutliche Beispiele
   erklären die Kategorien, danach folgen die eingetragenen Übungswerte in
   zufälliger Reihenfolge

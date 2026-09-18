@@ -181,6 +181,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             IReadOnlyList<CheckerboardTrial> trials,
             float gridLineSpacingDegrees,
             float stimulusDurationSeconds,
+            float postResponseNoiseSeconds,
             float responseTimeoutSeconds,
             string categoryAKey,
             string categoryBKey,
@@ -199,7 +200,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "eye_presentation,angular_diameter_deg,grid_line_spacing_deg," +
                 "grid_line_spacing_uv,visual_space_l,content_zoom," +
                 "oomes_endpoint_equivalent,stimulus_duration_s," +
-                "noise_until_response,response_timeout_s," +
+                "noise_until_response,post_response_noise_s,response_timeout_s," +
                 "category_a_key,category_b_key,response_keys_swapped");
 
             foreach (CheckerboardTrial trial in trials)
@@ -225,6 +226,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                         trial.VisualSpaceL));
                 AppendFloat(builder, stimulusDurationSeconds);
                 AppendBoolean(builder, true);
+                AppendFloat(builder, postResponseNoiseSeconds);
                 AppendFloat(builder, responseTimeoutSeconds);
                 AppendCsv(builder, categoryAKey);
                 AppendCsv(builder, categoryBKey);

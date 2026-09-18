@@ -260,7 +260,9 @@ laufen.
    voreingestellte maximale Antwortzeit beträgt 5 Sekunden.
 5. Antwort, Reaktionszeit, `l`, FOV, Augenmodus und Fixationswerte werden sofort
    gespeichert.
-6. Nach einer kurzen Pause folgt der nächste zufällig gemischte Durchgang.
+6. Nach der Antwort erscheint für 500 ms eine neue Noise-Verteilung. Danach
+   beginnt direkt die graue Fixationsphase des nächsten Durchgangs. Ein schwarzer
+   Zwischenbildschirm wird vermieden.
 
 ## Welcome Screen und Training
 
@@ -273,11 +275,12 @@ Nach dem Start des Play Modes erscheint zunächst ein englischer Welcome Screen:
 * `F6`: laufenden Versuch oder laufendes Training abbrechen
 
 Das Training zeigt zunächst je ein deutliches Beispiel für Category A und B.
-Danach folgen standardmäßig zwei unbewertete Übungstrials pro Kategorie in
-zufälliger Reihenfolge. Es gibt bewusst keine Richtig-/Falsch-Rückmeldung. Nach
-dem Training geht es zurück zum Welcome Screen. Solange `Require Training Before
-Session` aktiv ist, startet `F5` erst nach einem vollständig durchlaufenen
-Training. Trainingsdurchgänge werden nicht in den Messdateien gespeichert.
+Danach folgen standardmäßig die vier Werte `0,2`, `0,4`, `0,8` und `1,2`, jeweils
+dreimal und in zufälliger Reihenfolge. Es gibt bewusst keine
+Richtig-/Falsch-Rückmeldung. Nach dem Training geht es zurück zum Welcome Screen.
+Solange `Require Training Before Session` aktiv ist, startet `F5` erst nach einem
+vollständig durchlaufenen Training. Trainingsdurchgänge werden nicht in den
+Messdateien gespeichert.
 
 Wenn die Fixation während der Darbietung zu lange verloren geht:
 
@@ -340,7 +343,8 @@ Die wichtigsten Einstellungen befinden sich am Objekt
 
 * `Stimulus Duration Seconds`: Dauer des Checkerboards; voreingestellt auf 0,6 s
 
-* `Noise Mask Duration Seconds`: Dauer der Maske; voreingestellt auf 0,5 s
+* `Post Response Noise Seconds`: Dauer der neuen Noise-Verteilung nach der
+  Antwort; voreingestellt auf 0,5 s
 
 * `Response Timeout Seconds`: maximale Antwortzeit; 0 bedeutet ohne Zeitlimit
 
@@ -350,7 +354,9 @@ Die wichtigsten Einstellungen befinden sich am Objekt
 
 * `Training Category A/B Visual Space L`: deutliche, noch zu pilotierende Beispiele
 
-* `Training Trials Per Category`: unbewertete Übungstrials pro Kategorie
+* `Training Visual Space L Values`: einstellbare `l`-Werte der Übungstrials
+
+* `Training Repetitions Per Value`: Wiederholungen jedes Übungswertes
 
 * `Random Seed`: macht die zufällige Reihenfolge reproduzierbar
 
