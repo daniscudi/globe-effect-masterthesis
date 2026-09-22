@@ -167,7 +167,7 @@ MonoBehaviour:
   fixationBackgroundColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   noiseCellSizeDegrees: 1
   responsePromptColor: {r: 1, g: 1, b: 1, a: 1}
-  responsePromptDistanceMeters: 10
+  responsePromptDistanceMeters: 9
   responsePromptCharacterSize: 0.04
   visibleAtStart: 1
   materialOverride: {fileID: 0}
@@ -798,10 +798,10 @@ MonoBehaviour:
   visualSpaceLValues:
   - 1.2
   - 1
+  - 0.9
   - 0.8
+  - 0.7
   - 0.6
-  - 0.5
-  - 0.4
   - 0.2
   contentZoomValues:
   - 1
@@ -823,8 +823,8 @@ MonoBehaviour:
   trainingKey: 34
   continueTrainingKey: 1
   requireTrainingBeforeSession: 0
-  trainingCategoryAVisualSpaceL: 1.2
-  trainingCategoryBVisualSpaceL: 0.2
+  trainingCategoryAVisualSpaceL: 1.4
+  trainingCategoryBVisualSpaceL: 0
   trainingVisualSpaceLValues:
   - 0.2
   - 0.4

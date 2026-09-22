@@ -188,12 +188,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.RandomDots.RandomDotFieldStimulus
   observer: {fileID: 684958492}
-  angularDiameterDegrees: 90
-  apertureEdgeSoftnessDegrees: 1
+  angularDiameterDegrees: 60
+  apertureEdgeSoftnessDegrees: 5
   fieldRadiusMeters: 5
   worldCoverageDiameterDegrees: 110
   dotCount: 4000
-  dotAngularDiameterDegrees: 0.22
+  dotAngularDiameterDegrees: 0.25
   randomSeed: 20260828
   darkColor: {r: 0, g: 0, b: 0, a: 1}
   lightColor: {r: 1, g: 1, b: 1, a: 1}
@@ -204,7 +204,7 @@ MonoBehaviour:
   showFixationTarget: 1
   fixationTargetSizeDegrees: 0.5
   fixationColor: {r: 1, g: 0, b: 0, a: 1}
-  motionMode: 1
+  motionMode: 0
   simulatedYawAmplitudeDegrees: 5
   simulatedYawSpeedDegreesPerSecond: 5
   sweepDirection: 1
@@ -654,20 +654,20 @@ MonoBehaviour:
   outputRoot: 
   autoStartOnPlay: 0
   angularDiametersDegrees:
-  - 90
+  - 70
   eyePresentations: 00000000
   visualSpaceLValues:
   - 1.2
   - 1
+  - 0.9
   - 0.8
+  - 0.7
   - 0.6
-  - 0.5
-  - 0.4
   - 0.2
   contentZoomValues:
   - 1
-  motionModes: 01000000
-  repetitionsPerCondition: 3
+  motionModes: 0100000000000000
+  repetitionsPerCondition: 25
   motionDurationSeconds: 4
   sweepAmplitudeDegrees: 5
   sweepSpeedDegreesPerSecond: 5
