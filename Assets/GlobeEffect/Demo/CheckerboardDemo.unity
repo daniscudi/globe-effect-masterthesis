@@ -167,8 +167,8 @@ MonoBehaviour:
   fixationBackgroundColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   noiseCellSizeDegrees: 1
   responsePromptColor: {r: 1, g: 1, b: 1, a: 1}
-  responsePromptDistanceMeters: 8
-  responsePromptCharacterSize: 0.05
+  responsePromptDistanceMeters: 10
+  responsePromptCharacterSize: 0.04
   visibleAtStart: 1
   materialOverride: {fileID: 0}
 --- !u!23 &607094976
@@ -259,6 +259,7 @@ MonoBehaviour:
   convexKey: 62
   logResponses: 0
   swapResponseKeys: 0
+  useVrControllerButtons: 1
 --- !u!1 &661361068
 GameObject:
   m_ObjectHideFlags: 0
@@ -812,9 +813,11 @@ MonoBehaviour:
   maximumAttemptsPerTrial: 0
   stimulusDurationSeconds: 0.6
   responseTimeoutSeconds: 5
-  postResponseNoiseSeconds: 0.5
+  postResponseNoiseSeconds: 0
   convexResponseKey: 63
   concaveResponseKey: 64
+  useVrControllerButtons: 1
+  swapResponseButtons: 0
   categoryAResponseText: CATEGORY A
   categoryBResponseText: CATEGORY B
   trainingKey: 34

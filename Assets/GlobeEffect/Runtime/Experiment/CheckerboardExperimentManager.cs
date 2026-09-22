@@ -148,8 +148,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private float responseTimeoutSeconds = 5f;
 
         [SerializeField, Min(0f)]
-        [Tooltip("Wie lange nach einer Antwort noch eine neue Noise-Maske zu sehen ist, bevor der nächste Durchgang beginnt.")]
-        private float postResponseNoiseSeconds = 0.5f;
+        [Tooltip("Zusätzliche Noise-Maske nach der Antwort. Normalerweise 0 lassen, dann beginnt direkt die Fixation für den nächsten Durchgang.")]
+        private float postResponseNoiseSeconds;
 
         [Header("Antwortkategorien und Tasten")]
         [SerializeField]
@@ -157,6 +157,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         [SerializeField]
         private Key concaveResponseKey = Key.DownArrow;
+
+        [SerializeField]
+        [Tooltip("Nimmt im Headset Trigger und Trackpad an. Die Pfeiltasten funktionieren zusätzlich weiter zum Testen am Laptop.")]
+        private bool useVrControllerButtons = true;
+
+        [SerializeField]
+        [Tooltip("Aus: Trigger = nach außen. An: Trigger = nach innen. Vor einer Sitzung einstellen und währenddessen nicht ändern.")]
+        private bool swapResponseButtons;
 
         [SerializeField]
         [Tooltip("Wie diese Antwort der Person genannt wird. Gespeichert wird sie im Code und in der CSV weiter als Convex.")]
@@ -284,14 +292,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public bool ResponseKeysSwapped =>
             keyboardController != null && keyboardController.SwapResponseKeys;
         public string ConvexResponseKeyName => keyboardController != null
-            ? CheckerboardKeyboardController.GetReadableKeyName(
-                keyboardController.GetKeyForResponse(
-                    CheckerboardCurvatureResponse.Convex))
+            ? keyboardController.GetResponseControlName(
+                CheckerboardCurvatureResponse.Convex)
             : "–";
         public string ConcaveResponseKeyName => keyboardController != null
-            ? CheckerboardKeyboardController.GetReadableKeyName(
-                keyboardController.GetKeyForResponse(
-                    CheckerboardCurvatureResponse.Concave))
+            ? keyboardController.GetResponseControlName(
+                CheckerboardCurvatureResponse.Concave)
             : "–";
         public bool IsSessionActive =>
             sessionState == CheckerboardSessionState.WaitingForExperimentReady ||
@@ -501,11 +507,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             sessionState = CheckerboardSessionState.TrainingInstructions;
             stimulus.ShowResponsePrompt(
                 "PRACTICE\n\n" +
-                "Keep looking at the fixation cross at all times,\n" +
-                "including while the pattern and noise are visible.\n" +
-                "First, both categories will be explained.\n" +
-                "Afterwards you can practise the complete sequence.\n\n" +
-                "RESPONSE KEYS\n" + BuildResponsePrompt() + "\n\n" +
+                "Keep looking at the cross.\n" +
+                "First you will see both categories.\n" +
+                "Then you can practise.\n\n" +
+                BuildResponsePrompt() + "\n\n" +
                 CheckerboardKeyboardController.GetReadableKeyName(continueTrainingKey) +
                 " = CONTINUE");
             yield return WaitForTrainingAdvance();
@@ -546,7 +551,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 sessionState = CheckerboardSessionState.TrainingInstructions;
                 stimulus.ShowResponsePrompt(string.Format(
                     CultureInfo.InvariantCulture,
-                    "THIS WAS {0}\n\n{1}\n\n{2} = CONTINUE",
+                    "{0}\n{1}\n\n{2} = CONTINUE",
                     GetCategoryLabel(example),
                     GetCategoryDescription(example),
                     CheckerboardKeyboardController.GetReadableKeyName(
@@ -558,13 +563,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulus.ShowResponsePrompt(string.Format(
                 CultureInfo.InvariantCulture,
                 "PRACTICE TRIALS\n\n" +
-                "From now on, every pattern is shown briefly for {0:0} ms,\n" +
-                "just like in the main experiment.\n" +
-                "The category labels will no longer be shown.\n" +
-                "After each pattern, respond while the noise is visible.\n" +
-                "Keep looking at the fixation cross at all times,\n" +
-                "including during the pattern and noise.\n" +
-                "There is no correct/incorrect feedback.\n\n" +
+                "Each pattern lasts {0:0} ms.\n" +
+                "Answer while the noise is visible.\n" +
+                "Keep looking at the cross.\n\n" +
                 "{1} = CONTINUE",
                 stimulusDurationSeconds * 1000f,
                 CheckerboardKeyboardController.GetReadableKeyName(
@@ -601,14 +602,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     yield return null;
                 }
 
-                // Nach der Antwort kommt eine neue Noise-Verteilung. Dadurch wird
-                // nicht kurz auf einen schwarzen Bildschirm gewechselt, auf dem das
-                // Nachbild des vorherigen Musters besonders auffallen würde.
-                int postResponseNoiseSeed = unchecked(
-                    randomSeed + 70000 + presentationIndex * 1879);
-                stimulus.ShowNoise(postResponseNoiseSeed);
                 if (postResponseNoiseSeconds > 0f)
                 {
+                    int postResponseNoiseSeed = unchecked(
+                        randomSeed + 70000 + presentationIndex * 1879);
+                    stimulus.ShowNoise(postResponseNoiseSeed);
                     yield return WaitForTrainingSeconds(postResponseNoiseSeconds);
                 }
             }
@@ -754,9 +752,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             return string.Format(
                 CultureInfo.InvariantCulture,
-                "THIS IS {0}\n\n{1}\n\n" +
-                "The example will be shown for {2:0.#} seconds.\n\n" +
-                "{3} = SHOW EXAMPLE",
+                "{0}\n{1}\n\n" +
+                "Example: {2:0.#} seconds\n\n" +
+                "{3} = SHOW",
                 GetCategoryLabel(response),
                 GetCategoryDescription(response),
                 trainingExampleStimulusSeconds,
@@ -767,8 +765,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private string GetCategoryDescription(CheckerboardCurvatureResponse response)
         {
             return response == CheckerboardCurvatureResponse.Convex
-                ? "The pattern appears to bulge outward, like the surface of a ball."
-                : "The pattern appears to curve inward, like the inside of a bowl.";
+                ? "CURVES OUTWARD"
+                : "CURVES INWARD";
         }
 
         private string GetCategoryLabel(CheckerboardCurvatureResponse response)
@@ -877,10 +875,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 activeSessionFolder,
                 this);
             stimulus.ShowResponsePrompt(
-                "Keep looking at the fixation cross at all times,\n" +
-                "including during the pattern and noise.\n\n" +
+                "MAIN EXPERIMENT\n\n" +
+                "Keep looking at the cross.\n\n" +
                 CheckerboardKeyboardController.GetReadableKeyName(
-                    continueTrainingKey) + " = START WHEN READY");
+                    continueTrainingKey) + " = START");
             WriteEyeTrackingMarker("ExperimentReadyScreenShown");
             return true;
         }
@@ -1301,10 +1299,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void FinishAttemptAndScheduleNext()
         {
-            // Nach der Antwort bleibt kurz eine neue Noise-Verteilung stehen. Ein
-            // schwarzer Zwischenbildschirm würde das Nachbild deutlicher machen.
             StopPresentationCoroutine();
-            ShowPostResponseNoise();
             currentTrial = null;
             sessionState = CheckerboardSessionState.InterTrial;
 
@@ -1314,6 +1309,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
             else
             {
+                // Optional kann nach der Antwort noch ein zweites Noise-Bild
+                // stehen bleiben. Für den normalen Ablauf bleibt der Wert bei 0.
+                ShowPostResponseNoise();
                 interTrialCoroutine = StartCoroutine(BeginNextAttemptAfterDelay());
             }
         }
@@ -1439,9 +1437,17 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void ApplyResponseKeySettings()
         {
-            keyboardController?.SetResponseKeys(
+            if (keyboardController == null)
+            {
+                return;
+            }
+
+            keyboardController.SetResponseKeys(
                 concaveResponseKey,
                 convexResponseKey);
+            keyboardController.SetVrControllerButtonsEnabled(
+                useVrControllerButtons);
+            keyboardController.SetSwapResponseKeys(swapResponseButtons);
         }
 
         private void SubscribeKeyboardEvents()
@@ -1551,18 +1557,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private string BuildResponsePrompt()
         {
-            Key convexKey = keyboardController.GetKeyForResponse(
-                CheckerboardCurvatureResponse.Convex);
-            Key concaveKey = keyboardController.GetKeyForResponse(
-                CheckerboardCurvatureResponse.Concave);
-
             return string.Format(
                 CultureInfo.InvariantCulture,
-                "{0} = {1}\n\n{2} = {3}",
-                CheckerboardKeyboardController.GetReadableKeyName(convexKey),
-                categoryAResponseText,
-                CheckerboardKeyboardController.GetReadableKeyName(concaveKey),
-                categoryBResponseText);
+                "{0} = A / OUTWARD\n" +
+                "{1} = B / INWARD",
+                ConvexResponseKeyName,
+                ConcaveResponseKeyName);
         }
 
         private string BuildWelcomePrompt(string notice)
@@ -1578,19 +1578,16 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             return string.Format(
                 CultureInfo.InvariantCulture,
-                "WELCOME TO THE VISUAL PERCEPTION EXPERIMENT\n\n" +
+                "WELCOME\n\n" +
                 "{0}" +
                 "{1} = PRACTICE\n" +
-                "{2} = START EXPERIMENT\n" +
-                "{3} = ABORT CURRENT RUN\n\n" +
-                "{4}\n\n" +
-                "Keep looking at the fixation cross at all times\n" +
-                "during practice and the main experiment.\n\n" +
-                "RESPONSE KEYS\n{5}",
+                "{2} = START\n\n" +
+                "{3}\n\n" +
+                "Always look at the cross.\n\n" +
+                "RESPONSES\n{4}",
                 noticeLine,
                 CheckerboardKeyboardController.GetReadableKeyName(trainingKey),
                 CheckerboardKeyboardController.GetReadableKeyName(startSessionKey),
-                CheckerboardKeyboardController.GetReadableKeyName(abortSessionKey),
                 practiceState,
                 BuildResponsePrompt());
         }
