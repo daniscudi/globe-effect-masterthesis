@@ -1,17 +1,17 @@
 using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
+using UnityEngine.InputSystem.XR;
 
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
     /// Nimmt die beiden Antworten beim Checkerboard-Test entgegen.
     ///
-    /// Die Versuchsperson hört nur Category A und Category B. Das sind absichtlich
-    /// neutrale Namen, damit nichts vorgegeben wird.
-    ///
-    /// Im Code und in den CSV-Dateien heißen sie weiter Concave und Convex. So
-    /// funktionieren die alten Auswertungen noch.
+    /// Am Laptop funktionieren weiterhin die Pfeiltasten. Im Headset kann die
+    /// Versuchsperson stattdessen Trigger und Trackpad am VR-Controller benutzen.
+    /// Beide Eingabearten lösen genau dieselben beiden Antworten aus.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(VrCheckerboardStimulus))]
@@ -31,14 +31,20 @@ namespace GlobeEffect.VRCheckerboard
         private bool logResponses;
 
         [SerializeField]
-        [Tooltip("Dreht Category A und B auf die jeweils andere Taste. Das stellt man pro Person einmal ein und lässt es dann so.")]
+        [Tooltip("Vertauscht beide Antworten. Das betrifft Pfeiltasten und VR-Controller und bleibt während einer Sitzung gleich.")]
         private bool swapResponseKeys;
+
+        [Header("VR-Controller")]
+        [SerializeField]
+        [Tooltip("Nimmt zusätzlich Trigger und Trackpad von einem angeschlossenen VR-Controller an.")]
+        private bool useVrControllerButtons = true;
 
         private VrCheckerboardStimulus stimulus;
 
         public event Action<CheckerboardCurvatureResponse> ResponseSubmitted;
 
         public bool SwapResponseKeys => swapResponseKeys;
+        public bool UseVrControllerButtons => useVrControllerButtons;
 
         // Der Antwortbildschirm fragt hier nach, welche Taste er anzeigen soll.
         // Dadurch steht auf dem Bildschirm auch dann die richtige Taste, wenn die
@@ -73,6 +79,24 @@ namespace GlobeEffect.VRCheckerboard
             };
         }
 
+        // Für Texte und CSV-Dateien wird hier der Name der tatsächlich vorgesehenen
+        // Eingabe zurückgegeben. Die Pfeiltasten bleiben trotzdem immer als
+        // Ersatzbedienung aktiv, damit man den Ablauf auch am Laptop testen kann.
+        public string GetResponseControlName(
+            CheckerboardCurvatureResponse response)
+        {
+            if (!useVrControllerButtons)
+            {
+                return GetReadableKeyName(GetKeyForResponse(response));
+            }
+
+            bool triggerMeansConvex = !swapResponseKeys;
+            bool responseUsesTrigger = response == CheckerboardCurvatureResponse.Convex
+                ? triggerMeansConvex
+                : !triggerMeansConvex;
+            return responseUsesTrigger ? "TRIGGER" : "TRACKPAD";
+        }
+
         private void Awake()
         {
             stimulus = GetComponent<VrCheckerboardStimulus>();
@@ -83,6 +107,12 @@ namespace GlobeEffect.VRCheckerboard
             // Die Belegung dreht man im Inspector, bevor eine Person anfängt.
             // Während der Sitzung wird sie nicht mehr angefasst. So muss die Person
             // nicht bei jedem Durchgang neu nachlesen, welche Taste was bedeutet.
+            ReadKeyboard();
+            ReadVrControllers();
+        }
+
+        private void ReadKeyboard()
+        {
             Keyboard keyboard = Keyboard.current;
             if (keyboard == null)
             {
@@ -104,9 +134,73 @@ namespace GlobeEffect.VRCheckerboard
             }
         }
 
+        private void ReadVrControllers()
+        {
+            if (!useVrControllerButtons)
+            {
+                return;
+            }
+
+            // Bei den Vive-Controllern heißen die Bedienelemente je nach aktivem
+            // XR-Plugin etwas anders. Deshalb werden die üblichen Namen geprüft.
+            // So funktioniert derselbe Code mit OpenXR und mit dem Varjo-Layout.
+            foreach (InputDevice device in InputSystem.devices)
+            {
+                if (device is not XRController)
+                {
+                    continue;
+                }
+
+                if (WasPressedThisFrame(
+                        device,
+                        "triggerPressed",
+                        "triggerButton"))
+                {
+                    SubmitResponse(swapResponseKeys
+                        ? CheckerboardCurvatureResponse.Concave
+                        : CheckerboardCurvatureResponse.Convex);
+                    return;
+                }
+
+                if (WasPressedThisFrame(
+                        device,
+                        "trackpadClicked",
+                        "trackpadPressed",
+                        "primary2DAxisClick"))
+                {
+                    SubmitResponse(swapResponseKeys
+                        ? CheckerboardCurvatureResponse.Convex
+                        : CheckerboardCurvatureResponse.Concave);
+                    return;
+                }
+            }
+        }
+
+        private static bool WasPressedThisFrame(
+            InputDevice device,
+            params string[] controlNames)
+        {
+            foreach (string controlName in controlNames)
+            {
+                ButtonControl button =
+                    device.TryGetChildControl<ButtonControl>(controlName);
+                if (button != null && button.wasPressedThisFrame)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public void SetSwapResponseKeys(bool value)
         {
             swapResponseKeys = value;
+        }
+
+        public void SetVrControllerButtonsEnabled(bool value)
+        {
+            useVrControllerButtons = value;
         }
 
         public void SetResponseKeys(Key concaveResponseKey, Key convexResponseKey)

@@ -102,11 +102,11 @@ namespace GlobeEffect.VRCheckerboard
 
         [SerializeField, Min(0.5f)]
         [Tooltip("Wie weit vorne der Text liegt. Das hat nichts mit dem Schachbrett zu tun.")]
-        private float responsePromptDistanceMeters = 8f;
+        private float responsePromptDistanceMeters = 10f;
 
         [SerializeField, Range(0.005f, 0.1f)]
         [Tooltip("Wie groß die Buchstaben im Text sind.")]
-        private float responsePromptCharacterSize = 0.05f;
+        private float responsePromptCharacterSize = 0.04f;
 
         [SerializeField]
         [Tooltip("Soll gleich alles sichtbar sein, wenn der Play Mode startet?")]
