@@ -19,7 +19,7 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
         _CheckerboardEnabled ("Checkerboard Enabled", Float) = 1
         _NoiseEnabled ("Noise Enabled", Float) = 0
         _NoiseCellSizeUv ("Noise Cell Size [u/v]", Float) = 0.0349
-        _NoiseSeed ("Noise Seed", Float) = 0
+        _NoiseSeed ("Noise Seed", Integer) = 0
         _EyeMode ("Eye Mode", Float) = 0
         _FixationEnabled ("Fixation Enabled", Float) = 1
         _FixationHalfSizeRad ("Fixation Half Size [rad]", Float) = 0.0043633
@@ -40,7 +40,7 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
         Pass
         {
             CGPROGRAM
-            #pragma target 3.0
+            #pragma target 3.5
             #pragma vertex Vert
             #pragma fragment Frag
             #pragma multi_compile_instancing
@@ -74,7 +74,7 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
             float _CheckerboardEnabled;
             float _NoiseEnabled;
             float _NoiseCellSizeUv;
-            float _NoiseSeed;
+            int _NoiseSeed;
             float _EyeMode;
             float _FixationEnabled;
             float _FixationHalfSizeRad;
@@ -135,6 +135,18 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
                         _ObserverWorldRight.xyz);
                     return lateralEyeOffset > 0.0001 ? 1.0 : 0.0;
                 #endif
+            }
+
+            uint MixNoiseBits(uint value)
+            {
+                // Mischt die Bits einer ganzen Zahl. Kleine Änderungen am Eingang
+                // ergeben dadurch eine andere Verteilung von Schwarz und Weiß.
+                // Die Überläufe sind hier Absicht: Es bleiben immer 32 Bits übrig.
+                value ^= value >> 16;
+                value *= 0x7feb352du;
+                value ^= value >> 15;
+                value *= 0x846ca68bu;
+                return value ^ (value >> 16);
             }
 
             fixed4 Frag(VertexToFragment input) : SV_Target
@@ -236,11 +248,17 @@ Shader "GlobeEffect/Helmholtz Checkerboard"
                 // Für die kurze Maske wird die angezeigte Fläche in kleine Zellen
                 // geteilt. Aus Zellkoordinate und Seed entsteht reproduzierbar ein
                 // schwarzes oder weißes Feld. Das ist keine weitere l-Verzerrung.
-                float2 noiseCell = floor(
+                int2 noiseCell = (int2)floor(
                     displayPosition / max(_NoiseCellSizeUv, 1e-6));
-                float noiseValue = frac(sin(dot(
-                    noiseCell + float2(_NoiseSeed, _NoiseSeed * 0.731),
-                    float2(12.9898, 78.233))) * 43758.5453);
+                // Früher wurde der große Seed direkt in eine Sinusrechnung
+                // eingesetzt. Dabei gingen Unterschiede zwischen Zellen verloren;
+                // je nach Grafikkarte konnte die Maske fast oder ganz schwarz werden.
+                // Jetzt bleiben Seed und Zellnummern ganze Zahlen. Auch negative
+                // Zellnummern werden anhand ihrer Bits eindeutig mit einbezogen.
+                uint noiseBits = MixNoiseBits(asuint(noiseCell.x) ^ asuint(_NoiseSeed));
+                noiseBits = MixNoiseBits(noiseBits ^ asuint(noiseCell.y) ^ 0x9e3779b9u);
+                // Das oberste Bit entscheidet: 0 = dunkel, 1 = hell.
+                float noiseValue = (float)(noiseBits >> 31);
                 fixed4 noiseColor = lerp(
                     _DarkColor,
                     _LightColor,
