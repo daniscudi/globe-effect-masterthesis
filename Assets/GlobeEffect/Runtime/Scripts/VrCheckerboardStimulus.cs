@@ -445,7 +445,9 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetFloat("_CheckerboardEnabled", checkerboardVisible ? 1f : 0f);
             propertyBlock.SetFloat("_NoiseEnabled", noiseVisible ? 1f : 0f);
             propertyBlock.SetFloat("_NoiseCellSizeUv", NoiseSizeInUv());
-            propertyBlock.SetFloat("_NoiseSeed", currentNoiseSeed);
+            // Als echte ganze Zahl übertragen. Ein Float kann große Seeds wie
+            // 20260901 nicht mehr exakt speichern und würde benachbarte Seeds runden.
+            propertyBlock.SetInteger("_NoiseSeed", currentNoiseSeed);
             // Beim Antworttext wird immer auf beiden Augen gezeigt, damit der Text
             // auch im Monokular-Durchgang gut lesbar bleibt.
             propertyBlock.SetFloat(
