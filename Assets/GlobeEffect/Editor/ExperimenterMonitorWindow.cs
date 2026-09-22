@@ -8,15 +8,17 @@ using UnityEngine;
 namespace GlobeEffect.VRCheckerboard.Editor
 {
     /// <summary>
-    /// Versuchsleiteranzeige für beide Tests. Als EditorWindow wird sie nur
-    /// auf dem Kontrollmonitor dargestellt und nicht in das XR-Bild gerendert.
-    /// Sie verändert keine Trialparameter und dient ausschließlich der
-    /// laufenden Qualitätskontrolle.
+    /// Das Kontrollfenster für den Versuchsleiter. Es gilt für beide Tests.
+    ///
+    /// Weil es ein Editorfenster ist, sieht man es nur auf dem Monitor am PC.
+    /// Im Headset taucht davon nichts auf, die Versuchsperson sieht es also nicht.
+    ///
+    /// Hier wird nur zugeschaut. Am Versuch selbst ändert dieses Fenster nichts.
     /// </summary>
     public sealed class ExperimenterMonitorWindow : EditorWindow
     {
-        // Dieses Fenster liest nur die Laufzeitwerte der Manager und Monitore.
-        // Es greift nicht in Trialplan, Antworten oder Stimulus ein.
+        // Das Fenster liest nur ab, was die Manager und Monitore gerade melden.
+        // Es fasst weder den Plan noch die Antworten noch den Stimulus an.
         internal const string AutoOpenPreference =
             "GlobeEffect.ExperimentMonitor.AutoOpenOnPlay";
 
@@ -81,15 +83,16 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private void OnInspectorUpdate()
         {
-            // Ein Editorfenster hat keinen normalen Unity-Update-Aufruf. Dieser
-            // Callback hält Referenzen und sichtbare Werte aktuell.
+            // Ein Editorfenster bekommt kein normales Update wie ein Skript in der
+            // Szene. Stattdessen meldet man sich hier an und wird regelmäßig
+            // aufgerufen. Nur so bleiben die angezeigten Werte aktuell.
             RefreshReferences(force: false);
             Repaint();
         }
 
         private void OnGUI()
         {
-            // OnGUI zeichnet den sichtbaren Inhalt des Fensters neu.
+            // OnGUI malt den Inhalt des Fensters. Das läuft immer wieder von vorne.
             EnsureStyles();
             DrawHeader();
 
@@ -106,9 +109,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
 
             RefreshReferences(force: false);
-            // Normalerweise enthält eine Demoszene genau einen Fixationsmonitor.
-            // Falls beide vorhanden sind, hat das Checkerboard Vorrang, damit die
-            // Anzeige auch in einer versehentlich kombinierten Szene eindeutig bleibt.
+            // In einer Szene liegt normalerweise nur einer der beiden Tests.
+            // Sind aus Versehen doch beide drin, wird das Checkerboard angezeigt.
+            // Hauptsache, es ist eindeutig und flackert nicht hin und her.
             if (randomDotFixation != null && checkerboardFixation == null)
             {
                 DrawRandomDotMonitor();
@@ -146,7 +149,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private void DrawCheckerboardMonitor()
         {
-            // Fixation, Trialfortschritt und aktuelle Checkerboard-Bedingung.
+            // Zeigt an: Wo schaut die Person hin, wie weit ist die Sitzung, und
+            // welche Bedingung läuft gerade.
             DrawFixationStatus(
                 checkerboardFixation.TargetState,
                 checkerboardFixation.CurrentAngleDegrees,
@@ -231,7 +235,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private void DrawRandomDotMonitor()
         {
-            // Fixation, Trialfortschritt und aktueller Schwenkwinkel des Punktfelds.
+            // Zeigt an: Wo schaut die Person hin, wie weit ist die Sitzung, und wo
+            // steht die Bewegung der Punkte gerade.
             DrawFixationStatus(
                 randomDotFixation.TargetState,
                 randomDotFixation.CurrentAngleDegrees,
@@ -381,8 +386,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
         private void RefreshReferences(bool force)
         {
             double now = EditorApplication.timeSinceStartup;
-            // FindAnyObjectByType durchsucht die geladene Szene. Eine Aktualisierung
-            // zweimal pro Sekunde reicht für Referenzwechsel und entlastet den Editor.
+            // FindAnyObjectByType sucht die ganze Szene ab und ist deshalb langsam.
+            // Zweimal pro Sekunde reicht dafür völlig. Würde man das in jedem Frame
+            // machen, würde der Editor unnötig ausgebremst.
             if (!force && now < nextReferenceRefresh)
             {
                 return;
@@ -407,9 +413,10 @@ namespace GlobeEffect.VRCheckerboard.Editor
     }
 
     /// <summary>
-    /// Öffnet die reine Editoranzeige automatisch, nachdem die Szene in den
-    /// Play Mode gewechselt ist. Dadurch kann die Statusanzeige im Labor nicht
-    /// versehentlich vergessen werden.
+    /// Macht das Kontrollfenster automatisch auf, sobald der Play Mode startet.
+    ///
+    /// So kann man im Labor nicht aus Versehen eine Messung fahren, ohne die
+    /// Anzeige offen zu haben.
     /// </summary>
     [InitializeOnLoad]
     internal static class ExperimenterMonitorBootstrap
@@ -432,15 +439,16 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private static void OpenIfExperimentSceneIsActive()
         {
-            // Automatisch nur öffnen, wenn die gestartete Szene tatsächlich einen
-            // der beiden Fixationsmonitore enthält.
+            // Nur aufmachen, wenn in der Szene wirklich einer der beiden Tests
+            // liegt. Sonst würde das Fenster bei jeder beliebigen Szene aufgehen.
             bool hasFixationMonitor =
                 Object.FindAnyObjectByType<CheckerboardFixationMonitor>() != null ||
                 Object.FindAnyObjectByType<RandomDotFixationMonitor>() != null;
             if (hasFixationMonitor)
             {
-                // Automatisches Öffnen darf der Game View nicht den
-                // Tastaturfokus für F5, Pfeiltasten oder Enter nehmen.
+                // Wichtig: Das Fenster darf sich nicht nach vorne drängeln. Sonst
+                // gehen die Tastendrücke an dieses Fenster statt an den Game View,
+                // und F5 oder die Pfeiltasten kommen nicht mehr im Versuch an.
                 ExperimenterMonitorWindow.OpenWindow(focus: false);
             }
         }

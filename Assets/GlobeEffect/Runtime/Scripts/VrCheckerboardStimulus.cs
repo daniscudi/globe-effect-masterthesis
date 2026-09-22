@@ -4,59 +4,64 @@ using UnityEngine;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Steuert das Checkerboard, das im Headset immer mittig vor der aktuellen
-    /// Blickrichtung bleibt. Die Fläche dient nur als Träger für den Shader.
-    /// Dessen Eckpunkte werden als Blickrichtungen und nicht als Punkte in einer
-    /// endlichen Entfernung gerendert. Linkes und rechtes Auge erhalten dadurch
-    /// dieselben Richtungen: Der Stimulus verhält sich wie ein Objekt in
-    /// unendlicher Entfernung und erzeugt keine Konvergenz auf eine nahe Ebene.
+    /// Zeigt das Schachbrett im Headset an.
+    ///
+    /// Das Bild bleibt immer genau vor dem Kopf. Dreht der Teilnehmer den Kopf,
+    /// dreht sich das Bild mit.
+    ///
+    /// Die viereckige Fläche hier ist nur die Leinwand. Das Muster malt der Shader.
+    ///
+    /// Beide Augen bekommen genau die gleiche Blickrichtung. Dadurch sieht es aus,
+    /// als wäre das Muster unendlich weit weg. Die Augen müssen also nicht auf eine
+    /// nahe Fläche schielen.
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
     public sealed class VrCheckerboardStimulus : MonoBehaviour
     {
-        // Kurzer Ablauf dieses Skripts:
-        // 1. BuildCarrierQuad erstellt nur eine einfache quadratische Trägerfläche.
-        // 2. Der Shader macht aus dieser Fläche ein Richtungsbild vor beiden Augen.
-        // 3. Die Inspector-Werte werden mit ApplyMaterialProperties an den Shader gegeben.
-        // 4. Die aktuelle HMD-Pose wird in jedem Frame nachgereicht.
-        // 5. Der Experiment Manager schaltet zwischen Fixation, Muster, Noise und Antwort um.
+        // So läuft das hier ab:
+        // 1. CreateQuad baut ein einfaches Viereck.
+        // 2. Der Shader malt auf dieses Viereck das Bild für beide Augen.
+        // 3. SendValuesToShader gibt die Werte aus dem Inspector an den Shader weiter.
+        // 4. Jeden Frame bekommt der Shader gesagt, wo der Kopf gerade ist.
+        // 5. Der Experiment Manager schaltet um zwischen Fixation, Muster, Noise
+        //    und Antwort.
         //
-        // Das Schachbrett selbst und die l-Verzerrung entstehen also im Shader,
-        // nicht aus vielen einzelnen schwarzen und weißen Unity-Objekten.
+        // Das Schachbrett und die Verzerrung entstehen also komplett im Shader.
+        // Es liegen hier keine hundert kleinen schwarzen und weißen Kacheln herum.
         private const string ShaderResourceName = "GlobeEffectHelmholtzCheckerboard";
         private const string ShaderFallbackName = "GlobeEffect/Helmholtz Checkerboard";
-        private const float CarrierDistanceMeters = 1f;
+        private const float QuadDistanceMeters = 1f;
 
         [Header("Blickrichtung und FOV")]
         [SerializeField]
-        [Tooltip("XR-Kopf-/Center-Eye-Transform. Normalerweise ist das die Main Camera im XR Origin.")]
+        [Tooltip("Der Kopf im XR-Rig. Normalerweise ist das die Main Camera im XR Origin.")]
         private Transform observer;
 
         [SerializeField, Range(1f, 170f)]
-        [Tooltip("Winkeldurchmesser der kreisrunden Blende. 90 bedeutet 90 Grad von Rand zu Rand.")]
+        [Tooltip("Wie groß der runde Ausschnitt ist, in Grad. 90 heißt 90 Grad von einem Rand zum anderen.")]
         private float angularDiameterDegrees = 90f;
 
         [SerializeField, Range(0f, 10f)]
-        [Tooltip("Breite des weichen Übergangs am inneren Rand der Kreisblende. 0 ergibt eine harte Kante.")]
+        [Tooltip("Wie weich der Rand des Kreises nach innen ausläuft. 0 gibt eine harte Kante.")]
         private float apertureEdgeSoftnessDegrees = 1f;
 
         [SerializeField]
-        [Tooltip("Schaltet die runde Öffnung ein. Zum Kontrollieren des vollständigen quadratischen Gitters kann sie vorübergehend ausgeschaltet werden.")]
+        [Tooltip("Schaltet den runden Ausschnitt an. Zum Prüfen kann man ihn ausmachen, dann sieht man das ganze viereckige Gitter.")]
         private bool useCircularAperture = true;
 
         [Header("Visual-Space-/Helmholtz-Gitter")]
         [SerializeField, Range(0f, 1.4f)]
-        [Tooltip("l = 1 zeigt ein gerades Gitter, l = 0,5 den Helmholtz-Endpunkt. Kleinere Werte setzen die kissenförmige, Werte über 1 die tonnenförmige Richtung fort.")]
+        [Tooltip("l = 1 gibt ein gerades Gitter, l = 0,5 den Helmholtz-Punkt. Kleinere Werte gehen weiter in die kissenförmige Richtung, Werte über 1 in die tonnenförmige.")]
         private float visualSpaceL = 0.5f;
 
         [SerializeField, Range(0.25f, 4f)]
-        [Tooltip("Einfacher Zoom des Musters. Ändert die Checkgröße, aber nicht l oder den FOV-Rand.")]
+        [Tooltip("Zoom für das Muster. Macht die Karos größer oder kleiner. l und der Rand bleiben dabei gleich.")]
         private float contentZoom = 1f;
 
         [SerializeField, Range(0.5f, 45f)]
-        [Tooltip("Winkelabstand zwischen benachbarten Gitterlinien. Oomes et al. verwendeten 10 Grad.")]
+        [Tooltip("Abstand zwischen zwei Gitterlinien in Grad. Oomes et al. haben 10 Grad benutzt.")]
         private float gridLineSpacingDegrees = 10f;
 
         [SerializeField]
@@ -67,28 +72,28 @@ namespace GlobeEffect.VRCheckerboard
 
         [Header("Darstellung und Fixation")]
         [SerializeField]
-        [Tooltip("Beidäugige oder monokulare Darbietung.")]
+        [Tooltip("Auf beiden Augen zeigen oder nur auf einem.")]
         private CheckerboardEyePresentation eyePresentation =
             CheckerboardEyePresentation.BothEyes;
 
         [SerializeField]
-        [Tooltip("Zeigt in der Mitte ein Fixationskreuz.")]
+        [Tooltip("Zeigt das Kreuz in der Mitte.")]
         private bool showFixationTarget = true;
 
         [SerializeField, Range(0.05f, 5f)]
-        [Tooltip("Gesamte Winkelgröße des Fixationskreuzes in Grad.")]
+        [Tooltip("Wie groß das Fixationskreuz insgesamt ist, in Grad.")]
         private float fixationTargetSizeDegrees = 0.5f;
 
         [SerializeField]
         private Color fixationColor = Color.red;
 
         [SerializeField]
-        [Tooltip("Hintergrund während der Fixationsphase vor einem Trial.")]
+        [Tooltip("Hintergrund in der Fixationsphase, also kurz bevor das Muster kommt.")]
         private Color fixationBackgroundColor = Color.gray;
 
         [Header("Noise-Maske")]
         [SerializeField, Range(0.25f, 10f)]
-        [Tooltip("Winkelgröße eines Noise-Feldes. Die Maske wird nach dem Checkerboard gezeigt.")]
+        [Tooltip("Wie groß ein einzelnes Noise-Kästchen ist, in Grad. Die Maske kommt direkt nach dem Schachbrett.")]
         private float noiseCellSizeDegrees = 1f;
 
         [Header("Antwortanzeige")]
@@ -96,26 +101,26 @@ namespace GlobeEffect.VRCheckerboard
         private Color responsePromptColor = Color.white;
 
         [SerializeField, Min(0.5f)]
-        [Tooltip("Technischer Abstand des Antworttexts. Er betrifft nicht das Checkerboard.")]
+        [Tooltip("Wie weit vorne der Text liegt. Das hat nichts mit dem Schachbrett zu tun.")]
         private float responsePromptDistanceMeters = 4f;
 
         [SerializeField, Range(0.005f, 0.1f)]
-        [Tooltip("Größe der Buchstaben des Antworttexts.")]
+        [Tooltip("Wie groß die Buchstaben im Text sind.")]
         private float responsePromptCharacterSize = 0.05f;
 
         [SerializeField]
-        [Tooltip("Ist der vollständige Stimulus beim Start im Play Mode sichtbar?")]
+        [Tooltip("Soll gleich alles sichtbar sein, wenn der Play Mode startet?")]
         private bool visibleAtStart = true;
 
         [Header("Technik")]
         [SerializeField]
-        [Tooltip("Optionales eigenes Material mit dem Helmholtz-Checkerboard-Shader.")]
+        [Tooltip("Optional ein eigenes Material mit dem Checkerboard-Shader. Normalerweise bleibt das leer.")]
         private Material materialOverride;
 
         private MeshFilter meshFilter;
         private MeshRenderer meshRenderer;
-        private Mesh ownedMesh;
-        private Material ownedMaterial;
+        private Mesh quadMesh;
+        private Material shaderMaterial;
         private MaterialPropertyBlock propertyBlock;
         private bool isVisible = true;
         private bool checkerboardVisible = true;
@@ -123,12 +128,12 @@ namespace GlobeEffect.VRCheckerboard
         private bool fixationVisible = true;
         private bool responsePromptVisible;
         private int currentNoiseSeed;
-        private GameObject ownedResponsePromptObject;
-        private TextMesh responseTextMesh;
-        private Material ownedResponsePromptMaterial;
+        private GameObject textObject;
+        private TextMesh textMesh;
+        private Material textMaterial;
 
-        // Andere Skripte können hier auf Änderungen reagieren und dabei genau den
-        // Zustand speichern, der in diesem Moment gezeigt wurde.
+        // Andere Skripte können hier mithören. Sie bekommen dann genau die Werte,
+        // die in dem Moment auf dem Bildschirm waren.
         public event Action<CheckerboardStimulusSnapshot> StimulusPresented;
         public event Action<CheckerboardStimulusSnapshot> StimulusHidden;
         public event Action<CheckerboardStimulusSnapshot> ParametersChanged;
@@ -139,7 +144,7 @@ namespace GlobeEffect.VRCheckerboard
             set
             {
                 observer = value;
-                ApplyObserverPose();
+                MoveQuadInFrontOfHead();
             }
         }
 
@@ -149,7 +154,7 @@ namespace GlobeEffect.VRCheckerboard
         public float VisualSpaceL => visualSpaceL;
         public float ContentZoom => contentZoom;
         public float GridLineSpacingDegrees => gridLineSpacingDegrees;
-        public float GridLineSpacingUv => CalculateGridLineSpacingUv();
+        public float GridLineSpacingUv => GridSpacingInUv();
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
         public bool IsVisible => isVisible;
         public bool IsCheckerboardVisible => isVisible && checkerboardVisible;
@@ -161,138 +166,138 @@ namespace GlobeEffect.VRCheckerboard
 
         private void Reset()
         {
-            // Beim Hinzufügen der Komponente wird die Main Camera automatisch als
-            // Beobachter vorgeschlagen. In VR ist das normalerweise die HMD-Kamera.
+            // Wenn man die Komponente neu ans Objekt hängt, wird gleich die Main
+            // Camera eingetragen. In VR ist das die Kamera im Headset.
             Camera mainCamera = Camera.main;
             observer = mainCamera != null ? mainCamera.transform : null;
         }
 
         private void OnEnable()
         {
-            // Hier werden Träger-Mesh, Material und Startdarstellung vorbereitet.
-            Application.onBeforeRender -= HandleBeforeRender;
-            Application.onBeforeRender += HandleBeforeRender;
-            ValidateSerializedFields();
-            EnsureResources();
+            // Hier werden Viereck, Material und die erste Ansicht vorbereitet.
+            Application.onBeforeRender -= UpdateBeforeRendering;
+            Application.onBeforeRender += UpdateBeforeRendering;
+            ClampInspectorValues();
+            SetupMeshAndMaterial();
             isVisible = Application.isPlaying ? visibleAtStart : true;
             checkerboardVisible = true;
             noiseVisible = false;
             fixationVisible = true;
             responsePromptVisible = false;
-            ApplyAll();
+            UpdateEverything();
         }
 
         private void OnValidate()
         {
-            // Dadurch werden Änderungen im Inspector schon außerhalb des Play Modes
-            // sichtbar und ungültige Werte sofort auf den erlaubten Bereich begrenzt.
-            ValidateSerializedFields();
+            // Dadurch sieht man Änderungen im Inspector sofort, auch ohne Play Mode.
+            // Werte außerhalb des erlaubten Bereichs werden hier gleich zurechtgerückt.
+            ClampInspectorValues();
             if (!isActiveAndEnabled)
             {
                 return;
             }
 
-            EnsureResources();
-            ApplyAll();
+            SetupMeshAndMaterial();
+            UpdateEverything();
         }
 
         private void OnDisable()
         {
-            Application.onBeforeRender -= HandleBeforeRender;
+            Application.onBeforeRender -= UpdateBeforeRendering;
         }
 
         private void LateUpdate()
         {
-            // Der Stimulus ist absichtlich head-locked. Der Träger folgt nur für
-            // Unitys Sichtbarkeitsprüfung; die eigentliche Projektion im Shader
-            // benutzt ausschließlich diese Blickrichtungsvektoren.
-            ApplyObserverPose();
-            ApplyObserverMaterialProperties();
+            // Das Bild soll mit dem Kopf mitgehen, das ist so gewollt.
+            // Das Viereck wird nur nachgezogen, damit Unity es nicht wegoptimiert.
+            // Wo das Muster wirklich hinkommt, rechnet allein der Shader aus.
+            MoveQuadInFrontOfHead();
+            SendHeadPoseToShader();
         }
 
         private void OnDestroy()
         {
-            // Nur die von diesem Skript erzeugten Laufzeitobjekte werden entfernt.
-            Application.onBeforeRender -= HandleBeforeRender;
-            DestroyOwnedObject(ownedMesh);
-            DestroyOwnedObject(ownedMaterial);
-            DestroyOwnedObject(ownedResponsePromptMaterial);
-            DestroyOwnedObject(ownedResponsePromptObject);
-            ownedMesh = null;
-            ownedMaterial = null;
-            ownedResponsePromptMaterial = null;
-            ownedResponsePromptObject = null;
-            responseTextMesh = null;
+            // Weggeräumt wird nur das, was dieses Skript selbst angelegt hat.
+            Application.onBeforeRender -= UpdateBeforeRendering;
+            DeleteObject(quadMesh);
+            DeleteObject(shaderMaterial);
+            DeleteObject(textMaterial);
+            DeleteObject(textObject);
+            quadMesh = null;
+            shaderMaterial = null;
+            textMaterial = null;
+            textObject = null;
+            textMesh = null;
         }
 
-        private void HandleBeforeRender()
+        private void UpdateBeforeRendering()
         {
-            // Der Tracked Pose Driver kann kurz vor dem Rendern noch eine neuere
-            // HMD-Pose liefern. Dieses Update verhindert, dass das kopffeste
-            // Muster bei schnellen Bewegungen einen Frame hinterherhinkt.
-            ApplyObserverPose();
-            ApplyObserverMaterialProperties();
+            // Kurz vor dem Zeichnen kann noch eine neuere Kopfposition reinkommen.
+            // Wir holen sie hier ab, damit das Bild bei schnellen Kopfbewegungen
+            // nicht einen Frame hinterherhängt.
+            MoveQuadInFrontOfHead();
+            SendHeadPoseToShader();
         }
 
         public void SetAngularDiameter(float value)
         {
-            // Winkeldurchmesser der Öffnung von einem Rand bis zum anderen.
+            // Wie groß der runde Ausschnitt ist, von einem Rand zum anderen.
             angularDiameterDegrees = Mathf.Clamp(value, 1f, 170f);
-            ApplyMaterialProperties();
+            SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
         public void SetApertureEdgeSoftness(float value)
         {
             apertureEdgeSoftnessDegrees = Mathf.Clamp(value, 0f, 10f);
-            ApplyMaterialProperties();
+            SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
         public void SetCircularApertureEnabled(bool value)
         {
-            // Ausgeschaltet sieht man das vollständige quadratische Testgitter.
-            // Im Versuch ist die runde Öffnung normalerweise eingeschaltet.
+            // Aus heißt: man sieht das ganze viereckige Gitter. Das ist nur zum
+            // Nachschauen. Im Versuch ist der Kreis normalerweise an.
             useCircularAperture = value;
-            ApplyMaterialProperties();
+            SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
         public void SetVisualSpaceL(float value)
         {
-            // l wird hier nicht berechnet, sondern als Versuchsbedingung gesetzt.
-            // Die radiale Formel wird anschließend pro Pixel im Shader ausgewertet.
+            // l wird hier nicht ausgerechnet. Es wird als Bedingung vorgegeben.
+            // Die Formel dazu läuft danach im Shader für jeden Bildpunkt.
             visualSpaceL = Mathf.Clamp(value, 0f, 1.4f);
-            ApplyMaterialProperties();
+            SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
         public void SetContentZoom(float value)
         {
-            // Dieser Zoom verändert nur die sichtbare Gittergröße und bleibt
-            // unabhängig von l. Er ist keine Fernglasabbildung.
+            // Der Zoom ändert nur, wie groß man die Karos sieht.
+            // Er hat nichts mit l zu tun und ist auch kein Fernglas.
             contentZoom = Mathf.Clamp(value, 0.25f, 4f);
-            ApplyMaterialProperties();
+            SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
         public void SetGridLineSpacing(float value)
         {
-            // Die Eingabe erfolgt verständlich in Grad. Vor dem Rendern wird sie
-            // in CalculateGridLineSpacingUv in eine lineare u/v-Weite umgerechnet.
+            // Eingegeben wird in Grad, weil man sich das besser vorstellen kann.
+            // GridSpacingInUv rechnet das vor dem Zeichnen in u/v-Weite um.
             gridLineSpacingDegrees = Mathf.Clamp(value, 0.5f, 45f);
-            ApplyMaterialProperties();
+            SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
         public void SetEyePresentation(CheckerboardEyePresentation value)
         {
             eyePresentation = value;
-            ApplyMaterialProperties();
+            SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
-        /// <summary>Zeigt das vollständige Checkerboard mit Fixationskreuz.</summary>
+        /// <summary>Zeigt das ganze Schachbrett mit Fixationskreuz.</summary>
         public void Show()
         {
             isVisible = true;
@@ -300,14 +305,14 @@ namespace GlobeEffect.VRCheckerboard
             noiseVisible = false;
             fixationVisible = true;
             responsePromptVisible = false;
-            ApplyMaterialProperties();
-            ApplyVisibility();
+            SendValuesToShader();
+            ShowOrHideObjects();
             StimulusPresented?.Invoke(CaptureSnapshot());
         }
 
         /// <summary>
-        /// Zeigt nur das Fixationskreuz auf neutralem Hintergrund. Diese Phase
-        /// läuft vor dem eigentlichen Trial, bis die Fixation stabil ist.
+        /// Zeigt nur das Fixationskreuz vor grauem Hintergrund. Das läuft vor
+        /// jedem Durchgang, bis der Blick ruhig genug auf dem Kreuz liegt.
         /// </summary>
         public void ShowFixationOnly()
         {
@@ -316,28 +321,29 @@ namespace GlobeEffect.VRCheckerboard
             noiseVisible = false;
             fixationVisible = true;
             responsePromptVisible = false;
-            ApplyMaterialProperties();
-            ApplyVisibility();
+            SendValuesToShader();
+            ShowOrHideObjects();
         }
 
-        // Zeigt direkt nach dem Muster eine neue Schwarz-Weiß-Maske. Der Seed
-        // bestimmt die Verteilung und wird deshalb für jeden Trial neu gesetzt.
+        // Zeigt direkt nach dem Muster eine neue Schwarz-Weiß-Maske.
+        // Der Seed legt fest, wie die Punkte verteilt sind. Deshalb bekommt
+        // jeder Durchgang einen neuen Seed.
         public void ShowNoise(int noiseSeed)
         {
             isVisible = true;
             checkerboardVisible = false;
             noiseVisible = true;
-            // Das Kreuz bleibt auch während der Maske sichtbar. Die Person kann
-            // dadurch bis zur Antwort dieselbe zentrale Blickposition halten.
+            // Das Kreuz bleibt auch während der Maske stehen. So kann die Person
+            // bis zur Antwort an derselben Stelle weiterschauen.
             fixationVisible = true;
             responsePromptVisible = false;
             currentNoiseSeed = noiseSeed;
-            ApplyMaterialProperties();
-            ApplyVisibility();
+            SendValuesToShader();
+            ShowOrHideObjects();
         }
 
-        // Welcome-, Trainings- und Bereitschaftstexte werden als kopffestes
-        // TextMesh eingeblendet und sind für beide Augen sichtbar.
+        // Begrüßung, Trainingstexte und Hinweise werden als Text vor dem Kopf
+        // eingeblendet. Der Text ist immer auf beiden Augen zu sehen.
         public void ShowResponsePrompt(string promptText)
         {
             isVisible = true;
@@ -345,28 +351,29 @@ namespace GlobeEffect.VRCheckerboard
             noiseVisible = false;
             fixationVisible = false;
             responsePromptVisible = true;
-            EnsureResponsePrompt();
-            if (responseTextMesh != null)
+            SetupTextObject();
+            if (textMesh != null)
             {
-                responseTextMesh.text = promptText ?? string.Empty;
-                responseTextMesh.color = responsePromptColor;
+                textMesh.text = promptText ?? string.Empty;
+                textMesh.color = responsePromptColor;
             }
 
-            ApplyMaterialProperties();
-            ApplyVisibility();
+            SendValuesToShader();
+            ShowOrHideObjects();
         }
 
         public void Hide()
         {
             isVisible = false;
             responsePromptVisible = false;
-            ApplyVisibility();
+            ShowOrHideObjects();
             StimulusHidden?.Invoke(CaptureSnapshot());
         }
 
         public CheckerboardStimulusSnapshot CaptureSnapshot()
         {
-            // Diese Kopie der momentanen Werte wird für Trial-Datei und Marker benutzt.
+            // Eine Kopie der Werte von genau jetzt. Sie wandert in die Trialdatei
+            // und in die Marker der Eye-Tracking-Aufnahme.
             return new CheckerboardStimulusSnapshot
             {
                 timestampSeconds = Time.realtimeSinceStartupAsDouble,
@@ -380,40 +387,40 @@ namespace GlobeEffect.VRCheckerboard
                 visualSpaceL = visualSpaceL,
                 contentZoom = contentZoom,
                 gridLineSpacingDegrees = gridLineSpacingDegrees,
-                gridLineSpacingUv = CalculateGridLineSpacingUv(),
+                gridLineSpacingUv = GridSpacingInUv(),
                 eyePresentation = eyePresentation
             };
         }
 
-        private void ApplyAll()
+        private void UpdateEverything()
         {
-            // Gemeinsamer Einstieg, wenn die gesamte Darstellung neu aufgebaut wird.
-            EnsureResources();
-            ApplyObserverPose();
-            ApplyMaterialProperties();
-            ApplyVisibility();
+            // Sammelstelle, wenn die ganze Anzeige neu aufgebaut werden soll.
+            SetupMeshAndMaterial();
+            MoveQuadInFrontOfHead();
+            SendValuesToShader();
+            ShowOrHideObjects();
         }
 
-        private void ApplyObserverPose()
+        private void MoveQuadInFrontOfHead()
         {
             if (observer == null)
             {
                 return;
             }
 
-            // Die Fläche liegt technisch einen Meter vor der Kamera. Ihre Eckpunkte
-            // werden im Shader aber als Richtungen projiziert. Darum entsteht keine
-            // binokulare Tiefe von einem Meter und der Stimulus wirkt unendlich fern.
+            // Das Viereck liegt einen Meter vor der Kamera. Der Shader behandelt
+            // seine Ecken aber als reine Richtungen. Deshalb sehen die Augen keine
+            // Tiefe von einem Meter, sondern etwas unendlich weit Entferntes.
             transform.SetPositionAndRotation(
-                observer.position + observer.forward * CarrierDistanceMeters,
+                observer.position + observer.forward * QuadDistanceMeters,
                 Quaternion.LookRotation(observer.forward, observer.up));
             transform.localScale = Vector3.one;
         }
 
-        private void ApplyMaterialProperties()
+        private void SendValuesToShader()
         {
-            // Der MaterialPropertyBlock übergibt die Inspector-Werte an diesen
-            // Renderer, ohne das verwendete Material dauerhaft zu verändern.
+            // Der MaterialPropertyBlock schiebt die Werte aus dem Inspector nur zu
+            // diesem einen Renderer. Das Material selbst bleibt dabei unverändert.
             if (meshRenderer == null)
             {
                 return;
@@ -431,14 +438,16 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetFloat("_ContentZoom", contentZoom);
             propertyBlock.SetFloat(
                 "_GridLineSpacingUv",
-                CalculateGridLineSpacingUv());
+                GridSpacingInUv());
             propertyBlock.SetColor("_DarkColor", darkColor);
             propertyBlock.SetColor("_LightColor", lightColor);
             propertyBlock.SetColor("_FixationBackgroundColor", fixationBackgroundColor);
             propertyBlock.SetFloat("_CheckerboardEnabled", checkerboardVisible ? 1f : 0f);
             propertyBlock.SetFloat("_NoiseEnabled", noiseVisible ? 1f : 0f);
-            propertyBlock.SetFloat("_NoiseCellSizeUv", CalculateNoiseCellSizeUv());
+            propertyBlock.SetFloat("_NoiseCellSizeUv", NoiseSizeInUv());
             propertyBlock.SetFloat("_NoiseSeed", currentNoiseSeed);
+            // Beim Antworttext wird immer auf beiden Augen gezeigt, damit der Text
+            // auch im Monokular-Durchgang gut lesbar bleibt.
             propertyBlock.SetFloat(
                 "_EyeMode",
                 responsePromptVisible
@@ -450,14 +459,14 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetFloat("_FixationHalfSizeRad",
                 0.5f * fixationTargetSizeDegrees * Mathf.Deg2Rad);
             propertyBlock.SetColor("_FixationColor", fixationColor);
-            ApplyObserverProperties(propertyBlock);
+            AddHeadPose(propertyBlock);
             meshRenderer.SetPropertyBlock(propertyBlock);
         }
 
-        private void ApplyObserverMaterialProperties()
+        private void SendHeadPoseToShader()
         {
-            // Kopfwerte ändern sich ständig, die übrigen Parameter dagegen meist
-            // nur beim Start eines Trials. Deshalb gibt es dafür eine kurze Methode.
+            // Die Kopfposition ändert sich dauernd, der Rest meist nur am Anfang
+            // eines Durchgangs. Deshalb gibt es hier eine kurze eigene Methode.
             if (meshRenderer == null)
             {
                 return;
@@ -465,121 +474,123 @@ namespace GlobeEffect.VRCheckerboard
 
             propertyBlock ??= new MaterialPropertyBlock();
             meshRenderer.GetPropertyBlock(propertyBlock);
-            ApplyObserverProperties(propertyBlock);
+            AddHeadPose(propertyBlock);
             meshRenderer.SetPropertyBlock(propertyBlock);
         }
 
-        private void ApplyObserverProperties(MaterialPropertyBlock block)
+        private void AddHeadPose(MaterialPropertyBlock block)
         {
-            // Aus diesen vier Angaben baut der Shader sein kopffestes Koordinatensystem.
-            Transform basis = observer != null ? observer : transform;
-            block.SetVector("_ObserverWorldPosition", basis.position);
-            block.SetVector("_ObserverWorldRight", basis.right);
-            block.SetVector("_ObserverWorldUp", basis.up);
-            block.SetVector("_ObserverWorldForward", basis.forward);
+            // Aus diesen vier Angaben baut sich der Shader sein eigenes
+            // Koordinatensystem, das am Kopf hängt.
+            Transform head = observer != null ? observer : transform;
+            block.SetVector("_ObserverWorldPosition", head.position);
+            block.SetVector("_ObserverWorldRight", head.right);
+            block.SetVector("_ObserverWorldUp", head.up);
+            block.SetVector("_ObserverWorldForward", head.forward);
         }
 
-        private float CalculateGridLineSpacingUv()
+        private float GridSpacingInUv()
         {
-            // Beispiel: 10 Grad werden bei einem FOV von 90 Grad zu ungefähr
-            // 0,1763 im normierten linearen u/v-Koordinatensystem.
+            // Beispiel: Bei 90 Grad FOV werden aus 10 Grad ungefähr 0,1763
+            // in u/v-Koordinaten.
             return (float)VisualSpaceRadialMapping.NormalizedGridLineSpacing(
                 angularDiameterDegrees,
                 gridLineSpacingDegrees);
         }
 
-        private float CalculateNoiseCellSizeUv()
+        private float NoiseSizeInUv()
         {
-            // Genau wie die Gitterweite wird auch die Noise-Größe von Grad in den
-            // normierten linearen Bildraum umgerechnet.
+            // Läuft genauso wie beim Gitter: von Grad in u/v-Koordinaten umrechnen.
             return (float)VisualSpaceRadialMapping.NormalizedGridLineSpacing(
                 angularDiameterDegrees,
                 noiseCellSizeDegrees);
         }
 
-        private void ApplyVisibility()
+        private void ShowOrHideObjects()
         {
             if (meshRenderer != null)
             {
                 meshRenderer.enabled = isVisible;
             }
 
-            if (ownedResponsePromptObject != null)
+            if (textObject != null)
             {
-                ownedResponsePromptObject.SetActive(
-                    isVisible && responsePromptVisible);
+                textObject.SetActive(isVisible && responsePromptVisible);
             }
         }
 
-        private void EnsureResponsePrompt()
+        private void SetupTextObject()
         {
-            if (ownedResponsePromptObject == null)
+            if (textObject == null)
             {
-                // Der Text wird erst beim ersten Antwortbildschirm erzeugt. Dadurch
-                // braucht die Unity-Szene kein zusätzlich vorbereitetes UI-Objekt.
-                ownedResponsePromptObject = new GameObject(
-                    "Runtime Checkerboard Response Prompt")
+                // Der Text wird erst gebaut, wenn er zum ersten Mal gebraucht wird.
+                // So muss in der Unity-Szene kein extra UI-Objekt liegen.
+                textObject = new GameObject("Runtime Checkerboard Response Prompt")
                 {
                     hideFlags = HideFlags.HideAndDontSave
                 };
-                ownedResponsePromptObject.transform.SetParent(transform, false);
-                responseTextMesh = ownedResponsePromptObject.AddComponent<TextMesh>();
-                responseTextMesh.anchor = TextAnchor.MiddleCenter;
-                responseTextMesh.alignment = TextAlignment.Center;
-                responseTextMesh.fontSize = 64;
-                responseTextMesh.lineSpacing = 1f;
-                responseTextMesh.richText = false;
+                textObject.transform.SetParent(transform, false);
+                textMesh = textObject.AddComponent<TextMesh>();
+                textMesh.anchor = TextAnchor.MiddleCenter;
+                textMesh.alignment = TextAlignment.Center;
+                textMesh.fontSize = 64;
+                textMesh.lineSpacing = 1f;
+                textMesh.richText = false;
 
                 Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
                 if (font != null)
                 {
-                    responseTextMesh.font = font;
-                    ownedResponsePromptMaterial = new Material(font.material)
+                    textMesh.font = font;
+                    // Die hohe Render Queue sorgt dafür, dass der Text immer vor
+                    // dem grauen Hintergrund liegt und nicht dahinter verschwindet.
+                    textMaterial = new Material(font.material)
                     {
                         name = "Runtime Checkerboard Response Text Material",
                         hideFlags = HideFlags.HideAndDontSave,
                         renderQueue = 5000
                     };
-                    MeshRenderer promptRenderer =
-                        ownedResponsePromptObject.GetComponent<MeshRenderer>();
-                    promptRenderer.sharedMaterial = ownedResponsePromptMaterial;
-                    promptRenderer.sortingOrder = short.MaxValue;
+                    MeshRenderer textRenderer = textObject.GetComponent<MeshRenderer>();
+                    textRenderer.sharedMaterial = textMaterial;
+                    textRenderer.sortingOrder = short.MaxValue;
                 }
             }
 
-            responseTextMesh ??= ownedResponsePromptObject.GetComponent<TextMesh>();
-            responseTextMesh.characterSize = responsePromptCharacterSize;
-            responseTextMesh.color = responsePromptColor;
-            ownedResponsePromptObject.transform.localPosition = Vector3.forward *
-                Mathf.Max(0.01f, responsePromptDistanceMeters - CarrierDistanceMeters);
-            ownedResponsePromptObject.transform.localRotation = Quaternion.identity;
-            ownedResponsePromptObject.transform.localScale = Vector3.one;
+            textMesh ??= textObject.GetComponent<TextMesh>();
+            textMesh.characterSize = responsePromptCharacterSize;
+            textMesh.color = responsePromptColor;
+            // Der Text steht weiter vorne als das Viereck. Deshalb wird der
+            // Abstand des Vierecks hier wieder abgezogen.
+            textObject.transform.localPosition = Vector3.forward *
+                Mathf.Max(0.01f, responsePromptDistanceMeters - QuadDistanceMeters);
+            textObject.transform.localRotation = Quaternion.identity;
+            textObject.transform.localScale = Vector3.one;
         }
 
-        private void EnsureResources()
+        private void SetupMeshAndMaterial()
         {
-            // MeshFilter hält die Trägerfläche, MeshRenderer zeichnet sie mit dem
-            // Checkerboard-Shader. Beides sitzt am selben GameObject.
+            // Der MeshFilter hält das Viereck, der MeshRenderer zeichnet es mit
+            // dem Checkerboard-Shader. Beide sitzen auf demselben GameObject.
             meshFilter ??= GetComponent<MeshFilter>();
             meshRenderer ??= GetComponent<MeshRenderer>();
 
-            if (ownedMesh == null)
+            if (quadMesh == null)
             {
-                // Die Trägerfläche ist immer gleich und muss nur einmal entstehen.
-                ownedMesh = BuildCarrierQuad();
+                // Das Viereck sieht immer gleich aus und muss nur einmal gebaut werden.
+                quadMesh = CreateQuad();
             }
 
-            if (meshFilter != null && meshFilter.sharedMesh != ownedMesh)
+            if (meshFilter != null && meshFilter.sharedMesh != quadMesh)
             {
-                meshFilter.sharedMesh = ownedMesh;
+                meshFilter.sharedMesh = quadMesh;
             }
 
-            Material desiredMaterial = materialOverride;
-            if (desiredMaterial == null)
+            Material materialToUse = materialOverride;
+            if (materialToUse == null)
             {
-                // Ohne eigenes Inspector-Material erzeugt das Skript automatisch
-                // ein nicht gespeichertes Laufzeitmaterial mit dem richtigen Shader.
-                if (ownedMaterial == null)
+                // Ist im Inspector kein eigenes Material eingetragen, baut sich das
+                // Skript selbst eins mit dem richtigen Shader. Das wird nicht
+                // gespeichert und ist nach dem Schließen wieder weg.
+                if (shaderMaterial == null)
                 {
                     Shader shader = Resources.Load<Shader>(ShaderResourceName);
                     shader ??= Shader.Find(ShaderFallbackName);
@@ -589,27 +600,27 @@ namespace GlobeEffect.VRCheckerboard
                         return;
                     }
 
-                    ownedMaterial = new Material(shader)
+                    shaderMaterial = new Material(shader)
                     {
                         name = "Runtime Helmholtz Checkerboard Material",
                         hideFlags = HideFlags.HideAndDontSave
                     };
                 }
 
-                desiredMaterial = ownedMaterial;
+                materialToUse = shaderMaterial;
             }
 
-            if (meshRenderer != null && meshRenderer.sharedMaterial != desiredMaterial)
+            if (meshRenderer != null && meshRenderer.sharedMaterial != materialToUse)
             {
-                meshRenderer.sharedMaterial = desiredMaterial;
+                meshRenderer.sharedMaterial = materialToUse;
             }
         }
 
-        private static Mesh BuildCarrierQuad()
+        private static Mesh CreateQuad()
         {
-            // Vier Eckpunkte und zwei Dreiecke ergeben ein Quadrat. Dieses Quadrat
-            // trägt später das pro Pixel berechnete Muster, ist aber nicht selbst
-            // das wissenschaftliche Schachbrett.
+            // Vier Ecken und zwei Dreiecke ergeben ein Quadrat. Auf diesem Quadrat
+            // malt der Shader später das Muster. Das Quadrat selbst ist also nicht
+            // das Schachbrett, sondern nur die Leinwand.
             var mesh = new Mesh
             {
                 name = "Runtime Checkerboard Direction Quad",
@@ -634,9 +645,10 @@ namespace GlobeEffect.VRCheckerboard
             return mesh;
         }
 
-        private void ValidateSerializedFields()
+        private void ClampInspectorValues()
         {
-            // Schutz für manuelle Inspector-Eingaben und ältere gespeicherte Szenen.
+            // Fängt Werte ab, die jemand von Hand eingetippt hat. Und alte Szenen,
+            // in denen noch Werte von früher stehen.
             angularDiameterDegrees = Mathf.Clamp(angularDiameterDegrees, 1f, 170f);
             apertureEdgeSoftnessDegrees = Mathf.Clamp(
                 apertureEdgeSoftnessDegrees,
@@ -654,29 +666,29 @@ namespace GlobeEffect.VRCheckerboard
                 0.1f);
         }
 
-        private static void DestroyOwnedObject(UnityEngine.Object ownedObject)
+        private static void DeleteObject(UnityEngine.Object objectToDelete)
         {
-            if (ownedObject == null)
+            if (objectToDelete == null)
             {
                 return;
             }
 
             if (Application.isPlaying)
             {
-                // Im Play Mode löscht Unity das Objekt sicher am Ende des Frames.
-                Destroy(ownedObject);
+                // Im Play Mode räumt Unity das am Ende vom Frame weg.
+                Destroy(objectToDelete);
             }
             else
             {
-                // Außerhalb des Play Modes wird die Editor-Vorschau sofort erneuert.
-                DestroyImmediate(ownedObject);
+                // Außerhalb vom Play Mode sofort, damit die Vorschau gleich stimmt.
+                DestroyImmediate(objectToDelete);
             }
         }
     }
 
-    // Diese beiden kurzen Listen stehen hier beim Stimulus, weil sie direkt
-    // festlegen, wie er gezeigt und wie die Antwort gespeichert wird. Dafür
-    // sind keine eigenen Skriptdateien nötig.
+    // Diese beiden kurzen Listen stehen hier mit beim Stimulus. Sie sagen direkt,
+    // wie gezeigt wird und wie die Antwort gespeichert wird. Dafür lohnen sich
+    // keine eigenen Dateien.
     public enum CheckerboardEyePresentation
     {
         BothEyes = 0,
@@ -691,8 +703,8 @@ namespace GlobeEffect.VRCheckerboard
         Convex = 2
     }
 
-    // Momentaufnahme der tatsächlich im Shader gesetzten Werte. Diese wird
-    // für die Eye-Tracking-Marker verwendet.
+    // Ein Foto von den Werten, die gerade wirklich im Shader stehen.
+    // Das wandert in die Marker der Eye-Tracking-Aufnahme.
     [Serializable]
     public struct CheckerboardStimulusSnapshot
     {

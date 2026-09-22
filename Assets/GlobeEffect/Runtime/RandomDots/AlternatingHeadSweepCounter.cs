@@ -3,12 +3,17 @@ using System;
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
-    /// Zählt nur echte Wechsel zwischen linker und rechter Winkelschwelle.
-    /// Mehrere Frames auf derselben Seite dürfen keinen weiteren Sweep
-    /// erzeugen. Die Klasse ist unabhängig von Unity-Transforms testbar.
+    /// Zählt, wie oft der Kopf wirklich von links nach rechts und wieder zurück
+    /// gedreht wurde.
+    ///
+    /// Bleibt der Kopf mehrere Frames lang auf derselben Seite, wird das nicht
+    /// noch einmal gezählt. Es zählt nur ein echter Wechsel auf die andere Seite.
+    ///
+    /// Hier steht nichts von Unity drin, deshalb kann man es einzeln testen.
     /// </summary>
     public sealed class AlternatingHeadSweepCounter
     {
+        // Auf welcher Seite der Kopf zuletzt war: 1 rechts, -1 links, 0 noch nirgends.
         private int lastExtreme;
 
         public AlternatingHeadSweepCounter(float thresholdDegrees)
@@ -29,36 +34,39 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public float MaximumAbsoluteYawDegrees { get; private set; }
 
         /// <summary>
-        /// Liefert true, wenn dieser Sample einen neuen Seitenwechsel
-        /// abgeschlossen hat.
+        /// Wird für jeden neuen Kopfwinkel aufgerufen. Gibt true zurück, wenn
+        /// genau jetzt ein Wechsel auf die andere Seite fertig geworden ist.
         /// </summary>
         public bool Update(float yawDegrees)
         {
-            // Diese drei Werte beschreiben den gesamten bisherigen Trial und werden
-            // später zusammen mit dem Ergebnis gespeichert.
+            // Die drei Werte merken sich, wie weit der Kopf im ganzen Durchgang
+            // gedreht wurde. Sie werden später mit dem Ergebnis gespeichert.
             MinimumYawDegrees = Math.Min(MinimumYawDegrees, yawDegrees);
             MaximumYawDegrees = Math.Max(MaximumYawDegrees, yawDegrees);
             MaximumAbsoluteYawDegrees = Math.Max(
                 MaximumAbsoluteYawDegrees,
                 Math.Abs(yawDegrees));
 
+            // Wo ist der Kopf gerade?
+            // 1 heißt rechter Rand erreicht, -1 linker Rand, 0 irgendwo dazwischen.
             int currentExtreme = yawDegrees >= ThresholdDegrees
                 ? 1
                 : yawDegrees <= -ThresholdDegrees
                     ? -1
                     : 0;
-            // 1 = rechter Rand erreicht, -1 = linker Rand, 0 = dazwischen.
 
+            // Mittendrin oder immer noch auf derselben Seite: nichts passiert.
             if (currentExtreme == 0 || currentExtreme == lastExtreme)
             {
                 return false;
             }
 
+            // Nur wenn der Kopf vorher schon mal an einem Rand war, ist das jetzt
+            // ein echter Wechsel. Beim allerersten Rand gibt es noch nichts zu zählen.
             bool completedAlternation = lastExtreme != 0;
             lastExtreme = currentExtreme;
             if (completedAlternation)
             {
-                // Erst links -> rechts oder rechts -> links zählt als Halbschwenk.
                 CompletedHalfSweeps++;
             }
 

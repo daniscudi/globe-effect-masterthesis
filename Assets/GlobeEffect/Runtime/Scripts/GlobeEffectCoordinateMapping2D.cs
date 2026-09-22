@@ -4,17 +4,20 @@ using UnityEngine;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Enthält dieselben Koordinaten und Schwenkgleichungen, die auch in den
-    /// begleitenden Python-Plots verwendet werden. Dadurch rechnen Plot und
-    /// Unity-Projekt nicht mit zwei unterschiedlichen Definitionen.
+    /// Die Umrechnungen für die Vergleichsplots.
     ///
-    /// Ein 3D-Punkt (X,Y,Z) wird zuerst durch die perspektivische Teilung zu
-    /// x = X/Z und y = Y/Z. Mit der Vergrößerung m entsteht daraus der lineare
-    /// Bildpunkt u = m*x und v = m*y. Erst danach wird verglichen, wie Schön
-    /// oder Merlitz denselben Punkt in Winkelkoordinaten umrechnen.
+    /// Genau dieselben Formeln stecken auch in den Python-Plots. Dadurch rechnen
+    /// die Plots und das Unity-Projekt nicht aus Versehen verschieden.
+    ///
+    /// Der Weg ist immer gleich: Ein Punkt im Raum (X,Y,Z) wird erst durch Z
+    /// geteilt, das gibt x = X/Z und y = Y/Z. Mit der Vergrößerung m kommt man
+    /// dann auf den Bildpunkt u = m*x und v = m*y. Erst danach wird verglichen,
+    /// was Schön und was Merlitz aus demselben Punkt machen.
     /// </summary>
     public static class GlobeEffectCoordinateMapping2D
     {
+        // Kleiner als das behandeln wir als null. Sonst würde gleich durch
+        // fast nichts geteilt und die Zahlen würden explodieren.
         private const double MinimumMagnitude = 1e-12;
 
         public static Vector2 ObjectToLinearImage(
@@ -38,20 +41,24 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Wendet die Merlitz-Gleichung auf einen zweidimensionalen Punkt an.
-        /// Die Richtung von der Bildmitte zum Punkt bleibt gleich. Verändert
-        /// wird nur sein Abstand zur Mitte. Bei k = 1 ist das Ergebnis genau
-        /// der normale lineare Bildpunkt (u,v) = m(x,y).
+        /// Wendet die Merlitz-Formel auf einen Punkt im Bild an.
+        ///
+        /// In welche Richtung der Punkt von der Mitte aus liegt, bleibt gleich.
+        /// Es ändert sich nur, wie weit er von der Mitte weg ist.
+        ///
+        /// Bei k = 1 kommt genau der normale Bildpunkt (u,v) = m(x,y) heraus.
         /// </summary>
         public static Vector2 ObjectToMerlitzInstrumentImage(
             Vector2 objectGnomonic,
             double magnification,
             double k)
         {
+            // Wie weit ist der Punkt von der Mitte weg?
             double objectRadius = Math.Sqrt(
                 objectGnomonic.x * objectGnomonic.x +
                 objectGnomonic.y * objectGnomonic.y);
 
+            // Genau in der Mitte gibt es keine Richtung, also bleibt er da.
             if (objectRadius <= MinimumMagnitude)
             {
                 return Vector2.zero;
@@ -63,13 +70,17 @@ namespace GlobeEffect.VRCheckerboard
                 magnification,
                 k);
 
+            // Ab 90 Grad läge der Punkt seitlich oder hinter einem. Auf einer
+            // flachen Bildfläche lässt sich das nicht mehr darstellen.
             if (apparentAngle >= Math.PI / 2.0)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(objectGnomonic),
-                    "Die Abbildung liegt außerhalb des frontalen planaren Bildraums.");
+                    "Dieser Punkt liegt zu weit außen und passt nicht mehr aufs flache Bild.");
             }
 
+            // Der Punkt wird auf seiner Linie zur Mitte nur nach außen oder innen
+            // geschoben. Deshalb reicht ein gemeinsamer Faktor für x und y.
             double imageRadius = Math.Tan(apparentAngle);
             double scale = imageRadius / objectRadius;
             return new Vector2(
@@ -78,9 +89,10 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Berechnet die neue lineare Bildposition eines ruhenden fernen Punktes,
-        /// nachdem die Kamera horizontal um psi gedreht wurde. Die Ausgangsposition
-        /// bei psi = 0 wird bereits als (u,v) übergeben.
+        /// Ein weit entfernter Punkt steht still, die Kamera dreht sich um psi
+        /// zur Seite. Wo liegt der Punkt danach im Bild?
+        ///
+        /// Wo er vor der Drehung lag, wird schon als (u,v) übergeben.
         /// </summary>
         public static Vector2 LinearImageAfterHorizontalPan(
             Vector2 linearImageAtZero,
@@ -94,11 +106,13 @@ namespace GlobeEffect.VRCheckerboard
             double cos = Math.Cos(panRadians);
             double denominator = objectAtZero.x * sin + cos;
 
+            // Wird der Nenner null, liegt der Punkt nach der Drehung genau seitlich.
+            // Dann gibt es keine Stelle im Bild mehr für ihn.
             if (Math.Abs(denominator) <= MinimumMagnitude)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(panRadians),
-                    "Der Punkt liegt für diesen Schwenkwinkel in der Projektionsebene.");
+                    "Bei diesem Drehwinkel liegt der Punkt genau seitlich und hat keine Bildposition mehr.");
             }
 
             double x = (objectAtZero.x * cos - sin) / denominator;
@@ -109,8 +123,8 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Berechnet, wie schnell und in welche Richtung sich der lineare
-        /// Bildpunkt in diesem Moment pro Radiant Kameradrehung bewegt.
+        /// Wie schnell und in welche Richtung wandert ein Bildpunkt gerade,
+        /// wenn sich die Kamera dreht? Der Wert gilt pro Radiant Drehung.
         /// </summary>
         public static Vector2 LinearImageVelocityForHorizontalPan(
             Vector2 linearImage,
@@ -125,9 +139,10 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Schöns Regel wird getrennt auf die horizontale und vertikale Achse
-        /// angewendet: (atan(u), atan(v)). Horizontal kennt dabei nur u und
-        /// vertikal nur v. Das Ergebnis wird in Radiant zurückgegeben.
+        /// Die Regel von Schön: atan wird einzeln auf u und auf v angewendet.
+        ///
+        /// Waagerecht zählt also nur u und senkrecht nur v. Die beiden Achsen
+        /// wissen nichts voneinander. Zurück kommt der Winkel im Bogenmaß.
         /// </summary>
         public static Vector2 LinearImageToSchoenAngular(Vector2 linearImage)
         {
@@ -137,11 +152,11 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Radiale Winkelkoordinaten für den Plotfall k = 1 und l = 0. Hier wird
-        /// zuerst der gemeinsame Radius r aus u und v berechnet und anschließend
-        /// mit atan(r) in einen Winkel umgerechnet. Die Richtung bleibt erhalten.
-        /// Das ist die Plotdarstellung und nicht der einstellbare k-Regler des
-        /// Checkerboard-Trials.
+        /// Dasselbe, aber nach Merlitz: Hier wird erst der gemeinsame Abstand r
+        /// aus u und v gebildet und dann atan(r) gerechnet. Die Richtung bleibt.
+        ///
+        /// Das gilt für den Plotfall k = 1 und l = 0. Es hat nichts mit dem
+        /// k-Regler im Checkerboard-Versuch zu tun.
         /// </summary>
         public static Vector2 LinearImageToMerlitzAngular(Vector2 linearImage)
         {

@@ -3,32 +3,35 @@ using System;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Hier steht die Merlitz-Gleichung für eine mögliche spätere Simulation
-    /// eines echten Fernglases und für die Vergleichsplots. Sie wird im Moment
-    /// weder vom Checkerboard noch vom Random-Dot-Piloten aufgerufen. Beide
-    /// Versuchsszenen benutzen derzeit die getrennte Visual-Space-l-Abbildung.
-    /// Die Gleichung stammt aus Merlitz
-    /// (JOSA A 27, 50-57, 2010):
+    /// Die Fernglas-Formel von Merlitz.
+    ///
+    /// Achtung: Diese Datei wird im Moment von keinem der beiden Versuche benutzt.
+    /// Sie liegt hier für Vergleichsrechnungen und für den Fall, dass später
+    /// wirklich ein Fernglas nachgebaut werden soll. Checkerboard und Random-Dot
+    /// benutzen zurzeit die andere Formel mit l.
+    ///
+    /// Die Gleichung steht bei Merlitz (JOSA A 27, 50-57, 2010):
     ///
     ///     tan(k a) = m tan(k A)
     ///
-    /// A ist der ursprüngliche Winkel eines Punktes und a der Winkel, unter dem
-    /// der Punkt nach der Abbildung erscheint. m ist die Vergrößerung in der
-    /// Nähe der Bildmitte. k bestimmt, wie sich die Abbildung zum Rand hin
-    /// verhält. Für k = 0 wird der Grenzfall a = m A verwendet.
+    /// A ist der Winkel, unter dem ein Punkt in Wirklichkeit liegt. a ist der
+    /// Winkel, unter dem man ihn durch das Fernglas sieht. m ist die Vergrößerung
+    /// in der Mitte des Bildes. k sagt, wie sich das Ganze zum Rand hin verhält.
+    /// Bei k = 0 bleibt einfach a = m A übrig.
     ///
-    /// In dieser Datei steht nur die Mathematik. Darstellung und Bewegung einer
-    /// späteren Fernglassimulation würden im Stimulus gesteuert.
+    /// Hier steht nur die Mathematik. Wie so ein Fernglas später aussehen und sich
+    /// bewegen würde, käme in den Stimulus.
     /// </summary>
     public static class MerlitzBinocularReferenceMath
     {
-        private const double KLimitEpsilon = 1e-7;
+        private const double AlmostZero = 1e-7;
 
         /// <summary>
-        /// Vorwärtsrichtung der Gleichung: Zu einem ursprünglichen Objektwinkel
-        /// A wird berechnet, bei welchem sichtbaren Winkel a der Punkt landet.
-        /// Diese Richtung wird für die Vergleichsrechnung und später eventuell
-        /// für einen eigenen Fernglasmodus des Random-Dot-Tests benötigt.
+        /// Der Weg vorwärts: Ein Punkt liegt in Wirklichkeit beim Winkel A.
+        /// Unter welchem Winkel a sieht man ihn durch das Fernglas?
+        ///
+        /// Diese Richtung braucht man für die Vergleichsrechnungen und später
+        /// vielleicht für einen eigenen Fernglasmodus beim Random-Dot-Test.
         /// </summary>
         public static double ApparentAngleFromObject(
             double objectAngleRadians,
@@ -37,9 +40,9 @@ namespace GlobeEffect.VRCheckerboard
         {
             Validate(magnification, k);
 
-            // Direkt durch k zu teilen wäre bei k = 0 nicht möglich. Der hier
-            // verwendete Grenzfall ist genau das Ergebnis für k gegen null.
-            if (k < KLimitEpsilon)
+            // Durch k teilen geht bei k = 0 nicht. Der Wert hier ist genau das,
+            // was herauskommt, wenn k immer kleiner wird.
+            if (k < AlmostZero)
             {
                 return magnification * objectAngleRadians;
             }
@@ -49,9 +52,10 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Rückwärtsrichtung der Gleichung: Zu einem bereits sichtbaren Winkel a
-        /// wird der ursprüngliche Objektwinkel A gesucht. Diese Richtung wird
-        /// noch für mathematische Vergleiche und Plot-Abbildungen verwendet.
+        /// Der Weg rückwärts: Man sieht einen Punkt unter dem Winkel a.
+        /// Wo liegt er in Wirklichkeit, also bei welchem Winkel A?
+        ///
+        /// Diese Richtung wird für die Vergleichsrechnungen und die Plots benutzt.
         /// </summary>
         public static double ObjectAngleFromApparent(
             double apparentAngleRadians,
@@ -60,7 +64,7 @@ namespace GlobeEffect.VRCheckerboard
         {
             Validate(magnification, k);
 
-            if (k < KLimitEpsilon)
+            if (k < AlmostZero)
             {
                 return apparentAngleRadians / magnification;
             }
@@ -70,18 +74,16 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Rechnet die Position eines sichtbaren Pixels zurück auf das gerade
-        /// Ausgangsmuster des Checkerboards.
+        /// Rechnet eine Stelle im fertigen Bild zurück auf das gerade Ausgangsmuster.
         ///
-        /// normalizedDisplayRadius beschreibt die Stelle im fertigen Kreis:
-        /// 0 ist die Mitte und 1 ist der Rand. Die Rückgabe beschreibt die
-        /// passende Stelle im ursprünglichen geraden Schachbrett ebenfalls von
-        /// 0 bis 1. Der Shader liest anschließend an dieser Stelle ab, ob das
-        /// Feld schwarz oder weiß ist.
+        /// normalizedDisplayRadius sagt, wo im Kreis man ist: 0 ist die Mitte,
+        /// 1 ist der Rand. Zurück kommt die passende Stelle im geraden Schachbrett,
+        /// auch wieder von 0 bis 1. Der Shader schaut dann dort nach, ob das Feld
+        /// schwarz oder weiß ist.
         ///
-        /// Die Teilung durch den Wert am äußeren Rand sorgt dafür, dass der Rand
-        /// bei jedem k an derselben Stelle bleibt. Dadurch ändert k die Form der
-        /// Linien, aber nicht den eingestellten Winkeldurchmesser des Kreises.
+        /// Am Ende wird durch den Wert am Rand geteilt. Dadurch bleibt der Rand bei
+        /// jedem k an derselben Stelle. k ändert also nur die Form der Linien, aber
+        /// nicht, wie groß der Kreis ist.
         /// </summary>
         public static double NormalizedSourceRadius(
             double normalizedDisplayRadius,
@@ -100,21 +102,21 @@ namespace GlobeEffect.VRCheckerboard
                 throw new ArgumentOutOfRangeException(nameof(apparentHalfAngleRadians));
             }
 
-            // Schritt 1: Position im fertigen Kreis in einen sichtbaren Winkel
-            // umrechnen. Der Halbwinkel entspricht dem eingestellten FOV-Rand.
+            // Schritt 1: Von der Stelle im Kreis auf den Winkel kommen, unter dem
+            // man diesen Punkt sieht. Der halbe Winkel ist der eingestellte Rand.
             double tangentAtBoundary = Math.Tan(apparentHalfAngleRadians);
             double apparentAngle = Math.Atan(
                 normalizedDisplayRadius * tangentAtBoundary);
 
-            // Schritt 2: Mit der rückwärts gelösten Merlitz-Gleichung bestimmen,
-            // von welchem ursprünglichen Winkel dieser sichtbare Winkel kommt.
+            // Schritt 2: Mit der Formel rückwärts nachschauen, von welchem
+            // wirklichen Winkel dieser gesehene Winkel kommt.
             double objectAngle = ObjectAngleFromApparent(
                 apparentAngle,
                 magnification,
                 k);
 
-            // Schritt 3: Auch den äußeren Rand zurückrechnen. Durch die anschließende
-            // Teilung wird die gesuchte Position wieder auf den Bereich 0 bis 1 gesetzt.
+            // Schritt 3: Dasselbe noch einmal für den äußeren Rand. Durch das
+            // Teilen landet das Ergebnis wieder sauber zwischen 0 und 1.
             double maximumObjectAngle = ObjectAngleFromApparent(
                 apparentHalfAngleRadians,
                 magnification,
@@ -125,8 +127,8 @@ namespace GlobeEffect.VRCheckerboard
 
         private static void Validate(double magnification, double k)
         {
-            // Ungültige Werte würden keine sinnvolle Winkelabbildung ergeben und
-            // sollen deshalb früh mit einer klaren Meldung auffallen.
+            // Falsche Werte würden hier nur Unsinn ergeben. Besser gleich meckern,
+            // als später komische Bilder zu suchen.
             if (magnification <= 0.0)
             {
                 throw new ArgumentOutOfRangeException(
@@ -138,7 +140,7 @@ namespace GlobeEffect.VRCheckerboard
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(k),
-                    "Merlitz parametrisiert k im Bereich 0 bis 1.");
+                    "Bei Merlitz liegt k zwischen 0 und 1.");
             }
         }
     }

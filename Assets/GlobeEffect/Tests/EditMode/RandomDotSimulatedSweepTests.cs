@@ -3,6 +3,13 @@ using NUnit.Framework;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
+    /// <summary>
+    /// Testet die Links-Rechts-Bewegung der Punkte.
+    ///
+    /// Bei 5 Grad Ausschlag und 5 Grad pro Sekunde weiß man genau, wo die
+    /// Bewegung nach jeder Sekunde stehen muss. Genau das wird hier nachgerechnet,
+    /// einmal für den Start nach rechts und einmal für den Start nach links.
+    /// </summary>
     public sealed class RandomDotSimulatedSweepTests
     {
         [Test]

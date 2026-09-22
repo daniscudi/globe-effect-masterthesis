@@ -4,8 +4,10 @@ using NUnit.Framework;
 namespace GlobeEffect.VRCheckerboard.Tests
 {
     /// <summary>
-    /// Sichert Merlitz' belegte Gleichung, ihre Inverse, den Grenzfall k=0 und
-    /// die für den Shader verwendete normierte Rückabbildung ab.
+    /// Testet die Fernglas-Formel von Merlitz.
+    ///
+    /// Geprüft wird der Weg vorwärts und der Weg rückwärts, der Sonderfall k = 0
+    /// und die normierte Rückrechnung, die genauso auch im Shader steckt.
     /// </summary>
     public sealed class MerlitzBinocularReferenceMathTests
     {

@@ -5,9 +5,13 @@ using GlobeEffect.VRCheckerboard.RandomDots;
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
     /// <summary>
-    /// Erzeugt den Random-Dot-Plan nach der Methode konstanter Reize. Jeder
-    /// vorgegebene l-Wert kommt gleich oft vor. Die Person stellt nichts ein,
-    /// sondern erhält nach jeder Bewegung eine Konkav-/Konvex-Entscheidung.
+    /// Stellt vor der Sitzung die Liste aller Random-Dot-Durchgänge zusammen.
+    ///
+    /// Das Verfahren heißt "Methode konstanter Reize": Jeder l-Wert kommt gleich
+    /// oft dran, und zwar in zufälliger Reihenfolge.
+    ///
+    /// Die Person kann nichts einstellen. Sie sieht die Bewegung und sagt danach
+    /// nur, ob es konkav oder konvex aussah.
     /// </summary>
     public static class RandomDotTrialPlanner
     {
@@ -21,7 +25,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             int randomSeed,
             int dotSeedBase)
         {
-            // Alle Inspector-Listen werden geprüft, bevor daraus Trials entstehen.
+            // Erst prüfen, ob die Werte stimmen. Lieber hier abbrechen, als mitten
+            // in der Messung zu merken, dass etwas nicht passt.
             ValidateValues(
                 angularDiametersDegrees,
                 eyePresentations,
@@ -34,19 +39,22 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             int conditionIndex = 0;
             int contextIndex = 0;
 
+            // Die ineinander liegenden Schleifen gehen jede Kombination einmal durch:
+            // jedes FOV mit jedem Augenmodus mit jeder Bewegungsart mit jedem Zoom
+            // mit jedem l. Jede davon kommt gleich oft dran.
             foreach (float angularDiameter in angularDiametersDegrees)
             {
-                // Diese Schleifen bilden jede Kombination aus FOV, Auge, Bewegung,
-                // Zoom und l. Jede Bedingung erhält gleich viele Wiederholungen.
                 foreach (CheckerboardEyePresentation eye in eyePresentations)
                 {
                     foreach (RandomDotMotionMode motionMode in motionModes)
                     {
                         contextIndex++;
+
+                        // Damit nicht immer alles nach rechts losgeht, wird hier je
+                        // nach Bedingung zwischen links und rechts gewechselt. Das
+                        // Ergebnis ist entweder 0 oder 1 und dreht die Startseite um.
                         int directionOffset = unchecked(
                             randomSeed + contextIndex * 7919) & 1;
-                        // directionOffset wechselt ausbalanciert, ob der erste
-                        // Schwenk nach links oder rechts startet.
 
                         foreach (float contentZoom in contentZoomValues)
                         {
@@ -57,9 +65,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                                     repetition <= repetitions;
                                     repetition++)
                                 {
-                                    // Derselbe Seed wird bei allen l-Werten einer
-                                    // Wiederholung verwendet. Dadurch ist keine
-                                    // Punktverteilung fest mit einem l verbunden.
+                                    // Innerhalb einer Wiederholung bekommen alle
+                                    // l-Werte denselben Punkt-Seed, also genau
+                                    // dieselben Punkte. Sonst könnte es passieren,
+                                    // dass eine bestimmte Punktverteilung immer nur
+                                    // bei einem bestimmten l auftaucht, und dann
+                                    // wüsste man nicht, woran die Antwort lag.
                                     int dotSeed = unchecked(
                                         dotSeedBase +
                                         contextIndex * 1009 +
@@ -87,8 +98,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 }
             }
 
+            // Jetzt wird gemischt. Das Verfahren heißt Fisher-Yates: Man geht von
+            // hinten durch und tauscht jeden Eintrag mit einem zufälligen Eintrag
+            // weiter vorne. Durch den Seed kommt dabei immer dasselbe heraus.
             var random = new Random(randomSeed);
-            // Fisher-Yates mischt den fertigen Plan reproduzierbar mit dem Seed.
             for (int index = trials.Count - 1; index > 0; index--)
             {
                 int swapIndex = random.Next(index + 1);
@@ -96,9 +109,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     (trials[swapIndex], trials[index]);
             }
 
+            // Die Nummer 1, 2, 3 ... wird erst jetzt vergeben, nach dem Mischen.
+            // So passt sie zu der Reihenfolge, die später wirklich gezeigt wird.
             for (int index = 0; index < trials.Count; index++)
             {
-                // Erst nach der Mischung bekommen die Trials ihre Reihenfolgennummer.
                 trials[index] = trials[index].WithSequenceIndex(index + 1);
             }
 
@@ -113,6 +127,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             IReadOnlyList<RandomDotMotionMode> motionModes,
             int repetitions)
         {
+            // In jeder Liste muss mindestens ein Wert stehen, sonst gibt es gar
+            // keine Kombinationen und der Plan wäre leer.
             RequireNonEmpty(angularDiametersDegrees, nameof(angularDiametersDegrees));
             RequireNonEmpty(eyePresentations, nameof(eyePresentations));
             RequireNonEmpty(visualSpaceLValues, nameof(visualSpaceLValues));
@@ -132,6 +148,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 }
             }
 
+            // Erst jedes l für sich prüfen, dann jedes l zusammen mit jedem FOV.
+            // Einzeln kann beides in Ordnung sein und zusammen trotzdem nicht gehen.
             foreach (float value in visualSpaceLValues)
             {
                 VisualSpaceRadialMapping.ValidateVisualSpaceL(value);
@@ -161,11 +179,15 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         }
     }
 
+    /// <summary>
+    /// Ein einzelner Durchgang.
+    ///
+    /// Hier stehen nur Werte drin, sonst nichts. Nach dem Anlegen wird daran auch
+    /// nichts mehr verändert. Zeigen tut das Ganze später der RandomDotFieldStimulus.
+    /// </summary>
     [Serializable]
     public sealed class RandomDotTrial
     {
-        // Ein RandomDotTrial ist nur ein unveränderlicher Datensatz. Die Darstellung
-        // selbst übernimmt später RandomDotFieldStimulus.
         public int SequenceIndex { get; }
         public int ConditionIndex { get; }
         public int Repetition { get; }
@@ -206,7 +228,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         internal RandomDotTrial WithSequenceIndex(int sequenceIndex)
         {
-            // Kopie mit neuer Sequenznummer, alle Versuchsbedingungen bleiben gleich.
+            // An einem fertigen Durchgang wird nichts mehr geändert. Für die neue
+            // Nummer wird deshalb eine Kopie gemacht, bei der sonst alles gleich bleibt.
             return new RandomDotTrial(
                 sequenceIndex,
                 ConditionIndex,
@@ -223,8 +246,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public RandomDotTrial CreateRepeatedAttempt()
         {
-            // Bei ungültiger Fixation wird dieselbe Punktverteilung und Bedingung
-            // erneut benutzt. Nur AttemptNumber wird um eins erhöht.
+            // Hat die Person danebengeschaut, kommt derselbe Durchgang noch einmal.
+            // Punkte und Bedingung bleiben exakt gleich, nur der Zähler für die
+            // Versuche geht eins hoch.
             return new RandomDotTrial(
                 SequenceIndex,
                 ConditionIndex,
@@ -240,9 +264,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         }
     }
 
-    // Enthält das Ergebnis einer tatsächlichen Präsentation. Auch ungültige
-    // Versuche werden gespeichert, damit später nachvollziehbar bleibt, warum
-    // eine Bedingung erneut gezeigt wurde.
+    /// <summary>
+    /// Was bei einem gezeigten Durchgang herausgekommen ist.
+    ///
+    /// Auch schiefgegangene Versuche landen hier und kommen in die CSV. Sonst
+    /// könnte man später nicht mehr nachvollziehen, warum eine Bedingung noch
+    /// einmal gezeigt wurde.
+    /// </summary>
     public sealed class RandomDotTrialResult
     {
         public RandomDotTrial Trial { get; }
@@ -332,7 +360,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         }
     }
 
-    // Einfache Warteschlange für neue Trials und hinten angehängte Wiederholungen.
+    /// <summary>
+    /// Die Warteschlange mit den Durchgängen, die noch kommen.
+    ///
+    /// Ging etwas schief, wird der Durchgang ganz hinten angehängt und nicht
+    /// sofort wiederholt. Sonst käme zweimal hintereinander dasselbe Bild.
+    /// </summary>
     public sealed class RandomDotTrialQueue
     {
         private readonly Queue<RandomDotTrial> pending = new();
@@ -354,7 +387,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public bool TryTakeNext(out RandomDotTrial trial)
         {
-            // Das vorderste Element wird entnommen. false bedeutet: Sitzung fertig.
+            // Holt den vordersten Eintrag heraus. Kommt false zurück, ist die
+            // Sitzung durch.
             if (pending.Count == 0)
             {
                 trial = null;
@@ -372,8 +406,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 throw new ArgumentNullException(nameof(invalidTrial));
             }
 
+            // Enqueue hängt hinten an. Genau das wollen wir hier: Der Durchgang
+            // kommt noch einmal dran, aber erst ganz am Schluss.
             RandomDotTrial repeat = invalidTrial.CreateRepeatedAttempt();
-            // Wiederholung bewusst hinten anhängen, damit sie nicht sofort folgt.
             pending.Enqueue(repeat);
             return repeat;
         }

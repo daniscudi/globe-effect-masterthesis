@@ -5,9 +5,11 @@ using UnityEngine.InputSystem;
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
-    /// Nimmt die beiden Antworten des Random-Dot-Tests entgegen. Die jeweilige
-    /// Reizbedingung wird vor dem Trial vom Experiment Manager gesetzt und kann
-    /// von der Versuchsperson nicht verändert werden.
+    /// Nimmt die beiden Antworten beim Random-Dot-Test entgegen.
+    ///
+    /// Was in einem Durchgang gezeigt wird, stellt vorher der Experiment Manager
+    /// ein. Die Versuchsperson kann daran nichts verändern, sie drückt nur eine
+    /// der beiden Tasten.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(RandomDotFieldStimulus))]
@@ -15,15 +17,15 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     {
         [Header("Tastensteuerung")]
         [SerializeField]
-        [Tooltip("Antwort: Die Bewegung beziehungsweise Fläche wirkt konkav.")]
+        [Tooltip("Taste für: die Bewegung wirkt konkav, also nach innen gewölbt.")]
         private Key concaveKey = Key.LeftArrow;
 
         [SerializeField]
-        [Tooltip("Antwort: Die Bewegung beziehungsweise Fläche wirkt konvex.")]
+        [Tooltip("Taste für: die Bewegung wirkt konvex, also nach außen gewölbt.")]
         private Key convexKey = Key.RightArrow;
 
         [SerializeField]
-        [Tooltip("Vertauscht die Bedeutung der beiden Tasten zwischen Versuchspersonen.")]
+        [Tooltip("Dreht die Bedeutung der beiden Tasten um. Das stellt man pro Person einmal ein.")]
         private bool swapResponseKeys;
 
         [SerializeField]
@@ -42,7 +44,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         private void Update()
         {
-            // Je nach Gegenbalancierung kann links/rechts im Inspector vertauscht sein.
+            // Links und rechts können im Inspector vertauscht sein. Das macht man,
+            // damit nicht bei allen Personen dieselbe Seite dieselbe Antwort ist.
             Keyboard keyboard = Keyboard.current;
             if (keyboard == null)
             {
@@ -71,8 +74,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         public void SubmitResponse(CheckerboardCurvatureResponse response)
         {
-            // Das Event gibt nur die gedrückte Antwort weiter. Ob sie gerade erlaubt
-            // ist und zu welchem Trial sie gehört, entscheidet der Experiment Manager.
+            // Hier wird die gedrückte Taste nur weitergemeldet. Ob die Antwort
+            // gerade überhaupt erlaubt ist und zu welchem Durchgang sie gehört,
+            // entscheidet der Experiment Manager.
             if (response == CheckerboardCurvatureResponse.None)
             {
                 return;

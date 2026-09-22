@@ -5,10 +5,13 @@ using UnityEngine.InputSystem;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Nimmt die beiden Antworten des Checkerboard-Tests entgegen. Für die
-    /// Versuchsperson heißen sie neutral Category A und Category B. Intern
-    /// bleiben die bisherigen Namen erhalten, damit ältere CSV-Auswertungen
-    /// weiterhin funktionieren.
+    /// Nimmt die beiden Antworten beim Checkerboard-Test entgegen.
+    ///
+    /// Die Versuchsperson hört nur Category A und Category B. Das sind absichtlich
+    /// neutrale Namen, damit nichts vorgegeben wird.
+    ///
+    /// Im Code und in den CSV-Dateien heißen sie weiter Concave und Convex. So
+    /// funktionieren die alten Auswertungen noch.
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(VrCheckerboardStimulus))]
@@ -16,19 +19,19 @@ namespace GlobeEffect.VRCheckerboard
     {
         [Header("Tastensteuerung")]
         [SerializeField]
-        [Tooltip("Antwort für Category B. Die Taste bleibt innerhalb einer Sitzung gleich.")]
+        [Tooltip("Taste für Category B. Sie bleibt während einer Sitzung gleich.")]
         private Key concaveKey = Key.DownArrow;
 
         [SerializeField]
-        [Tooltip("Antwort für Category A. Die Taste bleibt innerhalb einer Sitzung gleich.")]
+        [Tooltip("Taste für Category A. Sie bleibt während einer Sitzung gleich.")]
         private Key convexKey = Key.UpArrow;
 
         [SerializeField]
-        [Tooltip("Schreibt die Antwort zusätzlich in die Unity Console.")]
+        [Tooltip("Schreibt jede Antwort zusätzlich in die Unity Console.")]
         private bool logResponses;
 
         [SerializeField]
-        [Tooltip("Vertauscht Category A und B zwischen den beiden Antworttasten. Innerhalb einer Sitzung bleibt die Zuordnung fest.")]
+        [Tooltip("Dreht Category A und B auf die jeweils andere Taste. Das stellt man pro Person einmal ein und lässt es dann so.")]
         private bool swapResponseKeys;
 
         private VrCheckerboardStimulus stimulus;
@@ -37,8 +40,9 @@ namespace GlobeEffect.VRCheckerboard
 
         public bool SwapResponseKeys => swapResponseKeys;
 
-        // Der Antwortbildschirm fragt diese Methode ab, damit die angezeigte
-        // Taste auch bei vertauschter Zuordnung immer mit der Auswertung übereinstimmt.
+        // Der Antwortbildschirm fragt hier nach, welche Taste er anzeigen soll.
+        // Dadurch steht auf dem Bildschirm auch dann die richtige Taste, wenn die
+        // Belegung für diese Person gedreht ist.
         public Key GetKeyForResponse(CheckerboardCurvatureResponse response)
         {
             return response switch
@@ -53,6 +57,8 @@ namespace GlobeEffect.VRCheckerboard
             };
         }
 
+        // Macht aus dem Unity-Tastennamen etwas, das man auf dem Bildschirm
+        // lesen kann. Aus "UpArrow" wird zum Beispiel "UP".
         public static string GetReadableKeyName(Key key)
         {
             return key switch
@@ -74,9 +80,9 @@ namespace GlobeEffect.VRCheckerboard
 
         private void Update()
         {
-            // Die Zuordnung wird zwischen Personen über den Inspector vertauscht,
-            // während einer Sitzung aber nicht mehr verändert. Dadurch muss die
-            // Person nicht bei jedem Trial eine neue Tastenbelegung lesen.
+            // Die Belegung dreht man im Inspector, bevor eine Person anfängt.
+            // Während der Sitzung wird sie nicht mehr angefasst. So muss die Person
+            // nicht bei jedem Durchgang neu nachlesen, welche Taste was bedeutet.
             Keyboard keyboard = Keyboard.current;
             if (keyboard == null)
             {
@@ -111,9 +117,10 @@ namespace GlobeEffect.VRCheckerboard
 
         public void SubmitResponse(CheckerboardCurvatureResponse response)
         {
-            // Der Controller bewertet die Antwort nicht. Er meldet sie nur an den
-            // Experiment Manager, der den aktuellen Trial kennt und speichert.
-            EnsureStimulus();
+            // Hier wird nicht entschieden, ob die Antwort richtig oder falsch ist.
+            // Sie wird nur weitergereicht. Der Experiment Manager weiß, zu welchem
+            // Durchgang sie gehört, und schreibt sie weg.
+            FindStimulus();
             if (response == CheckerboardCurvatureResponse.None)
             {
                 return;
@@ -127,8 +134,10 @@ namespace GlobeEffect.VRCheckerboard
             }
         }
 
-        private void EnsureStimulus()
+        private void FindStimulus()
         {
+            // Normalerweise steht der Stimulus schon seit Awake fest. Falls nicht,
+            // wird er hier nachgeholt.
             if (stimulus == null)
             {
                 stimulus = GetComponent<VrCheckerboardStimulus>();

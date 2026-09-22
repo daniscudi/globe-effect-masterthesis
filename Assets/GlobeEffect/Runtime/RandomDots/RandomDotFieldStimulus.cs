@@ -6,14 +6,15 @@ using UnityEngine.Serialization;
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
-    /// Erzeugt ein Schwarz-Weiß-Punktfeld, dessen Punkte wie Richtungen in großer
-    /// Entfernung gerendert werden. Dadurch entsteht zwischen linkem und rechtem
-    /// Auge keine künstliche Konvergenz auf eine nahe Unity-Fläche.
+    /// Zeigt ein Feld aus schwarzen und weißen Punkten.
     ///
-    /// Im Hauptversuch folgt die runde Öffnung der HMD-Blickrichtung, während
-    /// Unity das Punktfeld kontrolliert nach links und rechts schwenkt. Der
-    /// Visual-Space-Parameter l bleibt während einer Präsentation fest. Damit
-    /// verwenden Checkerboard und Punktfeld jetzt dieselbe radiale Abbildung.
+    /// Die Punkte werden als Richtungen gezeichnet, nicht als Sachen in einer
+    /// bestimmten Entfernung. Dadurch sehen beide Augen dasselbe und müssen nicht
+    /// auf eine nahe Fläche schielen.
+    ///
+    /// Im Hauptversuch hängt die runde Öffnung am Kopf, und Unity schiebt das
+    /// Punktfeld dahinter nach links und rechts. Der Wert l bleibt während einer
+    /// Darbietung fest. Es ist genau dieselbe Verzerrung wie beim Schachbrett.
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
@@ -21,48 +22,49 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     public sealed class RandomDotFieldStimulus : MonoBehaviour
     {
         // Das Skript hat im Grunde fünf Aufgaben:
-        // 1. Es erzeugt für jeden Punkt ein kleines Viereck (BuildDotMesh).
-        // 2. Es verteilt die Mittelpunkte gleichmäßig auf einem kugelförmigen Feld.
-        // 3. Es gibt l, Zoom, FOV und Bewegung an den Shader weiter.
-        // 4. Es hält die Darstellung bei simuliertem Schwenken vor dem Kopf.
-        // 5. Es stellt Show/Hide-Funktionen für den Experiment Manager bereit.
+        // 1. Für jeden Punkt ein kleines Viereck bauen (CreateDotMesh).
+        // 2. Die Punkte gleichmäßig über eine gewölbte Fläche verteilen.
+        // 3. l, Zoom, FOV und Bewegung an den Shader weitergeben.
+        // 4. Das Feld beim simulierten Schwenken vor dem Kopf halten.
+        // 5. Show und Hide für den Experiment Manager anbieten.
         //
-        // Die eigentliche radiale Verzerrung wird nicht hier, sondern im Shader
-        // GlobeEffectVisualSpaceRandomDots.shader für jeden Punkt berechnet.
+        // Die Verzerrung selbst passiert nicht hier, sondern im Shader
+        // GlobeEffectVisualSpaceRandomDots.shader, und zwar für jeden Punkt einzeln.
         private const string ShaderResourceName = "GlobeEffectVisualSpaceRandomDots";
         private const string ShaderFallbackName = "GlobeEffect/Visual Space Random Dots";
         private const float MinimumRadiusMeters = 0.25f;
 
         [Header("Beobachter und Punktfeld")]
         [SerializeField]
-        [Tooltip("XR-Kopf-/Center-Eye-Transform.")]
+        [Tooltip("Der Kopf im XR-Rig, also normalerweise die Main Camera.")]
         private Transform observer;
 
         [SerializeField, Range(5f, 170f)]
-        [Tooltip("Kreisförmiger sichtbarer Winkeldurchmesser des Punktfelds.")]
+        [Tooltip("Wie groß der sichtbare runde Ausschnitt ist, in Grad.")]
         private float angularDiameterDegrees = 90f;
 
         [SerializeField, Range(0f, 10f)]
-        [Tooltip("Breite des weichen Übergangs am inneren Rand der runden Öffnung. 0 ergibt eine harte Kante.")]
+        [Tooltip("Wie weich der Rand des Kreises nach innen ausläuft. 0 gibt eine harte Kante.")]
         private float apertureEdgeSoftnessDegrees = 1f;
 
         [SerializeField, Min(MinimumRadiusMeters)]
-        [Tooltip("Technischer Radius des Trägermeshes. Der Shader rendert Richtungen, daher erzeugt dieser Wert keine wahrgenommene Betrachtungsentfernung.")]
+        [Tooltip("Nur die technische Größe des Meshes. Der Shader zeichnet Richtungen, deshalb sieht man diesen Abstand nicht als Entfernung.")]
         private float fieldRadiusMeters = 5f;
 
         [SerializeField, Range(20f, 170f)]
-        [Tooltip("Gesamter Winkelbereich, in dem Punkte erzeugt werden. Er sollte größer als das sichtbare FOV plus der Schwenk zu beiden Seiten sein, damit am Rand keine Lücken entstehen.")]
+        [Tooltip("In welchem Bereich überhaupt Punkte erzeugt werden, in Grad. Muss größer sein als das Sichtfeld plus die Schwenkweite, sonst entstehen am Rand Lücken.")]
         private float worldCoverageDiameterDegrees = 110f;
 
         [SerializeField, Range(100, 12000)]
+        [Tooltip("Wie viele Punkte erzeugt werden.")]
         private int dotCount = 4000;
 
         [SerializeField, Range(0.02f, 2f)]
-        [Tooltip("Winkeldurchmesser eines einzelnen Punktes am Ausgangsort.")]
+        [Tooltip("Wie groß ein einzelner Punkt ist, in Grad.")]
         private float dotAngularDiameterDegrees = 0.22f;
 
         [SerializeField]
-        [Tooltip("Gleicher Seed erzeugt dieselben Punktpositionen und Farben.")]
+        [Tooltip("Gleicher Seed heißt: dieselben Punkte an denselben Stellen in denselben Farben.")]
         private int randomSeed = 20260828;
 
         [SerializeField]
@@ -72,17 +74,17 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private Color lightColor = Color.white;
 
         [SerializeField, Range(0f, 1f)]
-        [Tooltip("Anteil heller Punkte; 0.5 ergibt gleich viele schwarze und weiße Punkte.")]
+        [Tooltip("Wie viele Punkte hell sind. 0,5 heißt halb schwarz und halb weiß.")]
         private float lightDotFraction = 0.5f;
 
         [Header("Radiale Verzerrung")]
         [FormerlySerializedAs("merlitzK")]
         [SerializeField, Range(0f, 1.4f)]
-        [Tooltip("Derselbe Visual-Space-Parameter wie beim Checkerboard: l = 1 gerade, l = 0,5 Helmholtz-Referenz.")]
+        [Tooltip("Derselbe Wert wie beim Schachbrett: l = 1 ist gerade, l = 0,5 ist der Helmholtz-Punkt.")]
         private float visualSpaceL = 0.5f;
 
         [SerializeField, Range(0.25f, 4f)]
-        [Tooltip("Einfacher Zoom des Punktfelds. Ändert den sichtbaren Ausschnitt, aber nicht l.")]
+        [Tooltip("Zoom für das Punktfeld. Ändert den sichtbaren Ausschnitt, aber nicht l.")]
         private float contentZoom = 1f;
 
         [SerializeField]
@@ -104,15 +106,15 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private RandomDotMotionMode motionMode = RandomDotMotionMode.SimulatedYaw;
 
         [SerializeField, Range(0.1f, 30f)]
-        [Tooltip("Maximaler simulierter Schwenkwinkel zu jeder Seite. Beim Start einer Sitzung wird dieser Wert vom Random Dot Experiment Manager überschrieben.")]
+        [Tooltip("Wie weit die Bewegung zu jeder Seite geht. Beim Start einer Sitzung überschreibt der Experiment Manager diesen Wert.")]
         private float simulatedYawAmplitudeDegrees = 5f;
 
         [SerializeField, Range(0.1f, 60f)]
-        [Tooltip("Winkelgeschwindigkeit des simulierten Schwenks. Beim Start einer Sitzung wird dieser Wert vom Random Dot Experiment Manager überschrieben.")]
+        [Tooltip("Wie schnell die Bewegung läuft, in Grad pro Sekunde. Beim Start einer Sitzung überschreibt der Experiment Manager diesen Wert.")]
         private float simulatedYawSpeedDegreesPerSecond = 5f;
 
         [SerializeField]
-        [Tooltip("Seite, zu der das Punktfeld nach dem Start zuerst läuft.")]
+        [Tooltip("Zu welcher Seite die Bewegung zuerst losgeht.")]
         private RandomDotSweepDirection sweepDirection =
             RandomDotSweepDirection.RightFirst;
 
@@ -121,21 +123,23 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private bool visibleAtStart = true;
 
         [SerializeField]
-        [Tooltip("Optionales Material mit dem Shader 'GlobeEffect/Visual Space Random Dots'.")]
+        [Tooltip("Optional ein eigenes Material mit dem Random-Dot-Shader. Normalerweise bleibt das leer.")]
         private Material materialOverride;
 
         private MeshFilter meshFilter;
         private MeshRenderer meshRenderer;
-        private Mesh ownedMesh;
-        private Material ownedMaterial;
+        private Mesh dotMesh;
+        private Material shaderMaterial;
         private MaterialPropertyBlock propertyBlock;
         private bool isVisible = true;
         private bool pointsVisible = true;
-        private double simulatedMotionStartSeconds;
 
-        // Diese Ereignisse informieren andere Skripte darüber, dass der Stimulus
-        // gezeigt, ausgeblendet oder verändert wurde. Der Experiment Manager kann
-        // dadurch den tatsächlich gezeigten Zustand in den Markern festhalten.
+        // Ab wann die Bewegung läuft. Daraus wird ausgerechnet, wo sie gerade steht.
+        private double motionStartSeconds;
+
+        // Hier können andere Skripte mithören, wenn etwas gezeigt, versteckt oder
+        // verändert wurde. Der Experiment Manager schreibt damit genau den Zustand
+        // mit, der in dem Moment wirklich zu sehen war.
         public event Action<RandomDotStimulusSnapshot> StimulusPresented;
         public event Action<RandomDotStimulusSnapshot> StimulusHidden;
         public event Action<RandomDotStimulusSnapshot> ParametersChanged;
@@ -150,8 +154,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             }
         }
 
-        // Nur lesbare Eigenschaften für andere Skripte. Die Werte selbst werden
-        // im Inspector oder über die Set-Methoden weiter unten verändert.
+        // Diese Werte kann man von außen nur lesen. Geändert werden sie im
+        // Inspector oder über die Set-Methoden weiter unten.
         public float AngularDiameterDegrees => angularDiameterDegrees;
         public float ApertureEdgeSoftnessDegrees => apertureEdgeSoftnessDegrees;
         public float FieldRadiusMeters => fieldRadiusMeters;
@@ -170,8 +174,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public bool ArePointsVisible => isVisible && pointsVisible;
 
         /// <summary>
-        /// Momentaner technischer Schwenkwinkel. Bei realer Kopfbewegung ist
-        /// dieser Wert null; der Sweep-Monitor berechnet dort die HMD-Drehung.
+        /// Wo die simulierte Bewegung gerade steht, in Grad.
+        ///
+        /// Dreht die Person den Kopf selbst, steht hier null. Dann rechnet der
+        /// Sweep-Monitor die echte Kopfdrehung aus.
         /// </summary>
         public float CurrentSimulatedYawDegrees
         {
@@ -184,7 +190,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 }
 
                 double elapsed = Time.realtimeSinceStartupAsDouble -
-                    simulatedMotionStartSeconds;
+                    motionStartSeconds;
                 return RandomDotSimulatedSweep.EvaluateYawDegrees(
                     elapsed,
                     simulatedYawAmplitudeDegrees,
@@ -198,8 +204,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             : transform.position + transform.forward * fieldRadiusMeters;
 
         /// <summary>
-        /// Das Fixationskreuz ist eine eigene, unverzerrte Ebene des Shaders. Es
-        /// bleibt in der Mitte, während sich ausschließlich die Punkte bewegen.
+        /// Das Fixationskreuz ist im Shader eine eigene Ebene und wird nicht
+        /// verzerrt. Es bleibt einfach in der Mitte stehen, während sich nur die
+        /// Punkte bewegen.
         /// </summary>
         public bool TryGetRenderedFixationWorldDirection(
             Vector3 gazeOriginWorld,
@@ -217,126 +224,126 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         private void Reset()
         {
-            // Beim erstmaligen Hinzufügen des Skripts wird automatisch versucht,
-            // die Main Camera als Kopf-/Center-Eye-Transform einzutragen.
+            // Wenn man das Skript neu ans Objekt hängt, wird gleich die Main
+            // Camera eingetragen.
             Camera mainCamera = Camera.main;
             observer = mainCamera != null ? mainCamera.transform : null;
         }
 
         private void OnEnable()
         {
-            // Unity ruft OnEnable beim Laden und beim Aktivieren des Objekts auf.
+            // OnEnable läuft beim Laden und beim Anschalten des Objekts.
             // Hier werden Mesh, Material und alle Startwerte vorbereitet.
-            Application.onBeforeRender -= HandleBeforeRender;
-            Application.onBeforeRender += HandleBeforeRender;
-            ValidateSerializedFields();
-            EnsureResources(rebuildMesh: true);
+            Application.onBeforeRender -= UpdateBeforeRendering;
+            Application.onBeforeRender += UpdateBeforeRendering;
+            ClampInspectorValues();
+            SetupMeshAndMaterial(rebuildMesh: true);
             isVisible = Application.isPlaying ? visibleAtStart : true;
             pointsVisible = true;
-            simulatedMotionStartSeconds = Time.realtimeSinceStartupAsDouble;
+            motionStartSeconds = Time.realtimeSinceStartupAsDouble;
             if (observer != null)
             {
                 PlaceAroundObserver();
             }
 
-            ApplyMaterialProperties();
-            ApplyVisibility();
+            SendValuesToShader();
+            ShowOrHideRenderer();
         }
 
         private void OnValidate()
         {
-            // OnValidate läuft im Editor, sobald ich einen Inspector-Wert ändere.
-            // Deshalb wird das Punkt-Mesh dort direkt mit den neuen Werten gebaut.
-            ValidateSerializedFields();
+            // OnValidate läuft im Editor, sobald man im Inspector etwas ändert.
+            // Das Punkt-Mesh wird deshalb gleich mit den neuen Werten neu gebaut.
+            ClampInspectorValues();
             if (!isActiveAndEnabled)
             {
                 return;
             }
 
-            EnsureResources(rebuildMesh: true);
-            ApplyMaterialProperties();
-            ApplyVisibility();
+            SetupMeshAndMaterial(rebuildMesh: true);
+            SendValuesToShader();
+            ShowOrHideRenderer();
         }
 
         private void LateUpdate()
         {
-            // Die Kopfpose und der aktuelle Schwenkwinkel ändern sich fortlaufend.
-            // Diese beiden Werte werden deshalb in jedem Frame aktualisiert.
-            FollowObserverInSimulatedMode();
-            ApplyFrameProperties();
+            // Kopfposition und Schwenkwinkel ändern sich dauernd. Beide werden
+            // deshalb in jedem Frame neu weitergegeben.
+            FollowHeadDuringSimulatedSweep();
+            SendFrameValuesToShader();
         }
 
         private void OnDisable()
         {
-            Application.onBeforeRender -= HandleBeforeRender;
+            Application.onBeforeRender -= UpdateBeforeRendering;
         }
 
         private void OnDestroy()
         {
-            // Laufzeit-Mesh und Laufzeit-Material wurden von diesem Skript erzeugt.
-            // Beim Löschen des Objekts werden genau diese eigenen Ressourcen entfernt.
-            Application.onBeforeRender -= HandleBeforeRender;
-            DestroyOwnedObject(ownedMesh);
-            DestroyOwnedObject(ownedMaterial);
-            ownedMesh = null;
-            ownedMaterial = null;
+            // Mesh und Material hat dieses Skript selbst gebaut. Also räumt es sie
+            // beim Löschen auch selbst wieder weg.
+            Application.onBeforeRender -= UpdateBeforeRendering;
+            DeleteObject(dotMesh);
+            DeleteObject(shaderMaterial);
+            dotMesh = null;
+            shaderMaterial = null;
         }
 
-        private void HandleBeforeRender()
+        private void UpdateBeforeRendering()
         {
-            // XR kann die HMD-Pose noch kurz vor dem Rendern aktualisieren. So wird
-            // für das tatsächlich gerenderte Bild die möglichst neue Pose benutzt.
-            FollowObserverInSimulatedMode();
-            ApplyFrameProperties();
+            // Kurz vor dem Zeichnen kann noch eine neuere Kopfposition kommen.
+            // Dann wird auch wirklich mit dieser neuen Position gezeichnet.
+            FollowHeadDuringSimulatedSweep();
+            SendFrameValuesToShader();
         }
 
         public void SetVisualSpaceL(float value)
         {
-            // l bestimmt die radiale Abbildung. l wird hier nur begrenzt und an
-            // den Shader weitergegeben; die Formel steht im Shader selbst.
+            // l wird hier nur auf den erlaubten Bereich gebracht und weitergereicht.
+            // Gerechnet wird damit erst im Shader.
             visualSpaceL = Mathf.Clamp(value, 0f, 1.4f);
-            ApplyMaterialProperties();
+            SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
         public void SetContentZoom(float value)
         {
-            // Content Zoom vergrößert nur den sichtbaren Inhalt. Er verändert l
-            // nicht und ist daher nicht der Merlitz-Instrumentenparameter m.
+            // Der Zoom macht den Inhalt nur größer oder kleiner. Er ändert l nicht
+            // und ist auch nicht die Fernglasvergrößerung m von Merlitz.
             contentZoom = Mathf.Clamp(value, 0.25f, 4f);
-            ApplyMaterialProperties();
+            SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
         public void SetAngularDiameter(float value)
         {
-            // Das ist der Durchmesser der kreisförmigen sichtbaren Öffnung in Grad.
+            // Wie groß der sichtbare runde Ausschnitt ist, in Grad.
             angularDiameterDegrees = Mathf.Clamp(value, 5f, 170f);
-            ApplyMaterialProperties();
+            SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
         public void SetApertureEdgeSoftness(float value)
         {
             apertureEdgeSoftnessDegrees = Mathf.Clamp(value, 0f, 10f);
-            ApplyMaterialProperties();
+            SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
         public void SetEyePresentation(CheckerboardEyePresentation value)
         {
             eyePresentation = value;
-            ApplyMaterialProperties();
+            SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
         public void SetMotionMode(RandomDotMotionMode value)
         {
-            // SimulatedYaw bewegt das Muster per Code. HeadTracked lässt die
-            // Versuchsperson die Bewegung durch eine echte Kopfdrehung erzeugen.
+            // SimulatedYaw heißt: Der Computer bewegt das Muster.
+            // HeadTracked heißt: Die Person dreht den Kopf selbst.
             motionMode = value;
             RestartMotionPhase();
-            ApplyMaterialProperties();
+            SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
@@ -344,7 +351,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             float amplitudeDegrees,
             float speedDegreesPerSecond)
         {
-            // Amplitude = maximale Auslenkung pro Seite. Speed = Grad pro Sekunde.
+            // Amplitude ist, wie weit es zu jeder Seite geht.
+            // Speed ist, wie schnell, also Grad pro Sekunde.
             simulatedYawAmplitudeDegrees = Mathf.Clamp(amplitudeDegrees, 0.1f, 30f);
             simulatedYawSpeedDegreesPerSecond = Mathf.Clamp(
                 speedDegreesPerSecond,
@@ -366,22 +374,23 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             int newRandomSeed,
             float newCoverageDiameterDegrees)
         {
-            // Punktzahl, Zufallsverteilung oder abgedeckter Weltbereich verändern
-            // die Geometrie. Deshalb muss danach ein neues Mesh erzeugt werden.
+            // Andere Punktzahl, anderer Seed oder anderer Bereich heißt: Die Punkte
+            // liegen jetzt woanders. Deshalb muss das Mesh komplett neu gebaut werden.
             dotCount = Mathf.Clamp(newDotCount, 100, 12000);
             randomSeed = newRandomSeed;
             worldCoverageDiameterDegrees = Mathf.Clamp(
                 newCoverageDiameterDegrees,
                 20f,
                 170f);
-            EnsureResources(rebuildMesh: true);
+            SetupMeshAndMaterial(rebuildMesh: true);
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
         /// <summary>
-        /// Verankert das Feld an der aktuellen Kopfposition und -richtung. Im
-        /// SimulatedYaw-Modus wird diese Pose danach in jedem Renderframe
-        /// aktualisiert; im HeadTracked-Modus bleibt sie stehen.
+        /// Setzt das Feld dorthin, wo der Kopf gerade ist und hinschaut.
+        ///
+        /// Bei SimulatedYaw wird das danach in jedem Frame nachgezogen. Bei
+        /// HeadTracked bleibt es stehen, damit die Kopfdrehung überhaupt auffällt.
         /// </summary>
         public void PlaceAroundObserver()
         {
@@ -394,14 +403,14 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 observer.position,
                 Quaternion.LookRotation(observer.forward, observer.up));
             RestartMotionPhase();
-            ApplyFrameProperties();
+            SendFrameValuesToShader();
         }
 
-        private void FollowObserverInSimulatedMode()
+        private void FollowHeadDuringSimulatedSweep()
         {
-            // Beim simulierten Schwenken soll der Teilnehmer nicht durch eine
-            // Kopfbewegung aus der Öffnung herausschauen können. Das ganze Feld
-            // folgt deshalb der aktuellen Position und Grundrichtung des HMDs.
+            // Wenn der Computer die Bewegung macht, soll die Person nicht einfach
+            // aus der Öffnung herausschauen können. Deshalb zieht das ganze Feld
+            // mit dem Kopf mit.
             if (observer == null || motionMode != RandomDotMotionMode.SimulatedYaw)
             {
                 return;
@@ -414,43 +423,44 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         public void RestartMotionPhase()
         {
-            // Der Schwenk wird aus der seit dem Start vergangenen Zeit berechnet.
-            simulatedMotionStartSeconds = Time.realtimeSinceStartupAsDouble;
+            // Die Bewegung wird aus der Zeit seit dem Start ausgerechnet. Hier wird
+            // diese Uhr wieder auf null gestellt.
+            motionStartSeconds = Time.realtimeSinceStartupAsDouble;
         }
 
         public void Show()
         {
-            // Öffnung, Punkte und Fixationsziel werden gemeinsam sichtbar.
+            // Öffnung, Punkte und Kreuz kommen zusammen.
             isVisible = true;
             pointsVisible = true;
-            ApplyMaterialProperties();
-            ApplyVisibility();
+            SendValuesToShader();
+            ShowOrHideRenderer();
             StimulusPresented?.Invoke(CaptureSnapshot());
         }
 
         /// <summary>
-        /// Zeigt vor dem Trial nur das zentrale Fixationskreuz. Das Punktmuster
-        /// und damit auch der noch nicht präsentierte l-Wert bleiben verborgen.
+        /// Zeigt vor dem Durchgang nur das Kreuz in der Mitte. Die Punkte bleiben
+        /// weg, damit man den l-Wert noch nicht sieht.
         /// </summary>
         public void ShowFixationOnly()
         {
             isVisible = true;
             pointsVisible = false;
-            ApplyMaterialProperties();
-            ApplyVisibility();
+            SendValuesToShader();
+            ShowOrHideRenderer();
         }
 
         public void Hide()
         {
             isVisible = false;
-            ApplyVisibility();
+            ShowOrHideRenderer();
             StimulusHidden?.Invoke(CaptureSnapshot());
         }
 
         public RandomDotStimulusSnapshot CaptureSnapshot()
         {
-            // Eine Momentaufnahme verhindert, dass im Protokoll später versehentlich
-            // schon Werte des nächsten Trials stehen.
+            // Ein Foto von genau jetzt. Ohne das könnten später aus Versehen schon
+            // die Werte vom nächsten Durchgang im Protokoll stehen.
             return new RandomDotStimulusSnapshot
             {
                 timestampSeconds = Time.realtimeSinceStartupAsDouble,
@@ -473,32 +483,32 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             };
         }
 
-        private void EnsureResources(bool rebuildMesh)
+        private void SetupMeshAndMaterial(bool rebuildMesh)
         {
-            // MeshFilter speichert die Punktgeometrie, MeshRenderer zeichnet sie.
-            // Fehlen die Referenzen noch, werden sie vom selben GameObject geholt.
+            // Der MeshFilter hält die Punkte, der MeshRenderer zeichnet sie.
+            // Fehlen die noch, werden sie hier vom eigenen Objekt geholt.
             meshFilter ??= GetComponent<MeshFilter>();
             meshRenderer ??= GetComponent<MeshRenderer>();
 
-            if (rebuildMesh || ownedMesh == null)
+            if (rebuildMesh || dotMesh == null)
             {
-                // Bei geänderter Punktzahl oder neuem Seed passt das alte Mesh
-                // nicht mehr. Es wird entfernt und vollständig neu erzeugt.
-                DestroyOwnedObject(ownedMesh);
-                ownedMesh = BuildDotMesh();
-                meshFilter.sharedMesh = ownedMesh;
+                // Bei geänderter Punktzahl oder neuem Seed passt das alte Mesh nicht
+                // mehr. Also weg damit und ein neues bauen.
+                DeleteObject(dotMesh);
+                dotMesh = CreateDotMesh();
+                meshFilter.sharedMesh = dotMesh;
             }
-            else if (meshFilter.sharedMesh != ownedMesh)
+            else if (meshFilter.sharedMesh != dotMesh)
             {
-                meshFilter.sharedMesh = ownedMesh;
+                meshFilter.sharedMesh = dotMesh;
             }
 
-            Material desiredMaterial = materialOverride;
-            if (desiredMaterial == null)
+            Material materialToUse = materialOverride;
+            if (materialToUse == null)
             {
-                // Ist im Inspector kein Material eingetragen, erstellt das Skript
-                // selbst eines mit dem Random-Dot-Shader aus dem Resources-Ordner.
-                if (ownedMaterial == null)
+                // Ist im Inspector kein Material eingetragen, baut sich das Skript
+                // selbst eins mit dem Shader aus dem Resources-Ordner.
+                if (shaderMaterial == null)
                 {
                     Shader shader = Resources.Load<Shader>(ShaderResourceName);
                     shader ??= Shader.Find(ShaderFallbackName);
@@ -510,26 +520,26 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                         return;
                     }
 
-                    ownedMaterial = new Material(shader)
+                    shaderMaterial = new Material(shader)
                     {
                         name = "Runtime Visual Space Random Dot Material",
                         hideFlags = HideFlags.HideAndDontSave
                     };
                 }
 
-                desiredMaterial = ownedMaterial;
+                materialToUse = shaderMaterial;
             }
 
-            if (meshRenderer != null && meshRenderer.sharedMaterial != desiredMaterial)
+            if (meshRenderer != null && meshRenderer.sharedMaterial != materialToUse)
             {
-                meshRenderer.sharedMaterial = desiredMaterial;
+                meshRenderer.sharedMaterial = materialToUse;
             }
         }
 
-        private Mesh BuildDotMesh()
+        private Mesh CreateDotMesh()
         {
-            // Ein Punkt benötigt vier Eckpunkte und zwei Dreiecke (sechs Indizes).
-            // Das Fixationsziel wird technisch als ein zusätzlicher Punkt angelegt.
+            // Jeder Punkt braucht vier Ecken und zwei Dreiecke, also sechs Indizes.
+            // Das Fixationskreuz läuft technisch einfach als ein Punkt mehr mit.
             int renderedDotCount = dotCount + (showFixationTarget ? 1 : 0);
             var vertices = new Vector3[renderedDotCount * 4];
             var uv = new Vector2[renderedDotCount * 4];
@@ -542,10 +552,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             float minimumCosine = Mathf.Cos(halfCoverage);
             for (int dotIndex = 0; dotIndex < dotCount; dotIndex++)
             {
-                // Für eine gleichmäßige Verteilung auf der gekrümmten Fläche darf
-                // der Polarwinkel nicht einfach gleichverteilt gezogen werden.
-                // Eine Gleichverteilung von cos(Winkel) ergibt überall ungefähr
-                // dieselbe Punktdichte pro sichtbarem Flächenanteil.
+                // Hier ist ein kleiner Trick drin: Würde man den Winkel einfach
+                // gleichmäßig auslosen, lägen in der Mitte viel mehr Punkte als
+                // außen. Deshalb wird stattdessen der Kosinus des Winkels
+                // gleichmäßig ausgelost. Dann ist die Dichte überall gleich.
                 float cosine = 1f - (1f - minimumCosine) * (float)random.NextDouble();
                 float sine = Mathf.Sqrt(Mathf.Max(0f, 1f - cosine * cosine));
                 float azimuth = 2f * Mathf.PI * (float)random.NextDouble();
@@ -553,12 +563,13 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                     sine * Mathf.Cos(azimuth),
                     sine * Mathf.Sin(azimuth),
                     cosine);
-                // Nur die Richtung ist wissenschaftlich wichtig. Der technische
-                // Abstand entsteht erst durch direction * fieldRadiusMeters.
+
+                // Wichtig ist nur die Richtung. Der Abstand kommt erst durch
+                // direction * fieldRadiusMeters dazu und ist reine Technik.
                 Color color = random.NextDouble() < lightDotFraction
                     ? lightColor
                     : darkColor;
-                AddDotQuad(
+                AddOneDot(
                     dotIndex,
                     direction,
                     1f,
@@ -571,9 +582,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                     triangles);
             }
 
+            // Das Kreuz kommt ganz zum Schluss dazu, genau geradeaus in der Mitte.
             if (showFixationTarget)
             {
-                AddDotQuad(
+                AddOneDot(
                     dotCount,
                     Vector3.forward,
                     fixationTargetSizeDegrees / dotAngularDiameterDegrees,
@@ -590,8 +602,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             {
                 name = "Runtime Random Dot Spherical Cap",
                 hideFlags = HideFlags.HideAndDontSave,
-                // UInt32 ist nötig, sobald die Punktzahl mehr als 65.535
-                // Mesh-Eckpunkte erzeugt. Jeder Punkt besitzt vier Eckpunkte.
+                // Normalerweise kann ein Mesh nur 65.535 Ecken haben. Bei 4000
+                // Punkten mit je vier Ecken sind wir schon darüber. Mit UInt32
+                // sind deutlich mehr möglich.
                 indexFormat = IndexFormat.UInt32,
                 vertices = vertices,
                 uv = uv,
@@ -605,7 +618,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             return mesh;
         }
 
-        private void AddDotQuad(
+        private void AddOneDot(
             int dotIndex,
             Vector3 direction,
             float sizeMultiplier,
@@ -619,20 +632,25 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         {
             Vector3 center = direction * fieldRadiusMeters;
             int vertexIndex = dotIndex * 4;
-            // Jeder Punkt besteht technisch aus einem kleinen Viereck. Seine vier
-            // Ecken starten zunächst am selben Mittelpunkt. Erst der Shader zieht
-            // daraus nach der Visual-Space-l-Abbildung einen Kreis mit fester
-            // Winkelgröße. So verändert l die Punktbahn, aber nicht die Punktgröße.
+
+            // Alle vier Ecken liegen erst mal genau übereinander im Mittelpunkt.
+            // Auseinandergezogen werden sie erst im Shader, und zwar nachdem dort
+            // die Verzerrung gerechnet wurde. Dadurch verschiebt l zwar, wo ein
+            // Punkt liegt, macht ihn aber nicht größer oder kleiner.
             vertices[vertexIndex] = center;
             vertices[vertexIndex + 1] = center;
             vertices[vertexIndex + 2] = center;
             vertices[vertexIndex + 3] = center;
+
+            // Über die uv-Werte weiß der Shader, welche Ecke er in welche Richtung
+            // ziehen muss: links unten, rechts unten, rechts oben, links oben.
             uv[vertexIndex] = new Vector2(-1f, -1f);
             uv[vertexIndex + 1] = new Vector2(1f, -1f);
             uv[vertexIndex + 2] = new Vector2(1f, 1f);
             uv[vertexIndex + 3] = new Vector2(-1f, 1f);
-            // uv2.y unterscheidet das zentrale Fixationskreuz von den Punkten.
-            // Der Shader lässt dieses Element unverzerrt in der Mitte stehen.
+
+            // In uv2 steht die Größe und ob das hier das Kreuz ist. Beim Kreuz
+            // lässt der Shader die Verzerrung weg und lässt es in der Mitte stehen.
             Vector2 sizeData = new Vector2(
                 sizeMultiplier,
                 isFixationTarget ? 1f : 0f);
@@ -641,12 +659,15 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             uv2[vertexIndex + 2] = sizeData;
             uv2[vertexIndex + 3] = sizeData;
 
+            // Alle vier Ecken bekommen dieselbe Farbe, sonst würde der Punkt
+            // einen Farbverlauf bekommen.
             Color32 packedColor = color;
             colors[vertexIndex] = packedColor;
             colors[vertexIndex + 1] = packedColor;
             colors[vertexIndex + 2] = packedColor;
             colors[vertexIndex + 3] = packedColor;
 
+            // Zwei Dreiecke ergeben zusammen das Viereck.
             int triangleIndex = dotIndex * 6;
             triangles[triangleIndex] = vertexIndex;
             triangles[triangleIndex + 1] = vertexIndex + 2;
@@ -656,10 +677,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             triangles[triangleIndex + 5] = vertexIndex + 2;
         }
 
-        private void ApplyMaterialProperties()
+        private void SendValuesToShader()
         {
-            // Ein MaterialPropertyBlock verändert die Werte nur an diesem Renderer.
-            // Das gemeinsame Shader-Material selbst muss dafür nicht kopiert werden.
+            // Der MaterialPropertyBlock schiebt die Werte nur zu diesem einen
+            // Renderer. Das Material muss dafür nicht kopiert werden.
             if (meshRenderer == null)
             {
                 return;
@@ -678,13 +699,13 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             propertyBlock.SetFloat("_DotHalfSizeRad",
                 0.5f * dotAngularDiameterDegrees * Mathf.Deg2Rad);
             meshRenderer.SetPropertyBlock(propertyBlock);
-            ApplyFrameProperties();
+            SendFrameValuesToShader();
         }
 
-        private void ApplyFrameProperties()
+        private void SendFrameValuesToShader()
         {
-            // Diese Werte können sich in jedem Frame ändern. Der Shader braucht
-            // den aktuellen Yaw-Winkel sowie Position und Rechtsachse des Kopfes.
+            // Diese Werte ändern sich in jedem Frame: wo die Bewegung gerade steht
+            // und wo der Kopf ist.
             if (meshRenderer == null)
             {
                 return;
@@ -704,7 +725,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             meshRenderer.SetPropertyBlock(propertyBlock);
         }
 
-        private void ApplyVisibility()
+        private void ShowOrHideRenderer()
         {
             if (meshRenderer != null)
             {
@@ -712,11 +733,11 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             }
         }
 
-        private void ValidateSerializedFields()
+        private void ClampInspectorValues()
         {
-            // Auch Werte aus gespeicherten Szenen werden hier auf gültige Bereiche
-            // begrenzt. So landen keine negativen Größen oder unmöglichen Winkel
-            // in der Mesh-Erzeugung oder im Shader.
+            // Fängt Werte ab, die jemand von Hand eingetippt hat, und alte Werte aus
+            // gespeicherten Szenen. So kommen keine negativen Größen oder unmöglichen
+            // Winkel in die Mesh-Erzeugung oder in den Shader.
             angularDiameterDegrees = Mathf.Clamp(angularDiameterDegrees, 5f, 170f);
             apertureEdgeSoftnessDegrees = Mathf.Clamp(
                 apertureEdgeSoftnessDegrees,
@@ -743,30 +764,32 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 60f);
         }
 
-        private static void DestroyOwnedObject(UnityEngine.Object ownedObject)
+        private static void DeleteObject(UnityEngine.Object objectToDelete)
         {
-            if (ownedObject == null)
+            if (objectToDelete == null)
             {
                 return;
             }
 
             if (Application.isPlaying)
             {
-                // Im Play Mode darf Unity Objekte erst am Ende des Frames löschen.
-                Destroy(ownedObject);
+                // Im Play Mode räumt Unity das am Ende vom Frame weg.
+                Destroy(objectToDelete);
             }
             else
             {
-                // Im Editor außerhalb des Play Modes muss die Vorschau sofort
-                // erneuert werden, deshalb wird hier DestroyImmediate verwendet.
-                DestroyImmediate(ownedObject);
+                // Außerhalb vom Play Mode sofort, damit die Vorschau gleich stimmt.
+                DestroyImmediate(objectToDelete);
             }
         }
     }
 
     public enum RandomDotMotionMode
     {
+        // Die Person dreht den Kopf selbst.
         HeadTracked = 0,
+
+        // Der Computer macht die Bewegung. Das ist der normale Fall im Versuch.
         SimulatedYaw = 1
     }
 
@@ -776,7 +799,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         RightFirst = 1
     }
 
-    // Momentaufnahme des Punktfelds für Protokoll und Eye-Tracking-Marker.
+    // Ein Foto von den Werten, die gerade wirklich gezeigt werden.
+    // Das wandert ins Protokoll und in die Eye-Tracking-Marker.
     [Serializable]
     public struct RandomDotStimulusSnapshot
     {

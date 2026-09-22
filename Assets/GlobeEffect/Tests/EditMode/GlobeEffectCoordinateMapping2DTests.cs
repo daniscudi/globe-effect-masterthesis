@@ -5,8 +5,12 @@ using UnityEngine;
 namespace GlobeEffect.VRCheckerboard.Tests
 {
     /// <summary>
-    /// Vergleicht Vorwärts-/Rückabbildung, Schwenkbahn und die separable sowie
-    /// radiale 2D-Darstellung mit ihren analytischen Sonderfällen.
+    /// Testet die Umrechnungen für die Vergleichsplots.
+    ///
+    /// Geprüft wird: Kommt man beim Hin- und Zurückrechnen wieder beim
+    /// Ausgangspunkt an? Wandert ein Punkt richtig, wenn sich die Kamera dreht?
+    /// Und stimmen die Formeln von Schön und Merlitz an den Stellen, an denen
+    /// man das Ergebnis von Hand nachrechnen kann?
     /// </summary>
     public sealed class GlobeEffectCoordinateMapping2DTests
     {
