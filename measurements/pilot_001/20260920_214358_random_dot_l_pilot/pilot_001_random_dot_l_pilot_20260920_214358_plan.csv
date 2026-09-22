@@ -1,4 +1,0 @@
-participant_id,session_label,session_start_utc,random_seed,mapping_version,sequence_index,total_planned_trials,condition_index,repetition,eye_presentation,angular_diameter_deg,visual_space_l,content_zoom,motion_mode,sweep_direction,dot_seed
-pilot_001,random_dot_l_pilot,2026-09-20T19:43:58.1455403Z,20260901,visual-space-l-directional-content-zoom-v1,1,3,1,2,BothEyes,70,1,1,SimulatedYaw,RightFirst,44041
-pilot_001,random_dot_l_pilot,2026-09-20T19:43:58.1455403Z,20260901,visual-space-l-directional-content-zoom-v1,2,3,1,3,BothEyes,70,1,1,SimulatedYaw,LeftFirst,53217
-pilot_001,random_dot_l_pilot,2026-09-20T19:43:58.1455403Z,20260901,visual-space-l-directional-content-zoom-v1,3,3,1,1,BothEyes,70,1,1,SimulatedYaw,LeftFirst,34865
