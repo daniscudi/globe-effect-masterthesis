@@ -3,11 +3,13 @@ using UnityEngine;
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
-    /// Reine Berechnung der automatisch erzeugten Links-Rechts-Bewegung. Die
-    /// Funktion startet in der Mitte, läuft mit gleichbleibender
-    /// Winkelgeschwindigkeit zu einer Seite, anschließend zur anderen Seite
-    /// und wieder zurück. Sie enthält keine Unity-Szenenlogik und lässt sich
-    /// deshalb unabhängig vom Headset testen.
+    /// Rechnet aus, wie weit die Bewegung gerade nach links oder rechts gelaufen ist.
+    ///
+    /// Die Bewegung startet in der Mitte, läuft gleichmäßig zu einer Seite, dann
+    /// ganz auf die andere Seite und wieder zurück.
+    ///
+    /// Hier steht nur Mathematik drin und nichts von Unity. Deshalb kann man das
+    /// ohne Headset testen.
     /// </summary>
     public static class RandomDotSimulatedSweep
     {
@@ -24,18 +26,20 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 return 0f;
             }
 
+            // Wie viel Weg schon zurückgelegt wurde.
+            // Beispiel: 5 Grad pro Sekunde sind nach 2 Sekunden 10 Grad.
             float travelledDegrees = (float)elapsedSeconds *
                 speedDegreesPerSecond;
-            // Beispiel: 5 Grad pro Sekunde ergeben nach 2 Sekunden einen
-            // insgesamt zurückgelegten Winkelweg von 10 Grad.
 
-            // Durch den Versatz um eine Amplitude beginnt PingPong genau in der
-            // Mitte. Nach einer weiteren Amplitude ist die erste Randposition
-            // erreicht, nach drei Amplituden die gegenüberliegende Seite.
+            // PingPong läuft normalerweise von 0 los. Wir wollen aber in der Mitte
+            // anfangen, deshalb wird eine Amplitude draufgerechnet und hinterher
+            // wieder abgezogen. Nach einer weiteren Amplitude ist der erste Rand
+            // erreicht, nach drei Amplituden der Rand auf der anderen Seite.
             float rightFirstYaw = Mathf.PingPong(
                 travelledDegrees + amplitudeDegrees,
                 2f * amplitudeDegrees) - amplitudeDegrees;
 
+            // Soll es nach links losgehen, drehen wir einfach das Vorzeichen um.
             return direction == RandomDotSweepDirection.LeftFirst
                 ? -rightFirstYaw
                 : rightFirstYaw;
@@ -50,8 +54,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 return 0f;
             }
 
-            // Von der Mitte über beide Ränder und zurück zur Mitte werden
-            // insgesamt vier Amplituden zurückgelegt.
+            // Von der Mitte zum ersten Rand, quer zum anderen Rand und zurück zur
+            // Mitte sind zusammen vier Amplituden.
             return 4f * amplitudeDegrees / speedDegreesPerSecond;
         }
     }

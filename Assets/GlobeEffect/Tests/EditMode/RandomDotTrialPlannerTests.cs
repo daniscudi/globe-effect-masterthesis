@@ -6,8 +6,12 @@ using NUnit.Framework;
 namespace GlobeEffect.VRCheckerboard.Tests
 {
     /// <summary>
-    /// Prüft Reihenfolge, feste l-Stufen, ausgeglichene Bewegungsrichtungen und
-    /// die über l hinweg vergleichbaren Punkt-Seeds.
+    /// Testet den Planer für den Random-Dot-Versuch.
+    ///
+    /// Geprüft wird: Kommt bei gleichem Seed wirklich dieselbe Reihenfolge heraus?
+    /// Kommt jeder l-Wert gleich oft dran? Geht es ungefähr gleich oft nach links
+    /// wie nach rechts los? Und haben gleiche Wiederholungen dieselben Punkte,
+    /// damit die Punktverteilung nicht an einem bestimmten l hängt?
     /// </summary>
     public sealed class RandomDotTrialPlannerTests
     {
@@ -35,7 +39,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
         {
             var plan = CreatePlan(7);
 
-            // 2 FOV * 1 Auge * 2 l * 1 Zoom * 1 Bewegung * 4 Wiederholungen.
+            // So kommt die 16 zustande:
+            // 2 FOV * 1 Auge * 2 l-Werte * 1 Zoom * 1 Bewegungsart * 4 Wiederholungen.
             Assert.That(plan.Count, Is.EqualTo(16));
             Assert.That(plan.Count(t => t.VisualSpaceL == 0.5f), Is.EqualTo(8));
             Assert.That(plan.Count(t => t.VisualSpaceL == 1f), Is.EqualTo(8));

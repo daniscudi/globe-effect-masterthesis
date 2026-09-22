@@ -4,18 +4,20 @@ using UnityEngine;
 namespace GlobeEffect.VRCheckerboard.EyeTracking
 {
     /// <summary>
-    /// Prüft den Blick auf die Mitte des head-locked Checkerboards. Da der
-    /// Stimulus als Richtung in unendlicher Entfernung dargestellt wird, wird
-    /// auch hier nur die Winkelabweichung von der Center-Eye-Blickrichtung
-    /// berechnet. Eine künstliche Entfernung geht nicht mehr in die Prüfung ein.
+    /// Passt auf, ob die Person wirklich auf das Kreuz in der Mitte schaut.
+    ///
+    /// Das Schachbrett hängt am Kopf und wirkt unendlich weit weg. Deshalb wird
+    /// hier auch nur der Winkel zwischen Blickrichtung und Kreuz gemessen. Eine
+    /// Entfernung spielt dabei überhaupt keine Rolle.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class CheckerboardFixationMonitor : MonoBehaviour
     {
-        // Pro neuem Blicksample passiert Folgendes:
-        // passendes Auge auswählen -> Winkel zum Kreuz berechnen -> mit Toleranz
-        // vergleichen -> Dauer der ununterbrochenen Fixation aktualisieren.
-        // Dieses Skript speichert keine Rohdaten; das macht die EyeTrackingToolbox.
+        // Für jeden neuen Messwert läuft immer dasselbe ab:
+        // das richtige Auge aussuchen -> Winkel zum Kreuz ausrechnen -> schauen,
+        // ob der Winkel klein genug ist -> mitzählen, wie lange das schon so geht.
+        //
+        // Rohdaten schreibt dieses Skript keine. Das macht die EyeTrackingToolbox.
         [Header("Referenzen")]
         [SerializeField]
         private EyeTrackingToolbox eyeTrackingToolbox;
@@ -25,11 +27,11 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         [Header("Fixationskriterium")]
         [SerializeField, Range(0.1f, 15f)]
-        [Tooltip("Maximaler Winkel zwischen Blickstrahl und Fixationsziel.")]
+        [Tooltip("Wie weit der Blick höchstens vom Kreuz weg sein darf, in Grad.")]
         private float toleranceDegrees = 3f;
 
         [SerializeField, Min(0f)]
-        [Tooltip("Erforderliche ununterbrochene Fixationsdauer in Sekunden.")]
+        [Tooltip("Wie lange der Blick am Stück ruhig liegen muss, in Sekunden.")]
         private float requiredContinuousSeconds = 0.3f;
 
         [Header("Laufzeitstatus")]
@@ -51,7 +53,9 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         [SerializeField]
         private int totalSampleCount;
 
-        private double previousSampleTime;
+        // Zeitstempel vom letzten Messwert. Daraus wird der Abstand zum nächsten
+        // ausgerechnet, um die Fixationsdauer zusammenzuzählen.
+        private double lastSampleTimestamp;
         private double lastSampleRealtimeSeconds;
         private bool subscribed;
 
@@ -76,8 +80,8 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         public bool HasRecentSample(float maximumAgeSeconds)
         {
-            // Ein alter letzter Sample darf nicht so behandelt werden, als würde
-            // die Person weiterhin sicher auf das Kreuz schauen.
+            // Kommen gerade gar keine Daten mehr, darf der letzte alte Wert nicht
+            // so tun, als würde die Person immer noch brav auf das Kreuz schauen.
             if (lastSampleRealtimeSeconds <= 0d)
             {
                 return false;
@@ -89,13 +93,15 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private void OnEnable()
         {
-            TryResolveReferences();
+            FindReferences();
             Subscribe();
         }
 
         private void Start()
         {
-            TryResolveReferences();
+            // Noch einmal dasselbe wie in OnEnable. Beim ersten Start ist die
+            // Toolbox manchmal noch nicht fertig, dann klappt es hier.
+            FindReferences();
             Subscribe();
         }
 
@@ -108,6 +114,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
             EyeTrackingToolbox toolbox,
             VrCheckerboardStimulus checkerboardStimulus)
         {
+            // Erst abmelden, dann die neuen Sachen eintragen, dann wieder anmelden.
             Unsubscribe();
             eyeTrackingToolbox = toolbox;
             stimulus = checkerboardStimulus;
@@ -119,12 +126,12 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         public void ResetFixationWindow()
         {
-            // Vor jedem Trial beginnt die Fixationsmessung wieder bei null.
+            // Vor jedem Durchgang fängt die Messung wieder bei null an.
             currentSampleValid = false;
             isInsideTolerance = false;
             currentAngleDegrees = float.NaN;
             continuousFixationSeconds = 0f;
-            previousSampleTime = 0d;
+            lastSampleTimestamp = 0d;
             lastSampleRealtimeSeconds = 0d;
             validSampleCount = 0;
             totalSampleCount = 0;
@@ -132,24 +139,26 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private void HandleGazeData(GazeData gazeData)
         {
-            // Diese Methode wird von der Lab-Toolbox bei jedem neuen Sample aufgerufen.
+            // Die Toolbox ruft das hier bei jedem neuen Messwert auf.
             lastSampleRealtimeSeconds = Time.realtimeSinceStartupAsDouble;
             totalSampleCount++;
             bool previousState = isInsideTolerance;
-            if (stimulus == null || !TrySelectGazeRay(gazeData, out Ray gazeRay))
+
+            // Ohne Stimulus oder ohne brauchbares Auge geht hier nichts weiter.
+            if (stimulus == null || !PickEyeRay(gazeData, out Ray gazeRay))
             {
-                ResetInvalidSample(gazeData.unityTimestamp);
-                NotifyIfStateChanged(previousState);
+                MarkSampleUnusable(gazeData.unityTimestamp);
+                TellOthersIfChanged(previousState);
                 return;
             }
 
-            // Beide Augen sollen parallel in die aktuelle Vorwärtsrichtung blicken.
-            // Der Ursprung des Blickstrahls ist deshalb für das Ziel nicht wichtig.
+            // Beide Augen schauen parallel geradeaus. Deshalb zählt nur, in welche
+            // Richtung geschaut wird. Wo der Blickstrahl anfängt, ist egal.
             Vector3 targetDirection = stimulus.FixationDirectionWorld;
             if (targetDirection.sqrMagnitude <= 1e-8f)
             {
-                ResetInvalidSample(gazeData.unityTimestamp);
-                NotifyIfStateChanged(previousState);
+                MarkSampleUnusable(gazeData.unityTimestamp);
+                TellOthersIfChanged(previousState);
                 return;
             }
 
@@ -158,16 +167,23 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
             currentAngleDegrees = Vector3.Angle(
                 gazeRay.direction,
                 targetDirection.normalized);
-            // On target heißt ausschließlich: Winkel kleiner oder gleich Toleranz.
+
+            // "Auf dem Kreuz" heißt genau eine Sache: Der Winkel ist klein genug.
             isInsideTolerance = currentAngleDegrees <= toleranceDegrees;
 
-            double sampleInterval = previousSampleTime > 0d
-                ? gazeData.unityTimestamp - previousSampleTime
+            // Wie viel Zeit ist seit dem letzten Messwert vergangen?
+            double sampleInterval = lastSampleTimestamp > 0d
+                ? gazeData.unityTimestamp - lastSampleTimestamp
                 : 0d;
-            previousSampleTime = gazeData.unityTimestamp;
+            lastSampleTimestamp = gazeData.unityTimestamp;
 
-            // Lange Datenlücken dürfen nicht als kontinuierliche Fixation
-            // gewertet werden. 100 ms ist bewusst konservativ gewählt.
+            // Die Fixationsdauer wächst nur, wenn der Blick auch vorher schon auf
+            // dem Kreuz lag und die Messwerte dicht genug beieinander liegen.
+            //
+            // Die Grenze von 100 ms ist mit Absicht streng: War länger nichts da,
+            // wissen wir für diese Zeit gar nichts und tun lieber nicht so, als
+            // hätte die Person durchgehend geschaut. In jedem anderen Fall fängt
+            // die Zählung wieder bei null an.
             if (isInsideTolerance && previousState &&
                 sampleInterval >= 0d && sampleInterval <= 0.1d)
             {
@@ -182,13 +198,14 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
                 continuousFixationSeconds = 0f;
             }
 
-            NotifyIfStateChanged(previousState);
+            TellOthersIfChanged(previousState);
         }
 
-        private bool TrySelectGazeRay(GazeData gazeData, out Ray gazeRay)
+        private bool PickEyeRay(GazeData gazeData, out Ray gazeRay)
         {
-            // Bei monokularer Darbietung muss dasselbe Auge für die Kontrolle
-            // verwendet werden. Nur im binokularen Modus gilt der kombinierte Strahl.
+            // Wird das Bild nur einem Auge gezeigt, muss auch genau dieses Auge
+            // kontrolliert werden. Der gemittelte Strahl aus beiden Augen passt
+            // nur, wenn beide Augen das Bild sehen.
             switch (stimulus.EyePresentation)
             {
                 case CheckerboardEyePresentation.LeftEyeOnly:
@@ -205,26 +222,29 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
             }
         }
 
-        private void ResetInvalidSample(double sampleTime)
+        private void MarkSampleUnusable(double sampleTime)
         {
-            // Fehlende/ungültige Daten unterbrechen die zusammenhängende Fixation.
+            // Fehlen die Daten oder taugen sie nichts, ist die Fixation unterbrochen
+            // und der Zähler fängt wieder von vorne an.
             currentSampleValid = false;
             isInsideTolerance = false;
             currentAngleDegrees = float.NaN;
             continuousFixationSeconds = 0f;
-            previousSampleTime = sampleTime;
+            lastSampleTimestamp = sampleTime;
         }
 
-        private void NotifyIfStateChanged(bool previousState)
+        private void TellOthersIfChanged(bool previousState)
         {
+            // Nur bei einem echten Wechsel Bescheid geben, nicht bei jedem Messwert.
             if (previousState != isInsideTolerance)
             {
                 FixationStateChanged?.Invoke(isInsideTolerance);
             }
         }
 
-        private void TryResolveReferences()
+        private void FindReferences()
         {
+            // Sind die Felder im Inspector leer, wird hier selbst gesucht.
             if (eyeTrackingToolbox == null)
             {
                 eyeTrackingToolbox = EyeTrackingToolbox.Instance;
@@ -238,7 +258,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private void Subscribe()
         {
-            // Abonnieren verbindet dieses Skript mit den neuen Samples der Toolbox.
+            // Ab jetzt bekommt dieses Skript jeden neuen Messwert von der Toolbox.
             if (subscribed || eyeTrackingToolbox == null)
             {
                 return;
@@ -250,7 +270,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private void Unsubscribe()
         {
-            // Beim Deaktivieren wieder lösen, sonst könnte derselbe Sample mehrfach ankommen.
+            // Wieder abmelden, sonst kommt derselbe Messwert später doppelt an.
             if (!subscribed || eyeTrackingToolbox == null)
             {
                 subscribed = false;

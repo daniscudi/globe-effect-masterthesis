@@ -3,6 +3,14 @@ using NUnit.Framework;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
+    /// <summary>
+    /// Testet die Verzerrungsformel mit l.
+    ///
+    /// Geprüft werden vor allem die Stellen, an denen man das Ergebnis von Hand
+    /// weiß: Bei l = 1 muss das Gitter gerade bleiben, die Mitte und der Rand
+    /// müssen immer an derselben Stelle liegen, und unmögliche Kombinationen aus
+    /// l und FOV müssen einen Fehler geben.
+    /// </summary>
     public sealed class VisualSpaceRadialMappingTests
     {
         [TestCase(0.0)]

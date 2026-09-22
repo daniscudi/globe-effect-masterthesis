@@ -6,7 +6,10 @@ using System.Text;
 
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
-    /// <summary>Antwort und Qualitätsdaten eines gezeigten Trialversuchs.</summary>
+    /// <summary>
+    /// Was bei einem gezeigten Durchgang herausgekommen ist: die Antwort, die
+    /// Zeiten und die Werte dazu, wie gut die Person auf das Kreuz geschaut hat.
+    /// </summary>
     public sealed class CheckerboardTrialResult
     {
         public CheckerboardTrial Trial { get; }
@@ -88,16 +91,20 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     }
 
     /// <summary>
-    /// Legt für jede Sitzung einen eigenen Ordner, den vorher erzeugten Plan und
-    /// eine fortlaufend ergänzte Trialdatei an. Jede Präsentation wird sofort
-    /// geschrieben, damit auch ein später abgebrochener Durchlauf erhalten bleibt.
+    /// Schreibt die CSV-Dateien für den Checkerboard-Test.
+    ///
+    /// Jede Sitzung bekommt einen eigenen Ordner. Geschrieben wird sofort nach
+    /// jedem Durchgang. Bricht man später ab oder stürzt Unity ab, sind die bis
+    /// dahin gemessenen Daten trotzdem alle da.
     /// </summary>
     public sealed class CheckerboardExperimentFiles
     {
         // Pro Sitzung entstehen zwei Dateien:
-        // plan.csv enthält die vorab festgelegte Reihenfolge.
-        // trials.csv erhält nach jeder tatsächlichen Präsentation eine neue Zeile.
-        // Eye-Tracking-Rohdaten werden getrennt von der Lab-Toolbox geschrieben.
+        // plan.csv steht vorher fest und zeigt, was in welcher Reihenfolge kommt.
+        // trials.csv wächst während der Messung, nach jedem Durchgang eine Zeile mehr.
+        //
+        // Die vielen Blickdaten pro Sekunde stehen nicht hier drin. Die schreibt
+        // die Lab-Toolbox in ihre eigenen Dateien.
         private static readonly UTF8Encoding Utf8WithoutBom = new(false);
 
         private readonly string participantId;
@@ -135,7 +142,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             DateTime sessionStartUtc,
             int randomSeed)
         {
-            // Aus Teilnehmer-ID und Startzeit wird ein eindeutiger Sitzungsordner.
+            // Legt für jede Sitzung einen eigenen Ordner an, benannt nach Person,
+            // Datum und Uhrzeit.
             if (string.IsNullOrWhiteSpace(outputRoot))
             {
                 throw new ArgumentException(
@@ -154,6 +162,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 safeParticipant);
             Directory.CreateDirectory(participantFolder);
 
+            // Gibt es den Ordner schon, wird hinten eine Zahl angehängt. So wird
+            // niemals eine vorhandene Messung überschrieben.
             string folderStem = timestamp + "_" + safeSession;
             string sessionFolder = Path.Combine(participantFolder, folderStem);
             int suffix = 1;
@@ -187,7 +197,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             string categoryBKey,
             bool responseKeysSwapped)
         {
-            // Der komplette randomisierte Plan wird vor dem ersten Trial geschrieben.
+            // Wird einmal vor der Messung aufgerufen und schreibt die gemischte
+            // Reihenfolge weg. Danach wird gleich noch die Kopfzeile für die
+            // Ergebnisdatei angelegt.
             if (trials == null)
             {
                 throw new ArgumentNullException(nameof(trials));
@@ -239,7 +251,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public void AppendResult(CheckerboardTrialResult result, int plannedTrials)
         {
-            // Nur eine neue Zeile anhängen: frühere Ergebnisse bleiben unverändert.
+            // Hängt für einen gezeigten Durchgang genau eine Zeile an. Schon
+            // geschriebene Zeilen werden dabei nie wieder angefasst.
+            //
+            // Die Reihenfolge der Werte hier muss exakt zur Kopfzeile in
+            // WriteTrialHeader passen, sonst stehen die Zahlen später in den
+            // falschen Spalten.
             if (result == null)
             {
                 throw new ArgumentNullException(nameof(result));
@@ -290,7 +307,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public static string SanitizeIdentifier(string value, string fallback)
         {
-            // Entfernt Zeichen, die in Datei- und Ordnernamen Probleme machen können.
+            // Macht aus einer Eingabe einen Namen, der als Datei- oder Ordnername
+            // funktioniert. Alles, was Ärger machen könnte, wird zu einem
+            // Unterstrich. Mehrere Unterstriche hintereinander werden zu einem
+            // zusammengezogen, und am Anfang und Ende fliegen sie ganz weg.
+            //
+            // Bleibt am Schluss nichts übrig, wird der Ersatzname genommen.
             string source = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
             var builder = new StringBuilder(source.Length);
             bool previousWasSeparator = false;
@@ -316,6 +338,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void WriteTrialHeader()
         {
+            // Die Kopfzeile der Ergebnisdatei. Sie wird einmal am Anfang geschrieben
+            // und muss Spalte für Spalte zu AppendResult passen.
             const string header =
                 "participant_id,session_label,session_start_utc,random_seed,mapping_version," +
                 "presentation_index,sequence_index,total_planned_trials," +
@@ -339,6 +363,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void AppendSessionPrefix(StringBuilder builder)
         {
+            // Diese fünf Angaben stehen am Anfang jeder Zeile, in beiden Dateien.
+            // Dadurch weiß man bei jeder einzelnen Zeile, aus welcher Sitzung sie
+            // stammt und mit welcher Formel gerechnet wurde.
             AppendCsv(builder, participantId);
             AppendCsv(builder, sessionLabel);
             AppendCsv(builder, sessionStartUtc.ToString("O", CultureInfo.InvariantCulture));
@@ -383,7 +410,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             string value,
             bool terminateRow = false)
         {
-            // Komma, Anführungszeichen und Zeilenumbruch werden nach CSV-Regeln maskiert.
+            // Steht in einem Wert ein Komma, ein Anführungszeichen oder ein
+            // Zeilenumbruch, würde die CSV-Datei durcheinanderkommen. Solche Werte
+            // werden deshalb in Anführungszeichen gesetzt, und Anführungszeichen
+            // darin werden verdoppelt. Das sind die normalen CSV-Regeln.
             string safeValue = value ?? string.Empty;
             bool quote = safeValue.IndexOf(',') >= 0 ||
                 safeValue.IndexOf('"') >= 0 ||

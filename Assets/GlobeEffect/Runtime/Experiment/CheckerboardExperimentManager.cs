@@ -5,7 +5,6 @@ using System.Globalization;
 using GlobeEffect.VRCheckerboard.EyeTracking;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.Serialization;
 
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
@@ -29,22 +28,30 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     }
 
     /// <summary>
-    /// Führt den statischen Checkerboard-Test aus. l wird vorgegeben und nicht
-    /// von der Versuchsperson verändert. Nach stabiler Fixation erscheint das
-    /// Muster und danach die Entscheidung zwischen Category A und Category B.
-    /// Während der Antwort bleibt die Noise-Maske mit Fixationskreuz sichtbar.
-    /// Vor der eigentlichen Sitzung können dieselben Schritte geübt werden.
+    /// Steuert den ganzen Checkerboard-Versuch.
+    ///
+    /// So läuft ein Durchgang ab: Die Person schaut auf das Kreuz. Liegt der Blick
+    /// ruhig genug, kommt kurz das Schachbrett. Direkt danach die Noise-Maske, und
+    /// während die zu sehen ist, drückt die Person Category A oder B.
+    ///
+    /// Welches l gezeigt wird, steht vorher fest. Die Person kann daran nichts
+    /// verändern.
+    ///
+    /// Vor dem richtigen Versuch kann man dieselben Schritte erst einmal üben.
     /// </summary>
     [DisallowMultipleComponent]
     [DefaultExecutionOrder(20)]
     public sealed class CheckerboardExperimentManager : MonoBehaviour
     {
-        // Hier läuft der komplette Versuch zusammen:
-        // StartSession erstellt und speichert den zufälligen Trialplan.
-        // BeginNextAttempt holt die nächste Bedingung aus der Warteschlange.
-        // PresentCurrentTrial überträgt die Werte an den Stimulus.
-        // MonitorFixationDuringTrial prüft den Blick während der Präsentation.
-        // Die Antwort wird gespeichert; ein ungültiger Trial kommt hinten dran.
+        // Hier läuft alles zusammen. Der Weg durch die Datei ist ungefähr dieser:
+        //
+        // StartSession           baut den gemischten Plan und speichert ihn.
+        // BeginNextAttempt       holt den nächsten Durchgang aus der Warteschlange.
+        // PresentCurrentTrial    gibt die Werte an den Stimulus weiter und zeigt ihn.
+        // MonitorFixationDuringTrial  schaut nebenher, ob der Blick liegen bleibt.
+        //
+        // Danach wird die Antwort gespeichert. Hat die Person danebengeschaut,
+        // kommt derselbe Durchgang ganz hinten noch einmal in die Warteschlange.
         [Header("Referenzen")]
         [SerializeField]
         private VrCheckerboardStimulus stimulus;
@@ -60,18 +67,18 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         [Header("Sitzung")]
         [SerializeField]
-        [Tooltip("Pseudonymisierte Versuchsperson-ID; keine Klarnamen verwenden.")]
+        [Tooltip("Kennung der Versuchsperson. Hier gehören keine echten Namen rein, sondern zum Beispiel pilot_001.")]
         private string participantId = "pilot_001";
 
         [SerializeField]
         private string sessionLabel = "checkerboard_pilot";
 
         [SerializeField]
-        [Tooltip("Gleicher Seed und gleiche Inspector-Werte ergeben dieselbe Reihenfolge.")]
+        [Tooltip("Mit derselben Zahl und denselben Einstellungen kommt wieder genau dieselbe Reihenfolge heraus.")]
         private int randomSeed = 20260901;
 
         [SerializeField]
-        [Tooltip("Leer = measurements-Ordner direkt im Unity-Projekt.")]
+        [Tooltip("Wohin die Messdaten kommen. Leer lassen ist normal, dann landen sie im Ordner measurements im Projekt.")]
         private string outputRoot = string.Empty;
 
         [SerializeField]
@@ -79,18 +86,18 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         [Header("Trialplan")]
         [SerializeField]
-        [Tooltip("Ein oder mehrere Winkeldurchmesser der kreisrunden Blende.")]
+        [Tooltip("Wie groß der runde Ausschnitt sein soll, in Grad. Es können auch mehrere Werte drinstehen, dann wird jeder davon gezeigt.")]
         private List<float> angularDiametersDegrees = new() { 90f };
 
         [SerializeField]
-        [Tooltip("Hier kann Both Eyes, Left Eye Only oder Right Eye Only gewählt werden.")]
+        [Tooltip("Auf welchen Augen gezeigt wird: beide, nur links oder nur rechts.")]
         private List<CheckerboardEyePresentation> eyePresentations = new()
         {
             CheckerboardEyePresentation.BothEyes
         };
 
         [SerializeField]
-        [Tooltip("Vorläufige Pilotwerte. l = 1 ist gerade, l = 0,5 ist der Helmholtz-Endpunkt. Die Liste kann vollständig geändert werden.")]
+        [Tooltip("Alle l-Werte, die gezeigt werden sollen. l = 1 ist gerade, l = 0,5 ist der Helmholtz-Punkt. Das hier sind nur Pilotwerte, die Liste darf komplett geändert werden.")]
         private List<float> visualSpaceLValues = new()
         {
             1.2f,
@@ -103,47 +110,45 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         };
 
         [SerializeField]
-        [Tooltip("Unabhängiger Zoom des Gitterinhalts. 1 bedeutet Originalgröße. Dieser Wert ist nicht die Merlitz-Vergrößerung m.")]
+        [Tooltip("Zoom für das Muster. 1 heißt: unverändert. Das ist nicht die Fernglasvergrößerung m von Merlitz.")]
         private List<float> contentZoomValues = new() { 1f };
 
         [SerializeField, Min(1)]
-        [Tooltip("Wie oft jede Kombination aus FOV, Augenmodus, l und Content Zoom vorkommt.")]
+        [Tooltip("Wie oft jede Kombination gezeigt wird. Mehr Wiederholungen heißt sicherere Ergebnisse, aber auch eine längere Sitzung.")]
         private int repetitionsPerCondition = 3;
 
         [Header("Fixation und Wiederholung")]
         [SerializeField]
-        [Tooltip("Vor dem Muster wird stabile Fixation verlangt und während des Trials überwacht.")]
+        [Tooltip("Das Muster kommt erst, wenn der Blick ruhig auf dem Kreuz liegt, und wird dabei auch weiter überwacht. Für eine echte Messung muss das an sein.")]
         private bool requireFixation = true;
 
         [SerializeField, Min(0f)]
-        [Tooltip("So lange darf der Blick am Stück außerhalb der Toleranz liegen, bevor der Trial ungültig wird.")]
+        [Tooltip("So lange darf die Person am Stück vom Kreuz wegschauen. Danach wird der Durchgang ungültig.")]
         private float maximumOffTargetSeconds = 0.15f;
 
         [SerializeField, Min(0f)]
-        [Tooltip("So lange dürfen am Stück ungültige oder fehlende Blickdaten vorliegen.")]
+        [Tooltip("So lange darf am Stück gar kein brauchbarer Blickwert kommen, zum Beispiel beim Blinzeln.")]
         private float maximumInvalidGazeSeconds = 0.2f;
 
         [SerializeField, Min(0.01f)]
-        [Tooltip("Ältere Eye-Tracking-Samples gelten als fehlende Daten.")]
+        [Tooltip("Ist der letzte Blickwert älter als das hier, gilt er als nicht mehr aktuell und zählt wie gar kein Wert.")]
         private float maximumGazeSampleAgeSeconds = 0.1f;
 
         [SerializeField, Min(0)]
-        [Tooltip("0 = unbegrenzt wiederholen. Ein positiver Wert bricht die Sitzung nach so vielen erfolglosen Versuchen derselben Bedingung ab.")]
+        [Tooltip("Wie oft derselbe Durchgang höchstens wiederholt werden darf. 0 heißt: so lange, bis es klappt.")]
         private int maximumAttemptsPerTrial;
 
         [Header("Ablauf")]
         [SerializeField, Min(0.01f)]
-        [Tooltip("Wie lange das Checkerboard sichtbar ist. 0,6 entspricht 600 ms.")]
+        [Tooltip("Wie lange das Schachbrett zu sehen ist. 0,6 sind 600 Millisekunden.")]
         private float stimulusDurationSeconds = 0.6f;
 
         [SerializeField, Min(0f)]
-        [Tooltip("Maximale Antwortzeit ab Beginn der Noise-Maske. 0 bedeutet ohne Zeitlimit.")]
+        [Tooltip("Wie lange die Person ab der Noise-Maske Zeit zum Antworten hat. 0 heißt: unbegrenzt.")]
         private float responseTimeoutSeconds = 5f;
 
-        [FormerlySerializedAs("interTrialSeconds")]
         [SerializeField, Min(0f)]
-        [Tooltip("Nach der Antwort bleibt eine neue Noise-Maske noch so lange sichtbar. Danach beginnt direkt die Fixation für den nächsten Trial.")]
-        private float postResponseNoiseSeconds = 0.5f;
+        private float interTrialSeconds = 0.5f;
 
         [Header("Antwortkategorien und Tasten")]
         [SerializeField]
@@ -153,36 +158,36 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private Key concaveResponseKey = Key.DownArrow;
 
         [SerializeField]
-        [Tooltip("Bezeichnung der intern als Convex gespeicherten Antwort.")]
+        [Tooltip("Wie diese Antwort der Person genannt wird. Gespeichert wird sie im Code und in der CSV weiter als Convex.")]
         private string categoryAResponseText = "CATEGORY A";
 
         [SerializeField]
-        [Tooltip("Bezeichnung der intern als Concave gespeicherten Antwort.")]
+        [Tooltip("Wie diese Antwort der Person genannt wird. Gespeichert wird sie im Code und in der CSV weiter als Concave.")]
         private string categoryBResponseText = "CATEGORY B";
 
         [Header("Welcome und Training")]
         [SerializeField]
-        [Tooltip("Startet das Training vom Welcome Screen.")]
+        [Tooltip("Taste, mit der vom Startbildschirm aus das Training losgeht.")]
         private Key trainingKey = Key.T;
 
         [SerializeField]
-        [Tooltip("Geht im Training zur nächsten Erklärung weiter.")]
+        [Tooltip("Taste zum Weiterblättern im Training. Damit startet später auch der erste Durchgang.")]
         private Key continueTrainingKey = Key.Space;
 
         [SerializeField]
-        [Tooltip("Wenn aktiv, muss das Training vor F5 einmal vollständig beendet werden.")]
+        [Tooltip("Ist das an, geht der Versuch erst los, wenn das Training einmal komplett durchlaufen wurde.")]
         private bool requireTrainingBeforeSession = true;
 
         [SerializeField, Range(0f, 1.4f)]
-        [Tooltip("Deutliches Beispiel für Category A. Der Wert sollte pilotiert werden und im geplanten Versuchsbereich liegen.")]
+        [Tooltip("Das deutliche Beispiel für Category A im Training. Der Wert sollte klar zu erkennen sein und trotzdem im Bereich liegen, der später im Versuch vorkommt.")]
         private float trainingCategoryAVisualSpaceL = 1.2f;
 
         [SerializeField, Range(0f, 1.4f)]
-        [Tooltip("Deutliches Beispiel für Category B. Der Wert sollte pilotiert werden und im geplanten Versuchsbereich liegen.")]
+        [Tooltip("Das deutliche Beispiel für Category B im Training. Der Wert sollte klar zu erkennen sein und trotzdem im Bereich liegen, der später im Versuch vorkommt.")]
         private float trainingCategoryBVisualSpaceL = 0.2f;
 
         [SerializeField]
-        [Tooltip("l-Werte für die unbewerteten Übungstrials. Jeder Wert wird gleich oft gezeigt.")]
+        [Tooltip("Die l-Werte für die Übungsdurchgänge. Jeder kommt gleich oft dran, und es gibt keine Rückmeldung, ob die Antwort stimmte.")]
         private List<float> trainingVisualSpaceLValues = new()
         {
             0.2f,
@@ -192,15 +197,15 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         };
 
         [SerializeField, Min(1)]
-        [Tooltip("Wie oft jeder eingetragene l-Wert im Training vorkommt.")]
+        [Tooltip("Wie oft jeder Übungswert im Training drankommt.")]
         private int trainingRepetitionsPerValue = 3;
 
         [SerializeField, Min(0f)]
-        [Tooltip("Kurze Noise-Dauer nach den beiden erklärten Beispielmustern.")]
+        [Tooltip("Wie lange die Noise-Maske nach den beiden Beispielen zu sehen ist.")]
         private float trainingExampleNoiseSeconds = 0.5f;
 
         [SerializeField, Min(0f)]
-        [Tooltip("Fixationszeit im Training, falls die Eye-Tracking-Kontrolle ausgeschaltet ist.")]
+        [Tooltip("Wie lange im Training nur das Kreuz gezeigt wird, wenn die Blickkontrolle aus ist. Dann kann ja nicht gemessen werden, ob der Blick ruhig liegt.")]
         private float trainingFixationSecondsWithoutEyeTracking = 0.5f;
 
         [Header("Tasten")]
@@ -299,7 +304,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void Awake()
         {
-            // Referenzen werden früh gesucht, damit StartSession sie sicher findet.
+            // Möglichst früh suchen, damit später beim Start alles da ist.
             ResolveReferences();
         }
 
@@ -313,8 +318,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             if (autoStartOnPlay)
             {
-                // Auto Start ist nur für technische Tests gedacht und überspringt
-                // deshalb den vorgeschalteten Welcome-/Trainingsschritt.
+                // Auto Start ist nur zum schnellen Ausprobieren da. Begrüßung und
+                // Training werden dann übersprungen. Für eine echte Messung darf
+                // das nicht an sein.
                 trainingCompleted = true;
                 StartSession();
                 return;
@@ -325,8 +331,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void Update()
         {
-            // Start, Training und Abbruch werden hier abgefragt. Die Antworten A/B
-            // meldet weiterhin der Keyboard Controller.
+            // Hier werden nur die Tasten vom Versuchsleiter abgefragt: starten,
+            // trainieren, abbrechen, weiter. Die Antworttasten A und B laufen
+            // weiter über den Keyboard Controller.
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null)
             {
@@ -421,8 +428,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void ShowWelcomeScreen(string notice)
         {
-            // Der Welcome Screen ist der ruhige Ausgangspunkt vor Training und
-            // Hauptversuch. Hier werden noch keine Dateien oder Blickdaten angelegt.
+            // Der Startbildschirm ist der ruhige Punkt, an dem nichts läuft. Von
+            // hier geht es ins Training oder in den Versuch.
+            //
+            // Hier wird noch keine Datei angelegt und noch nichts aufgezeichnet.
             ResolveReferences();
             if (stimulus == null || keyboardController == null)
             {
@@ -495,8 +504,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 " = CONTINUE");
             yield return WaitForTrainingAdvance();
 
-            // Die beiden deutlichen Beispiele erklären nur, was mit A und B gemeint
-            // ist. Erst danach kommen die gemischten Übungstrials ohne Hinweistext.
+            // Zuerst kommen zwei ganz deutliche Beispiele. Die zeigen der Person,
+            // was mit Category A und was mit Category B gemeint ist.
+            //
+            // Danach folgen die gemischten Übungsdurchgänge, und da steht dann kein
+            // Hinweis mehr dabei. Es gibt auch keine Rückmeldung, ob eine Antwort
+            // richtig war. Das ist Absicht, sonst würde man das Ergebnis verfälschen.
             var examples = new[]
             {
                 CheckerboardCurvatureResponse.Convex,
@@ -574,15 +587,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     yield return null;
                 }
 
-                // Direkt nach der Antwort wird nicht auf Schwarz geschaltet.
-                // Eine neue Noise-Verteilung überdeckt das Nachbild noch kurz,
-                // bevor die Fixationsphase des nächsten Übungstrials beginnt.
-                int postResponseNoiseSeed = unchecked(
-                    randomSeed + 70000 + presentationIndex * 1879);
-                stimulus.ShowNoise(postResponseNoiseSeed);
-                if (postResponseNoiseSeconds > 0f)
+                stimulus.Hide();
+                if (interTrialSeconds > 0f)
                 {
-                    yield return WaitForTrainingSeconds(postResponseNoiseSeconds);
+                    yield return WaitForTrainingSeconds(interTrialSeconds);
                 }
             }
 
@@ -667,8 +675,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void PrepareTrainingCondition(float visualSpaceL)
         {
-            // Training und Hauptversuch verwenden dieselbe erste FOV-, Augen- und
-            // Zoom-Bedingung. Nur l wird durch den jeweiligen Übungswert ersetzt.
+            // Im Training soll alles genauso aussehen wie später im Versuch.
+            // Deshalb werden FOV, Augenmodus und Zoom aus der ersten echten
+            // Bedingung übernommen. Nur l wird durch den Übungswert ersetzt.
             if (angularDiametersDegrees != null && angularDiametersDegrees.Count > 0)
             {
                 stimulus.SetAngularDiameter(angularDiametersDegrees[0]);
@@ -748,8 +757,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public bool StartSession()
         {
-            // Diese Methode prüft die Szene, erzeugt alle Trialkombinationen,
-            // legt den Messordner an und startet danach die erste Präsentation.
+            // Das ist der große Startknopf. Der Reihe nach passiert hier:
+            // prüfen, ob in der Szene alles da ist -> alle Durchgänge bauen und
+            // mischen -> den Messordner anlegen -> Eye Tracking starten ->
+            // den ersten Durchgang zeigen.
             if (IsSessionActive || IsTrainingActive)
             {
                 Debug.LogWarning(
@@ -782,8 +793,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return false;
             }
 
-            // Die Tasten stehen bewusst beim Experiment Manager. Dadurch gelten
-            // die neuen Hoch-/Runter-Standardwerte auch in bereits vorhandenen Szenen.
+            // Die Tastenbelegung wird mit Absicht hier gesetzt und nicht im
+            // Keyboard Controller. So gilt sie auch in älteren Szenen, in denen
+            // am Controller noch die alten Tasten eingetragen sind.
             ApplyResponseKeySettings();
 
             try
@@ -809,7 +821,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     trialPlan,
                     stimulus.GridLineSpacingDegrees,
                     stimulusDurationSeconds,
-                    postResponseNoiseSeconds,
                     responseTimeoutSeconds,
                     ConvexResponseKeyName,
                     ConcaveResponseKeyName,
@@ -851,8 +862,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public void AbortSession(string reason = "ManualAbort")
         {
-            // Beim Abbruch bleiben bereits geschriebene Zeilen erhalten. Ein gerade
-            // laufender Trial wird zusätzlich als abgebrochen protokolliert.
+            // Beim Abbrechen geht nichts verloren. Alles, was schon in der Datei
+            // steht, bleibt stehen. Läuft gerade noch ein Durchgang, wird der extra
+            // als abgebrochen vermerkt.
             if (!IsSessionActive)
             {
                 return;
@@ -882,8 +894,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void BeginNextAttempt()
         {
-            // Die Queue liefert entweder einen neuen Trial oder eine zuvor hinten
-            // angehängte Wiederholung. Ist sie leer, ist die Sitzung fertig.
+            // Aus der Warteschlange kommt entweder ein neuer Durchgang oder eine
+            // Wiederholung, die vorhin hinten angehängt wurde. Beides sieht hier
+            // gleich aus. Ist die Warteschlange leer, ist die Sitzung fertig.
             interTrialCoroutine = null;
             if (trialQueue == null || !trialQueue.TryTakeNext(out currentTrial))
             {
@@ -921,8 +934,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void PresentCurrentTrial()
         {
-            // Erst hier wird die aktuelle Bedingung sichtbar. Damit zählen
-            // Trialzeit und Fixationsprüfung nicht schon während der Wartephase.
+            // Erst ab hier ist das Muster zu sehen. Vorher lief nur das Warten auf
+            // eine ruhige Fixation. Deshalb fangen auch die Zeitmessung und die
+            // Blickkontrolle erst jetzt an und nicht schon vorher.
             if (currentTrial == null)
             {
                 return;
@@ -962,7 +976,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private IEnumerator RunPresentationSequence(CheckerboardTrial presentedTrial)
         {
-            // Das Muster bleibt für alle Personen exakt gleich lange sichtbar.
+            // Das Muster ist bei allen Personen exakt gleich lange zu sehen.
+            // Sonst könnte man die Antworten hinterher nicht vergleichen.
             yield return new WaitForSecondsRealtime(stimulusDurationSeconds);
             if (sessionState != CheckerboardSessionState.RunningTrial ||
                 currentTrial != presentedTrial)
@@ -1004,8 +1019,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             if (sessionState == CheckerboardSessionState.WaitingForResponse &&
                 currentTrial == presentedTrial)
             {
-                // Vor Invalidate wird die Referenz geleert, weil die Coroutine
-                // sich an dieser Stelle bereits selbst beendet.
+                // Erst die Referenz leeren, dann abbrechen. Die Coroutine ist an
+                // dieser Stelle nämlich schon von selbst fertig, und man würde
+                // sonst versuchen, etwas zu stoppen, das gar nicht mehr läuft.
                 presentationCoroutine = null;
                 InvalidateCurrentTrial("response_timeout");
                 yield break;
@@ -1016,8 +1032,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void HandleResponseSubmitted(CheckerboardCurvatureResponse response)
         {
-            // Im Training wird die Antwort nur als Tastendruck verwendet. Sie wird
-            // nicht bewertet und nicht in die Ergebnisdateien übernommen.
+            // Im Training zählt der Tastendruck nur als "weiter". Er wird nicht
+            // bewertet und landet auch in keiner Messdatei.
             if (sessionState == CheckerboardSessionState.TrainingWaitingForResponse &&
                 response != CheckerboardCurvatureResponse.None)
             {
@@ -1025,8 +1041,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return;
             }
 
-            // Im Hauptversuch wird die Antwort während der Noise-Maske angenommen.
-            // Danach wird genau ein Ergebnis geschrieben.
+            // Im Versuch wird die Antwort angenommen, solange die Noise-Maske zu
+            // sehen ist. Pro Durchgang wird danach genau eine Zeile geschrieben.
             if (sessionState != CheckerboardSessionState.WaitingForResponse ||
                 currentTrial == null ||
                 response == CheckerboardCurvatureResponse.None)
@@ -1060,8 +1076,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void MonitorFixationDuringTrial()
         {
-            // Off target und ungültige Blickdaten werden getrennt gezählt. Nur eine
-            // ununterbrochene Überschreitung der erlaubten Zeit macht den Trial ungültig.
+            // Zwei Dinge werden getrennt mitgezählt: wie lange die Person am Kreuz
+            // vorbeigeschaut hat, und wie lange gar keine Daten da waren.
+            //
+            // Getrennt deshalb, weil ein Blinzeln etwas anderes ist als wegschauen.
+            // Der Durchgang wird nur dann ungültig, wenn eines davon am Stück zu
+            // lange dauert. Kurze Aussetzer sind also in Ordnung.
             if (fixationMonitor == null)
             {
                 InvalidateCurrentTrial("missing_fixation_monitor");
@@ -1107,9 +1127,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void InvalidateCurrentTrial(string reason)
         {
-            // Der ungültige Versuch wird gespeichert, aber nicht als gültige Antwort
-            // gezählt. Dieselbe Bedingung erhält eine höhere Attempt Number und wird
-            // am Ende der Queue erneut eingeordnet.
+            // Der misslungene Versuch wird trotzdem gespeichert, zählt aber nicht als
+            // Antwort. Man sieht später in der CSV, dass es ihn gab und warum er
+            // nicht gezählt hat.
+            //
+            // Dieselbe Bedingung kommt danach ganz hinten wieder in die
+            // Warteschlange, mit einer höheren Versuchsnummer.
             if ((sessionState != CheckerboardSessionState.RunningTrial &&
                  sessionState != CheckerboardSessionState.WaitingForResponse) ||
                 currentTrial == null)
@@ -1177,8 +1200,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             bool validForAnalysis,
             string status)
         {
-            // Hier werden Trialbedingung, Zeitpunkte und Blickstatus in einem Objekt
-            // gesammelt. Die Dateiklasse schreibt dieses Objekt anschließend als CSV.
+            // Hier wird alles zu diesem Durchgang in ein Objekt gepackt: die
+            // Bedingung, die Zeiten und die Blickwerte. Dieses Objekt geht danach
+            // an die Dateiklasse, die daraus eine CSV-Zeile macht.
             bool sampleValid = fixationSnapshotAvailable
                 ? fixationSampleValidAtTrialEnd
                 : fixationMonitor != null && fixationMonitor.CurrentSampleValid;
@@ -1235,8 +1259,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private bool TryAppendResult(CheckerboardTrialResult result)
         {
-            // Schreibfehler werden abgefangen, damit nicht unbemerkt ein Versuch
-            // weiterläuft, obwohl keine Ergebnisse gespeichert werden können.
+            // Wenn das Schreiben schiefgeht, zum Beispiel weil die Datei noch in
+            // Excel offen ist, wird das hier abgefangen und gemeldet. Sonst würde
+            // die Messung munter weiterlaufen und am Ende wäre nichts gespeichert.
             try
             {
                 experimentFiles.AppendResult(result, totalTrials);
@@ -1251,15 +1276,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void FinishAttemptAndScheduleNext()
         {
-            // Nach der Antwort darf kein schwarzer Zwischenbildschirm erscheinen,
-            // weil dort das Nachbild des Checkerboards besonders deutlich wird.
-            // Stattdessen wird die Noise mit einem neuen Seed noch kurz fortgesetzt.
+            // Kurze Pause zwischen zwei Durchgängen. Der Bildschirm bleibt leer,
+            // damit das vorige Muster nicht in den nächsten hineinwirkt.
             StopPresentationCoroutine();
-            ShowPostResponseNoise();
+            stimulus.Hide();
             currentTrial = null;
             sessionState = CheckerboardSessionState.InterTrial;
 
-            if (postResponseNoiseSeconds <= 0f)
+            if (interTrialSeconds <= 0f)
             {
                 BeginNextAttempt();
             }
@@ -1271,33 +1295,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private IEnumerator BeginNextAttemptAfterDelay()
         {
-            yield return new WaitForSecondsRealtime(postResponseNoiseSeconds);
+            yield return new WaitForSecondsRealtime(interTrialSeconds);
             BeginNextAttempt();
-        }
-
-        private void ShowPostResponseNoise()
-        {
-            if (stimulus == null)
-            {
-                return;
-            }
-
-            // Der zweite Seed unterscheidet sich bewusst von der Noise während
-            // der Antwort. So bleibt nicht dasselbe Schwarz-Weiß-Muster stehen.
-            int postResponseNoiseSeed = unchecked(
-                randomSeed + presentationCount * 1879 + 0x4A31);
-            stimulus.ShowNoise(postResponseNoiseSeed);
-            WriteEyeTrackingMarker(string.Format(
-                CultureInfo.InvariantCulture,
-                "PostTrialNoiseStarted;presentation={0};duration_s={1:F4};seed={2}",
-                presentationCount,
-                postResponseNoiseSeconds,
-                postResponseNoiseSeed));
         }
 
         private void CompleteSession()
         {
-            // Abschlussmarker schreiben, Stimulus ausblenden und Aufzeichnung stoppen.
+            // Zum Schluss: Marker in die Aufnahme schreiben, Bild ausblenden und
+            // die Eye-Tracking-Aufzeichnung beenden.
             StopPresentationCoroutine();
             currentTrial = null;
             currentTrialNumber = totalTrials;
@@ -1334,8 +1339,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void StartEyeTracking(DateTime sessionStartUtc)
         {
-            // Die vorhandene Lab-Toolbox übernimmt weiterhin die eigentlichen
-            // Blickdaten. Der Manager startet nur die Aufnahme und schreibt Marker.
+            // Die Blickdaten selbst schreibt die Lab-Toolbox. Von hier wird die
+            // Aufnahme nur an- und ausgeschaltet, und es werden Marker gesetzt.
             if (eyeTrackingToolbox == null)
             {
                 Debug.LogWarning("Sitzung läuft ohne Eye-Tracking-Aufzeichnung.", this);
@@ -1352,8 +1357,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             WriteEyeTrackingMarker(string.Format(
                 CultureInfo.InvariantCulture,
                 "SessionStart;participant={0};session={1};seed={2};planned_trials={3};utc={4};mapping={5};" +
-                "stimulus_duration_s={6:F4};noise_until_response=1;post_response_noise_s={7:F4};" +
-                "response_timeout_s={8:F4};category_a_key={9};category_b_key={10};response_keys_swapped={11}",
+                "stimulus_duration_s={6:F4};noise_until_response=1;response_timeout_s={7:F4};" +
+                "category_a_key={8};category_b_key={9};response_keys_swapped={10}",
                 CheckerboardExperimentFiles.SanitizeIdentifier(participantId, "pilot"),
                 CheckerboardExperimentFiles.SanitizeIdentifier(sessionLabel, "session"),
                 randomSeed,
@@ -1361,7 +1366,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 sessionStartUtc.ToString("O", CultureInfo.InvariantCulture),
                 VisualSpaceRadialMapping.MappingVersion,
                 stimulusDurationSeconds,
-                postResponseNoiseSeconds,
                 responseTimeoutSeconds,
                 ConvexResponseKeyName,
                 ConcaveResponseKeyName,
@@ -1370,8 +1374,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void ResolveReferences()
         {
-            // Leere Inspector-Felder werden, soweit eindeutig möglich, aus der
-            // offenen Szene ergänzt. Fest eingetragene Referenzen bleiben erhalten.
+            // Felder, die im Inspector leer geblieben sind, werden hier in der Szene
+            // gesucht. Was schon eingetragen ist, wird nicht angefasst.
             stimulus ??= FindAnyObjectByType<VrCheckerboardStimulus>();
             if (keyboardController == null && stimulus != null)
             {
@@ -1467,16 +1471,17 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             CheckerboardTrial trial,
             int presentationIndex)
         {
-            // Der Marker steht zusätzlich in der Eye-Tracking-Datei. Dadurch kann
-            // man Blicksamples später der gerade gezeigten Bedingung zuordnen.
+            // Ein Marker ist eine kurze Notiz mitten in der Eye-Tracking-Aufnahme.
+            // Damit weiß man beim Auswerten, welcher Blickwert zu welchem Teil des
+            // Versuchs gehört, also zum Beispiel zum Muster oder zur Noise-Maske.
             return string.Format(
                 CultureInfo.InvariantCulture,
                 "TrialStart;presentation={0};sequence={1};condition={2};repetition={3};" +
                 "attempt={4};eye={5};fov_deg={6:F3};edge_softness_deg={7:F3};" +
                 "circular_aperture={8};grid_spacing_deg={9:F3};" +
                 "grid_spacing_uv={10:F6};visual_space_l={11:F4};content_zoom={12:F4};" +
-                "stimulus_duration_s={13:F4};noise_until_response=1;post_response_noise_s={14:F4};" +
-                "response_timeout_s={15:F4};category_a_key={16};category_b_key={17};response_keys_swapped={18}",
+                "stimulus_duration_s={13:F4};noise_until_response=1;response_timeout_s={14:F4};" +
+                "category_a_key={15};category_b_key={16};response_keys_swapped={17}",
                 presentationIndex,
                 trial.SequenceIndex,
                 trial.ConditionIndex,
@@ -1491,7 +1496,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 trial.VisualSpaceL,
                 trial.ContentZoom,
                 stimulusDurationSeconds,
-                postResponseNoiseSeconds,
                 responseTimeoutSeconds,
                 ConvexResponseKeyName,
                 ConcaveResponseKeyName,
@@ -1544,8 +1548,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void CaptureFixationAtTrialEnd()
         {
-            // Das Fixationskreuz bleibt auch in der Noise-Phase sichtbar. Deshalb
-            // werden die letzten Blickwerte erst bei Antwort oder Abbruch eingefroren.
+            // Das Kreuz bleibt auch während der Noise-Maske stehen, die Person soll
+            // ja weiter dorthin schauen. Deshalb werden die Blickwerte erst
+            // festgehalten, wenn die Antwort kommt oder abgebrochen wird.
             fixationSnapshotAvailable = true;
             fixationSampleValidAtTrialEnd = fixationMonitor != null &&
                 fixationMonitor.CurrentSampleValid;
@@ -1577,7 +1582,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void ResetTrialFixationCounters()
         {
-            // Jeder Präsentationsversuch beginnt mit eigenen leeren Zeitzählern.
+            // Jeder Versuch fängt mit frischen Zählern bei null an. Sonst würde man
+            // die Aussetzer vom vorigen Durchgang mitschleppen.
             currentOffTargetSeconds = 0f;
             currentInvalidGazeSeconds = 0f;
             longestOffTargetSeconds = 0f;
@@ -1616,7 +1622,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             maximumInvalidGazeSeconds = Mathf.Max(0f, maximumInvalidGazeSeconds);
             maximumGazeSampleAgeSeconds = Mathf.Max(0.01f, maximumGazeSampleAgeSeconds);
             maximumAttemptsPerTrial = Mathf.Max(0, maximumAttemptsPerTrial);
-            postResponseNoiseSeconds = Mathf.Max(0f, postResponseNoiseSeconds);
+            interTrialSeconds = Mathf.Max(0f, interTrialSeconds);
         }
     }
 }

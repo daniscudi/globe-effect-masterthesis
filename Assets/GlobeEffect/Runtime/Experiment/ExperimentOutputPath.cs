@@ -4,23 +4,26 @@ using UnityEngine;
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
     /// <summary>
-    /// Bestimmt den gemeinsamen Ausgabeordner für alle Versuchsteile. Der Pfad
-    /// wird aus Unitys eigenem Assets-Pfad aufgebaut und enthält deshalb keinen
-    /// Laufwerksbuchstaben, der nur auf einem bestimmten Rechner funktioniert.
+    /// Sucht den Ordner, in den die Messdaten geschrieben werden.
+    ///
+    /// Der Pfad wird aus Unitys eigenem Assets-Pfad gebaut. Deshalb steht hier
+    /// nirgends ein fester Laufwerksbuchstabe. Das Projekt läuft also auch dann,
+    /// wenn es auf dem Labor-PC auf einem anderen Laufwerk liegt.
     /// </summary>
     public static class ExperimentOutputPath
     {
         /// <summary>
-        /// Im Unity Editor liegt Application.dataPath im Assets-Ordner. Eine
-        /// Ebene darüber befindet sich der Projektordner. Bei einem späteren
-        /// Build liegt der Measurements-Ordner entsprechend neben der Anwendung.
+        /// Im Unity Editor zeigt Application.dataPath auf den Assets-Ordner. Eine
+        /// Ebene darüber liegt der Projektordner, und da hinein kommt der Ordner
+        /// "measurements". Baut man das Projekt später als Programm, landet er
+        /// neben der fertigen Anwendung.
         /// </summary>
         public static string DefaultMeasurementsFolder => Path.GetFullPath(
             Path.Combine(Application.dataPath, "..", "measurements"));
 
         /// <summary>
-        /// Ein im Inspector eingetragener Pfad hat weiterhin Vorrang. Bleibt
-        /// das Feld leer, wird automatisch der portable Standardpfad benutzt.
+        /// Steht im Inspector ein eigener Pfad, wird der genommen. Ist das Feld
+        /// leer, nimmt das Skript den Standardordner von oben.
         /// </summary>
         public static string Resolve(string configuredFolder)
         {

@@ -4,16 +4,19 @@ using UnityEngine;
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
-    /// Protokolliert den horizontalen Bewegungsverlauf. In der kontrollierten
-    /// SimulatedYaw-Bedingung wird der Shader-Schwenk ausgewertet. Im optionalen
-    /// HeadTracked-Modus wird stattdessen die Kopfbewegung relativ zur Startpose
-    /// gemessen.
+    /// Schreibt mit, wie die Links-Rechts-Bewegung im Durchgang verlaufen ist.
+    ///
+    /// Im normalen Modus "SimulatedYaw" läuft die Bewegung automatisch im Shader.
+    /// Dann wird einfach dieser Wert mitgeschrieben.
+    ///
+    /// Es gibt auch noch den Modus "HeadTracked". Da dreht die Person den Kopf
+    /// selbst, und gemessen wird, wie weit sie sich vom Startpunkt weggedreht hat.
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RandomDotHeadSweepMonitor : MonoBehaviour
     {
-        // Dieses Skript bewegt nichts. Es beobachtet nur den aktuellen Yaw-Winkel
-        // und zählt, wie oft abwechselnd der linke und rechte Grenzwert erreicht wird.
+        // Dieses Skript bewegt selbst gar nichts. Es schaut nur zu und zählt,
+        // wie oft der linke und der rechte Rand abwechselnd erreicht wurden.
         [Header("Referenzen")]
         [SerializeField]
         private Transform observer;
@@ -23,11 +26,11 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         [Header("Bewegungsprotokoll")]
         [SerializeField, Range(0.5f, 45f)]
-        [Tooltip("Gierwinkel je Seite, ab dem eine linke/rechte Extremposition gilt.")]
+        [Tooltip("Ab wie vielen Grad zu einer Seite das als Rand zählt.")]
         private float yawThresholdDegrees = 2.5f;
 
         [SerializeField, Range(1, 20)]
-        [Tooltip("Referenzwert für technische Kontrollen; die Antwort wird im festen Trialablauf nicht davon blockiert.")]
+        [Tooltip("Nur ein Vergleichswert für die Kontrolle. Der Durchgang wird dadurch nicht blockiert.")]
         private int requiredHalfSweeps = 4;
 
         [Header("Laufzeitstatus")]
@@ -40,7 +43,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [SerializeField]
         private float maximumAbsoluteYawDegrees;
 
-        private Vector3 referenceForward = Vector3.forward;
+        // Die Richtung, in die der Kopf am Anfang des Durchgangs geschaut hat.
+        private Vector3 startDirection = Vector3.forward;
         private AlternatingHeadSweepCounter counter;
 
         public event Action<int, float> HalfSweepCompleted;
@@ -56,22 +60,23 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         private void Awake()
         {
-            ResolveReferences();
+            FindReferences();
             ResetForTrial();
         }
 
         private void Update()
         {
+            // Solange nichts zu sehen ist, gibt es auch nichts mitzuschreiben.
             if (stimulus == null || !stimulus.IsVisible)
             {
                 return;
             }
 
+            // Bei SimulatedYaw kommt der Wert direkt aus der programmierten Bewegung.
+            // Bei HeadTracked wird stattdessen die echte Kopfdrehung gemessen.
             currentYawDegrees = stimulus.MotionMode == RandomDotMotionMode.SimulatedYaw
                 ? stimulus.CurrentSimulatedYawDegrees
-                : CalculateTrackedYaw();
-            // Bei SimulatedYaw kommt der Wert direkt aus der programmierten Bewegung.
-            // Bei HeadTracked wird stattdessen die echte HMD-Drehung gemessen.
+                : MeasureRealHeadYaw();
 
             counter ??= new AlternatingHeadSweepCounter(yawThresholdDegrees);
             if (counter.Update(currentYawDegrees))
@@ -104,9 +109,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         public void ResetForTrial()
         {
-            // Die momentane Blickrichtung wird als neue Nullrichtung gespeichert.
-            ResolveReferences();
-            referenceForward = FlattenForward(
+            // Wohin die Person gerade schaut, gilt ab jetzt als Nullstellung.
+            // Alles danach wird als Abweichung von dieser Richtung gemessen.
+            FindReferences();
+            startDirection = RemoveUpDownTilt(
                 observer != null ? observer.forward : Vector3.forward);
             counter = new AlternatingHeadSweepCounter(yawThresholdDegrees);
             currentYawDegrees = 0f;
@@ -114,23 +120,26 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             maximumAbsoluteYawDegrees = 0f;
         }
 
-        private float CalculateTrackedYaw()
+        private float MeasureRealHeadYaw()
         {
             if (observer == null)
             {
                 return 0f;
             }
 
-            Vector3 currentForward = FlattenForward(observer.forward);
-            // SignedAngle liefert links und rechts mit unterschiedlichem Vorzeichen.
+            // SignedAngle gibt links und rechts mit unterschiedlichem Vorzeichen
+            // zurück. Genau das brauchen wir hier.
+            Vector3 currentForward = RemoveUpDownTilt(observer.forward);
             return Vector3.SignedAngle(
-                referenceForward,
+                startDirection,
                 currentForward,
                 Vector3.up);
         }
 
-        private void ResolveReferences()
+        private void FindReferences()
         {
+            // Sind die Felder im Inspector leer, wird hier selbst gesucht.
+            // Erst am eigenen Objekt, dann in der ganzen Szene.
             if (stimulus == null)
             {
                 stimulus = GetComponent<RandomDotFieldStimulus>();
@@ -145,10 +154,11 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             }
         }
 
-        private static Vector3 FlattenForward(Vector3 direction)
+        private static Vector3 RemoveUpDownTilt(Vector3 direction)
         {
-            // Die vertikale Kopfneigung wird entfernt, weil nur der horizontale
-            // Links-Rechts-Schwenk ausgewertet werden soll.
+            // Ob der Kopf nach oben oder unten geneigt ist, interessiert hier nicht.
+            // Uns interessiert nur das Drehen nach links und rechts. Deshalb wird
+            // der Höhenanteil einfach auf null gesetzt.
             direction.y = 0f;
             return direction.sqrMagnitude > 1e-8f
                 ? direction.normalized

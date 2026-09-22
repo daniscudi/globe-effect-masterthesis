@@ -3,26 +3,25 @@ using System;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Radiale Abbildung für den statischen Checkerboard-Test.
+    /// Die Formel, mit der das Gitter beim statischen Checkerboard verzogen wird.
     ///
-    /// Merlitz beschreibt den wahrgenommenen radialen Abstand eines Punktes
-    /// mit der Visual-Space-Funktion
+    /// Merlitz beschreibt, wie weit ein Punkt von der Mitte weg zu sein scheint, mit
     ///
     ///     y_l(a) = tan(l a) / l.
     ///
-    /// Anders als sein Instrumentenparameter k hängt l nicht von einer
-    /// Fernglasvergrößerung ab. Für den Shader wird die Funktion am Rand der
-    /// kreisrunden Blende normiert. Dadurch verändert l die Form der Linien,
-    /// aber weder den eingestellten Winkeldurchmesser noch den Blendenrand.
+    /// Anders als sein k hat l nichts mit einer Fernglasvergrößerung zu tun.
+    /// Für den Shader wird die Formel am Rand des Kreises auf 1 gebracht.
+    /// Dadurch ändert l nur die Form der Linien. Wie groß der Kreis ist und wo
+    /// sein Rand liegt, bleibt gleich.
     /// </summary>
     public static class VisualSpaceRadialMapping
     {
-        // Wichtig: Dieses Skript schätzt l nicht aus Daten und berechnet auch
-        // keinen neuen l-Wert. l wird im Inspector als Versuchsbedingung festgelegt.
-        // Hier steht nur dieselbe radiale Formel noch einmal in C#, damit Werte
-        // geprüft, protokolliert und unabhängig vom Shader getestet werden können.
-        private const double LLimitEpsilon = 1e-7;
-        private const double SingularityMarginRadians = 1e-5;
+        // Wichtig: Hier wird l nicht aus Daten geschätzt und auch nicht neu
+        // ausgerechnet. l wird im Inspector als Bedingung vorgegeben.
+        // In dieser Datei steht nur dieselbe Formel noch einmal in C#. So kann man
+        // Werte prüfen, mitschreiben und testen, ohne den Shader zu brauchen.
+        private const double AlmostZero = 1e-7;
+        private const double SafetyMarginRadians = 1e-5;
 
         public const double MinimumAngularDiameterDegrees = 1.0;
         public const double MaximumAngularDiameterDegrees = 170.0;
@@ -30,21 +29,21 @@ namespace GlobeEffect.VRCheckerboard
         public const double MaximumVisualSpaceL = 1.4;
 
         /// <summary>
-        /// Die Kennung wird in jeder Messdatei gespeichert. So bleiben Daten
-        /// unterscheidbar, falls die Abbildung später noch erweitert wird.
+        /// Diese Kennung steht in jeder Messdatei. Wenn die Formel später noch
+        /// einmal geändert wird, sieht man an den alten Dateien trotzdem, womit
+        /// sie aufgenommen wurden.
         /// </summary>
         public const string MappingVersion =
             "visual-space-l-tangent-normalized-cartesian-grid-v2";
 
         /// <summary>
-        /// Rechnet einen Radius im sichtbaren Kreis auf die Stelle zurück, an
-        /// der das unverzerrte Ausgangsgitter abgetastet werden muss.
+        /// Rechnet einen Radius im sichtbaren Kreis zurück auf die Stelle, an der
+        /// das gerade Ausgangsgitter abgelesen werden muss.
         /// </summary>
-        /// displayRadius: 0 ist die Mitte und 1 der Blendenrand.
-        /// angularDiameterDegrees: gesamter Winkeldurchmesser der Blende.
-        /// visualSpaceL: l = 1 ergibt ein gerades gnomonisches Gitter,
-        /// l = 0,5 den stereografischen Helmholtz-Endpunkt und l gegen 0
-        /// den äquidistanten Grenzfall.
+        /// displayRadius: 0 ist die Mitte, 1 ist der Rand.
+        /// angularDiameterDegrees: wie groß der Kreis insgesamt ist, in Grad.
+        /// visualSpaceL: l = 1 gibt ein gerades Gitter, l = 0,5 den Helmholtz-Punkt.
+        /// Geht l gegen 0, sind die Abstände überall gleich groß.
         public static double SourceRadius(
             double displayRadius,
             double angularDiameterDegrees,
@@ -65,30 +64,32 @@ namespace GlobeEffect.VRCheckerboard
 
             double halfAngle = 0.5 * angularDiameterDegrees * Math.PI / 180.0;
 
-            // displayRadius ist zunächst ein linearer Radius zwischen Mitte und Rand.
-            // atan übersetzt ihn in den Winkel, den dieser Bildpunkt im HMD einnimmt.
+            // displayRadius ist erst mal nur ein gerader Abstand zwischen Mitte und
+            // Rand. atan macht daraus den Winkel, den dieser Bildpunkt im Headset
+            // wirklich einnimmt.
             double visualAngle = Math.Atan(
                 displayRadius * Math.Tan(halfAngle));
 
-            // Direkt durch l zu teilen wäre bei l = 0 nicht möglich. Nach der
-            // Normierung kürzt sich l für alle anderen Werte heraus. Der hier
-            // eingesetzte Grenzfall folgt aus tan(l a) / l -> a.
-            if (visualSpaceL < LLimitEpsilon)
+            // Direkt durch l zu teilen geht bei l = 0 nicht. Nach dem Normieren
+            // kürzt sich l für alle anderen Werte sowieso weg. Der Sonderfall hier
+            // kommt daher, dass tan(l a) / l für ganz kleine l einfach gegen a geht.
+            if (visualSpaceL < AlmostZero)
             {
                 return visualAngle / halfAngle;
             }
 
-            // Das Ergebnis ist wieder normiert: 0 bleibt die Mitte und 1 bleibt
-            // der Rand. Dazwischen verschiebt l die Abtastposition des Gitters.
+            // Das Ergebnis liegt wieder zwischen 0 und 1: 0 ist die Mitte, 1 ist der
+            // Rand. Dazwischen verschiebt l, an welcher Stelle das Gitter abgelesen wird.
             return Math.Tan(visualSpaceL * visualAngle) /
                 Math.Tan(visualSpaceL * halfAngle);
         }
 
         /// <summary>
-        /// Übersetzt nur die beiden gemeinsamen Referenzpunkte auf eine
-        /// Oomes-ähnliche Skala: l = 1 entspricht 0 und l = 0,5 entspricht 1.
-        /// Diese Zahl ist nicht die unveröffentlichte Originalinterpolation
-        /// von Oomes und wird deshalb nur als endpoint equivalent gespeichert.
+        /// Rechnet nur die beiden gemeinsamen Eckpunkte auf eine Oomes-ähnliche
+        /// Skala um: l = 1 wird zu 0 und l = 0,5 wird zu 1.
+        /// Das ist nicht die Originalformel von Oomes, die steht nirgends in der
+        /// Veröffentlichung. Deshalb wird die Zahl nur als endpoint equivalent
+        /// mitgeschrieben und nicht weiter ausgewertet.
         /// </summary>
         public static double OomesEndpointEquivalent(double visualSpaceL)
         {
@@ -97,10 +98,10 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
-        /// Rechnet den gewünschten Winkelabstand der Gitterlinien in die
-        /// lineare Gitterweite des normierten u/v-Koordinatensystems um.
-        /// Der Winkel dient damit nur zur Festlegung der Reizgröße. Das
-        /// Ausgangsgitter selbst bleibt danach kartesisch und gleichmäßig.
+        /// Rechnet den gewünschten Abstand der Gitterlinien von Grad in die Weite
+        /// im u/v-Koordinatensystem um. Der Winkel legt also nur fest, wie groß die
+        /// Karos sind. Das Ausgangsgitter bleibt danach ein ganz normales
+        /// gleichmäßiges Gitter.
         /// </summary>
         public static double NormalizedGridLineSpacing(
             double angularDiameterDegrees,
@@ -115,15 +116,15 @@ namespace GlobeEffect.VRCheckerboard
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(gridLineSpacingDegrees),
-                    "Der Winkelabstand der Gitterlinien muss zwischen " +
+                    "Der Abstand der Gitterlinien muss zwischen " +
                     "0 und 90 Grad liegen.");
             }
 
             double halfAngle = 0.5 * angularDiameterDegrees * Math.PI / 180.0;
             double spacingRadians = gridLineSpacingDegrees * Math.PI / 180.0;
 
-            // Beide Tangenswerte liegen im selben linearen Projektionsraum.
-            // Ihre Division ergibt die Gitterweite relativ zum Blendenradius.
+            // Beide Tangenswerte liegen im selben geraden Bildraum. Teilt man sie,
+            // kommt die Gitterweite im Verhältnis zum Radius des Kreises heraus.
             return Math.Tan(spacingRadians) / Math.Tan(halfAngle);
         }
 
@@ -134,13 +135,17 @@ namespace GlobeEffect.VRCheckerboard
             ValidateAngularDiameter(angularDiameterDegrees);
             ValidateVisualSpaceL(visualSpaceL);
 
+            // Bei sehr großen l und sehr großem FOV läuft der Tangens in seinen
+            // Umkehrpunkt. Dann wäre das Gitter nicht mehr eindeutig, deshalb wird
+            // so eine Kombination hier abgefangen.
             double halfAngle = 0.5 * angularDiameterDegrees * Math.PI / 180.0;
             if (visualSpaceL * halfAngle >=
-                Math.PI / 2.0 - SingularityMarginRadians)
+                Math.PI / 2.0 - SafetyMarginRadians)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(visualSpaceL),
-                    "Für diese Kombination aus l und FOV wäre die Tangensabbildung nicht mehr monoton.");
+                    "Diese Kombination aus l und FOV geht nicht. Der Tangens kippt " +
+                    "dabei um und das Gitter wäre nicht mehr eindeutig.");
             }
         }
 
@@ -173,6 +178,7 @@ namespace GlobeEffect.VRCheckerboard
 
         private static void ValidateFinite(double value, string parameterName)
         {
+            // Fängt kaputte Zahlen ab, also NaN und unendlich.
             if (double.IsNaN(value) || double.IsInfinity(value))
             {
                 throw new ArgumentOutOfRangeException(parameterName);

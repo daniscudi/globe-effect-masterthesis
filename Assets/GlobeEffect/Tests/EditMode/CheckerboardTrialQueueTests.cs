@@ -3,6 +3,12 @@ using NUnit.Framework;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
+    /// <summary>
+    /// Testet die Warteschlange der Durchgänge.
+    ///
+    /// Der wichtigste Punkt: Ein misslungener Durchgang muss ganz hinten wieder
+    /// eingereiht werden und darf nicht sofort noch einmal kommen.
+    /// </summary>
     public sealed class CheckerboardTrialQueueTests
     {
         [Test]

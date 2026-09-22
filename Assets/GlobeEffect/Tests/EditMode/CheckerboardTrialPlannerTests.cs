@@ -4,6 +4,13 @@ using NUnit.Framework;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
+    /// <summary>
+    /// Testet den Planer für den Checkerboard-Versuch.
+    ///
+    /// Geprüft wird: Kommt bei gleichem Seed wirklich dieselbe Reihenfolge heraus?
+    /// Kommt jede Kombination gleich oft dran? Und merkt der Planer, wenn eine
+    /// Kombination aus l und FOV gar nicht geht?
+    /// </summary>
     public sealed class CheckerboardTrialPlannerTests
     {
         [Test]
@@ -31,7 +38,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
         {
             IReadOnlyList<CheckerboardTrial> plan = CreatePlan(seed: 7);
 
-            // 2 FOV x 2 Augenmodi x 2 l-Werte x 2 Wiederholungen.
+            // So kommt die 16 zustande:
+            // 2 FOV * 2 Augenmodi * 2 l-Werte * 2 Wiederholungen.
             Assert.That(plan.Count, Is.EqualTo(16));
 
             var occurrenceByCondition = new Dictionary<int, int>();
