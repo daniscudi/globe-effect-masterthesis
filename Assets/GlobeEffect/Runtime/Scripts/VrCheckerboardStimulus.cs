@@ -102,7 +102,7 @@ namespace GlobeEffect.VRCheckerboard
 
         [SerializeField, Min(0.5f)]
         [Tooltip("Wie weit vorne der Text liegt. Das hat nichts mit dem Schachbrett zu tun.")]
-        private float responsePromptDistanceMeters = 4f;
+        private float responsePromptDistanceMeters = 8f;
 
         [SerializeField, Range(0.005f, 0.1f)]
         [Tooltip("Wie groß die Buchstaben im Text sind.")]

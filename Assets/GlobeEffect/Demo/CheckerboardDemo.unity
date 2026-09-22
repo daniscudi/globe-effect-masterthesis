@@ -167,7 +167,7 @@ MonoBehaviour:
   fixationBackgroundColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   noiseCellSizeDegrees: 1
   responsePromptColor: {r: 1, g: 1, b: 1, a: 1}
-  responsePromptDistanceMeters: 4
+  responsePromptDistanceMeters: 8
   responsePromptCharacterSize: 0.05
   visibleAtStart: 1
   materialOverride: {fileID: 0}
@@ -828,6 +828,7 @@ MonoBehaviour:
   - 0.8
   - 1.2
   trainingRepetitionsPerValue: 3
+  trainingExampleStimulusSeconds: 2
   trainingExampleNoiseSeconds: 0.5
   trainingFixationSecondsWithoutEyeTracking: 0.5
   startSessionKey: 98
