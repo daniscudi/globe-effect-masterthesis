@@ -15,6 +15,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         [TestCase(0.5)]
         [TestCase(0.7)]
         [TestCase(1.0)]
+        [TestCase(1.2)]
         public void ForwardAndInverseMapping_RoundTrip(double k)
         {
             const double magnification = 10.0;
@@ -30,6 +31,40 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 k);
 
             Assert.That(reconstructed, Is.EqualTo(objectAngle).Within(1e-12));
+        }
+
+        [Test]
+        public void TangentCondition_EqualsIdealAngularContentZoom()
+        {
+            const double objectAngle = 5.0 * Math.PI / 180.0;
+            const double magnification = 10.0;
+
+            double apparent =
+                MerlitzBinocularReferenceMath.ApparentAngleFromObject(
+                    objectAngle,
+                    magnification,
+                    k: 1.0);
+            double expected = Math.Atan(
+                magnification * Math.Tan(objectAngle));
+
+            Assert.That(apparent, Is.EqualTo(expected).Within(1e-12));
+        }
+
+        [TestCase(0.0)]
+        [TestCase(0.5)]
+        [TestCase(1.0)]
+        [TestCase(1.2)]
+        public void MagnificationOne_CollapsesInstrumentMappingToIdentity(double k)
+        {
+            const double objectAngle = 5.0 * Math.PI / 180.0;
+
+            double apparent =
+                MerlitzBinocularReferenceMath.ApparentAngleFromObject(
+                    objectAngle,
+                    magnification: 1.0,
+                    k: k);
+
+            Assert.That(apparent, Is.EqualTo(objectAngle).Within(1e-12));
         }
 
         [TestCase(0.0)]

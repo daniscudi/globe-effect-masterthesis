@@ -7,8 +7,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// <summary>
     /// Stellt vor der Sitzung die Liste aller Random-Dot-Durchgänge zusammen.
     ///
-    /// Das Verfahren heißt "Methode konstanter Reize": Jeder l-Wert kommt gleich
-    /// oft dran, und zwar in zufälliger Reihenfolge.
+    /// Das Verfahren heißt "Methode konstanter Reize": Jede Kombination aus
+    /// Instrumentenverzeichnung k und Vergrößerung m kommt gleich oft dran,
+    /// und zwar in zufälliger Reihenfolge.
     ///
     /// Die Person kann nichts einstellen. Sie sieht die Bewegung und sagt danach
     /// nur, ob es konkav oder konvex aussah.
@@ -18,7 +19,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public static IReadOnlyList<RandomDotTrial> CreateRandomizedPlan(
             IReadOnlyList<float> angularDiametersDegrees,
             IReadOnlyList<CheckerboardEyePresentation> eyePresentations,
-            IReadOnlyList<float> visualSpaceLValues,
+            IReadOnlyList<float> instrumentDistortionKValues,
+            IReadOnlyList<float> instrumentMagnificationMValues,
             IReadOnlyList<float> contentZoomValues,
             IReadOnlyList<RandomDotMotionMode> motionModes,
             int repetitions,
@@ -30,7 +32,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             ValidateValues(
                 angularDiametersDegrees,
                 eyePresentations,
-                visualSpaceLValues,
+                instrumentDistortionKValues,
+                instrumentMagnificationMValues,
                 contentZoomValues,
                 motionModes,
                 repetitions);
@@ -40,8 +43,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             int contextIndex = 0;
 
             // Die ineinander liegenden Schleifen gehen jede Kombination einmal durch:
-            // jedes FOV mit jedem Augenmodus mit jeder Bewegungsart mit jedem Zoom
-            // mit jedem l. Jede davon kommt gleich oft dran.
+            // jedes FOV mit jedem Augenmodus mit jeder Bewegungsart mit jedem m,
+            // jedem optionalen Content Zoom und jedem k. Jede davon kommt gleich
+            // oft dran.
             foreach (float angularDiameter in angularDiametersDegrees)
             {
                 foreach (CheckerboardEyePresentation eye in eyePresentations)
@@ -58,39 +62,46 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
                         foreach (float contentZoom in contentZoomValues)
                         {
-                            foreach (float visualSpaceL in visualSpaceLValues)
+                            foreach (float instrumentMagnificationM in
+                                instrumentMagnificationMValues)
                             {
-                                conditionIndex++;
-                                for (int repetition = 1;
-                                    repetition <= repetitions;
-                                    repetition++)
+                                foreach (float instrumentDistortionK in
+                                    instrumentDistortionKValues)
                                 {
-                                    // Innerhalb einer Wiederholung bekommen alle
-                                    // l-Werte denselben Punkt-Seed, also genau
-                                    // dieselben Punkte. Sonst könnte es passieren,
-                                    // dass eine bestimmte Punktverteilung immer nur
-                                    // bei einem bestimmten l auftaucht, und dann
-                                    // wüsste man nicht, woran die Antwort lag.
-                                    int dotSeed = unchecked(
-                                        dotSeedBase +
-                                        contextIndex * 1009 +
-                                        repetition * 9176);
-                                    bool rightFirst = ((repetition + directionOffset) & 1) == 0;
+                                    conditionIndex++;
+                                    for (int repetition = 1;
+                                        repetition <= repetitions;
+                                        repetition++)
+                                    {
+                                        // Innerhalb einer Wiederholung bekommen
+                                        // alle k- und m-Werte denselben Punkt-Seed.
+                                        // So hängt keine Antwort an einer zufällig
+                                        // anderen Punktverteilung.
+                                        int dotSeed = unchecked(
+                                            dotSeedBase +
+                                            contextIndex * 1009 +
+                                            repetition * 9176);
+                                        bool rightFirst =
+                                            ((repetition + directionOffset) & 1) == 0;
 
-                                    trials.Add(new RandomDotTrial(
-                                        sequenceIndex: 0,
-                                        conditionIndex: conditionIndex,
-                                        repetition: repetition,
-                                        attemptNumber: 1,
-                                        angularDiameterDegrees: angularDiameter,
-                                        eyePresentation: eye,
-                                        visualSpaceL: visualSpaceL,
-                                        contentZoom: contentZoom,
-                                        motionMode: motionMode,
-                                        sweepDirection: rightFirst
-                                            ? RandomDotSweepDirection.RightFirst
-                                            : RandomDotSweepDirection.LeftFirst,
-                                        dotSeed: dotSeed));
+                                        trials.Add(new RandomDotTrial(
+                                            sequenceIndex: 0,
+                                            conditionIndex: conditionIndex,
+                                            repetition: repetition,
+                                            attemptNumber: 1,
+                                            angularDiameterDegrees: angularDiameter,
+                                            eyePresentation: eye,
+                                            instrumentDistortionK:
+                                                instrumentDistortionK,
+                                            instrumentMagnificationM:
+                                                instrumentMagnificationM,
+                                            contentZoom: contentZoom,
+                                            motionMode: motionMode,
+                                            sweepDirection: rightFirst
+                                                ? RandomDotSweepDirection.RightFirst
+                                                : RandomDotSweepDirection.LeftFirst,
+                                            dotSeed: dotSeed));
+                                    }
                                 }
                             }
                         }
@@ -122,7 +133,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private static void ValidateValues(
             IReadOnlyList<float> angularDiametersDegrees,
             IReadOnlyList<CheckerboardEyePresentation> eyePresentations,
-            IReadOnlyList<float> visualSpaceLValues,
+            IReadOnlyList<float> instrumentDistortionKValues,
+            IReadOnlyList<float> instrumentMagnificationMValues,
             IReadOnlyList<float> contentZoomValues,
             IReadOnlyList<RandomDotMotionMode> motionModes,
             int repetitions)
@@ -131,7 +143,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // keine Kombinationen und der Plan wäre leer.
             RequireNonEmpty(angularDiametersDegrees, nameof(angularDiametersDegrees));
             RequireNonEmpty(eyePresentations, nameof(eyePresentations));
-            RequireNonEmpty(visualSpaceLValues, nameof(visualSpaceLValues));
+            RequireNonEmpty(
+                instrumentDistortionKValues,
+                nameof(instrumentDistortionKValues));
+            RequireNonEmpty(
+                instrumentMagnificationMValues,
+                nameof(instrumentMagnificationMValues));
             RequireNonEmpty(contentZoomValues, nameof(contentZoomValues));
             RequireNonEmpty(motionModes, nameof(motionModes));
 
@@ -148,9 +165,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 }
             }
 
-            // Erst jedes l für sich prüfen, dann jedes l zusammen mit jedem FOV.
+            // Erst jedes k für sich prüfen, dann jedes k zusammen mit jedem FOV.
             // Einzeln kann beides in Ordnung sein und zusammen trotzdem nicht gehen.
-            foreach (float value in visualSpaceLValues)
+            foreach (float value in instrumentDistortionKValues)
             {
                 VisualSpaceRadialMapping.ValidateVisualSpaceL(value);
                 foreach (float angularDiameter in angularDiametersDegrees)
@@ -158,6 +175,18 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     VisualSpaceRadialMapping.ValidateParameters(
                         angularDiameter,
                         value);
+                }
+            }
+
+            foreach (float value in instrumentMagnificationMValues)
+            {
+                if (value <
+                        RandomDotFieldStimulus.MinimumInstrumentMagnification ||
+                    value >
+                        RandomDotFieldStimulus.MaximumInstrumentMagnification)
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(instrumentMagnificationMValues));
                 }
             }
 
@@ -196,7 +225,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public int AttemptNumber { get; }
         public float AngularDiameterDegrees { get; }
         public CheckerboardEyePresentation EyePresentation { get; }
-        public float VisualSpaceL { get; }
+        public float InstrumentDistortionK { get; }
+        public float InstrumentMagnificationM { get; }
+        // Kompatibilitätsname: Der frühere Trialwert visualSpaceL ist im
+        // Instrumentenmodus das dargestellte k, nicht das geschätzte Teilnehmer-l.
+        public float VisualSpaceL => InstrumentDistortionK;
         public float ContentZoom { get; }
         public RandomDotMotionMode MotionMode { get; }
         public RandomDotSweepDirection SweepDirection { get; }
@@ -209,7 +242,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             int attemptNumber,
             float angularDiameterDegrees,
             CheckerboardEyePresentation eyePresentation,
-            float visualSpaceL,
+            float instrumentDistortionK,
+            float instrumentMagnificationM,
             float contentZoom,
             RandomDotMotionMode motionMode,
             RandomDotSweepDirection sweepDirection,
@@ -221,7 +255,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             AttemptNumber = attemptNumber;
             AngularDiameterDegrees = angularDiameterDegrees;
             EyePresentation = eyePresentation;
-            VisualSpaceL = visualSpaceL;
+            InstrumentDistortionK = instrumentDistortionK;
+            InstrumentMagnificationM = instrumentMagnificationM;
             ContentZoom = contentZoom;
             MotionMode = motionMode;
             SweepDirection = sweepDirection;
@@ -239,7 +274,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 AttemptNumber,
                 AngularDiameterDegrees,
                 EyePresentation,
-                VisualSpaceL,
+                InstrumentDistortionK,
+                InstrumentMagnificationM,
                 ContentZoom,
                 MotionMode,
                 SweepDirection,
@@ -258,7 +294,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 AttemptNumber + 1,
                 AngularDiameterDegrees,
                 EyePresentation,
-                VisualSpaceL,
+                InstrumentDistortionK,
+                InstrumentMagnificationM,
                 ContentZoom,
                 MotionMode,
                 SweepDirection,

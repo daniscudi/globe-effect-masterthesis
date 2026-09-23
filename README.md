@@ -42,9 +42,9 @@ Schwarze und weiße Punkte bewegen sich dahinter automatisch von links nach
 rechts und wieder zurück. Die Öffnung und das Fixationskreuz bleiben dabei
 kopffest. Eine tatsächliche Kopfbewegung ist für die Hauptbedingung nicht nötig.
 
-Die aktuelle Pilotfassung setzt vor jedem Durchgang einen festen Visual-Space-
-Wert `l`. Dieser Wert wird nicht angezeigt und kann von der Versuchsperson nicht
-verändert werden.
+Die aktuelle Instrumentenfassung setzt vor jedem Durchgang eine feste
+Fernglasvergrößerung `m` und eine feste Instrumentenverzeichnung `k`. Beide Werte
+werden nicht angezeigt und können von der Versuchsperson nicht verändert werden.
 Nach der festgelegten Bewegungsdauer verschwindet das Punktfeld und es folgt
 wieder nur die Entscheidung:
 
@@ -52,14 +52,14 @@ wieder nur die Entscheidung:
 
 * Pfeil rechts: Bewegung wirkt konvex.
 
-Aus `P(konvex | l)` kann später der Übergang bestimmt werden, an dem konkav und
-konvex gleich häufig geantwortet werden. Ob dieser allgemeine Bewegungstest
-bleibt oder durch eine genaue Merlitz-Fernglassimulation mit getrenntem `m`, `k`
-und angenommenem `l` ersetzt wird, ist noch mit dem Betreuer festzulegen.
+Aus `P(konvex | k, m)` kann später für jede Vergrößerung der Übergang bestimmt
+werden, an dem konkav und konvex gleich häufig geantwortet werden. Dieser
+dynamische Neutralpunkt kann mit dem im statischen Checkerboard geschätzten
+persönlichen `l` verglichen werden.
 
 ## l und k
 
-In der ersten Version wurde die Instrumentengleichung von Merlitz benutzt:
+Der Random-Dot-Test benutzt die Instrumentengleichung von Merlitz:
 
 ```text
 tan(k · a) = m · tan(k · A)
@@ -70,7 +70,7 @@ daneben ein eigener, unabhängiger Parameter. Beide stehen in derselben
 Gleichung, aber `k` wird nicht aus `m` berechnet und verändert sich nicht, wenn
 nur die Vergrößerung geändert wird. Die sichtbare Wirkung eines festen `k` kann
 sich mit `m` trotzdem ändern. Beim statischen Checkerboard ohne simuliertes
-Fernglas wären `m` und diese Instrumentengleichung unnötig.
+Fernglas sind `m` und diese Instrumentengleichung nicht aktiv.
 
 Merlitz führt zusätzlich den Parameter `l` für eine radiale Abbildung des
 visuellen Raums ein:
@@ -79,13 +79,14 @@ visuellen Raums ein:
 y_l(a) = tan(l · a) / l
 ```
 
-In dieser Funktion kommt keine Fernglasvergrößerung vor. Deshalb wird `l` im
-statischen Test als eigentlicher Verzerrungsparameter verwendet.
+In dieser Funktion kommt keine Fernglasvergrößerung vor. Im statischen Test
+werden verschiedene Kandidatenwerte gezeigt; der subjektiv gerade Kandidat
+schätzt das persönliche `l`.
 
-`Content Zoom` ist in beiden Szenen nur eine zusätzliche Skalierung des Musters
-und bleibt unabhängig von `l`. Der Name `m` wird dafür bewusst nicht benutzt,
-weil Merlitz mit `m` die paraxiale Vergrößerung eines simulierten Fernglases
-meint. Diese Fernglassimulation ist in den aktuellen Versuchsszenen nicht aktiv.
+`Content Zoom` bleibt eine zusätzliche Skalierung nach der
+Instrumentenabbildung. Im Random-Dot-Hauptversuch bleibt er auf `1`. Die echte
+paraxiale Fernglasvergrößerung wird getrennt als `m` geführt und zusammen mit
+`k` direkt im Shader ausgewertet.
 
 Die wichtigen Referenzpunkte sind:
 
@@ -97,10 +98,22 @@ Die wichtigen Referenzpunkte sind:
 
 * `l > 1`: Fortsetzung in die tonnenförmige Richtung
 
-Damit bleiben die Helmholtz- und Oomes-Fragestellung erhalten, ohne die
-Verzerrung an eine Fernglasvergrößerung zu koppeln.
+Beim Random-Dot-Test heißen dieselben dargestellten Kandidatenwerte `k`, weil sie
+die Verzeichnung des simulierten Instruments steuern. Der neutrale `k`-Wert ist
+die dynamische Schätzung, die mit dem statischen `l` verglichen wird.
 
-## Die radiale Abbildung im Shader
+Im Random-Dot-Shader wird aus dem wirklichen radialen Punktwinkel `A` direkt der
+scheinbare Fernglaswinkel berechnet:
+
+```text
+a = atan(m · tan(k · A)) / k
+```
+
+Für `k → 0` wird der Grenzfall `a = m · A` verwendet. Erst danach wird der
+optionale `Content Zoom` angewendet. Bei `k = 1` und `Content Zoom = 1` entspricht
+die Abbildung genau der klassischen Tangentenbedingung eines Fernglases.
+
+## Die radiale Abbildung im Checkerboard-Shader
 
 `r` ist der Radius im fertigen sichtbaren Kreis. Die Mitte hat `r = 0`, der
 Blendenrand `r = 1`. `β` ist der halbe Winkeldurchmesser des sichtbaren Feldes.
@@ -371,9 +384,15 @@ setzt der Experiment Manager FOV, `l`, Content Zoom und Augenmodus automatisch.
 Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
 `Random Dot Experiment Manager`:
 
-* `Visual Space L Values`: die festen l-Werte der aktuellen Pilotfassung
+* `Instrument Distortion K Values`: die zu präsentierenden
+  Instrumentenverzeichnungen; geometrisch dieselbe Kandidatenfamilie wie beim
+  Checkerboard
 
-* `Content Zoom Values`: unabhängig von `l`; `1` bedeutet kein Zusatzzoom
+* `Instrument Magnification M Values`: eine oder mehrere
+  Fernglasvergrößerungen; voreingestellt ist `10`
+
+* `Content Zoom Values`: optionaler Nach-Zoom; für die Instrumentensimulation
+  normalerweise `1`
 
 * `Repetitions Per Condition`: Wiederholungen jeder Kombination
 
@@ -449,7 +468,8 @@ verbinden den Versuchsablauf zeitlich mit den Rohdaten.
 
 Beim Random-Dot-Test werden zusätzlich unter anderem festgehalten:
 
-* die vorgegebenen Werte `visual_space_l` und `content_zoom`
+* die vorgegebenen Werte `instrument_distortion_k`,
+  `instrument_magnification_m` und `content_zoom`
 
 * Schwenkrichtung, Amplitude und Geschwindigkeit
 
@@ -543,29 +563,29 @@ dieselbe Abbildung für jeden sichtbaren Pixel aus.
 ## Trennung der beiden Tests
 
 Der statische Test verwendet bewusst keine Fernglassimulation. Beim Random-Dot-
-Teil ist die endgültige Abbildung noch offen. Die aktuelle lauffähige Fassung
-verwendet ebenfalls `l` und einen davon unabhängigen Content Zoom. Merlitz'
-Binokularbeispiel wird später als eigener Modus umgesetzt, falls dieser Aufbau
-für die Fragestellung übernommen wird.
+Teil ist die Merlitz-Instrumentenabbildung aktiv. Die Vergrößerung `m` und die
+Instrumentenverzeichnung `k` sind getrennt einstellbare Trialfaktoren. Der
+unabhängige Content Zoom bleibt für technische Vergleiche vorhanden und steht im
+Hauptversuch auf `1`.
 
 Kurz gesagt:
 
 * Statisches Checkerboard: Visual-Space-`l`, feste Reize,
   konkav/konvex und head-locked.
 
-* Random-Dot-Pilot: feste `l`-Reize, unabhängiger Zoom, kontrollierte Bewegung
-  und konkav/konvex.
+* Random-Dot-Instrumententest: feste Kombinationen aus `k` und `m`, kontrollierte
+  oder kopfgesteuerte Bewegung und konkav/konvex.
 
 ## Noch offen
 
-* Die endgültigen `l`-Stufen und die Wiederholungszahl 
+* Die endgültigen `l`-/`k`-Stufen und die Wiederholungszahl
 
-* Für den Random-Dot-Test muss entschieden werden, ob der allgemeine l-Pilot
-  bleibt oder Merlitz' geschwenktes Binokular mit getrenntem `m`, `k` und `l`
-  nachgebildet wird. Schwenkweite, Geschwindigkeit und Dauer sind Pilotwerte.
+* Vergrößerungen `m`, Schwenkweite, Geschwindigkeit und Dauer des
+  Random-Dot-Instrumententests sind weiterhin zu pilotieren.
 
 * Für die Auswertung wird später eine psychometrische Funktion für
-  `P(konvex | l)` angepasst; der 50-%-Punkt ist der gesuchte PSE.
+  `P(konvex | k, m)` angepasst; der 50-%-Punkt in `k` ist der gesuchte
+  dynamische PSE.
 
 * Falls die Originalimplementierung von Oomes noch verfügbar wird, kann ihre
   α-Skala nachträglich mit der hier verwendeten l-Familie verglichen werden.

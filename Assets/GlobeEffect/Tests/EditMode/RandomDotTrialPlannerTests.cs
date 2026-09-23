@@ -9,9 +9,9 @@ namespace GlobeEffect.VRCheckerboard.Tests
     /// Testet den Planer für den Random-Dot-Versuch.
     ///
     /// Geprüft wird: Kommt bei gleichem Seed wirklich dieselbe Reihenfolge heraus?
-    /// Kommt jeder l-Wert gleich oft dran? Geht es ungefähr gleich oft nach links
-    /// wie nach rechts los? Und haben gleiche Wiederholungen dieselben Punkte,
-    /// damit die Punktverteilung nicht an einem bestimmten l hängt?
+    /// Kommt jede k-/m-Kombination gleich oft dran? Geht es ungefähr gleich oft
+    /// nach links wie nach rechts los? Und haben gleiche Wiederholungen dieselben
+    /// Punkte, damit die Punktverteilung nicht an einem bestimmten k oder m hängt?
     /// </summary>
     public sealed class RandomDotTrialPlannerTests
     {
@@ -35,15 +35,21 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [Test]
-        public void Plan_ContainsEveryFixedLEquallyOften()
+        public void Plan_ContainsEveryKAndMagnificationEquallyOften()
         {
             var plan = CreatePlan(7);
 
-            // So kommt die 16 zustande:
-            // 2 FOV * 1 Auge * 2 l-Werte * 1 Zoom * 1 Bewegungsart * 4 Wiederholungen.
-            Assert.That(plan.Count, Is.EqualTo(16));
-            Assert.That(plan.Count(t => t.VisualSpaceL == 0.5f), Is.EqualTo(8));
-            Assert.That(plan.Count(t => t.VisualSpaceL == 1f), Is.EqualTo(8));
+            // 2 FOV * 1 Auge * 2 k-Werte * 2 m-Werte * 1 Content Zoom *
+            // 1 Bewegungsart * 4 Wiederholungen.
+            Assert.That(plan.Count, Is.EqualTo(32));
+            Assert.That(plan.Count(t => t.InstrumentDistortionK == 0.5f),
+                Is.EqualTo(16));
+            Assert.That(plan.Count(t => t.InstrumentDistortionK == 1f),
+                Is.EqualTo(16));
+            Assert.That(plan.Count(t => t.InstrumentMagnificationM == 4f),
+                Is.EqualTo(16));
+            Assert.That(plan.Count(t => t.InstrumentMagnificationM == 10f),
+                Is.EqualTo(16));
             Assert.That(plan.All(t => t.AttemptNumber == 1), Is.True);
         }
 
@@ -55,7 +61,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
             foreach (var group in plan.GroupBy(t => new
                      {
                          t.AngularDiameterDegrees,
-                         t.VisualSpaceL
+                         t.InstrumentDistortionK,
+                         t.InstrumentMagnificationM
                      }))
             {
                 Assert.That(group.Count(
@@ -68,17 +75,24 @@ namespace GlobeEffect.VRCheckerboard.Tests
 
             foreach (float fov in new[] { 40f, 70f })
             {
-                int[] helmholtzSeeds = plan
-                    .Where(t => t.AngularDiameterDegrees == fov && t.VisualSpaceL == 0.5f)
-                    .OrderBy(t => t.Repetition)
-                    .Select(t => t.DotSeed)
-                    .ToArray();
-                int[] straightSeeds = plan
-                    .Where(t => t.AngularDiameterDegrees == fov && t.VisualSpaceL == 1f)
-                    .OrderBy(t => t.Repetition)
-                    .Select(t => t.DotSeed)
-                    .ToArray();
-                Assert.That(straightSeeds, Is.EqualTo(helmholtzSeeds));
+                foreach (float magnification in new[] { 4f, 10f })
+                {
+                    int[] helmholtzSeeds = plan
+                        .Where(t => t.AngularDiameterDegrees == fov &&
+                            t.InstrumentDistortionK == 0.5f &&
+                            t.InstrumentMagnificationM == magnification)
+                        .OrderBy(t => t.Repetition)
+                        .Select(t => t.DotSeed)
+                        .ToArray();
+                    int[] straightSeeds = plan
+                        .Where(t => t.AngularDiameterDegrees == fov &&
+                            t.InstrumentDistortionK == 1f &&
+                            t.InstrumentMagnificationM == magnification)
+                        .OrderBy(t => t.Repetition)
+                        .Select(t => t.DotSeed)
+                        .ToArray();
+                    Assert.That(straightSeeds, Is.EqualTo(helmholtzSeeds));
+                }
             }
         }
 
@@ -89,6 +103,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 new[] { 40f, 70f },
                 new[] { CheckerboardEyePresentation.BothEyes },
                 new[] { 0.5f, 1f },
+                new[] { 4f, 10f },
                 new[] { 1f },
                 new[] { RandomDotMotionMode.SimulatedYaw },
                 repetitions: 4,

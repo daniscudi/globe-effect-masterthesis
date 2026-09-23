@@ -5,10 +5,10 @@ namespace GlobeEffect.VRCheckerboard
     /// <summary>
     /// Die Fernglas-Formel von Merlitz.
     ///
-    /// Achtung: Diese Datei wird im Moment von keinem der beiden Versuche benutzt.
-    /// Sie liegt hier für Vergleichsrechnungen und für den Fall, dass später
-    /// wirklich ein Fernglas nachgebaut werden soll. Checkerboard und Random-Dot
-    /// benutzen zurzeit die andere Formel mit l.
+    /// Der Random-Dot-Versuch benutzt dieselbe Gleichung im Shader. Diese C#-
+    /// Fassung bleibt die prüfbare Referenz für Vorwärts- und Rückrechnungen.
+    /// Das statische Checkerboard arbeitet weiterhin mit seiner normierten
+    /// Visual-Space-Abbildung.
     ///
     /// Die Gleichung steht bei Merlitz (JOSA A 27, 50-57, 2010):
     ///
@@ -25,6 +25,8 @@ namespace GlobeEffect.VRCheckerboard
     public static class MerlitzBinocularReferenceMath
     {
         private const double AlmostZero = 1e-7;
+        public const double MinimumDistortionK = 0.0;
+        public const double MaximumDistortionK = 1.4;
 
         /// <summary>
         /// Der Weg vorwärts: Ein Punkt liegt in Wirklichkeit beim Winkel A.
@@ -136,11 +138,13 @@ namespace GlobeEffect.VRCheckerboard
                     "Die Vergrößerung muss positiv sein.");
             }
 
-            if (k < 0.0 || k > 1.0)
+            if (k < MinimumDistortionK || k > MaximumDistortionK)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(k),
-                    "Bei Merlitz liegt k zwischen 0 und 1.");
+                    "k muss zwischen 0 und 1,4 liegen. Der Bereich über 1 " +
+                    "setzt die Abbildungsfamilie in die tonnenförmige " +
+                    "Richtung fort.");
             }
         }
     }
