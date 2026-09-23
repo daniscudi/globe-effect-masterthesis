@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace GlobeEffect.VRCheckerboard.Experiment
@@ -19,7 +19,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             IReadOnlyList<float> angularDiametersDegrees,
             IReadOnlyList<CheckerboardEyePresentation> eyePresentations,
             IReadOnlyList<float> visualSpaceLValues,
-            IReadOnlyList<float> contentZoomValues,
             int repetitions,
             int randomSeed)
         {
@@ -29,37 +28,32 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 angularDiametersDegrees,
                 eyePresentations,
                 visualSpaceLValues,
-                contentZoomValues,
                 repetitions);
 
             var trials = new List<CheckerboardTrial>();
             int conditionIndex = 0;
 
             // Die ineinander liegenden Schleifen gehen jede Kombination einmal
-            // durch: jedes FOV mit jedem Augenmodus mit jedem Zoom mit jedem l.
+            // durch: jedes FOV mit jedem Augenmodus mit jedem l.
             foreach (float angularDiameter in angularDiametersDegrees)
             {
                 foreach (CheckerboardEyePresentation eye in eyePresentations)
                 {
-                    foreach (float contentZoom in contentZoomValues)
+                    foreach (float visualSpaceL in visualSpaceLValues)
                     {
-                        foreach (float visualSpaceL in visualSpaceLValues)
+                        conditionIndex++;
+                        for (int repetition = 1;
+                            repetition <= repetitions;
+                            repetition++)
                         {
-                            conditionIndex++;
-                            for (int repetition = 1;
-                                repetition <= repetitions;
-                                repetition++)
-                            {
-                                trials.Add(new CheckerboardTrial(
-                                    sequenceIndex: 0,
-                                    conditionIndex: conditionIndex,
-                                    repetition: repetition,
-                                    attemptNumber: 1,
-                                    angularDiameterDegrees: angularDiameter,
-                                    eyePresentation: eye,
-                                    visualSpaceL: visualSpaceL,
-                                    contentZoom: contentZoom));
-                            }
+                            trials.Add(new CheckerboardTrial(
+                                sequenceIndex: 0,
+                                conditionIndex: conditionIndex,
+                                repetition: repetition,
+                                attemptNumber: 1,
+                                angularDiameterDegrees: angularDiameter,
+                                eyePresentation: eye,
+                                visualSpaceL: visualSpaceL));
                         }
                     }
                 }
@@ -91,7 +85,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             IReadOnlyList<float> angularDiametersDegrees,
             IReadOnlyList<CheckerboardEyePresentation> eyePresentations,
             IReadOnlyList<float> visualSpaceLValues,
-            IReadOnlyList<float> contentZoomValues,
             int repetitions)
         {
             // In jeder Liste muss mindestens ein Wert stehen, sonst gibt es gar
@@ -99,7 +92,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             RequireNonEmpty(angularDiametersDegrees, nameof(angularDiametersDegrees));
             RequireNonEmpty(eyePresentations, nameof(eyePresentations));
             RequireNonEmpty(visualSpaceLValues, nameof(visualSpaceLValues));
-            RequireNonEmpty(contentZoomValues, nameof(contentZoomValues));
 
             if (repetitions < 1)
             {
@@ -114,14 +106,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             foreach (float value in visualSpaceLValues)
             {
                 VisualSpaceRadialMapping.ValidateVisualSpaceL(value);
-            }
-
-            foreach (float value in contentZoomValues)
-            {
-                if (value < 0.25f || value > 4f)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(contentZoomValues));
-                }
             }
 
             // Jetzt noch die Paare prüfen. Einzeln kann ein großes FOV in Ordnung
@@ -168,7 +152,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public float AngularDiameterDegrees { get; }
         public CheckerboardEyePresentation EyePresentation { get; }
         public float VisualSpaceL { get; }
-        public float ContentZoom { get; }
 
         public CheckerboardTrial(
             int sequenceIndex,
@@ -177,8 +160,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             int attemptNumber,
             float angularDiameterDegrees,
             CheckerboardEyePresentation eyePresentation,
-            float visualSpaceL,
-            float contentZoom)
+            float visualSpaceL)
         {
             SequenceIndex = sequenceIndex;
             ConditionIndex = conditionIndex;
@@ -187,7 +169,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             AngularDiameterDegrees = angularDiameterDegrees;
             EyePresentation = eyePresentation;
             VisualSpaceL = visualSpaceL;
-            ContentZoom = contentZoom;
         }
 
         internal CheckerboardTrial WithSequenceIndex(int sequenceIndex)
@@ -201,8 +182,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 AttemptNumber,
                 AngularDiameterDegrees,
                 EyePresentation,
-                VisualSpaceL,
-                ContentZoom);
+                VisualSpaceL);
         }
 
         public CheckerboardTrial CreateRepeatedAttempt()
@@ -216,8 +196,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 AttemptNumber + 1,
                 AngularDiameterDegrees,
                 EyePresentation,
-                VisualSpaceL,
-                ContentZoom);
+                VisualSpaceL);
         }
     }
 

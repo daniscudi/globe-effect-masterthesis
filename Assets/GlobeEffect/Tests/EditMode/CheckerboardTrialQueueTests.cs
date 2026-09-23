@@ -1,4 +1,4 @@
-using GlobeEffect.VRCheckerboard.Experiment;
+﻿using GlobeEffect.VRCheckerboard.Experiment;
 using NUnit.Framework;
 
 namespace GlobeEffect.VRCheckerboard.Tests
@@ -40,8 +40,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 attemptNumber: 1,
                 angularDiameterDegrees: 90f,
                 eyePresentation: CheckerboardEyePresentation.BothEyes,
-                visualSpaceL: visualSpaceL,
-                contentZoom: 1f);
+                visualSpaceL: visualSpaceL);
         }
     }
 }

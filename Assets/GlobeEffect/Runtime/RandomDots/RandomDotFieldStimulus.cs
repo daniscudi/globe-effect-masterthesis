@@ -40,6 +40,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private const int MinimumDotCount = 100;
         private const int MaximumDotCount = 60000;
 
+        // Wie klein und wie groß der Zoom sein darf. Die beiden Zahlen stehen
+        // nur hier, damit der Regler im Inspector, die Set-Methode und die
+        // Prüfung vor der Sitzung nie auseinanderlaufen.
+        public const float MinimumContentZoom = 0.25f;
+        public const float MaximumContentZoom = 10f;
+
         [Header("Beobachter und Punktfeld")]
         [SerializeField]
         [Tooltip("Der Kopf im XR-Rig, also normalerweise die Main Camera.")]
@@ -89,7 +95,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [Tooltip("Derselbe Wert wie beim Schachbrett: l = 1 ist gerade, l = 0,5 ist der Helmholtz-Punkt.")]
         private float visualSpaceL = 0.5f;
 
-        [SerializeField, Range(0.25f, 4f)]
+        [SerializeField, Range(MinimumContentZoom, MaximumContentZoom)]
         [Tooltip("Zoom für das Punktfeld. Ändert den sichtbaren Ausschnitt, aber nicht l.")]
         private float contentZoom = 1f;
 
@@ -316,7 +322,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         {
             // Der Zoom macht den Inhalt nur größer oder kleiner. Er ändert l nicht
             // und ist auch nicht die Fernglasvergrößerung m von Merlitz.
-            contentZoom = Mathf.Clamp(value, 0.25f, 4f);
+            contentZoom = Mathf.Clamp(value, MinimumContentZoom, MaximumContentZoom);
             SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
@@ -758,7 +764,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             dotAngularDiameterDegrees = Mathf.Clamp(dotAngularDiameterDegrees, 0.02f, 2f);
             lightDotFraction = Mathf.Clamp01(lightDotFraction);
             visualSpaceL = Mathf.Clamp(visualSpaceL, 0f, 1.4f);
-            contentZoom = Mathf.Clamp(contentZoom, 0.25f, 4f);
+            contentZoom = Mathf.Clamp(
+                contentZoom,
+                MinimumContentZoom,
+                MaximumContentZoom);
             fixationTargetSizeDegrees = Mathf.Clamp(fixationTargetSizeDegrees, 0.05f, 3f);
             simulatedYawAmplitudeDegrees = Mathf.Clamp(
                 simulatedYawAmplitudeDegrees,

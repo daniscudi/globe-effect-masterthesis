@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -108,10 +108,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             0.4f,
             0.2f
         };
-
-        [SerializeField]
-        [Tooltip("Zoom für das Muster. 1 heißt: unverändert. Das ist nicht die Fernglasvergrößerung m von Merlitz.")]
-        private List<float> contentZoomValues = new() { 1f };
 
         [SerializeField, Min(1)]
         [Tooltip("Wie oft jede Kombination gezeigt wird. Mehr Wiederholungen heißt sicherere Ergebnisse, aber auch eine längere Sitzung.")]
@@ -706,11 +702,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 stimulus.SetEyePresentation(eyePresentations[0]);
             }
 
-            if (contentZoomValues != null && contentZoomValues.Count > 0)
-            {
-                stimulus.SetContentZoom(contentZoomValues[0]);
-            }
-
             stimulus.SetVisualSpaceL(visualSpaceL);
         }
 
@@ -825,7 +816,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     angularDiametersDegrees,
                     eyePresentations,
                     visualSpaceLValues,
-                    contentZoomValues,
                     repetitionsPerCondition,
                     randomSeed);
                 trialQueue = new CheckerboardTrialQueue(trialPlan);
@@ -933,7 +923,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulus.SetAngularDiameter(currentTrial.AngularDiameterDegrees);
             stimulus.SetEyePresentation(currentTrial.EyePresentation);
             stimulus.SetVisualSpaceL(currentTrial.VisualSpaceL);
-            stimulus.SetContentZoom(currentTrial.ContentZoom);
 
             fixationMonitor?.ResetFixationWindow();
             ResetTrialFixationCounters();
@@ -984,14 +973,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             Debug.Log(string.Format(
                 CultureInfo.InvariantCulture,
                 "Trial {0}/{1}, Präsentation {2}: {3}, FOV={4:F1}°, l={5:F3}, " +
-                "Zoom={6:F2}, Versuch {7}. Stimulus={8:F3}s, danach Noise bis zur Antwort.",
+                "Versuch {6}. Stimulus={7:F3}s, danach Noise bis zur Antwort.",
                 currentTrialNumber,
                 totalTrials,
                 presentationCount,
                 currentTrial.EyePresentation,
                 currentTrial.AngularDiameterDegrees,
                 currentTrial.VisualSpaceL,
-                currentTrial.ContentZoom,
                 currentTrial.AttemptNumber,
                 stimulusDurationSeconds),
                 this);
@@ -1531,9 +1519,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "TrialStart;presentation={0};sequence={1};condition={2};repetition={3};" +
                 "attempt={4};eye={5};fov_deg={6:F3};edge_softness_deg={7:F3};" +
                 "circular_aperture={8};grid_spacing_deg={9:F3};" +
-                "grid_spacing_uv={10:F6};visual_space_l={11:F4};content_zoom={12:F4};" +
-                "stimulus_duration_s={13:F4};noise_until_response=1;post_response_noise_s={14:F4};" +
-                "response_timeout_s={15:F4};category_a_key={16};category_b_key={17};response_keys_swapped={18}",
+                "grid_spacing_uv={10:F6};visual_space_l={11:F4};" +
+                "stimulus_duration_s={12:F4};noise_until_response=1;post_response_noise_s={13:F4};" +
+                "response_timeout_s={14:F4};category_a_key={15};category_b_key={16};response_keys_swapped={17}",
                 presentationIndex,
                 trial.SequenceIndex,
                 trial.ConditionIndex,
@@ -1546,7 +1534,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 stimulus.GridLineSpacingDegrees,
                 stimulus.GridLineSpacingUv,
                 trial.VisualSpaceL,
-                trial.ContentZoom,
                 stimulusDurationSeconds,
                 postResponseNoiseSeconds,
                 responseTimeoutSeconds,
