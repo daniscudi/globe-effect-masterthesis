@@ -2,13 +2,15 @@ Shader "GlobeEffect/Visual Space Random Dots"
 {
     // Der C#-Teil erzeugt nur die Richtungen und Farben der Punkte. Dieser Shader
     // macht daraus das Bild für jedes Auge. Der Ablauf pro Punkt ist:
-    // Richtung in Kamerakoordinaten umrechnen -> Schwenk anwenden -> mit l radial
-    // abbilden -> Content Zoom anwenden -> Punktgröße ergänzen -> Kreis ausschneiden.
+    // Richtung in Kamerakoordinaten umrechnen -> Schwenk anwenden -> mit der
+    // Merlitz-Instrumentenformel aus m und k abbilden -> optionalen Content Zoom
+    // anwenden -> Punktgröße ergänzen -> Kreis ausschneiden.
     Properties
     {
         _ApertureHalfAngleRad ("Aperture Half Angle [rad]", Float) = 0.785398
         _ApertureEdgeSoftnessRad ("Aperture Edge Softness [rad]", Float) = 0.0174533
-        _VisualSpaceL ("Visual-space l", Range(0, 1.4)) = 0.5
+        _InstrumentDistortionK ("Instrument distortion k", Range(0, 1.4)) = 0.5
+        _InstrumentMagnificationM ("Instrument magnification m", Range(1, 20)) = 10
         _ContentZoom ("Content Zoom", Float) = 1
         _EyeMode ("Eye Mode", Float) = 0
         _DotsEnabled ("Dots Enabled", Float) = 1
@@ -58,7 +60,8 @@ Shader "GlobeEffect/Visual Space Random Dots"
 
             float _ApertureHalfAngleRad;
             float _ApertureEdgeSoftnessRad;
-            float _VisualSpaceL;
+            float _InstrumentDistortionK;
+            float _InstrumentMagnificationM;
             float _ContentZoom;
             float _EyeMode;
             float _DotsEnabled;
@@ -67,43 +70,42 @@ Shader "GlobeEffect/Visual Space Random Dots"
             float4 _ObserverWorldPosition;
             float4 _ObserverWorldRight;
 
-            // Dieselbe normierte l-Abbildung wie beim Checkerboard, diesmal
-            // vorwärts gelöst: Aus der unverzerrten Punktposition wird die
-            // Position berechnet, an der der Punkt im HMD erscheinen soll.
-            float DisplayedAngleFromSource(float sourceAngle)
+            // Merlitz' Instrumentenabbildung:
+            //
+            //     tan(k a) = m tan(k A)
+            //
+            // A ist der wirkliche Winkel der Punktrichtung zur Instrumentenachse,
+            // a der im Fernglas erscheinende Winkel. k = 1 ist die klassische
+            // Tangentenbedingung, k = 0,5 die Kreisbedingung. Für k gegen null
+            // bleibt die Winkelbedingung a = m A.
+            float ApparentAngleFromObject(
+                float objectAngle,
+                out float validInstrumentDomain)
             {
-                // Erst wird der unverzerrte Winkel als Radius relativ zum Rand
-                // ausgedrückt. Am eingestellten Öffnungsrand ist dieser Radius 1.
-                float tangentAtBoundary = tan(_ApertureHalfAngleRad);
-                float sourceRadius = tan(sourceAngle) /
-                    max(tangentAtBoundary, 1e-6);
-
-                if (_VisualSpaceL < 1e-6)
+                if (_InstrumentDistortionK < 1e-6)
                 {
-                    // Für l = 0 würde die normale Formel durch null teilen.
-                    // Diese Zeile ist der mathematische Grenzfall für l gegen 0.
-                    return sourceRadius * _ApertureHalfAngleRad;
+                    validInstrumentDomain = 1.0;
+                    return _InstrumentMagnificationM * objectAngle;
                 }
 
+                // Vor dem Umkehrpunkt des Tangens bleiben Abbildung und
+                // Umkehrabbildung eindeutig. Punkte außerhalb dieses Bereichs
+                // werden verworfen, statt auf die andere Seite umzuschlagen.
+                float scaledObjectAngle =
+                    _InstrumentDistortionK * objectAngle;
+                validInstrumentDomain = step(
+                    scaledObjectAngle,
+                    1.560796);
                 return atan(
-                    sourceRadius * tan(_VisualSpaceL * _ApertureHalfAngleRad)) /
-                    _VisualSpaceL;
+                    _InstrumentMagnificationM *
+                    tan(min(scaledObjectAngle, 1.560796))) /
+                    _InstrumentDistortionK;
             }
 
-            float CenterRadialScale()
+            float CenterInstrumentScale()
             {
-                // Genau in der Mitte ist der Radius 0 und eine Division durch den
-                // Radius wäre nicht möglich. Diese Funktion liefert dort direkt
-                // die passende lokale Skalierung.
-                float tangentAtBoundary = tan(_ApertureHalfAngleRad);
-                if (_VisualSpaceL < 1e-6)
-                {
-                    return _ApertureHalfAngleRad /
-                        max(tangentAtBoundary, 1e-6);
-                }
-
-                return tan(_VisualSpaceL * _ApertureHalfAngleRad) /
-                    max(_VisualSpaceL * tangentAtBoundary, 1e-6);
+                // Im Zentrum ist die Ableitung da/dA für jedes k genau m.
+                return _InstrumentMagnificationM;
             }
 
             float ResolveEyeIndex()
@@ -165,26 +167,30 @@ Shader "GlobeEffect/Visual Space Random Dots"
                     max(forwardDistance, 1e-4);
                 float sourceRadius = length(sourcePosition);
                 float sourceAngle = atan(sourceRadius);
+                float validInstrumentDomain = 1.0;
                 float displayedAngle = isFixation > 0.5
                     ? 0.0
-                    : DisplayedAngleFromSource(sourceAngle);
-                float validAngle = step(displayedAngle, 1.560796);
+                    : ApparentAngleFromObject(
+                        sourceAngle,
+                        validInstrumentDomain);
 
                 float displayedRadius = tan(min(displayedAngle, 1.560796)) *
                     _ContentZoom;
-                // Content Zoom ist hier eine zusätzliche Vergrößerung nach der
-                // l-Abbildung. Zoom 4 vervierfacht den Tangensradius, nicht l.
+                // Content Zoom bleibt bewusst ein getrennter optionaler Nach-Zoom.
+                // Die Fernglasvergrößerung steckt bereits oben in m.
                 displayedAngle = atan(displayedRadius);
+                float validAngle = step(displayedAngle, 1.560796);
                 float radialScale = sourceRadius > 1e-6
                     ? displayedRadius / sourceRadius
-                    : CenterRadialScale() * _ContentZoom;
+                    : CenterInstrumentScale() * _ContentZoom;
                 float2 displayedPosition = isFixation > 0.5
                     ? float2(0.0, 0.0)
                     : sourcePosition * radialScale;
                 viewPosition.xy = displayedPosition * forwardDistance;
 
-                // Erst wird der Punktmittelpunkt verzerrt. Danach wird die
-                // feste Winkelgröße ergänzt, damit l nur die Bahn verändert.
+                // Erst wird der Punktmittelpunkt durch das Instrument abgebildet.
+                // Danach wird die feste Winkelgröße des sternähnlichen Markers
+                // ergänzt; k und m verändern damit seine Bahn, nicht seine Größe.
                 float angularHalfSize = _DotHalfSizeRad * input.sizeData.x;
                 viewPosition.xy += input.uv * forwardDistance *
                     tan(angularHalfSize);
@@ -194,7 +200,8 @@ Shader "GlobeEffect/Visual Space Random Dots"
                     float4(viewPosition, 1.0));
                 output.dotUv = input.uv;
                 output.displayedAngle = displayedAngle;
-                output.validProjection = validFront * validAngle;
+                output.validProjection = validFront *
+                    validInstrumentDomain * validAngle;
                 output.isFixationTarget = isFixation;
                 output.color = input.color;
                 return output;
@@ -229,8 +236,19 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 }
 
                 clip(_DotsEnabled - 0.5);
-                // Das Viereck jedes Punktes wird hier zu einem Kreis beschnitten.
-                clip(1.0 - length(input.dotUv));
+
+                // Das Viereck jedes Punktes wird zu einem geglätteten Kreis. Die
+                // Ableitung fwidth liefert ungefähr die Breite eines Bildpixels
+                // in den lokalen Punktkoordinaten. Dadurch bleibt die Kreiskante
+                // auch während des Schwenks stabil, statt hart zwischen sichtbaren
+                // und unsichtbaren Pixeln zu springen.
+                float radialDistance = length(input.dotUv);
+                float antialiasWidth = max(fwidth(radialDistance), 1e-4);
+                float dotAlpha = 1.0 - smoothstep(
+                    1.0 - antialiasWidth,
+                    1.0 + antialiasWidth,
+                    radialDistance);
+                clip(dotAlpha - 0.001);
 
                 float apertureAlpha;
                 if (_ApertureEdgeSoftnessRad <= 1e-6)
@@ -254,7 +272,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 clip(apertureAlpha - 0.001);
                 return fixed4(
                     input.color.rgb,
-                    input.color.a * apertureAlpha);
+                    input.color.a * apertureAlpha * dotAlpha);
             }
             ENDCG
         }

@@ -13,8 +13,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     /// auf eine nahe Fläche schielen.
     ///
     /// Im Hauptversuch hängt die runde Öffnung am Kopf, und Unity schiebt das
-    /// Punktfeld dahinter nach links und rechts. Der Wert l bleibt während einer
-    /// Darbietung fest. Es ist genau dieselbe Verzerrung wie beim Schachbrett.
+    /// Punktfeld dahinter nach links und rechts. Die Instrumentenwerte m und k
+    /// bleiben während einer Darbietung fest.
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
@@ -24,7 +24,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         // Das Skript hat im Grunde fünf Aufgaben:
         // 1. Für jeden Punkt ein kleines Viereck bauen (CreateDotMesh).
         // 2. Die Punkte gleichmäßig über eine gewölbte Fläche verteilen.
-        // 3. l, Zoom, FOV und Bewegung an den Shader weitergeben.
+        // 3. Instrumenten-k, Instrumenten-m, Zusatzzoom, FOV und Bewegung an den
+        //    Shader weitergeben.
         // 4. Das Feld beim simulierten Schwenken vor dem Kopf halten.
         // 5. Show und Hide für den Experiment Manager anbieten.
         //
@@ -45,6 +46,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         // Prüfung vor der Sitzung nie auseinanderlaufen.
         public const float MinimumContentZoom = 0.25f;
         public const float MaximumContentZoom = 10f;
+        public const float MinimumInstrumentMagnification = 1f;
+        public const float MaximumInstrumentMagnification = 20f;
 
         [Header("Beobachter und Punktfeld")]
         [SerializeField]
@@ -52,7 +55,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private Transform observer;
 
         [SerializeField, Range(5f, 170f)]
-        [Tooltip("Wie groß der sichtbare runde Ausschnitt ist, in Grad.")]
+        [Tooltip("Scheinbarer Winkeldurchmesser des sichtbaren Fernglasfelds im HMD, in Grad.")]
         private float angularDiameterDegrees = 90f;
 
         [SerializeField, Range(0f, 10f)]
@@ -64,8 +67,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private float fieldRadiusMeters = 5f;
 
         [SerializeField, Range(20f, 170f)]
-        [Tooltip("In welchem Bereich überhaupt Punkte erzeugt werden, in Grad. Muss größer sein als das Sichtfeld plus die Schwenkweite, sonst entstehen am Rand Lücken.")]
-        private float worldCoverageDiameterDegrees = 110f;
+        [Tooltip("Winkeldurchmesser der erzeugten Außenwelt vor der Instrumentenabbildung. Der Experiment Manager erweitert ihn bei Bedarf automatisch für FOV, m, k und Schwenkweite.")]
+        private float worldCoverageDiameterDegrees = 20f;
 
         [SerializeField, Range(MinimumDotCount, MaximumDotCount)]
         [Tooltip("Wie viele Punkte erzeugt werden.")]
@@ -89,14 +92,21 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [Tooltip("Wie viele Punkte hell sind. 0,5 heißt halb schwarz und halb weiß.")]
         private float lightDotFraction = 0.5f;
 
-        [Header("Radiale Verzerrung")]
+        [Header("Merlitz-Instrumentenabbildung")]
         [FormerlySerializedAs("merlitzK")]
+        [FormerlySerializedAs("visualSpaceL")]
         [SerializeField, Range(0f, 1.4f)]
-        [Tooltip("Derselbe Wert wie beim Schachbrett: l = 1 ist gerade, l = 0,5 ist der Helmholtz-Punkt.")]
-        private float visualSpaceL = 0.5f;
+        [Tooltip("Verzeichnung k des simulierten Instruments. k = 1 ist die Tangentenbedingung, k = 0,5 der Helmholtz-/Kreispunkt. Werte über 1 setzen die Familie in die tonnenförmige Richtung fort.")]
+        private float instrumentDistortionK = 0.5f;
+
+        [SerializeField, Range(
+            MinimumInstrumentMagnification,
+            MaximumInstrumentMagnification)]
+        [Tooltip("Paraxiale Fernglasvergrößerung m. 10 entspricht einem typischen 10x-Fernglas.")]
+        private float instrumentMagnificationM = 10f;
 
         [SerializeField, Range(MinimumContentZoom, MaximumContentZoom)]
-        [Tooltip("Zoom für das Punktfeld. Ändert den sichtbaren Ausschnitt, aber nicht l.")]
+        [Tooltip("Optionaler zusätzlicher Zoom nach der Instrumentenabbildung. Für den Fernglasversuch normalerweise 1 lassen.")]
         private float contentZoom = 1f;
 
         [SerializeField]
@@ -174,7 +184,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public float WorldCoverageDiameterDegrees => worldCoverageDiameterDegrees;
         public int DotCount => dotCount;
         public int RandomSeed => randomSeed;
-        public float VisualSpaceL => visualSpaceL;
+        public float InstrumentDistortionK => instrumentDistortionK;
+        public float InstrumentMagnificationM => instrumentMagnificationM;
+        // Kompatibilitätsname für bestehende Editor-Erweiterungen und Szenen.
+        public float VisualSpaceL => instrumentDistortionK;
         public float ContentZoom => contentZoom;
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
         public RandomDotMotionMode MotionMode => motionMode;
@@ -309,19 +322,36 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             SendFrameValuesToShader();
         }
 
+        public void SetInstrumentDistortionK(float value)
+        {
+            // k wird hier nur auf den erlaubten Bereich gebracht und weitergereicht.
+            // Die Merlitz-Instrumentenformel wird im Shader ausgewertet.
+            instrumentDistortionK = Mathf.Clamp(value, 0f, 1.4f);
+            SendValuesToShader();
+            ParametersChanged?.Invoke(CaptureSnapshot());
+        }
+
         public void SetVisualSpaceL(float value)
         {
-            // l wird hier nur auf den erlaubten Bereich gebracht und weitergereicht.
-            // Gerechnet wird damit erst im Shader.
-            visualSpaceL = Mathf.Clamp(value, 0f, 1.4f);
+            // Alte Aufrufer dürfen weiterarbeiten. Im Random-Dot-Instrumentenmodus
+            // ist dieser Trialwert jetzt ausdrücklich das dargestellte k.
+            SetInstrumentDistortionK(value);
+        }
+
+        public void SetInstrumentMagnification(float value)
+        {
+            instrumentMagnificationM = Mathf.Clamp(
+                value,
+                MinimumInstrumentMagnification,
+                MaximumInstrumentMagnification);
             SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
         public void SetContentZoom(float value)
         {
-            // Der Zoom macht den Inhalt nur größer oder kleiner. Er ändert l nicht
-            // und ist auch nicht die Fernglasvergrößerung m von Merlitz.
+            // Dieser Zoom kommt nach der Instrumentenabbildung. Er ändert weder
+            // k noch m und bleibt im Hauptversuch normalerweise auf 1.
             contentZoom = Mathf.Clamp(value, MinimumContentZoom, MaximumContentZoom);
             SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
@@ -452,7 +482,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         /// <summary>
         /// Zeigt vor dem Durchgang nur das Kreuz in der Mitte. Die Punkte bleiben
-        /// weg, damit man den l-Wert noch nicht sieht.
+        /// weg, damit man den k-Wert noch nicht sieht.
         /// </summary>
         public void ShowFixationOnly()
         {
@@ -484,7 +514,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 worldCoverageDiameterDegrees = worldCoverageDiameterDegrees,
                 dotCount = dotCount,
                 randomSeed = randomSeed,
-                visualSpaceL = visualSpaceL,
+                instrumentDistortionK = instrumentDistortionK,
+                instrumentMagnificationM = instrumentMagnificationM,
                 contentZoom = contentZoom,
                 eyePresentation = eyePresentation,
                 motionMode = motionMode,
@@ -647,8 +678,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
             // Alle vier Ecken liegen erst mal genau übereinander im Mittelpunkt.
             // Auseinandergezogen werden sie erst im Shader, und zwar nachdem dort
-            // die Verzerrung gerechnet wurde. Dadurch verschiebt l zwar, wo ein
-            // Punkt liegt, macht ihn aber nicht größer oder kleiner.
+            // die Instrumentenabbildung gerechnet wurde. Dadurch verschieben k
+            // und m den Punktmittelpunkt, während die Punkte selbst als kleine,
+            // sternähnliche Richtungsmarker eine feste Winkelgröße behalten.
             vertices[vertexIndex] = center;
             vertices[vertexIndex + 1] = center;
             vertices[vertexIndex + 2] = center;
@@ -704,7 +736,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 0.5f * angularDiameterDegrees * Mathf.Deg2Rad);
             propertyBlock.SetFloat("_ApertureEdgeSoftnessRad",
                 apertureEdgeSoftnessDegrees * Mathf.Deg2Rad);
-            propertyBlock.SetFloat("_VisualSpaceL", visualSpaceL);
+            propertyBlock.SetFloat(
+                "_InstrumentDistortionK",
+                instrumentDistortionK);
+            propertyBlock.SetFloat(
+                "_InstrumentMagnificationM",
+                instrumentMagnificationM);
             propertyBlock.SetFloat("_ContentZoom", contentZoom);
             propertyBlock.SetFloat("_EyeMode", (float)eyePresentation);
             propertyBlock.SetFloat("_DotsEnabled", pointsVisible ? 1f : 0f);
@@ -763,7 +800,14 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             dotCount = Mathf.Clamp(dotCount, MinimumDotCount, MaximumDotCount);
             dotAngularDiameterDegrees = Mathf.Clamp(dotAngularDiameterDegrees, 0.02f, 2f);
             lightDotFraction = Mathf.Clamp01(lightDotFraction);
-            visualSpaceL = Mathf.Clamp(visualSpaceL, 0f, 1.4f);
+            instrumentDistortionK = Mathf.Clamp(
+                instrumentDistortionK,
+                0f,
+                1.4f);
+            instrumentMagnificationM = Mathf.Clamp(
+                instrumentMagnificationM,
+                MinimumInstrumentMagnification,
+                MaximumInstrumentMagnification);
             contentZoom = Mathf.Clamp(
                 contentZoom,
                 MinimumContentZoom,
@@ -828,7 +872,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public float worldCoverageDiameterDegrees;
         public int dotCount;
         public int randomSeed;
-        public float visualSpaceL;
+        public float instrumentDistortionK;
+        public float instrumentMagnificationM;
         public float contentZoom;
         public CheckerboardEyePresentation eyePresentation;
         public RandomDotMotionMode motionMode;

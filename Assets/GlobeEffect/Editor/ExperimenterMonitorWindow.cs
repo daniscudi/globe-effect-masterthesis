@@ -241,7 +241,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             EditorGUILayout.Space(6f);
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                EditorGUILayout.LabelField("Test", "Random Dot l");
+                EditorGUILayout.LabelField("Test", "Random Dot Instrument");
                 EditorGUILayout.LabelField(
                     "Session",
                     randomDotSession != null
@@ -253,9 +253,18 @@ namespace GlobeEffect.VRCheckerboard.Editor
                         randomDotSession?.CurrentTrialNumber ?? 0,
                         randomDotSession?.TotalTrials ?? 0));
                 EditorGUILayout.LabelField(
-                    "Visual Space l",
+                    "Instrument k",
                     randomDotStimulus != null
-                        ? randomDotStimulus.VisualSpaceL.ToString("F3", CultureInfo.InvariantCulture)
+                        ? randomDotStimulus.InstrumentDistortionK.ToString(
+                            "F3",
+                            CultureInfo.InvariantCulture)
+                        : "–");
+                EditorGUILayout.LabelField(
+                    "Vergrößerung m",
+                    randomDotStimulus != null
+                        ? randomDotStimulus.InstrumentMagnificationM.ToString(
+                            "F2",
+                            CultureInfo.InvariantCulture) + "x"
                         : "–");
                 EditorGUILayout.LabelField(
                     "Content Zoom",
