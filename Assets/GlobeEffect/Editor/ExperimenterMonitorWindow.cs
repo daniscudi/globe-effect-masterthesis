@@ -253,6 +253,28 @@ namespace GlobeEffect.VRCheckerboard.Editor
                         randomDotSession?.CurrentTrialNumber ?? 0,
                         randomDotSession?.TotalTrials ?? 0));
                 EditorGUILayout.LabelField(
+                    "Bewegungsblock",
+                    randomDotSession != null
+                        ? randomDotSession.CurrentMotionBlock.ToString(
+                            CultureInfo.InvariantCulture)
+                        : "–");
+                EditorGUILayout.LabelField(
+                    "Unterblock",
+                    randomDotSession != null
+                        ? randomDotSession.CurrentMiniBlock.ToString(
+                            CultureInfo.InvariantCulture)
+                        : "–");
+                if (randomDotSession != null &&
+                    (randomDotSession.SessionState ==
+                        RandomDotSessionState.PausedBetweenMiniBlocks ||
+                     randomDotSession.SessionState ==
+                        RandomDotSessionState.PausedBetweenMotionBlocks))
+                {
+                    EditorGUILayout.HelpBox(
+                        "Pause – mit F5 fortsetzen.",
+                        MessageType.Info);
+                }
+                EditorGUILayout.LabelField(
                     "Instrument k",
                     randomDotStimulus != null
                         ? randomDotStimulus.InstrumentDistortionK.ToString(
@@ -281,6 +303,27 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     sweepMonitor != null
                         ? sweepMonitor.CompletedHalfSweeps.ToString(
                             CultureInfo.InvariantCulture)
+                        : "–");
+                EditorGUILayout.LabelField(
+                    "Mittlere Kopfgeschwindigkeit",
+                    sweepMonitor != null
+                        ? sweepMonitor.MeanAbsoluteYawSpeedDegreesPerSecond.ToString(
+                            "F2",
+                            CultureInfo.InvariantCulture) + "°/s"
+                        : "–");
+                EditorGUILayout.LabelField(
+                    "Spitzen-Kopfgeschwindigkeit",
+                    sweepMonitor != null
+                        ? sweepMonitor.PeakAbsoluteYawSpeedDegreesPerSecond.ToString(
+                            "F2",
+                            CultureInfo.InvariantCulture) + "°/s"
+                        : "–");
+                EditorGUILayout.LabelField(
+                    "Maximale Kopfauslenkung",
+                    sweepMonitor != null
+                        ? sweepMonitor.MaximumAbsoluteYawDegrees.ToString(
+                            "F2",
+                            CultureInfo.InvariantCulture) + "°"
                         : "–");
                 EditorGUILayout.LabelField(
                     "Antwort",

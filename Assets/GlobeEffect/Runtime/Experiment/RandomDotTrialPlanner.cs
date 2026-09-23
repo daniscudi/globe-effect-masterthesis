@@ -24,6 +24,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             IReadOnlyList<float> contentZoomValues,
             IReadOnlyList<RandomDotMotionMode> motionModes,
             int repetitions,
+            int repetitionsPerMiniBlock,
             int randomSeed,
             int dotSeedBase)
         {
@@ -36,30 +37,28 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 instrumentMagnificationMValues,
                 contentZoomValues,
                 motionModes,
-                repetitions);
+                repetitions,
+                repetitionsPerMiniBlock);
 
             var trials = new List<RandomDotTrial>();
             int conditionIndex = 0;
-            int contextIndex = 0;
+            int motionBlockIndex = 0;
 
-            // Die ineinander liegenden Schleifen gehen jede Kombination einmal durch:
-            // jedes FOV mit jedem Augenmodus mit jeder Bewegungsart mit jedem m,
-            // jedem optionalen Content Zoom und jedem k. Jede davon kommt gleich
-            // oft dran.
-            foreach (float angularDiameter in angularDiametersDegrees)
+            // Die Bewegungsarten bleiben als getrennte Blöcke in der Reihenfolge,
+            // in der sie im Inspector stehen. Nur innerhalb eines Unterblocks wird
+            // gemischt. Dadurch lassen sich die beiden PSEs sauber vergleichen und
+            // zwischen den Blöcken kann eine echte Pause stattfinden.
+            foreach (RandomDotMotionMode motionMode in motionModes)
             {
-                foreach (CheckerboardEyePresentation eye in eyePresentations)
+                motionBlockIndex++;
+                var conditions = new List<ConditionDefinition>();
+                int dotSeedContextIndex = 0;
+
+                foreach (float angularDiameter in angularDiametersDegrees)
                 {
-                    foreach (RandomDotMotionMode motionMode in motionModes)
+                    foreach (CheckerboardEyePresentation eye in eyePresentations)
                     {
-                        contextIndex++;
-
-                        // Damit nicht immer alles nach rechts losgeht, wird hier je
-                        // nach Bedingung zwischen links und rechts gewechselt. Das
-                        // Ergebnis ist entweder 0 oder 1 und dreht die Startseite um.
-                        int directionOffset = unchecked(
-                            randomSeed + contextIndex * 7919) & 1;
-
+                        dotSeedContextIndex++;
                         foreach (float contentZoom in contentZoomValues)
                         {
                             foreach (float instrumentMagnificationM in
@@ -69,55 +68,94 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                                     instrumentDistortionKValues)
                                 {
                                     conditionIndex++;
-                                    for (int repetition = 1;
-                                        repetition <= repetitions;
-                                        repetition++)
-                                    {
-                                        // Innerhalb einer Wiederholung bekommen
-                                        // alle k- und m-Werte denselben Punkt-Seed.
-                                        // So hängt keine Antwort an einer zufällig
-                                        // anderen Punktverteilung.
-                                        int dotSeed = unchecked(
-                                            dotSeedBase +
-                                            contextIndex * 1009 +
-                                            repetition * 9176);
-                                        bool rightFirst =
-                                            ((repetition + directionOffset) & 1) == 0;
-
-                                        trials.Add(new RandomDotTrial(
-                                            sequenceIndex: 0,
-                                            conditionIndex: conditionIndex,
-                                            repetition: repetition,
-                                            attemptNumber: 1,
-                                            angularDiameterDegrees: angularDiameter,
-                                            eyePresentation: eye,
-                                            instrumentDistortionK:
-                                                instrumentDistortionK,
-                                            instrumentMagnificationM:
-                                                instrumentMagnificationM,
-                                            contentZoom: contentZoom,
-                                            motionMode: motionMode,
-                                            sweepDirection: rightFirst
-                                                ? RandomDotSweepDirection.RightFirst
-                                                : RandomDotSweepDirection.LeftFirst,
-                                            dotSeed: dotSeed));
-                                    }
+                                    conditions.Add(new ConditionDefinition(
+                                        conditionIndex,
+                                        dotSeedContextIndex,
+                                        angularDiameter,
+                                        eye,
+                                        instrumentDistortionK,
+                                        instrumentMagnificationM,
+                                        contentZoom));
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            // Jetzt wird gemischt. Das Verfahren heißt Fisher-Yates: Man geht von
-            // hinten durch und tauscht jeden Eintrag mit einem zufälligen Eintrag
-            // weiter vorne. Durch den Seed kommt dabei immer dasselbe heraus.
-            var random = new Random(randomSeed);
-            for (int index = trials.Count - 1; index > 0; index--)
-            {
-                int swapIndex = random.Next(index + 1);
-                (trials[index], trials[swapIndex]) =
-                    (trials[swapIndex], trials[index]);
+                int miniBlockCount =
+                    (repetitions + repetitionsPerMiniBlock - 1) /
+                    repetitionsPerMiniBlock;
+                for (int miniBlockIndex = 1;
+                    miniBlockIndex <= miniBlockCount;
+                    miniBlockIndex++)
+                {
+                    int firstRepetition =
+                        (miniBlockIndex - 1) * repetitionsPerMiniBlock + 1;
+                    int lastRepetition = Math.Min(
+                        repetitions,
+                        firstRepetition + repetitionsPerMiniBlock - 1);
+                    var miniBlockTrials = new List<RandomDotTrial>();
+
+                    foreach (ConditionDefinition condition in conditions)
+                    {
+                        int directionOffset = unchecked(
+                            randomSeed +
+                            motionBlockIndex * 7919 +
+                            condition.ConditionIndex * 101) & 1;
+                        for (int repetition = firstRepetition;
+                            repetition <= lastRepetition;
+                            repetition++)
+                        {
+                            // Passende Wiederholungen in beiden Bewegungsblöcken
+                            // verwenden dieselbe Punktverteilung. Der Bewegungsmodus
+                            // wird deshalb absichtlich nicht in den Seed eingerechnet.
+                            int dotSeed = unchecked(
+                                dotSeedBase +
+                                condition.DotSeedContextIndex * 1009 +
+                                repetition * 9176);
+                            bool rightFirst =
+                                ((repetition + directionOffset) & 1) == 0;
+
+                            miniBlockTrials.Add(new RandomDotTrial(
+                                sequenceIndex: 0,
+                                conditionIndex: condition.ConditionIndex,
+                                repetition: repetition,
+                                attemptNumber: 1,
+                                motionBlockIndex: motionBlockIndex,
+                                miniBlockIndex: miniBlockIndex,
+                                angularDiameterDegrees:
+                                    condition.AngularDiameterDegrees,
+                                eyePresentation: condition.EyePresentation,
+                                instrumentDistortionK:
+                                    condition.InstrumentDistortionK,
+                                instrumentMagnificationM:
+                                    condition.InstrumentMagnificationM,
+                                contentZoom: condition.ContentZoom,
+                                motionMode: motionMode,
+                                sweepDirection: rightFirst
+                                    ? RandomDotSweepDirection.RightFirst
+                                    : RandomDotSweepDirection.LeftFirst,
+                                dotSeed: dotSeed));
+                        }
+                    }
+
+                    // Fisher-Yates nur innerhalb des Unterblocks. Dadurch bleiben
+                    // Bewegungsblock und Pausengrenzen erhalten.
+                    var random = new Random(unchecked(
+                        randomSeed +
+                        motionBlockIndex * 104729 +
+                        miniBlockIndex * 15485863));
+                    for (int index = miniBlockTrials.Count - 1;
+                        index > 0;
+                        index--)
+                    {
+                        int swapIndex = random.Next(index + 1);
+                        (miniBlockTrials[index], miniBlockTrials[swapIndex]) =
+                            (miniBlockTrials[swapIndex], miniBlockTrials[index]);
+                    }
+
+                    trials.AddRange(miniBlockTrials);
+                }
             }
 
             // Die Nummer 1, 2, 3 ... wird erst jetzt vergeben, nach dem Mischen.
@@ -137,7 +175,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             IReadOnlyList<float> instrumentMagnificationMValues,
             IReadOnlyList<float> contentZoomValues,
             IReadOnlyList<RandomDotMotionMode> motionModes,
-            int repetitions)
+            int repetitions,
+            int repetitionsPerMiniBlock)
         {
             // In jeder Liste muss mindestens ein Wert stehen, sonst gibt es gar
             // keine Kombinationen und der Plan wäre leer.
@@ -155,6 +194,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             if (repetitions < 1)
             {
                 throw new ArgumentOutOfRangeException(nameof(repetitions));
+            }
+
+            if (repetitionsPerMiniBlock < 1 ||
+                repetitionsPerMiniBlock > repetitions)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(repetitionsPerMiniBlock));
             }
 
             foreach (float value in angularDiametersDegrees)
@@ -208,6 +254,35 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 throw new ArgumentException("Mindestens ein Wert ist erforderlich.", name);
             }
         }
+
+        private readonly struct ConditionDefinition
+        {
+            public int ConditionIndex { get; }
+            public int DotSeedContextIndex { get; }
+            public float AngularDiameterDegrees { get; }
+            public CheckerboardEyePresentation EyePresentation { get; }
+            public float InstrumentDistortionK { get; }
+            public float InstrumentMagnificationM { get; }
+            public float ContentZoom { get; }
+
+            public ConditionDefinition(
+                int conditionIndex,
+                int dotSeedContextIndex,
+                float angularDiameterDegrees,
+                CheckerboardEyePresentation eyePresentation,
+                float instrumentDistortionK,
+                float instrumentMagnificationM,
+                float contentZoom)
+            {
+                ConditionIndex = conditionIndex;
+                DotSeedContextIndex = dotSeedContextIndex;
+                AngularDiameterDegrees = angularDiameterDegrees;
+                EyePresentation = eyePresentation;
+                InstrumentDistortionK = instrumentDistortionK;
+                InstrumentMagnificationM = instrumentMagnificationM;
+                ContentZoom = contentZoom;
+            }
+        }
     }
 
     /// <summary>
@@ -223,6 +298,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public int ConditionIndex { get; }
         public int Repetition { get; }
         public int AttemptNumber { get; }
+        public int MotionBlockIndex { get; }
+        public int MiniBlockIndex { get; }
         public float AngularDiameterDegrees { get; }
         public CheckerboardEyePresentation EyePresentation { get; }
         public float InstrumentDistortionK { get; }
@@ -240,6 +317,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             int conditionIndex,
             int repetition,
             int attemptNumber,
+            int motionBlockIndex,
+            int miniBlockIndex,
             float angularDiameterDegrees,
             CheckerboardEyePresentation eyePresentation,
             float instrumentDistortionK,
@@ -253,6 +332,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             ConditionIndex = conditionIndex;
             Repetition = repetition;
             AttemptNumber = attemptNumber;
+            MotionBlockIndex = motionBlockIndex;
+            MiniBlockIndex = miniBlockIndex;
             AngularDiameterDegrees = angularDiameterDegrees;
             EyePresentation = eyePresentation;
             InstrumentDistortionK = instrumentDistortionK;
@@ -272,6 +353,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 ConditionIndex,
                 Repetition,
                 AttemptNumber,
+                MotionBlockIndex,
+                MiniBlockIndex,
                 AngularDiameterDegrees,
                 EyePresentation,
                 InstrumentDistortionK,
@@ -292,6 +375,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 ConditionIndex,
                 Repetition,
                 AttemptNumber + 1,
+                MotionBlockIndex,
+                MiniBlockIndex,
                 AngularDiameterDegrees,
                 EyePresentation,
                 InstrumentDistortionK,
@@ -323,6 +408,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public int CompletedHalfSweeps { get; }
         public float MinimumYawDegrees { get; }
         public float MaximumYawDegrees { get; }
+        public float MaximumAbsoluteYawDegrees { get; }
+        public float MeanAbsoluteYawSpeedDegreesPerSecond { get; }
+        public float PeakAbsoluteYawSpeedDegreesPerSecond { get; }
         public float SweepAmplitudeDegrees { get; }
         public float SweepSpeedDegreesPerSecond { get; }
         public float ApertureEdgeSoftnessDegrees { get; }
@@ -356,6 +444,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             int completedHalfSweeps,
             float minimumYawDegrees,
             float maximumYawDegrees,
+            float maximumAbsoluteYawDegrees,
+            float meanAbsoluteYawSpeedDegreesPerSecond,
+            float peakAbsoluteYawSpeedDegreesPerSecond,
             float sweepAmplitudeDegrees,
             float sweepSpeedDegreesPerSecond,
             float apertureEdgeSoftnessDegrees,
@@ -382,6 +473,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             CompletedHalfSweeps = completedHalfSweeps;
             MinimumYawDegrees = minimumYawDegrees;
             MaximumYawDegrees = maximumYawDegrees;
+            MaximumAbsoluteYawDegrees = maximumAbsoluteYawDegrees;
+            MeanAbsoluteYawSpeedDegreesPerSecond =
+                meanAbsoluteYawSpeedDegreesPerSecond;
+            PeakAbsoluteYawSpeedDegreesPerSecond =
+                peakAbsoluteYawSpeedDegreesPerSecond;
             SweepAmplitudeDegrees = sweepAmplitudeDegrees;
             SweepSpeedDegreesPerSecond = sweepSpeedDegreesPerSecond;
             ApertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees;
@@ -407,7 +503,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// </summary>
     public sealed class RandomDotTrialQueue
     {
-        private readonly Queue<RandomDotTrial> pending = new();
+        private readonly LinkedList<RandomDotTrial> pending = new();
 
         public int Count => pending.Count;
 
@@ -420,7 +516,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             foreach (RandomDotTrial trial in plan)
             {
-                pending.Enqueue(trial);
+                pending.AddLast(trial);
             }
         }
 
@@ -434,7 +530,20 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return false;
             }
 
-            trial = pending.Dequeue();
+            trial = pending.First.Value;
+            pending.RemoveFirst();
+            return true;
+        }
+
+        public bool TryPeekNext(out RandomDotTrial trial)
+        {
+            if (pending.Count == 0)
+            {
+                trial = null;
+                return false;
+            }
+
+            trial = pending.First.Value;
             return true;
         }
 
@@ -445,10 +554,29 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 throw new ArgumentNullException(nameof(invalidTrial));
             }
 
-            // Enqueue hängt hinten an. Genau das wollen wir hier: Der Durchgang
-            // kommt noch einmal dran, aber erst ganz am Schluss.
+            // Der Wiederholungsversuch kommt ans Ende seines Unterblocks. So wird
+            // weder die Pause übersprungen noch ein Versuch in den anderen
+            // Bewegungsmodus verschoben.
             RandomDotTrial repeat = invalidTrial.CreateRepeatedAttempt();
-            pending.Enqueue(repeat);
+            LinkedListNode<RandomDotTrial> insertionPoint = pending.First;
+            while (insertionPoint != null &&
+                insertionPoint.Value.MotionBlockIndex ==
+                    invalidTrial.MotionBlockIndex &&
+                insertionPoint.Value.MiniBlockIndex ==
+                    invalidTrial.MiniBlockIndex)
+            {
+                insertionPoint = insertionPoint.Next;
+            }
+
+            if (insertionPoint == null)
+            {
+                pending.AddLast(repeat);
+            }
+            else
+            {
+                pending.AddBefore(insertionPoint, repeat);
+            }
+
             return repeat;
         }
     }

@@ -17,7 +17,7 @@ namespace GlobeEffect.VRCheckerboard
     [RequireComponent(typeof(VrCheckerboardStimulus))]
     public sealed class CheckerboardKeyboardController : MonoBehaviour
     {
-        [Header("Tastensteuerung")]
+        [Header("Response Keys")]
         [SerializeField]
         [Tooltip("Taste für Category B. Sie bleibt während einer Sitzung gleich.")]
         private Key concaveKey = Key.DownArrow;
@@ -34,7 +34,7 @@ namespace GlobeEffect.VRCheckerboard
         [Tooltip("Vertauscht beide Antworten. Das betrifft Pfeiltasten und VR-Controller und bleibt während einer Sitzung gleich.")]
         private bool swapResponseKeys;
 
-        [Header("VR-Controller")]
+        [Header("VR Controller")]
         [SerializeField]
         [Tooltip("Nimmt zusätzlich Trigger und Trackpad von einem angeschlossenen VR-Controller an.")]
         private bool useVrControllerButtons = true;

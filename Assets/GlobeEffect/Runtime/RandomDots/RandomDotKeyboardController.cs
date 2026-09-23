@@ -15,7 +15,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     [RequireComponent(typeof(RandomDotFieldStimulus))]
     public sealed class RandomDotKeyboardController : MonoBehaviour
     {
-        [Header("Tastensteuerung")]
+        [Header("Response Keys")]
         [SerializeField]
         [Tooltip("Taste für: die Bewegung wirkt konkav, also nach innen gewölbt.")]
         private Key concaveKey = Key.LeftArrow;

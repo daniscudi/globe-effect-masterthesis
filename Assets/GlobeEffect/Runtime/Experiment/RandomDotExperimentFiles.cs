@@ -21,7 +21,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         // Nach jedem Durchgang wird sofort geschrieben. Stürzt Unity ab, sind die
         // bisherigen Daten trotzdem da. Auch schiefgegangene Versuche kommen rein.
         public const string MappingVersion =
-            "merlitz-instrument-k-m-directional-v2";
+            "merlitz-instrument-k-m-blocked-motion-v4";
 
         private static readonly UTF8Encoding Utf8WithoutBom = new(false);
 
@@ -121,6 +121,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             builder.AppendLine(
                 "participant_id,session_label,session_start_utc,random_seed,mapping_version," +
                 "sequence_index,total_planned_trials,condition_index,repetition," +
+                "motion_block_index,mini_block_index," +
                 "eye_presentation,angular_diameter_deg,instrument_distortion_k," +
                 "instrument_magnification_m,content_zoom,motion_mode," +
                 "sweep_direction,dot_seed");
@@ -132,6 +133,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 AppendInteger(builder, trials.Count);
                 AppendInteger(builder, trial.ConditionIndex);
                 AppendInteger(builder, trial.Repetition);
+                AppendInteger(builder, trial.MotionBlockIndex);
+                AppendInteger(builder, trial.MiniBlockIndex);
                 AppendCsv(builder, trial.EyePresentation.ToString());
                 AppendFloat(builder, trial.AngularDiameterDegrees);
                 AppendFloat(builder, trial.InstrumentDistortionK);
@@ -166,6 +169,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             AppendInteger(builder, trial.ConditionIndex);
             AppendInteger(builder, trial.Repetition);
             AppendInteger(builder, trial.AttemptNumber);
+            AppendInteger(builder, trial.MotionBlockIndex);
+            AppendInteger(builder, trial.MiniBlockIndex);
             AppendCsv(builder, result.TrialStartUtc.ToString("O", CultureInfo.InvariantCulture));
             AppendDouble(builder, result.TrialStartUnitySeconds);
             AppendDouble(builder, result.StimulusEndUnitySeconds);
@@ -185,6 +190,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             AppendInteger(builder, result.CompletedHalfSweeps);
             AppendFloat(builder, result.MinimumYawDegrees);
             AppendFloat(builder, result.MaximumYawDegrees);
+            AppendFloat(builder, result.MaximumAbsoluteYawDegrees);
+            AppendFloat(builder, result.MeanAbsoluteYawSpeedDegreesPerSecond);
+            AppendFloat(builder, result.PeakAbsoluteYawSpeedDegreesPerSecond);
             AppendInteger(builder, trial.DotSeed);
             AppendInteger(builder, result.DotCount);
             AppendFloat(builder, result.WorldCoverageDiameterDegrees);
@@ -209,13 +217,16 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             const string header =
                 "participant_id,session_label,session_start_utc,random_seed,mapping_version," +
                 "presentation_index,sequence_index,total_planned_trials," +
-                "condition_index,repetition,attempt_number,trial_start_utc," +
+                "condition_index,repetition,attempt_number,motion_block_index," +
+                "mini_block_index,trial_start_utc," +
                 "trial_start_unity_s,stimulus_end_unity_s,response_unity_s," +
                 "stimulus_duration_s,response_time_s,eye_presentation," +
                 "angular_diameter_deg,aperture_edge_softness_deg," +
                 "instrument_distortion_k,instrument_magnification_m," +
                 "content_zoom,motion_mode,sweep_direction,sweep_amplitude_deg," +
                 "sweep_speed_deg_per_s,completed_half_sweeps,min_yaw_deg,max_yaw_deg," +
+                "max_abs_yaw_deg,mean_abs_yaw_speed_deg_per_s," +
+                "peak_abs_yaw_speed_deg_per_s," +
                 "dot_seed,dot_count,world_coverage_diameter_deg,carrier_radius_m," +
                 "response,valid_for_analysis,fixation_sample_valid," +
                 "fixation_inside_tolerance,fixation_angle_deg,continuous_fixation_s," +

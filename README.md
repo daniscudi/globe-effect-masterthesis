@@ -299,7 +299,7 @@ Wenn die Fixation während der Darbietung zu lange verloren geht:
 
 1. Das Muster wird ausgeblendet.
 2. Die Präsentation wird als ungültig gespeichert und nicht ausgewertet.
-3. Dieselbe Bedingung wird hinten an die Warteschlange gehängt.
+3. Dieselbe Bedingung wird ans Ende des aktuellen Unterblocks gehängt.
 4. Die übrige zufällige Reihenfolge bleibt erhalten.
 
 Kurze Blickunterbrechungen und vollständig ungültige Blickdaten besitzen
@@ -310,7 +310,7 @@ stattdessen eine Obergrenze.
 
 ## Bedienung
 
-* `F5`: Sitzung starten
+* `F5`: Sitzung starten beziehungsweise nach einer Blockpause fortsetzen
 
 * `F6`: Sitzung abbrechen
 
@@ -345,6 +345,10 @@ Die wichtigsten Einstellungen befinden sich am Objekt
 * `Content Zoom Values`: unabhängiger Zoom; `1` lässt die Größe unverändert
 
 * `Repetitions Per Condition`: Wiederholungen jeder Kombination
+
+* `Repetitions Per Mini Block`: Wiederholungen jeder Bedingung pro Unterblock;
+  mit `25` insgesamt und `5` pro Unterblock entstehen fünf Abschnitte je
+  Bewegungsart
 
 * `Require Fixation`: Vorfixation und Kontrolle während des Musters
 
@@ -396,23 +400,45 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
 
 * `Repetitions Per Condition`: Wiederholungen jeder Kombination
 
-* `Motion Duration Seconds`: sichtbare Dauer der Bewegung
+* `Motion Duration Seconds`: sichtbare Dauer der Bewegung; der Pilotwert beträgt
+  `5 s`
 
-* `Sweep Amplitude Degrees`: Schwenkweite je Seite
+* `Sweep Amplitude Degrees`: Zielschwenkweite je Seite; für `10x` zunächst `2°`
 
-* `Sweep Speed Degrees Per Second`: Winkelgeschwindigkeit
+* `Sweep Speed Degrees Per Second`: reale Instrument-/Kopfgeschwindigkeit;
+  für `10x` zunächst `1,2°/s`, entsprechend ungefähr `12°/s` in der Bildmitte
 
-* `Motion Modes`: für den Haupttest `Simulated Yaw`
+* `Motion Modes`: Reihenfolge der getrennten Bewegungsblöcke; für die Hälfte der
+  Personen `Simulated Yaw` vor `Head Tracked`, für die andere Hälfte umgekehrt
+
+* `Head Tracked Coverage Yaw Degrees`: unsichtbarer Sicherheitspuffer der
+  Punktwelt; voreingestellt auf `15°` je Seite
+
+* `Validate Head Tracked Motion`: wiederholt aktive Durchgänge, wenn der
+  Seitenwechsel fehlt oder Auslenkung beziehungsweise Geschwindigkeit außerhalb
+  der eingestellten Grenzen liegen
 
 * `Eye Presentations`: beide, nur linkes oder nur rechtes Auge
 
 * Fixations- und Wiederholungsgrenzen wie beim Checkerboard
 
-Die Richtung des ersten Schwenks wird über die Wiederholungen möglichst gleich
-auf links und rechts verteilt. Die Reihenfolge wird anschließend mit dem Seed
-gemischt. Gleiche Wiederholungen verschiedener `k`-Stufen verwenden
-vergleichbare Punkt-Seeds, damit nicht eine bestimmte Punktverteilung nur mit
-einem einzigen `k` verbunden ist.
+Die beiden Bewegungsarten werden nicht trialweise vermischt, sondern als
+getrennte Blöcke in der Reihenfolge der Liste ausgeführt. Nach jedem Unterblock
+und zwischen den Bewegungsblöcken hält die Sitzung an; `F5` setzt sie fort. Nur
+innerhalb eines Unterblocks wird mit dem Seed gemischt. Die Richtung des ersten
+Schwenks wird über die Wiederholungen möglichst gleich auf links und rechts
+verteilt. Gleiche Wiederholungen verschiedener `k`-Stufen und beider
+Bewegungsarten verwenden vergleichbare Punkt-Seeds, damit die Punktverteilung
+nicht mit einer Bedingung verwechselt wird.
+
+Das sichtbare Feld hat innen einen neutralgrauen Hintergrund für symmetrischen
+Kontrast der schwarzen und weißen Punkte. Außerhalb der kreisförmigen Feldblende
+ist der Hintergrund nahezu schwarz. Für Head-Tracked-Trials wird die erzeugte
+Punktwelt automatisch bis zum Sicherheitspuffer erweitert. Die Punktzahl wächst
+dabei proportional zur Kugelkappenfläche, damit die sichtbare Punktdichte nicht
+vom Bewegungsbereich abhängt. Für die aktuellen `70°`, `10x` und `±15°`
+Sicherheitsabdeckung sind rund `40,6°` Quellenfeld und `24.500` Punkte
+voreingestellt.
 
 ## Eye Tracking und Messdateien
 
@@ -580,8 +606,11 @@ Kurz gesagt:
 
 * Die endgültigen `l`-/`k`-Stufen und die Wiederholungszahl
 
-* Vergrößerungen `m`, Schwenkweite, Geschwindigkeit und Dauer des
-  Random-Dot-Instrumententests sind weiterhin zu pilotieren.
+* Vergrößerungen `m` sowie die voreingestellten Pilotwerte von `2°`, `1,2°/s`
+  und `5 s` sind weiterhin empirisch zu pilotieren.
+
+* Instruktion und Training für den aktiven Head-Tracked-Schwenk werden in einem
+  separaten Schritt ergänzt.
 
 * Für die Auswertung wird später eine psychometrische Funktion für
   `P(konvex | k, m)` angepasst; der 50-%-Punkt in `k` ist der gesuchte

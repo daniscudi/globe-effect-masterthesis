@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace GlobeEffect.VRCheckerboard
 {
@@ -34,31 +35,34 @@ namespace GlobeEffect.VRCheckerboard
         private const string ShaderFallbackName = "GlobeEffect/Helmholtz Checkerboard";
         private const float QuadDistanceMeters = 1f;
 
-        [Header("Blickrichtung und FOV")]
+        [Header("Field Of View")]
         [SerializeField]
         [Tooltip("Der Kopf im XR-Rig. Normalerweise ist das die Main Camera im XR Origin.")]
         private Transform observer;
 
+        [FormerlySerializedAs("angularDiameterDegrees")]
         [SerializeField, Range(1f, 170f)]
         [Tooltip("Wie groß der runde Ausschnitt ist, in Grad. 90 heißt 90 Grad von einem Rand zum anderen.")]
-        private float angularDiameterDegrees = 90f;
+        private float fieldOfViewDegrees = 90f;
 
+        [FormerlySerializedAs("apertureEdgeSoftnessDegrees")]
         [SerializeField, Range(0f, 10f)]
         [Tooltip("Wie weich der Rand des Kreises nach innen ausläuft. 0 gibt eine harte Kante.")]
-        private float apertureEdgeSoftnessDegrees = 1f;
+        private float edgeSoftnessDegrees = 1f;
 
         [SerializeField]
         [Tooltip("Schaltet den runden Ausschnitt an. Zum Prüfen kann man ihn ausmachen, dann sieht man das ganze viereckige Gitter.")]
         private bool useCircularAperture = true;
 
-        [Header("Visual-Space-/Helmholtz-Gitter")]
+        [Header("Grid Distortion")]
         [SerializeField, Range(0f, 1.4f)]
         [Tooltip("l = 1 gibt ein gerades Gitter, l = 0,5 den Helmholtz-Punkt. Kleinere Werte gehen weiter in die kissenförmige Richtung, Werte über 1 in die tonnenförmige.")]
         private float visualSpaceL = 0.5f;
 
+        [FormerlySerializedAs("gridLineSpacingDegrees")]
         [SerializeField, Range(0.5f, 45f)]
         [Tooltip("Abstand zwischen zwei Gitterlinien in Grad. Oomes et al. haben 10 Grad benutzt.")]
-        private float gridLineSpacingDegrees = 10f;
+        private float gridSpacingDegrees = 10f;
 
         [SerializeField]
         private Color darkColor = Color.black;
@@ -66,7 +70,7 @@ namespace GlobeEffect.VRCheckerboard
         [SerializeField]
         private Color lightColor = Color.white;
 
-        [Header("Darstellung und Fixation")]
+        [Header("Display And Fixation")]
         [SerializeField]
         [Tooltip("Auf beiden Augen zeigen oder nur auf einem.")]
         private CheckerboardEyePresentation eyePresentation =
@@ -76,9 +80,10 @@ namespace GlobeEffect.VRCheckerboard
         [Tooltip("Zeigt das Kreuz in der Mitte.")]
         private bool showFixationTarget = true;
 
+        [FormerlySerializedAs("fixationTargetSizeDegrees")]
         [SerializeField, Range(0.05f, 5f)]
         [Tooltip("Wie groß das Fixationskreuz insgesamt ist, in Grad.")]
-        private float fixationTargetSizeDegrees = 0.5f;
+        private float fixationSizeDegrees = 0.5f;
 
         [SerializeField]
         private Color fixationColor = Color.red;
@@ -87,28 +92,32 @@ namespace GlobeEffect.VRCheckerboard
         [Tooltip("Hintergrund in der Fixationsphase, also kurz bevor das Muster kommt.")]
         private Color fixationBackgroundColor = Color.gray;
 
-        [Header("Noise-Maske")]
+        [Header("Noise Mask")]
+        [FormerlySerializedAs("noiseCellSizeDegrees")]
         [SerializeField, Range(0.25f, 10f)]
         [Tooltip("Wie groß ein einzelnes Noise-Kästchen ist, in Grad. Die Maske kommt direkt nach dem Schachbrett.")]
-        private float noiseCellSizeDegrees = 1f;
+        private float noiseSizeDegrees = 1f;
 
-        [Header("Antwortanzeige")]
+        [Header("Response Text")]
+        [FormerlySerializedAs("responsePromptColor")]
         [SerializeField]
-        private Color responsePromptColor = Color.white;
+        private Color textColor = Color.white;
 
+        [FormerlySerializedAs("responsePromptDistanceMeters")]
         [SerializeField, Min(0.5f)]
         [Tooltip("Wie weit vorne der Text liegt. Das hat nichts mit dem Schachbrett zu tun.")]
-        private float responsePromptDistanceMeters = 10f;
+        private float textDistanceMeters = 10f;
 
+        [FormerlySerializedAs("responsePromptCharacterSize")]
         [SerializeField, Range(0.005f, 0.1f)]
         [Tooltip("Wie groß die Buchstaben im Text sind.")]
-        private float responsePromptCharacterSize = 0.04f;
+        private float textSize = 0.04f;
 
         [SerializeField]
         [Tooltip("Soll gleich alles sichtbar sein, wenn der Play Mode startet?")]
         private bool visibleAtStart = true;
 
-        [Header("Technik")]
+        [Header("Advanced")]
         [SerializeField]
         [Tooltip("Optional ein eigenes Material mit dem Checkerboard-Shader. Normalerweise bleibt das leer.")]
         private Material materialOverride;
@@ -144,11 +153,11 @@ namespace GlobeEffect.VRCheckerboard
             }
         }
 
-        public float AngularDiameterDegrees => angularDiameterDegrees;
-        public float ApertureEdgeSoftnessDegrees => apertureEdgeSoftnessDegrees;
+        public float AngularDiameterDegrees => fieldOfViewDegrees;
+        public float ApertureEdgeSoftnessDegrees => edgeSoftnessDegrees;
         public bool UseCircularAperture => useCircularAperture;
         public float VisualSpaceL => visualSpaceL;
-        public float GridLineSpacingDegrees => gridLineSpacingDegrees;
+        public float GridLineSpacingDegrees => gridSpacingDegrees;
         public float GridLineSpacingUv => GridSpacingInUv();
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
         public bool IsVisible => isVisible;
@@ -237,14 +246,14 @@ namespace GlobeEffect.VRCheckerboard
         public void SetAngularDiameter(float value)
         {
             // Wie groß der runde Ausschnitt ist, von einem Rand zum anderen.
-            angularDiameterDegrees = Mathf.Clamp(value, 1f, 170f);
+            fieldOfViewDegrees = Mathf.Clamp(value, 1f, 170f);
             SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
         public void SetApertureEdgeSoftness(float value)
         {
-            apertureEdgeSoftnessDegrees = Mathf.Clamp(value, 0f, 10f);
+            edgeSoftnessDegrees = Mathf.Clamp(value, 0f, 10f);
             SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
@@ -271,7 +280,7 @@ namespace GlobeEffect.VRCheckerboard
         {
             // Eingegeben wird in Grad, weil man sich das besser vorstellen kann.
             // GridSpacingInUv rechnet das vor dem Zeichnen in u/v-Weite um.
-            gridLineSpacingDegrees = Mathf.Clamp(value, 0.5f, 45f);
+            gridSpacingDegrees = Mathf.Clamp(value, 0.5f, 45f);
             SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
@@ -341,7 +350,7 @@ namespace GlobeEffect.VRCheckerboard
             if (textMesh != null)
             {
                 textMesh.text = promptText ?? string.Empty;
-                textMesh.color = responsePromptColor;
+                textMesh.color = textColor;
             }
 
             SendValuesToShader();
@@ -367,15 +376,15 @@ namespace GlobeEffect.VRCheckerboard
                 checkerboardVisible = checkerboardVisible,
                 noiseVisible = noiseVisible,
                 responsePromptVisible = responsePromptVisible,
-                angularDiameterDegrees = angularDiameterDegrees,
-                apertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees,
+                angularDiameterDegrees = fieldOfViewDegrees,
+                apertureEdgeSoftnessDegrees = edgeSoftnessDegrees,
                 useCircularAperture = useCircularAperture,
                 visualSpaceL = visualSpaceL,
                 // Das Schachbrett hat keinen Zoom mehr. Das Feld bleibt nur
                 // stehen, weil die Eye-Tracking-Toolbox aus dem Labor es
                 // ausliest, und steht deshalb fest auf 1.
                 contentZoom = 1f,
-                gridLineSpacingDegrees = gridLineSpacingDegrees,
+                gridLineSpacingDegrees = gridSpacingDegrees,
                 gridLineSpacingUv = GridSpacingInUv(),
                 eyePresentation = eyePresentation
             };
@@ -418,9 +427,9 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock ??= new MaterialPropertyBlock();
             meshRenderer.GetPropertyBlock(propertyBlock);
             propertyBlock.SetFloat("_ApparentHalfAngleRad",
-                0.5f * angularDiameterDegrees * Mathf.Deg2Rad);
+                0.5f * fieldOfViewDegrees * Mathf.Deg2Rad);
             propertyBlock.SetFloat("_ApertureEdgeSoftnessRad",
-                apertureEdgeSoftnessDegrees * Mathf.Deg2Rad);
+                edgeSoftnessDegrees * Mathf.Deg2Rad);
             propertyBlock.SetFloat("_UseCircularAperture",
                 useCircularAperture ? 1f : 0f);
             propertyBlock.SetFloat("_VisualSpaceL", visualSpaceL);
@@ -447,7 +456,7 @@ namespace GlobeEffect.VRCheckerboard
                 "_FixationEnabled",
                 showFixationTarget && fixationVisible ? 1f : 0f);
             propertyBlock.SetFloat("_FixationHalfSizeRad",
-                0.5f * fixationTargetSizeDegrees * Mathf.Deg2Rad);
+                0.5f * fixationSizeDegrees * Mathf.Deg2Rad);
             propertyBlock.SetColor("_FixationColor", fixationColor);
             AddHeadPose(propertyBlock);
             meshRenderer.SetPropertyBlock(propertyBlock);
@@ -484,16 +493,16 @@ namespace GlobeEffect.VRCheckerboard
             // Beispiel: Bei 90 Grad FOV werden aus 10 Grad ungefähr 0,1763
             // in u/v-Koordinaten.
             return (float)VisualSpaceRadialMapping.NormalizedGridLineSpacing(
-                angularDiameterDegrees,
-                gridLineSpacingDegrees);
+                fieldOfViewDegrees,
+                gridSpacingDegrees);
         }
 
         private float NoiseSizeInUv()
         {
             // Läuft genauso wie beim Gitter: von Grad in u/v-Koordinaten umrechnen.
             return (float)VisualSpaceRadialMapping.NormalizedGridLineSpacing(
-                angularDiameterDegrees,
-                noiseCellSizeDegrees);
+                fieldOfViewDegrees,
+                noiseSizeDegrees);
         }
 
         private void ShowOrHideObjects()
@@ -546,12 +555,12 @@ namespace GlobeEffect.VRCheckerboard
             }
 
             textMesh ??= textObject.GetComponent<TextMesh>();
-            textMesh.characterSize = responsePromptCharacterSize;
-            textMesh.color = responsePromptColor;
+            textMesh.characterSize = textSize;
+            textMesh.color = textColor;
             // Der Text steht weiter vorne als das Viereck. Deshalb wird der
             // Abstand des Vierecks hier wieder abgezogen.
             textObject.transform.localPosition = Vector3.forward *
-                Mathf.Max(0.01f, responsePromptDistanceMeters - QuadDistanceMeters);
+                Mathf.Max(0.01f, textDistanceMeters - QuadDistanceMeters);
             textObject.transform.localRotation = Quaternion.identity;
             textObject.transform.localScale = Vector3.one;
         }
@@ -639,18 +648,18 @@ namespace GlobeEffect.VRCheckerboard
         {
             // Fängt Werte ab, die jemand von Hand eingetippt hat. Und alte Szenen,
             // in denen noch Werte von früher stehen.
-            angularDiameterDegrees = Mathf.Clamp(angularDiameterDegrees, 1f, 170f);
-            apertureEdgeSoftnessDegrees = Mathf.Clamp(
-                apertureEdgeSoftnessDegrees,
+            fieldOfViewDegrees = Mathf.Clamp(fieldOfViewDegrees, 1f, 170f);
+            edgeSoftnessDegrees = Mathf.Clamp(
+                edgeSoftnessDegrees,
                 0f,
                 10f);
             visualSpaceL = Mathf.Clamp(visualSpaceL, 0f, 1.4f);
-            gridLineSpacingDegrees = Mathf.Clamp(gridLineSpacingDegrees, 0.5f, 45f);
-            noiseCellSizeDegrees = Mathf.Clamp(noiseCellSizeDegrees, 0.25f, 10f);
-            fixationTargetSizeDegrees = Mathf.Clamp(fixationTargetSizeDegrees, 0.05f, 5f);
-            responsePromptDistanceMeters = Mathf.Max(0.5f, responsePromptDistanceMeters);
-            responsePromptCharacterSize = Mathf.Clamp(
-                responsePromptCharacterSize,
+            gridSpacingDegrees = Mathf.Clamp(gridSpacingDegrees, 0.5f, 45f);
+            noiseSizeDegrees = Mathf.Clamp(noiseSizeDegrees, 0.25f, 10f);
+            fixationSizeDegrees = Mathf.Clamp(fixationSizeDegrees, 0.05f, 5f);
+            textDistanceMeters = Mathf.Max(0.5f, textDistanceMeters);
+            textSize = Mathf.Clamp(
+                textSize,
                 0.005f,
                 0.1f);
         }
