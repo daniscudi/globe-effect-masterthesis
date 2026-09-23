@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Serialization;
@@ -34,6 +34,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private const string ShaderFallbackName = "GlobeEffect/Visual Space Random Dots";
         private const float MinimumRadiusMeters = 0.25f;
 
+        // Wie wenige und wie viele Punkte erlaubt sind. Die beiden Zahlen stehen
+        // absichtlich nur hier, damit der Regler im Inspector und die Prüfungen
+        // weiter unten nie auseinanderlaufen.
+        private const int MinimumDotCount = 100;
+        private const int MaximumDotCount = 60000;
+
         [Header("Beobachter und Punktfeld")]
         [SerializeField]
         [Tooltip("Der Kopf im XR-Rig, also normalerweise die Main Camera.")]
@@ -55,7 +61,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [Tooltip("In welchem Bereich überhaupt Punkte erzeugt werden, in Grad. Muss größer sein als das Sichtfeld plus die Schwenkweite, sonst entstehen am Rand Lücken.")]
         private float worldCoverageDiameterDegrees = 110f;
 
-        [SerializeField, Range(100, 12000)]
+        [SerializeField, Range(MinimumDotCount, MaximumDotCount)]
         [Tooltip("Wie viele Punkte erzeugt werden.")]
         private int dotCount = 4000;
 
@@ -376,7 +382,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         {
             // Andere Punktzahl, anderer Seed oder anderer Bereich heißt: Die Punkte
             // liegen jetzt woanders. Deshalb muss das Mesh komplett neu gebaut werden.
-            dotCount = Mathf.Clamp(newDotCount, 100, 12000);
+            dotCount = Mathf.Clamp(newDotCount, MinimumDotCount, MaximumDotCount);
             randomSeed = newRandomSeed;
             worldCoverageDiameterDegrees = Mathf.Clamp(
                 newCoverageDiameterDegrees,
@@ -748,7 +754,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 worldCoverageDiameterDegrees,
                 20f,
                 170f);
-            dotCount = Mathf.Clamp(dotCount, 100, 12000);
+            dotCount = Mathf.Clamp(dotCount, MinimumDotCount, MaximumDotCount);
             dotAngularDiameterDegrees = Mathf.Clamp(dotAngularDiameterDegrees, 0.02f, 2f);
             lightDotFraction = Mathf.Clamp01(lightDotFraction);
             visualSpaceL = Mathf.Clamp(visualSpaceL, 0f, 1.4f);
