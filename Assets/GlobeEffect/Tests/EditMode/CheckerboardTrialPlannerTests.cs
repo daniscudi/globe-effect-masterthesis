@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using GlobeEffect.VRCheckerboard.Experiment;
 using NUnit.Framework;
 
@@ -67,7 +67,6 @@ namespace GlobeEffect.VRCheckerboard.Tests
                     new[] { 90f },
                     new[] { CheckerboardEyePresentation.BothEyes },
                     new[] { 1.5f },
-                    new[] { 1f },
                     1,
                     1));
         }
@@ -92,7 +91,6 @@ namespace GlobeEffect.VRCheckerboard.Tests
                     CheckerboardEyePresentation.LeftEyeOnly
                 },
                 new[] { 0.5f, 1f },
-                new[] { 1f },
                 2,
                 seed);
         }

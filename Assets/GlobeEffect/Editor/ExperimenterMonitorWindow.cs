@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using GlobeEffect.VRCheckerboard.Experiment;
 using GlobeEffect.VRCheckerboard.EyeTracking;
 using GlobeEffect.VRCheckerboard.RandomDots;
@@ -198,13 +198,6 @@ namespace GlobeEffect.VRCheckerboard.Editor
                         ? checkerboardStimulus.AngularDiameterDegrees.ToString(
                             "F1",
                             CultureInfo.InvariantCulture) + "°"
-                        : "–");
-                EditorGUILayout.LabelField(
-                    "Content Zoom",
-                    checkerboardStimulus != null
-                        ? checkerboardStimulus.ContentZoom.ToString(
-                            "F2",
-                            CultureInfo.InvariantCulture)
                         : "–");
                 EditorGUILayout.LabelField(
                     "Augenmodus",

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 namespace GlobeEffect.VRCheckerboard
@@ -55,10 +55,6 @@ namespace GlobeEffect.VRCheckerboard
         [SerializeField, Range(0f, 1.4f)]
         [Tooltip("l = 1 gibt ein gerades Gitter, l = 0,5 den Helmholtz-Punkt. Kleinere Werte gehen weiter in die kissenförmige Richtung, Werte über 1 in die tonnenförmige.")]
         private float visualSpaceL = 0.5f;
-
-        [SerializeField, Range(0.25f, 4f)]
-        [Tooltip("Zoom für das Muster. Macht die Karos größer oder kleiner. l und der Rand bleiben dabei gleich.")]
-        private float contentZoom = 1f;
 
         [SerializeField, Range(0.5f, 45f)]
         [Tooltip("Abstand zwischen zwei Gitterlinien in Grad. Oomes et al. haben 10 Grad benutzt.")]
@@ -152,7 +148,6 @@ namespace GlobeEffect.VRCheckerboard
         public float ApertureEdgeSoftnessDegrees => apertureEdgeSoftnessDegrees;
         public bool UseCircularAperture => useCircularAperture;
         public float VisualSpaceL => visualSpaceL;
-        public float ContentZoom => contentZoom;
         public float GridLineSpacingDegrees => gridLineSpacingDegrees;
         public float GridLineSpacingUv => GridSpacingInUv();
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
@@ -272,15 +267,6 @@ namespace GlobeEffect.VRCheckerboard
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
-        public void SetContentZoom(float value)
-        {
-            // Der Zoom ändert nur, wie groß man die Karos sieht.
-            // Er hat nichts mit l zu tun und ist auch kein Fernglas.
-            contentZoom = Mathf.Clamp(value, 0.25f, 4f);
-            SendValuesToShader();
-            ParametersChanged?.Invoke(CaptureSnapshot());
-        }
-
         public void SetGridLineSpacing(float value)
         {
             // Eingegeben wird in Grad, weil man sich das besser vorstellen kann.
@@ -385,7 +371,10 @@ namespace GlobeEffect.VRCheckerboard
                 apertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees,
                 useCircularAperture = useCircularAperture,
                 visualSpaceL = visualSpaceL,
-                contentZoom = contentZoom,
+                // Das Schachbrett hat keinen Zoom mehr. Das Feld bleibt nur
+                // stehen, weil die Eye-Tracking-Toolbox aus dem Labor es
+                // ausliest, und steht deshalb fest auf 1.
+                contentZoom = 1f,
                 gridLineSpacingDegrees = gridLineSpacingDegrees,
                 gridLineSpacingUv = GridSpacingInUv(),
                 eyePresentation = eyePresentation
@@ -435,7 +424,6 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetFloat("_UseCircularAperture",
                 useCircularAperture ? 1f : 0f);
             propertyBlock.SetFloat("_VisualSpaceL", visualSpaceL);
-            propertyBlock.SetFloat("_ContentZoom", contentZoom);
             propertyBlock.SetFloat(
                 "_GridLineSpacingUv",
                 GridSpacingInUv());
@@ -657,7 +645,6 @@ namespace GlobeEffect.VRCheckerboard
                 0f,
                 10f);
             visualSpaceL = Mathf.Clamp(visualSpaceL, 0f, 1.4f);
-            contentZoom = Mathf.Clamp(contentZoom, 0.25f, 4f);
             gridLineSpacingDegrees = Mathf.Clamp(gridLineSpacingDegrees, 0.5f, 45f);
             noiseCellSizeDegrees = Mathf.Clamp(noiseCellSizeDegrees, 0.25f, 10f);
             fixationTargetSizeDegrees = Mathf.Clamp(fixationTargetSizeDegrees, 0.05f, 5f);

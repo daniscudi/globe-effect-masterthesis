@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using GlobeEffect.VRCheckerboard.RandomDots;
 
@@ -163,7 +163,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             foreach (float value in contentZoomValues)
             {
-                if (value < 0.25f || value > 4f)
+                // Dieselben Grenzen wie der Regler im Inspector.
+                if (value < RandomDotFieldStimulus.MinimumContentZoom ||
+                    value > RandomDotFieldStimulus.MaximumContentZoom)
                 {
                     throw new ArgumentOutOfRangeException(nameof(contentZoomValues));
                 }

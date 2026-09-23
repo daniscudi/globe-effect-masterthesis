@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -210,7 +210,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "participant_id,session_label,session_start_utc,random_seed,mapping_version," +
                 "sequence_index,total_planned_trials,condition_index,repetition," +
                 "eye_presentation,angular_diameter_deg,grid_line_spacing_deg," +
-                "grid_line_spacing_uv,visual_space_l,content_zoom," +
+                "grid_line_spacing_uv,visual_space_l," +
                 "oomes_endpoint_equivalent,stimulus_duration_s," +
                 "noise_until_response,post_response_noise_s,response_timeout_s," +
                 "category_a_key,category_b_key,response_keys_swapped");
@@ -231,7 +231,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                         trial.AngularDiameterDegrees,
                         gridLineSpacingDegrees));
                 AppendFloat(builder, trial.VisualSpaceL);
-                AppendFloat(builder, trial.ContentZoom);
                 AppendDouble(
                     builder,
                     VisualSpaceRadialMapping.OomesEndpointEquivalent(
@@ -286,7 +285,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             AppendFloat(builder, result.GridLineSpacingDegrees);
             AppendFloat(builder, result.GridLineSpacingUv);
             AppendFloat(builder, trial.VisualSpaceL);
-            AppendFloat(builder, trial.ContentZoom);
             AppendDouble(
                 builder,
                 VisualSpaceRadialMapping.OomesEndpointEquivalent(
@@ -348,7 +346,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "trial_end_unity_s,stimulus_duration_s,noise_mask_duration_s,response_time_s," +
                 "eye_presentation,angular_diameter_deg,aperture_edge_softness_deg," +
                 "circular_aperture_enabled,grid_line_spacing_deg," +
-                "grid_line_spacing_uv,visual_space_l,content_zoom," +
+                "grid_line_spacing_uv,visual_space_l," +
                 "oomes_endpoint_equivalent,response," +
                 "valid_for_analysis,fixation_sample_valid," +
                 "fixation_inside_tolerance,fixation_angle_deg," +
