@@ -96,6 +96,81 @@ namespace GlobeEffect.VRCheckerboard.Tests
             }
         }
 
+        [Test]
+        public void MotionModesStayInSeparateBlocksAndMiniBlocksStayComplete()
+        {
+            var plan = RandomDotTrialPlanner.CreateRandomizedPlan(
+                new[] { 90f },
+                new[] { CheckerboardEyePresentation.BothEyes },
+                new[] { 0.5f, 1f },
+                new[] { 10f },
+                new[] { 1f },
+                new[]
+                {
+                    RandomDotMotionMode.SimulatedYaw,
+                    RandomDotMotionMode.HeadTracked
+                },
+                repetitions: 4,
+                repetitionsPerMiniBlock: 2,
+                randomSeed: 23,
+                dotSeedBase: 5000);
+
+            Assert.That(plan.Count, Is.EqualTo(16));
+            Assert.That(plan.Take(8).All(t =>
+                t.MotionMode == RandomDotMotionMode.SimulatedYaw &&
+                t.MotionBlockIndex == 1), Is.True);
+            Assert.That(plan.Skip(8).All(t =>
+                t.MotionMode == RandomDotMotionMode.HeadTracked &&
+                t.MotionBlockIndex == 2), Is.True);
+            Assert.That(plan.GroupBy(t => new
+                {
+                    t.MotionBlockIndex,
+                    t.MiniBlockIndex,
+                    t.InstrumentDistortionK
+                }).All(group => group.Count() == 2), Is.True);
+
+            int[] simulatedSeeds = plan
+                .Where(t => t.MotionMode == RandomDotMotionMode.SimulatedYaw)
+                .OrderBy(t => t.InstrumentDistortionK)
+                .ThenBy(t => t.Repetition)
+                .Select(t => t.DotSeed)
+                .ToArray();
+            int[] headTrackedSeeds = plan
+                .Where(t => t.MotionMode == RandomDotMotionMode.HeadTracked)
+                .OrderBy(t => t.InstrumentDistortionK)
+                .ThenBy(t => t.Repetition)
+                .Select(t => t.DotSeed)
+                .ToArray();
+            Assert.That(headTrackedSeeds, Is.EqualTo(simulatedSeeds));
+        }
+
+        [Test]
+        public void InvalidTrialRepeatStaysInsideItsMiniBlock()
+        {
+            var plan = RandomDotTrialPlanner.CreateRandomizedPlan(
+                new[] { 90f },
+                new[] { CheckerboardEyePresentation.BothEyes },
+                new[] { 0.5f, 1f },
+                new[] { 10f },
+                new[] { 1f },
+                new[] { RandomDotMotionMode.SimulatedYaw },
+                repetitions: 2,
+                repetitionsPerMiniBlock: 1,
+                randomSeed: 31,
+                dotSeedBase: 5000);
+            var queue = new RandomDotTrialQueue(plan);
+
+            Assert.That(queue.TryTakeNext(out RandomDotTrial invalid), Is.True);
+            RandomDotTrial repeat = queue.AppendRepeatedAttempt(invalid);
+
+            Assert.That(queue.TryTakeNext(out _), Is.True);
+            Assert.That(queue.TryTakeNext(out RandomDotTrial inserted), Is.True);
+            Assert.That(inserted, Is.SameAs(repeat));
+            Assert.That(inserted.MiniBlockIndex, Is.EqualTo(1));
+            Assert.That(queue.TryPeekNext(out RandomDotTrial next), Is.True);
+            Assert.That(next.MiniBlockIndex, Is.EqualTo(2));
+        }
+
         private static System.Collections.Generic.IReadOnlyList<RandomDotTrial>
             CreatePlan(int randomSeed)
         {
@@ -107,6 +182,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 new[] { 1f },
                 new[] { RandomDotMotionMode.SimulatedYaw },
                 repetitions: 4,
+                repetitionsPerMiniBlock: 2,
                 randomSeed,
                 dotSeedBase: 5000);
         }

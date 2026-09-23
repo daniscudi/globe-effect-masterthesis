@@ -54,6 +54,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 float displayedAngle : TEXCOORD1;
                 float validProjection : TEXCOORD2;
                 float isFixationTarget : TEXCOORD3;
+                float isApertureBackground : TEXCOORD4;
                 fixed4 color : COLOR;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -108,6 +109,22 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 return _InstrumentMagnificationM;
             }
 
+            float ResolveApertureAlpha(float displayedAngle)
+            {
+                if (_ApertureEdgeSoftnessRad <= 1e-6)
+                {
+                    return step(displayedAngle, _ApertureHalfAngleRad);
+                }
+
+                float fadeStart = max(
+                    0.0,
+                    _ApertureHalfAngleRad - _ApertureEdgeSoftnessRad);
+                return 1.0 - smoothstep(
+                    fadeStart,
+                    _ApertureHalfAngleRad,
+                    displayedAngle);
+            }
+
             float ResolveEyeIndex()
             {
                 // Unity liefert den Augenindex je nach XR-Renderverfahren anders.
@@ -131,7 +148,33 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 UNITY_INITIALIZE_OUTPUT(VertexToFragment, output);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
-                float isFixation = step(0.5, input.sizeData.y);
+                float isApertureBackground = step(1.5, input.sizeData.y);
+                float isFixation = step(0.5, input.sizeData.y) *
+                    (1.0 - isApertureBackground);
+
+                // Ein zusätzliches Viereck füllt die kreisförmige Öffnung mit
+                // neutralem Grau. Außerhalb wird es im Fragment-Shader
+                // ausgeblendet, sodass dort der schwarze Kamerahintergrund bleibt.
+                if (isApertureBackground > 0.5)
+                {
+                    float tangentAtBoundary = tan(_ApertureHalfAngleRad);
+                    float3 backgroundViewPosition = float3(
+                        input.uv * tangentAtBoundary,
+                        -1.0);
+                    output.position = mul(
+                        UNITY_MATRIX_P,
+                        float4(backgroundViewPosition, 1.0));
+                    output.dotUv = input.uv;
+                    // Der genaue Winkel wird im Fragment aus den interpolierten
+                    // UV-Koordinaten berechnet. An allen vier Ecken wäre er sonst
+                    // gleich und könnte keinen Kreis ergeben.
+                    output.displayedAngle = 0.0;
+                    output.validProjection = 1.0;
+                    output.isFixationTarget = 0.0;
+                    output.isApertureBackground = 1.0;
+                    output.color = input.color;
+                    return output;
+                }
 
                 // Die Punkte werden als Richtungen dargestellt. w = 0 entfernt
                 // die Verschiebung zwischen den beiden Augenkameras und damit
@@ -203,6 +246,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 output.validProjection = validFront *
                     validInstrumentDomain * validAngle;
                 output.isFixationTarget = isFixation;
+                output.isApertureBackground = 0.0;
                 output.color = input.color;
                 return output;
             }
@@ -225,6 +269,19 @@ Shader "GlobeEffect/Visual Space Random Dots"
 
                 clip(visibleForEye - 0.5);
                 clip(input.validProjection - 0.5);
+
+                float apertureAngle = input.isApertureBackground > 0.5
+                    ? atan(length(input.dotUv) *
+                        tan(_ApertureHalfAngleRad))
+                    : input.displayedAngle;
+                float apertureAlpha = ResolveApertureAlpha(apertureAngle);
+                if (input.isApertureBackground > 0.5)
+                {
+                    clip(apertureAlpha - 0.001);
+                    return fixed4(
+                        input.color.rgb,
+                        input.color.a * apertureAlpha);
+                }
 
                 if (input.isFixationTarget > 0.5)
                 {
@@ -249,25 +306,6 @@ Shader "GlobeEffect/Visual Space Random Dots"
                     1.0 + antialiasWidth,
                     radialDistance);
                 clip(dotAlpha - 0.001);
-
-                float apertureAlpha;
-                if (_ApertureEdgeSoftnessRad <= 1e-6)
-                {
-                    apertureAlpha = step(
-                        input.displayedAngle,
-                        _ApertureHalfAngleRad);
-                }
-                else
-                {
-                    // Im Softness-Bereich nimmt die Deckkraft bis zum Rand glatt ab.
-                    float fadeStart = max(
-                        0.0,
-                        _ApertureHalfAngleRad - _ApertureEdgeSoftnessRad);
-                    apertureAlpha = 1.0 - smoothstep(
-                        fadeStart,
-                        _ApertureHalfAngleRad,
-                        input.displayedAngle);
-                }
 
                 clip(apertureAlpha - 0.001);
                 return fixed4(

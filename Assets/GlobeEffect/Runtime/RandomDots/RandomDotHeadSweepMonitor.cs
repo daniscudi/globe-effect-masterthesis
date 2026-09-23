@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
@@ -17,43 +18,63 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     {
         // Dieses Skript bewegt selbst gar nichts. Es schaut nur zu und zählt,
         // wie oft der linke und der rechte Rand abwechselnd erreicht wurden.
-        [Header("Referenzen")]
+        [Header("References")]
         [SerializeField]
         private Transform observer;
 
         [SerializeField]
         private RandomDotFieldStimulus stimulus;
+        [Header("Motion Log")]
 
-        [Header("Bewegungsprotokoll")]
+        [FormerlySerializedAs("yawThresholdDegrees")]
         [SerializeField, Range(0.5f, 45f)]
         [Tooltip("Ab wie vielen Grad zu einer Seite das als Rand zählt.")]
-        private float yawThresholdDegrees = 2.5f;
+        private float turnaroundDegrees = 1.5f;
 
         [SerializeField, Range(1, 20)]
-        [Tooltip("Nur ein Vergleichswert für die Kontrolle. Der Durchgang wird dadurch nicht blockiert.")]
-        private int requiredHalfSweeps = 4;
+        [Tooltip("Mindestzahl vollständiger Wechsel zwischen linker und rechter Seite. Der Experiment Manager kann unvollständige Durchgänge wiederholen.")]
+        private int requiredHalfSweeps = 1;
 
-        [Header("Laufzeitstatus")]
+        [Header("Runtime Status")]
         [SerializeField]
         private float currentYawDegrees;
 
         [SerializeField]
         private int completedHalfSweeps;
 
+        [FormerlySerializedAs("maximumAbsoluteYawDegrees")]
         [SerializeField]
-        private float maximumAbsoluteYawDegrees;
+        private float maxHeadTurnDegrees;
+
+        [FormerlySerializedAs("meanAbsoluteYawSpeedDegreesPerSecond")]
+        [SerializeField]
+        private float meanHeadSpeed;
+
+        [FormerlySerializedAs("peakAbsoluteYawSpeedDegreesPerSecond")]
+        [SerializeField]
+        private float peakHeadSpeed;
 
         // Die Richtung, in die der Kopf am Anfang des Durchgangs geschaut hat.
         private Vector3 startDirection = Vector3.forward;
         private AlternatingHeadSweepCounter counter;
+        private float previousYawDegrees;
+        private double previousSampleTime;
+        private float accumulatedAbsoluteYawDegrees;
+        private float accumulatedMeasurementSeconds;
+        private float smoothedAbsoluteYawSpeedDegreesPerSecond;
+        private bool hasPreviousYawSample;
 
         public event Action<int, float> HalfSweepCompleted;
 
         public float CurrentYawDegrees => currentYawDegrees;
         public int CompletedHalfSweeps => completedHalfSweeps;
         public int RequiredHalfSweeps => requiredHalfSweeps;
-        public float YawThresholdDegrees => yawThresholdDegrees;
-        public float MaximumAbsoluteYawDegrees => maximumAbsoluteYawDegrees;
+        public float YawThresholdDegrees => turnaroundDegrees;
+        public float MaximumAbsoluteYawDegrees => maxHeadTurnDegrees;
+        public float MeanAbsoluteYawSpeedDegreesPerSecond =>
+            meanHeadSpeed;
+        public float PeakAbsoluteYawSpeedDegreesPerSecond =>
+            peakHeadSpeed;
         public float MinimumYawDegrees => counter?.MinimumYawDegrees ?? 0f;
         public float MaximumYawDegrees => counter?.MaximumYawDegrees ?? 0f;
         public bool RequirementMet => completedHalfSweeps >= requiredHalfSweeps;
@@ -77,17 +98,18 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             currentYawDegrees = stimulus.MotionMode == RandomDotMotionMode.SimulatedYaw
                 ? stimulus.CurrentSimulatedYawDegrees
                 : MeasureRealHeadYaw();
+            UpdateYawSpeed(currentYawDegrees);
 
-            counter ??= new AlternatingHeadSweepCounter(yawThresholdDegrees);
+            counter ??= new AlternatingHeadSweepCounter(turnaroundDegrees);
             if (counter.Update(currentYawDegrees))
             {
                 completedHalfSweeps = counter.CompletedHalfSweeps;
-                maximumAbsoluteYawDegrees = counter.MaximumAbsoluteYawDegrees;
+                maxHeadTurnDegrees = counter.MaximumAbsoluteYawDegrees;
                 HalfSweepCompleted?.Invoke(completedHalfSweeps, currentYawDegrees);
             }
             else
             {
-                maximumAbsoluteYawDegrees = counter.MaximumAbsoluteYawDegrees;
+                maxHeadTurnDegrees = counter.MaximumAbsoluteYawDegrees;
             }
         }
 
@@ -102,7 +124,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         public void ConfigureCriterion(float thresholdDegrees, int halfSweeps)
         {
-            yawThresholdDegrees = Mathf.Clamp(thresholdDegrees, 0.5f, 45f);
+            turnaroundDegrees = Mathf.Clamp(thresholdDegrees, 0.5f, 45f);
             requiredHalfSweeps = Mathf.Clamp(halfSweeps, 1, 20);
             ResetForTrial();
         }
@@ -114,10 +136,62 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             FindReferences();
             startDirection = RemoveUpDownTilt(
                 observer != null ? observer.forward : Vector3.forward);
-            counter = new AlternatingHeadSweepCounter(yawThresholdDegrees);
+            counter = new AlternatingHeadSweepCounter(turnaroundDegrees);
             currentYawDegrees = 0f;
             completedHalfSweeps = 0;
-            maximumAbsoluteYawDegrees = 0f;
+            maxHeadTurnDegrees = 0f;
+            meanHeadSpeed = 0f;
+            peakHeadSpeed = 0f;
+            previousYawDegrees = 0f;
+            previousSampleTime = 0d;
+            accumulatedAbsoluteYawDegrees = 0f;
+            accumulatedMeasurementSeconds = 0f;
+            smoothedAbsoluteYawSpeedDegreesPerSecond = 0f;
+            hasPreviousYawSample = false;
+        }
+
+        private void UpdateYawSpeed(float yawDegrees)
+        {
+            double now = Time.realtimeSinceStartupAsDouble;
+            if (!hasPreviousYawSample)
+            {
+                previousYawDegrees = yawDegrees;
+                previousSampleTime = now;
+                hasPreviousYawSample = true;
+                return;
+            }
+
+            float deltaSeconds = (float)(now - previousSampleTime);
+            float deltaYaw = Mathf.Abs(Mathf.DeltaAngle(
+                previousYawDegrees,
+                yawDegrees));
+            previousYawDegrees = yawDegrees;
+            previousSampleTime = now;
+
+            // Große Zeitlücken entstehen etwa beim Pausieren des Editors und
+            // dürfen nicht als extrem langsame Kopfbewegung in den Trial eingehen.
+            if (deltaSeconds <= 0f || deltaSeconds > 0.25f)
+            {
+                return;
+            }
+
+            accumulatedAbsoluteYawDegrees += deltaYaw;
+            accumulatedMeasurementSeconds += deltaSeconds;
+            meanHeadSpeed =
+                accumulatedMeasurementSeconds > 1e-5f
+                    ? accumulatedAbsoluteYawDegrees /
+                        accumulatedMeasurementSeconds
+                    : 0f;
+
+            float instantaneousSpeed = deltaYaw / deltaSeconds;
+            float smoothingFactor = 1f - Mathf.Exp(-deltaSeconds / 0.15f);
+            smoothedAbsoluteYawSpeedDegreesPerSecond = Mathf.Lerp(
+                smoothedAbsoluteYawSpeedDegreesPerSecond,
+                instantaneousSpeed,
+                smoothingFactor);
+            peakHeadSpeed = Mathf.Max(
+                peakHeadSpeed,
+                smoothedAbsoluteYawSpeedDegreesPerSecond);
         }
 
         private float MeasureRealHeadYaw()
@@ -167,7 +241,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         private void OnValidate()
         {
-            yawThresholdDegrees = Mathf.Clamp(yawThresholdDegrees, 0.5f, 45f);
+            turnaroundDegrees = Mathf.Clamp(turnaroundDegrees, 0.5f, 45f);
             requiredHalfSweeps = Mathf.Clamp(requiredHalfSweeps, 1, 20);
         }
     }

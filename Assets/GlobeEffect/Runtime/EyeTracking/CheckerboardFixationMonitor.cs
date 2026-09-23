@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace GlobeEffect.VRCheckerboard.EyeTracking
 {
@@ -18,23 +19,24 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         // ob der Winkel klein genug ist -> mitzählen, wie lange das schon so geht.
         //
         // Rohdaten schreibt dieses Skript keine. Das macht die EyeTrackingToolbox.
-        [Header("Referenzen")]
+        [Header("References")]
         [SerializeField]
         private EyeTrackingToolbox eyeTrackingToolbox;
 
         [SerializeField]
         private VrCheckerboardStimulus stimulus;
 
-        [Header("Fixationskriterium")]
+        [Header("Fixation Criterion")]
         [SerializeField, Range(0.1f, 15f)]
         [Tooltip("Wie weit der Blick höchstens vom Kreuz weg sein darf, in Grad.")]
         private float toleranceDegrees = 3f;
 
+        [FormerlySerializedAs("requiredContinuousSeconds")]
         [SerializeField, Min(0f)]
         [Tooltip("Wie lange der Blick am Stück ruhig liegen muss, in Sekunden.")]
-        private float requiredContinuousSeconds = 0.3f;
+        private float requiredSteadySeconds = 0.3f;
 
-        [Header("Laufzeitstatus")]
+        [Header("Runtime Status")]
         [SerializeField]
         private bool currentSampleValid;
 
@@ -68,11 +70,11 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
                 currentSampleValid,
                 isInsideTolerance);
         public bool RequirementMet => currentSampleValid && isInsideTolerance &&
-            continuousFixationSeconds >= requiredContinuousSeconds;
+            continuousFixationSeconds >= requiredSteadySeconds;
         public float CurrentAngleDegrees => currentAngleDegrees;
         public float ContinuousFixationSeconds => continuousFixationSeconds;
         public float ToleranceDegrees => toleranceDegrees;
-        public float RequiredContinuousSeconds => requiredContinuousSeconds;
+        public float RequiredContinuousSeconds => requiredSteadySeconds;
         public double LastSampleRealtimeSeconds => lastSampleRealtimeSeconds;
         public float ValidSampleFraction => totalSampleCount > 0
             ? (float)validSampleCount / totalSampleCount
@@ -284,7 +286,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         private void OnValidate()
         {
             toleranceDegrees = Mathf.Clamp(toleranceDegrees, 0.1f, 15f);
-            requiredContinuousSeconds = Mathf.Max(0f, requiredContinuousSeconds);
+            requiredSteadySeconds = Mathf.Max(0f, requiredSteadySeconds);
         }
     }
 }

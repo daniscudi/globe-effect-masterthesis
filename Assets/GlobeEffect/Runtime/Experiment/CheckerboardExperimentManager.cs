@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using GlobeEffect.VRCheckerboard.EyeTracking;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.InputSystem;
 
 namespace GlobeEffect.VRCheckerboard.Experiment
@@ -52,7 +53,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         //
         // Danach wird die Antwort gespeichert. Hat die Person danebengeschaut,
         // kommt derselbe Durchgang ganz hinten noch einmal in die Warteschlange.
-        [Header("Referenzen")]
+        [Header("References")]
         [SerializeField]
         private VrCheckerboardStimulus stimulus;
 
@@ -65,7 +66,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [SerializeField]
         private CheckerboardFixationMonitor fixationMonitor;
 
-        [Header("Sitzung")]
+        [Header("Session")]
         [SerializeField]
         [Tooltip("Kennung der Versuchsperson. Hier gehören keine echten Namen rein, sondern zum Beispiel pilot_001.")]
         private string participantId = "pilot_001";
@@ -83,11 +84,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         [SerializeField]
         private bool autoStartOnPlay;
+        [Header("Trial Plan")]
 
-        [Header("Trialplan")]
+        [FormerlySerializedAs("angularDiametersDegrees")]
         [SerializeField]
         [Tooltip("Wie groß der runde Ausschnitt sein soll, in Grad. Es können auch mehrere Werte drinstehen, dann wird jeder davon gezeigt.")]
-        private List<float> angularDiametersDegrees = new() { 90f };
+        private List<float> fieldOfViewValues = new() { 90f };
 
         [SerializeField]
         [Tooltip("Auf welchen Augen gezeigt wird: beide, nur links oder nur rechts.")]
@@ -109,45 +111,53 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             0.2f
         };
 
+        [FormerlySerializedAs("repetitionsPerCondition")]
         [SerializeField, Min(1)]
         [Tooltip("Wie oft jede Kombination gezeigt wird. Mehr Wiederholungen heißt sicherere Ergebnisse, aber auch eine längere Sitzung.")]
-        private int repetitionsPerCondition = 3;
+        private int repeatsPerCondition = 3;
 
-        [Header("Fixation und Wiederholung")]
+        [Header("Fixation And Repeats")]
         [SerializeField]
         [Tooltip("Das Muster kommt erst, wenn der Blick ruhig auf dem Kreuz liegt, und wird dabei auch weiter überwacht. Für eine echte Messung muss das an sein.")]
         private bool requireFixation = true;
 
+        [FormerlySerializedAs("maximumOffTargetSeconds")]
         [SerializeField, Min(0f)]
         [Tooltip("So lange darf die Person am Stück vom Kreuz wegschauen. Danach wird der Durchgang ungültig.")]
-        private float maximumOffTargetSeconds = 0.15f;
+        private float maxLookAwaySeconds = 0.15f;
 
+        [FormerlySerializedAs("maximumInvalidGazeSeconds")]
         [SerializeField, Min(0f)]
         [Tooltip("So lange darf am Stück gar kein brauchbarer Blickwert kommen, zum Beispiel beim Blinzeln.")]
-        private float maximumInvalidGazeSeconds = 0.2f;
+        private float maxNoDataSeconds = 0.2f;
 
+        [FormerlySerializedAs("maximumGazeSampleAgeSeconds")]
         [SerializeField, Min(0.01f)]
         [Tooltip("Ist der letzte Blickwert älter als das hier, gilt er als nicht mehr aktuell und zählt wie gar kein Wert.")]
-        private float maximumGazeSampleAgeSeconds = 0.1f;
+        private float maxSampleAgeSeconds = 0.1f;
 
+        [FormerlySerializedAs("maximumAttemptsPerTrial")]
         [SerializeField, Min(0)]
         [Tooltip("Wie oft derselbe Durchgang höchstens wiederholt werden darf. 0 heißt: so lange, bis es klappt.")]
-        private int maximumAttemptsPerTrial;
+        private int maxRepeatsPerTrial;
+        [Header("Timing")]
 
-        [Header("Ablauf")]
+        [FormerlySerializedAs("stimulusDurationSeconds")]
         [SerializeField, Min(0.01f)]
         [Tooltip("Wie lange das Schachbrett zu sehen ist. 0,6 sind 600 Millisekunden.")]
-        private float stimulusDurationSeconds = 0.6f;
+        private float patternSeconds = 0.6f;
 
+        [FormerlySerializedAs("responseTimeoutSeconds")]
         [SerializeField, Min(0f)]
         [Tooltip("Wie lange die Person ab der Noise-Maske Zeit zum Antworten hat. 0 heißt: unbegrenzt.")]
-        private float responseTimeoutSeconds = 5f;
+        private float answerTimeoutSeconds = 5f;
 
+        [FormerlySerializedAs("postResponseNoiseSeconds")]
         [SerializeField, Min(0f)]
         [Tooltip("Zusätzliche Noise-Maske nach der Antwort. Normalerweise 0 lassen, dann beginnt direkt die Fixation für den nächsten Durchgang.")]
-        private float postResponseNoiseSeconds;
+        private float extraNoiseSeconds;
 
-        [Header("Antwortkategorien und Tasten")]
+        [Header("Response Keys")]
         [SerializeField]
         private Key convexResponseKey = Key.UpArrow;
 
@@ -162,15 +172,17 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [Tooltip("Aus: Trigger = nach außen. An: Trigger = nach innen. Vor einer Sitzung einstellen und währenddessen nicht ändern.")]
         private bool swapResponseButtons;
 
+        [FormerlySerializedAs("categoryAResponseText")]
         [SerializeField]
         [Tooltip("Wie diese Antwort der Person genannt wird. Gespeichert wird sie im Code und in der CSV weiter als Convex.")]
-        private string categoryAResponseText = "CATEGORY A";
+        private string categoryALabel = "CATEGORY A";
 
+        [FormerlySerializedAs("categoryBResponseText")]
         [SerializeField]
         [Tooltip("Wie diese Antwort der Person genannt wird. Gespeichert wird sie im Code und in der CSV weiter als Concave.")]
-        private string categoryBResponseText = "CATEGORY B";
+        private string categoryBLabel = "CATEGORY B";
 
-        [Header("Welcome und Training")]
+        [Header("Welcome And Training")]
         [SerializeField]
         [Tooltip("Taste, mit der vom Startbildschirm aus das Training losgeht.")]
         private Key trainingKey = Key.T;
@@ -183,17 +195,20 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [Tooltip("Ist das an, geht der Versuch erst los, wenn das Training einmal komplett durchlaufen wurde.")]
         private bool requireTrainingBeforeSession = true;
 
+        [FormerlySerializedAs("trainingCategoryAVisualSpaceL")]
         [SerializeField, Range(0f, 1.4f)]
         [Tooltip("Das deutliche Beispiel für Category A im Training. Der Wert sollte klar zu erkennen sein und trotzdem im Bereich liegen, der später im Versuch vorkommt.")]
-        private float trainingCategoryAVisualSpaceL = 1.2f;
+        private float trainingExampleA = 1.2f;
 
+        [FormerlySerializedAs("trainingCategoryBVisualSpaceL")]
         [SerializeField, Range(0f, 1.4f)]
         [Tooltip("Das deutliche Beispiel für Category B im Training. Der Wert sollte klar zu erkennen sein und trotzdem im Bereich liegen, der später im Versuch vorkommt.")]
-        private float trainingCategoryBVisualSpaceL = 0.2f;
+        private float trainingExampleB = 0.2f;
 
+        [FormerlySerializedAs("trainingVisualSpaceLValues")]
         [SerializeField]
         [Tooltip("Die l-Werte für die Übungsdurchgänge. Jeder kommt gleich oft dran, und es gibt keine Rückmeldung, ob die Antwort stimmte.")]
-        private List<float> trainingVisualSpaceLValues = new()
+        private List<float> trainingLValues = new()
         {
             0.2f,
             0.4f,
@@ -201,30 +216,34 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             1.2f
         };
 
+        [FormerlySerializedAs("trainingRepetitionsPerValue")]
         [SerializeField, Min(1)]
         [Tooltip("Wie oft jeder Übungswert im Training drankommt.")]
-        private int trainingRepetitionsPerValue = 3;
+        private int trainingRepeatsPerValue = 3;
 
+        [FormerlySerializedAs("trainingExampleStimulusSeconds")]
         [SerializeField, Min(0.1f)]
         [Tooltip("Wie lange die beiden deutlichen Beispiele für Category A und B gezeigt werden. Die normalen Übungsdurchgänge bleiben so kurz wie im richtigen Experiment.")]
-        private float trainingExampleStimulusSeconds = 2f;
+        private float trainingExampleSeconds = 2f;
 
+        [FormerlySerializedAs("trainingExampleNoiseSeconds")]
         [SerializeField, Min(0f)]
         [Tooltip("Wie lange die Noise-Maske nach den beiden Beispielen zu sehen ist.")]
-        private float trainingExampleNoiseSeconds = 0.5f;
+        private float trainingNoiseSeconds = 0.5f;
 
+        [FormerlySerializedAs("trainingFixationSecondsWithoutEyeTracking")]
         [SerializeField, Min(0f)]
         [Tooltip("Wie lange im Training nur das Kreuz gezeigt wird, wenn die Blickkontrolle aus ist. Dann kann ja nicht gemessen werden, ob der Blick ruhig liegt.")]
-        private float trainingFixationSecondsWithoutEyeTracking = 0.5f;
+        private float trainingFixationSeconds = 0.5f;
 
-        [Header("Tasten")]
+        [Header("Keys")]
         [SerializeField]
         private Key startSessionKey = Key.F5;
 
         [SerializeField]
         private Key abortSessionKey = Key.F6;
 
-        [Header("Laufzeitstatus (nur Anzeige)")]
+        [Header("Runtime Status (Read Only)")]
         [SerializeField]
         private CheckerboardSessionState sessionState = CheckerboardSessionState.Idle;
 
@@ -532,13 +551,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
                 presentationIndex++;
                 float exampleL = example == CheckerboardCurvatureResponse.Convex
-                    ? trainingCategoryAVisualSpaceL
-                    : trainingCategoryBVisualSpaceL;
+                    ? trainingExampleA
+                    : trainingExampleB;
                 yield return ShowTrainingPattern(
                     exampleL,
                     unchecked(randomSeed + 50000 + presentationIndex),
                     leaveNoiseVisible: false,
-                    patternDurationSeconds: trainingExampleStimulusSeconds);
+                    patternDurationSeconds: trainingExampleSeconds);
                 if (!IsTrainingActive)
                 {
                     yield break;
@@ -563,14 +582,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "Answer while the noise is visible.\n" +
                 "Keep looking at the cross.\n\n" +
                 "{1} = CONTINUE",
-                stimulusDurationSeconds * 1000f,
+                patternSeconds * 1000f,
                 CheckerboardKeyboardController.GetReadableKeyName(
                     continueTrainingKey)));
             yield return WaitForTrainingAdvance();
 
             List<float> practiceTrials = BuildTrainingLOrder(
-                trainingVisualSpaceLValues,
-                trainingRepetitionsPerValue,
+                trainingLValues,
+                trainingRepeatsPerValue,
                 unchecked(randomSeed ^ 0x51F15EED));
             foreach (float practiceL in practiceTrials)
             {
@@ -579,7 +598,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     practiceL,
                     unchecked(randomSeed + 60000 + presentationIndex),
                     leaveNoiseVisible: true,
-                    patternDurationSeconds: stimulusDurationSeconds);
+                    patternDurationSeconds: patternSeconds);
                 if (!IsTrainingActive)
                 {
                     yield break;
@@ -588,8 +607,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 trainingResponseReceived = false;
                 sessionState = CheckerboardSessionState.TrainingWaitingForResponse;
 
-                double responseDeadline = responseTimeoutSeconds > 0f
-                    ? Time.realtimeSinceStartupAsDouble + responseTimeoutSeconds
+                double responseDeadline = answerTimeoutSeconds > 0f
+                    ? Time.realtimeSinceStartupAsDouble + answerTimeoutSeconds
                     : double.PositiveInfinity;
                 while (IsTrainingActive &&
                        !trainingResponseReceived &&
@@ -598,12 +617,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     yield return null;
                 }
 
-                if (postResponseNoiseSeconds > 0f)
+                if (extraNoiseSeconds > 0f)
                 {
                     int postResponseNoiseSeed = unchecked(
                         randomSeed + 70000 + presentationIndex * 1879);
                     stimulus.ShowNoise(postResponseNoiseSeed);
-                    yield return WaitForTrainingSeconds(postResponseNoiseSeconds);
+                    yield return WaitForTrainingSeconds(extraNoiseSeconds);
                 }
             }
 
@@ -639,10 +658,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     yield return null;
                 }
             }
-            else if (trainingFixationSecondsWithoutEyeTracking > 0f)
+            else if (trainingFixationSeconds > 0f)
             {
                 yield return WaitForTrainingSeconds(
-                    trainingFixationSecondsWithoutEyeTracking);
+                    trainingFixationSeconds);
             }
 
             if (!IsTrainingActive)
@@ -660,9 +679,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             sessionState = CheckerboardSessionState.TrainingNoise;
             stimulus.ShowNoise(noiseSeed);
-            if (!leaveNoiseVisible && trainingExampleNoiseSeconds > 0f)
+            if (!leaveNoiseVisible && trainingNoiseSeconds > 0f)
             {
-                yield return WaitForTrainingSeconds(trainingExampleNoiseSeconds);
+                yield return WaitForTrainingSeconds(trainingNoiseSeconds);
             }
         }
 
@@ -692,9 +711,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // Im Training soll alles genauso aussehen wie später im Versuch.
             // Deshalb werden FOV, Augenmodus und Zoom aus der ersten echten
             // Bedingung übernommen. Nur l wird durch den Übungswert ersetzt.
-            if (angularDiametersDegrees != null && angularDiametersDegrees.Count > 0)
+            if (fieldOfViewValues != null && fieldOfViewValues.Count > 0)
             {
-                stimulus.SetAngularDiameter(angularDiametersDegrees[0]);
+                stimulus.SetAngularDiameter(fieldOfViewValues[0]);
             }
 
             if (eyePresentations != null && eyePresentations.Count > 0)
@@ -748,7 +767,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "{3} = SHOW",
                 GetCategoryLabel(response),
                 GetCategoryDescription(response),
-                trainingExampleStimulusSeconds,
+                trainingExampleSeconds,
                 CheckerboardKeyboardController.GetReadableKeyName(
                     continueTrainingKey));
         }
@@ -763,8 +782,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private string GetCategoryLabel(CheckerboardCurvatureResponse response)
         {
             return response == CheckerboardCurvatureResponse.Convex
-                ? categoryAResponseText
-                : categoryBResponseText;
+                ? categoryALabel
+                : categoryBLabel;
         }
 
         public bool StartSession()
@@ -813,10 +832,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             try
             {
                 trialPlan = CheckerboardTrialPlanner.CreateRandomizedPlan(
-                    angularDiametersDegrees,
+                    fieldOfViewValues,
                     eyePresentations,
                     visualSpaceLValues,
-                    repetitionsPerCondition,
+                    repeatsPerCondition,
                     randomSeed);
                 trialQueue = new CheckerboardTrialQueue(trialPlan);
 
@@ -831,9 +850,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 experimentFiles.WritePlan(
                     trialPlan,
                     stimulus.GridLineSpacingDegrees,
-                    stimulusDurationSeconds,
-                    postResponseNoiseSeconds,
-                    responseTimeoutSeconds,
+                    patternSeconds,
+                    extraNoiseSeconds,
+                    answerTimeoutSeconds,
                     ConvexResponseKeyName,
                     ConcaveResponseKeyName,
                     ResponseKeysSwapped);
@@ -981,7 +1000,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 currentTrial.AngularDiameterDegrees,
                 currentTrial.VisualSpaceL,
                 currentTrial.AttemptNumber,
-                stimulusDurationSeconds),
+                patternSeconds),
                 this);
         }
 
@@ -989,7 +1008,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             // Das Muster ist bei allen Personen exakt gleich lange zu sehen.
             // Sonst könnte man die Antworten hinterher nicht vergleichen.
-            yield return new WaitForSecondsRealtime(stimulusDurationSeconds);
+            yield return new WaitForSecondsRealtime(patternSeconds);
             if (sessionState != CheckerboardSessionState.RunningTrial ||
                 currentTrial != presentedTrial)
             {
@@ -1018,15 +1037,15 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 presentedTrial.SequenceIndex,
                 presentedTrial.AttemptNumber,
                 noiseSeed,
-                responseTimeoutSeconds));
+                answerTimeoutSeconds));
 
-            if (responseTimeoutSeconds <= 0f)
+            if (answerTimeoutSeconds <= 0f)
             {
                 presentationCoroutine = null;
                 yield break;
             }
 
-            yield return new WaitForSecondsRealtime(responseTimeoutSeconds);
+            yield return new WaitForSecondsRealtime(answerTimeoutSeconds);
             if (sessionState == CheckerboardSessionState.WaitingForResponse &&
                 currentTrial == presentedTrial)
             {
@@ -1101,7 +1120,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             float delta = Time.unscaledDeltaTime;
             bool sampleRecent = fixationMonitor.HasRecentSample(
-                maximumGazeSampleAgeSeconds);
+                maxSampleAgeSeconds);
 
             if (!sampleRecent || !fixationMonitor.CurrentSampleValid)
             {
@@ -1126,11 +1145,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 longestInvalidGazeSeconds,
                 currentInvalidGazeSeconds);
 
-            if (currentOffTargetSeconds > maximumOffTargetSeconds)
+            if (currentOffTargetSeconds > maxLookAwaySeconds)
             {
                 InvalidateCurrentTrial("off_target");
             }
-            else if (currentInvalidGazeSeconds > maximumInvalidGazeSeconds)
+            else if (currentInvalidGazeSeconds > maxNoDataSeconds)
             {
                 InvalidateCurrentTrial("invalid_gaze_data");
             }
@@ -1179,8 +1198,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 longestInvalidGazeSeconds));
             TrialEnded?.Invoke(result);
 
-            bool attemptLimitReached = maximumAttemptsPerTrial > 0 &&
-                invalidTrial.AttemptNumber >= maximumAttemptsPerTrial;
+            bool attemptLimitReached = maxRepeatsPerTrial > 0 &&
+                invalidTrial.AttemptNumber >= maxRepeatsPerTrial;
             if (attemptLimitReached)
             {
                 stimulus.Hide();
@@ -1291,7 +1310,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             currentTrial = null;
             sessionState = CheckerboardSessionState.InterTrial;
 
-            if (postResponseNoiseSeconds <= 0f)
+            if (extraNoiseSeconds <= 0f)
             {
                 BeginNextAttempt();
             }
@@ -1306,7 +1325,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private IEnumerator BeginNextAttemptAfterDelay()
         {
-            yield return new WaitForSecondsRealtime(postResponseNoiseSeconds);
+            yield return new WaitForSecondsRealtime(extraNoiseSeconds);
             BeginNextAttempt();
         }
 
@@ -1326,7 +1345,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 CultureInfo.InvariantCulture,
                 "PostTrialNoiseStarted;presentation={0};duration_s={1:F4};seed={2}",
                 presentationCount,
-                postResponseNoiseSeconds,
+                extraNoiseSeconds,
                 postResponseNoiseSeed));
         }
 
@@ -1396,9 +1415,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 trialPlan.Count,
                 sessionStartUtc.ToString("O", CultureInfo.InvariantCulture),
                 VisualSpaceRadialMapping.MappingVersion,
-                stimulusDurationSeconds,
-                postResponseNoiseSeconds,
-                responseTimeoutSeconds,
+                patternSeconds,
+                extraNoiseSeconds,
+                answerTimeoutSeconds,
                 ConvexResponseKeyName,
                 ConcaveResponseKeyName,
                 ResponseKeysSwapped ? 1 : 0));
@@ -1534,9 +1553,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 stimulus.GridLineSpacingDegrees,
                 stimulus.GridLineSpacingUv,
                 trial.VisualSpaceL,
-                stimulusDurationSeconds,
-                postResponseNoiseSeconds,
-                responseTimeoutSeconds,
+                patternSeconds,
+                extraNoiseSeconds,
+                answerTimeoutSeconds,
                 ConvexResponseKeyName,
                 ConcaveResponseKeyName,
                 ResponseKeysSwapped ? 1 : 0);
@@ -1625,40 +1644,40 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void OnValidate()
         {
-            repetitionsPerCondition = Mathf.Max(1, repetitionsPerCondition);
-            stimulusDurationSeconds = Mathf.Max(0.01f, stimulusDurationSeconds);
-            responseTimeoutSeconds = Mathf.Max(0f, responseTimeoutSeconds);
-            trainingCategoryAVisualSpaceL = Mathf.Clamp(
-                trainingCategoryAVisualSpaceL,
+            repeatsPerCondition = Mathf.Max(1, repeatsPerCondition);
+            patternSeconds = Mathf.Max(0.01f, patternSeconds);
+            answerTimeoutSeconds = Mathf.Max(0f, answerTimeoutSeconds);
+            trainingExampleA = Mathf.Clamp(
+                trainingExampleA,
                 0f,
                 1.4f);
-            trainingCategoryBVisualSpaceL = Mathf.Clamp(
-                trainingCategoryBVisualSpaceL,
+            trainingExampleB = Mathf.Clamp(
+                trainingExampleB,
                 0f,
                 1.4f);
-            trainingRepetitionsPerValue = Mathf.Max(1, trainingRepetitionsPerValue);
-            trainingExampleNoiseSeconds = Mathf.Max(0f, trainingExampleNoiseSeconds);
-            if (trainingVisualSpaceLValues != null)
+            trainingRepeatsPerValue = Mathf.Max(1, trainingRepeatsPerValue);
+            trainingNoiseSeconds = Mathf.Max(0f, trainingNoiseSeconds);
+            if (trainingLValues != null)
             {
-                for (int index = 0; index < trainingVisualSpaceLValues.Count; index++)
+                for (int index = 0; index < trainingLValues.Count; index++)
                 {
-                    trainingVisualSpaceLValues[index] = Mathf.Clamp(
-                        trainingVisualSpaceLValues[index],
+                    trainingLValues[index] = Mathf.Clamp(
+                        trainingLValues[index],
                         0f,
                         1.4f);
                 }
             }
-            trainingFixationSecondsWithoutEyeTracking = Mathf.Max(
+            trainingFixationSeconds = Mathf.Max(
                 0f,
-                trainingFixationSecondsWithoutEyeTracking);
-            maximumOffTargetSeconds = Mathf.Max(0f, maximumOffTargetSeconds);
-            maximumInvalidGazeSeconds = Mathf.Max(0f, maximumInvalidGazeSeconds);
-            maximumGazeSampleAgeSeconds = Mathf.Max(0.01f, maximumGazeSampleAgeSeconds);
-            maximumAttemptsPerTrial = Mathf.Max(0, maximumAttemptsPerTrial);
-            trainingExampleStimulusSeconds = Mathf.Max(
+                trainingFixationSeconds);
+            maxLookAwaySeconds = Mathf.Max(0f, maxLookAwaySeconds);
+            maxNoDataSeconds = Mathf.Max(0f, maxNoDataSeconds);
+            maxSampleAgeSeconds = Mathf.Max(0.01f, maxSampleAgeSeconds);
+            maxRepeatsPerTrial = Mathf.Max(0, maxRepeatsPerTrial);
+            trainingExampleSeconds = Mathf.Max(
                 0.1f,
-                trainingExampleStimulusSeconds);
-            postResponseNoiseSeconds = Mathf.Max(0f, postResponseNoiseSeconds);
+                trainingExampleSeconds);
+            extraNoiseSeconds = Mathf.Max(0f, extraNoiseSeconds);
         }
     }
 }

@@ -43,7 +43,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 stimulus.SetAngularDiameter(70f);
                 stimulus.SetApertureEdgeSoftness(0f);
                 var settings = new SerializedObject(stimulus);
-                settings.FindProperty("noiseCellSizeDegrees").floatValue = cellSize;
+                settings.FindProperty("noiseSizeDegrees").floatValue = cellSize;
                 settings.ApplyModifiedPropertiesWithoutUndo();
 
                 // Zwei benachbarte große Zahlen dürfen nicht zum gleichen Float

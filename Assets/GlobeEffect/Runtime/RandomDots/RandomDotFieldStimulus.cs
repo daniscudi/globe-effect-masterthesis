@@ -38,8 +38,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         // Wie wenige und wie viele Punkte erlaubt sind. Die beiden Zahlen stehen
         // absichtlich nur hier, damit der Regler im Inspector und die Prüfungen
         // weiter unten nie auseinanderlaufen.
-        private const int MinimumDotCount = 100;
-        private const int MaximumDotCount = 60000;
+        public const int MinimumDotCount = 100;
+        public const int MaximumDotCount = 60000;
 
         // Wie klein und wie groß der Zoom sein darf. Die beiden Zahlen stehen
         // nur hier, damit der Regler im Inspector, die Set-Methode und die
@@ -49,34 +49,38 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public const float MinimumInstrumentMagnification = 1f;
         public const float MaximumInstrumentMagnification = 20f;
 
-        [Header("Beobachter und Punktfeld")]
+        [Header("Observer And Dot Field")]
         [SerializeField]
         [Tooltip("Der Kopf im XR-Rig, also normalerweise die Main Camera.")]
         private Transform observer;
 
+        [FormerlySerializedAs("angularDiameterDegrees")]
         [SerializeField, Range(5f, 170f)]
         [Tooltip("Scheinbarer Winkeldurchmesser des sichtbaren Fernglasfelds im HMD, in Grad.")]
-        private float angularDiameterDegrees = 90f;
+        private float fieldOfViewDegrees = 90f;
 
+        [FormerlySerializedAs("apertureEdgeSoftnessDegrees")]
         [SerializeField, Range(0f, 10f)]
         [Tooltip("Wie weich der Rand des Kreises nach innen ausläuft. 0 gibt eine harte Kante.")]
-        private float apertureEdgeSoftnessDegrees = 1f;
+        private float edgeSoftnessDegrees = 1f;
 
         [SerializeField, Min(MinimumRadiusMeters)]
         [Tooltip("Nur die technische Größe des Meshes. Der Shader zeichnet Richtungen, deshalb sieht man diesen Abstand nicht als Entfernung.")]
         private float fieldRadiusMeters = 5f;
 
+        [FormerlySerializedAs("worldCoverageDiameterDegrees")]
         [SerializeField, Range(20f, 170f)]
         [Tooltip("Winkeldurchmesser der erzeugten Außenwelt vor der Instrumentenabbildung. Der Experiment Manager erweitert ihn bei Bedarf automatisch für FOV, m, k und Schwenkweite.")]
-        private float worldCoverageDiameterDegrees = 20f;
+        private float worldCoverageDegrees = 40.6f;
 
         [SerializeField, Range(MinimumDotCount, MaximumDotCount)]
         [Tooltip("Wie viele Punkte erzeugt werden.")]
-        private int dotCount = 4000;
+        private int dotCount = 24500;
 
+        [FormerlySerializedAs("dotAngularDiameterDegrees")]
         [SerializeField, Range(0.02f, 2f)]
         [Tooltip("Wie groß ein einzelner Punkt ist, in Grad.")]
-        private float dotAngularDiameterDegrees = 0.22f;
+        private float dotSizeDegrees = 0.22f;
 
         [SerializeField]
         [Tooltip("Gleicher Seed heißt: dieselben Punkte an denselben Stellen in denselben Farben.")]
@@ -88,11 +92,15 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [SerializeField]
         private Color lightColor = Color.white;
 
+        [SerializeField]
+        [Tooltip("Neutrales Grau innerhalb der kreisförmigen Fernglasöffnung. Außerhalb bleibt der Kamerahintergrund schwarz.")]
+        private Color fieldBackgroundColor = Color.gray;
+
         [SerializeField, Range(0f, 1f)]
         [Tooltip("Wie viele Punkte hell sind. 0,5 heißt halb schwarz und halb weiß.")]
         private float lightDotFraction = 0.5f;
 
-        [Header("Merlitz-Instrumentenabbildung")]
+        [Header("Merlitz Instrument Optics")]
         [FormerlySerializedAs("merlitzK")]
         [FormerlySerializedAs("visualSpaceL")]
         [SerializeField, Range(0f, 1.4f)]
@@ -113,34 +121,35 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private CheckerboardEyePresentation eyePresentation =
             CheckerboardEyePresentation.BothEyes;
 
-        [Header("Fixationsziel")]
+        [Header("Fixation Target")]
         [SerializeField]
         private bool showFixationTarget = true;
 
+        [FormerlySerializedAs("fixationTargetSizeDegrees")]
         [SerializeField, Range(0.05f, 3f)]
-        private float fixationTargetSizeDegrees = 0.5f;
+        private float fixationSizeDegrees = 0.5f;
 
         [SerializeField]
         private Color fixationColor = Color.red;
 
-        [Header("Bewegung (Vorschau und Laufzeitstatus)")]
+        [Header("Motion (Preview And Runtime Status)")]
         [SerializeField]
         private RandomDotMotionMode motionMode = RandomDotMotionMode.SimulatedYaw;
 
         [SerializeField, Range(0.1f, 30f)]
         [Tooltip("Wie weit die Bewegung zu jeder Seite geht. Beim Start einer Sitzung überschreibt der Experiment Manager diesen Wert.")]
-        private float simulatedYawAmplitudeDegrees = 5f;
+        private float simulatedYawAmplitudeDegrees = 2f;
 
         [SerializeField, Range(0.1f, 60f)]
         [Tooltip("Wie schnell die Bewegung läuft, in Grad pro Sekunde. Beim Start einer Sitzung überschreibt der Experiment Manager diesen Wert.")]
-        private float simulatedYawSpeedDegreesPerSecond = 5f;
+        private float simulatedYawSpeedDegreesPerSecond = 1.2f;
 
         [SerializeField]
         [Tooltip("Zu welcher Seite die Bewegung zuerst losgeht.")]
         private RandomDotSweepDirection sweepDirection =
             RandomDotSweepDirection.RightFirst;
 
-        [Header("Darstellung und Technik")]
+        [Header("Display And Advanced")]
         [SerializeField]
         private bool visibleAtStart = true;
 
@@ -155,6 +164,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private MaterialPropertyBlock propertyBlock;
         private bool isVisible = true;
         private bool pointsVisible = true;
+        private bool meshRebuildPending;
 
         // Ab wann die Bewegung läuft. Daraus wird ausgerechnet, wo sie gerade steht.
         private double motionStartSeconds;
@@ -178,10 +188,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         // Diese Werte kann man von außen nur lesen. Geändert werden sie im
         // Inspector oder über die Set-Methoden weiter unten.
-        public float AngularDiameterDegrees => angularDiameterDegrees;
-        public float ApertureEdgeSoftnessDegrees => apertureEdgeSoftnessDegrees;
+        public float AngularDiameterDegrees => fieldOfViewDegrees;
+        public float ApertureEdgeSoftnessDegrees => edgeSoftnessDegrees;
         public float FieldRadiusMeters => fieldRadiusMeters;
-        public float WorldCoverageDiameterDegrees => worldCoverageDiameterDegrees;
+        public float WorldCoverageDiameterDegrees => worldCoverageDegrees;
         public int DotCount => dotCount;
         public int RandomSeed => randomSeed;
         public float InstrumentDistortionK => instrumentDistortionK;
@@ -262,6 +272,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             Application.onBeforeRender -= UpdateBeforeRendering;
             Application.onBeforeRender += UpdateBeforeRendering;
             ClampInspectorValues();
+            meshRebuildPending = false;
             SetupMeshAndMaterial(rebuildMesh: true);
             isVisible = Application.isPlaying ? visibleAtStart : true;
             pointsVisible = true;
@@ -278,20 +289,22 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private void OnValidate()
         {
             // OnValidate läuft im Editor, sobald man im Inspector etwas ändert.
-            // Das Punkt-Mesh wird deshalb gleich mit den neuen Werten neu gebaut.
+            // Unity verbietet dort aber das sofortige Löschen des bisherigen
+            // Meshes. Deshalb wird der Neuaufbau für den nächsten normalen
+            // Editor-/Game-Loop vorgemerkt.
             ClampInspectorValues();
             if (!isActiveAndEnabled)
             {
                 return;
             }
 
-            SetupMeshAndMaterial(rebuildMesh: true);
-            SendValuesToShader();
-            ShowOrHideRenderer();
+            meshRebuildPending = true;
         }
 
         private void LateUpdate()
         {
+            RebuildMeshIfPending();
+
             // Kopfposition und Schwenkwinkel ändern sich dauernd. Beide werden
             // deshalb in jedem Frame neu weitergegeben.
             FollowHeadDuringSimulatedSweep();
@@ -320,6 +333,19 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             // Dann wird auch wirklich mit dieser neuen Position gezeichnet.
             FollowHeadDuringSimulatedSweep();
             SendFrameValuesToShader();
+        }
+
+        private void RebuildMeshIfPending()
+        {
+            if (!meshRebuildPending || !isActiveAndEnabled)
+            {
+                return;
+            }
+
+            meshRebuildPending = false;
+            SetupMeshAndMaterial(rebuildMesh: true);
+            SendValuesToShader();
+            ShowOrHideRenderer();
         }
 
         public void SetInstrumentDistortionK(float value)
@@ -360,14 +386,14 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public void SetAngularDiameter(float value)
         {
             // Wie groß der sichtbare runde Ausschnitt ist, in Grad.
-            angularDiameterDegrees = Mathf.Clamp(value, 5f, 170f);
+            fieldOfViewDegrees = Mathf.Clamp(value, 5f, 170f);
             SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
         public void SetApertureEdgeSoftness(float value)
         {
-            apertureEdgeSoftnessDegrees = Mathf.Clamp(value, 0f, 10f);
+            edgeSoftnessDegrees = Mathf.Clamp(value, 0f, 10f);
             SendValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
@@ -420,7 +446,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             // liegen jetzt woanders. Deshalb muss das Mesh komplett neu gebaut werden.
             dotCount = Mathf.Clamp(newDotCount, MinimumDotCount, MaximumDotCount);
             randomSeed = newRandomSeed;
-            worldCoverageDiameterDegrees = Mathf.Clamp(
+            worldCoverageDegrees = Mathf.Clamp(
                 newCoverageDiameterDegrees,
                 20f,
                 170f);
@@ -508,10 +534,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 timestampSeconds = Time.realtimeSinceStartupAsDouble,
                 visible = isVisible,
                 pointsVisible = pointsVisible,
-                angularDiameterDegrees = angularDiameterDegrees,
-                apertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees,
+                angularDiameterDegrees = fieldOfViewDegrees,
+                apertureEdgeSoftnessDegrees = edgeSoftnessDegrees,
                 fieldRadiusMeters = fieldRadiusMeters,
-                worldCoverageDiameterDegrees = worldCoverageDiameterDegrees,
+                worldCoverageDiameterDegrees = worldCoverageDegrees,
                 dotCount = dotCount,
                 randomSeed = randomSeed,
                 instrumentDistortionK = instrumentDistortionK,
@@ -583,15 +609,32 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         {
             // Jeder Punkt braucht vier Ecken und zwei Dreiecke, also sechs Indizes.
             // Das Fixationskreuz läuft technisch einfach als ein Punkt mehr mit.
-            int renderedDotCount = dotCount + (showFixationTarget ? 1 : 0);
-            var vertices = new Vector3[renderedDotCount * 4];
-            var uv = new Vector2[renderedDotCount * 4];
-            var uv2 = new Vector2[renderedDotCount * 4];
-            var colors = new Color32[renderedDotCount * 4];
-            var triangles = new int[renderedDotCount * 6];
+            // Das erste Viereck ist die graue Kreisfläche hinter den Punkten.
+            // Danach folgen die eigentlichen Zufallspunkte und zuletzt optional
+            // das Fixationskreuz. Diese Reihenfolge sorgt dafür, dass Punkte und
+            // Kreuz vor dem Hintergrund gezeichnet werden.
+            int renderedElementCount = 1 + dotCount +
+                (showFixationTarget ? 1 : 0);
+            var vertices = new Vector3[renderedElementCount * 4];
+            var uv = new Vector2[renderedElementCount * 4];
+            var uv2 = new Vector2[renderedElementCount * 4];
+            var colors = new Color32[renderedElementCount * 4];
+            var triangles = new int[renderedElementCount * 6];
             var random = new System.Random(randomSeed);
 
-            float halfCoverage = 0.5f * worldCoverageDiameterDegrees * Mathf.Deg2Rad;
+            AddOneDot(
+                0,
+                Vector3.forward,
+                1f,
+                2f,
+                fieldBackgroundColor,
+                vertices,
+                uv,
+                uv2,
+                colors,
+                triangles);
+
+            float halfCoverage = 0.5f * worldCoverageDegrees * Mathf.Deg2Rad;
             float minimumCosine = Mathf.Cos(halfCoverage);
             for (int dotIndex = 0; dotIndex < dotCount; dotIndex++)
             {
@@ -613,10 +656,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                     ? lightColor
                     : darkColor;
                 AddOneDot(
-                    dotIndex,
+                    dotIndex + 1,
                     direction,
                     1f,
-                    false,
+                    0f,
                     color,
                     vertices,
                     uv,
@@ -629,10 +672,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             if (showFixationTarget)
             {
                 AddOneDot(
-                    dotCount,
+                    dotCount + 1,
                     Vector3.forward,
-                    fixationTargetSizeDegrees / dotAngularDiameterDegrees,
-                    true,
+                    fixationSizeDegrees / dotSizeDegrees,
+                    1f,
                     fixationColor,
                     vertices,
                     uv,
@@ -665,7 +708,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             int dotIndex,
             Vector3 direction,
             float sizeMultiplier,
-            bool isFixationTarget,
+            float elementKind,
             Color color,
             Vector3[] vertices,
             Vector2[] uv,
@@ -693,11 +736,11 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             uv[vertexIndex + 2] = new Vector2(1f, 1f);
             uv[vertexIndex + 3] = new Vector2(-1f, 1f);
 
-            // In uv2 steht die Größe und ob das hier das Kreuz ist. Beim Kreuz
-            // lässt der Shader die Verzerrung weg und lässt es in der Mitte stehen.
+            // In uv2 steht die Größe und die Art des Elements:
+            // 0 = Punkt, 1 = Fixationskreuz, 2 = grauer Kreis-Hintergrund.
             Vector2 sizeData = new Vector2(
                 sizeMultiplier,
-                isFixationTarget ? 1f : 0f);
+                elementKind);
             uv2[vertexIndex] = sizeData;
             uv2[vertexIndex + 1] = sizeData;
             uv2[vertexIndex + 2] = sizeData;
@@ -733,9 +776,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             propertyBlock ??= new MaterialPropertyBlock();
             meshRenderer.GetPropertyBlock(propertyBlock);
             propertyBlock.SetFloat("_ApertureHalfAngleRad",
-                0.5f * angularDiameterDegrees * Mathf.Deg2Rad);
+                0.5f * fieldOfViewDegrees * Mathf.Deg2Rad);
             propertyBlock.SetFloat("_ApertureEdgeSoftnessRad",
-                apertureEdgeSoftnessDegrees * Mathf.Deg2Rad);
+                edgeSoftnessDegrees * Mathf.Deg2Rad);
             propertyBlock.SetFloat(
                 "_InstrumentDistortionK",
                 instrumentDistortionK);
@@ -746,7 +789,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             propertyBlock.SetFloat("_EyeMode", (float)eyePresentation);
             propertyBlock.SetFloat("_DotsEnabled", pointsVisible ? 1f : 0f);
             propertyBlock.SetFloat("_DotHalfSizeRad",
-                0.5f * dotAngularDiameterDegrees * Mathf.Deg2Rad);
+                0.5f * dotSizeDegrees * Mathf.Deg2Rad);
             meshRenderer.SetPropertyBlock(propertyBlock);
             SendFrameValuesToShader();
         }
@@ -787,18 +830,18 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             // Fängt Werte ab, die jemand von Hand eingetippt hat, und alte Werte aus
             // gespeicherten Szenen. So kommen keine negativen Größen oder unmöglichen
             // Winkel in die Mesh-Erzeugung oder in den Shader.
-            angularDiameterDegrees = Mathf.Clamp(angularDiameterDegrees, 5f, 170f);
-            apertureEdgeSoftnessDegrees = Mathf.Clamp(
-                apertureEdgeSoftnessDegrees,
+            fieldOfViewDegrees = Mathf.Clamp(fieldOfViewDegrees, 5f, 170f);
+            edgeSoftnessDegrees = Mathf.Clamp(
+                edgeSoftnessDegrees,
                 0f,
                 10f);
             fieldRadiusMeters = Mathf.Max(MinimumRadiusMeters, fieldRadiusMeters);
-            worldCoverageDiameterDegrees = Mathf.Clamp(
-                worldCoverageDiameterDegrees,
+            worldCoverageDegrees = Mathf.Clamp(
+                worldCoverageDegrees,
                 20f,
                 170f);
             dotCount = Mathf.Clamp(dotCount, MinimumDotCount, MaximumDotCount);
-            dotAngularDiameterDegrees = Mathf.Clamp(dotAngularDiameterDegrees, 0.02f, 2f);
+            dotSizeDegrees = Mathf.Clamp(dotSizeDegrees, 0.02f, 2f);
             lightDotFraction = Mathf.Clamp01(lightDotFraction);
             instrumentDistortionK = Mathf.Clamp(
                 instrumentDistortionK,
@@ -812,7 +855,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 contentZoom,
                 MinimumContentZoom,
                 MaximumContentZoom);
-            fixationTargetSizeDegrees = Mathf.Clamp(fixationTargetSizeDegrees, 0.05f, 3f);
+            fixationSizeDegrees = Mathf.Clamp(fixationSizeDegrees, 0.05f, 3f);
             simulatedYawAmplitudeDegrees = Mathf.Clamp(
                 simulatedYawAmplitudeDegrees,
                 0.1f,
