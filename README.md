@@ -346,10 +346,6 @@ Die wichtigsten Einstellungen befinden sich am Objekt
 
 * `Repetitions Per Condition`: Wiederholungen jeder Kombination
 
-* `Repetitions Per Mini Block`: Wiederholungen jeder Bedingung pro Unterblock;
-  mit `25` insgesamt und `5` pro Unterblock entstehen fünf Abschnitte je
-  Bewegungsart
-
 * `Require Fixation`: Vorfixation und Kontrolle während des Musters
 
 * `Maximum Off Target Seconds`: erlaubte zusammenhängende Blickabweichung
@@ -398,18 +394,25 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
 * `Content Zoom Values`: optionaler Nach-Zoom; für die Instrumentensimulation
   normalerweise `1`
 
-* `Repetitions Per Condition`: Wiederholungen jeder Kombination
+* `Repeats Per Condition`: Wiederholungen jeder Kombination
 
-* `Motion Duration Seconds`: sichtbare Dauer der Bewegung; der Pilotwert beträgt
+* `Repeats Per Block`: Wiederholungen jeder Bedingung pro Unterblock;
+  mit `25` insgesamt und `5` pro Unterblock entstehen fünf Abschnitte je
+  Bewegungsart
+
+* `Motion Seconds`: sichtbare Dauer der Bewegung; der Pilotwert beträgt
   `5 s`
 
 * `Sweep Amplitude Degrees`: Zielschwenkweite je Seite; für `10x` zunächst `2°`
 
-* `Sweep Speed Degrees Per Second`: reale Instrument-/Kopfgeschwindigkeit;
+* `Sweep Speed`: reale Instrument-/Kopfgeschwindigkeit;
   für `10x` zunächst `1,2°/s`, entsprechend ungefähr `12°/s` in der Bildmitte
 
-* `Motion Modes`: Reihenfolge der getrennten Bewegungsblöcke; für die Hälfte der
-  Personen `Simulated Yaw` vor `Head Tracked`, für die andere Hälfte umgekehrt
+* `Motion Modes`: Basisreihenfolge der getrennten Bewegungsblöcke
+
+* `Counterbalance Motion Block Order By Participant Id`: kehrt diese Reihenfolge
+  automatisch für jede zweite fortlaufende Versuchsperson um (`pilot_001` Basis,
+  `pilot_002` umgekehrt)
 
 * `Head Tracked Coverage Yaw Degrees`: unsichtbarer Sicherheitspuffer der
   Punktwelt; voreingestellt auf `15°` je Seite
@@ -430,6 +433,12 @@ Schwenks wird über die Wiederholungen möglichst gleich auf links und rechts
 verteilt. Gleiche Wiederholungen verschiedener `k`-Stufen und beider
 Bewegungsarten verwenden vergleichbare Punkt-Seeds, damit die Punktverteilung
 nicht mit einer Bedingung verwechselt wird.
+
+Nach einer Bewegungsphase verschwinden nur die Punkte. Der neutrale graue Kreis
+und das Fixationskreuz bleiben während der Antwort, zwischen den Trials und in
+den Blockpausen sichtbar. Dadurch entsteht kein Wechsel vom helleren Punktfeld
+auf einen vollständig schwarzen Bildschirm. Außerhalb der Kreisöffnung bleibt
+der Hintergrund in allen Phasen unverändert schwarz.
 
 Das sichtbare Feld hat innen einen neutralgrauen Hintergrund für symmetrischen
 Kontrast der schwarzen und weißen Punkte. Außerhalb der kreisförmigen Feldblende

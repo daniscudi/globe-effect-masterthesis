@@ -9,7 +9,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     ///
     /// Das Verfahren heißt "Methode konstanter Reize": Jede Kombination aus
     /// Instrumentenverzeichnung k und Vergrößerung m kommt gleich oft dran,
-    /// und zwar in zufälliger Reihenfolge.
+    /// und zwar in zufälliger Reihenfolge innerhalb kurzer Unterblöcke. Die
+    /// Bewegungsarten selbst bleiben als getrennte, ausbalancierte Blöcke erhalten.
     ///
     /// Die Person kann nichts einstellen. Sie sieht die Bewegung und sagt danach
     /// nur, ob es konkav oder konvex aussah.
@@ -190,6 +191,17 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 nameof(instrumentMagnificationMValues));
             RequireNonEmpty(contentZoomValues, nameof(contentZoomValues));
             RequireNonEmpty(motionModes, nameof(motionModes));
+
+            var uniqueMotionModes = new HashSet<RandomDotMotionMode>();
+            foreach (RandomDotMotionMode motionMode in motionModes)
+            {
+                if (!uniqueMotionModes.Add(motionMode))
+                {
+                    throw new ArgumentException(
+                        "Jede Bewegungsart darf nur einmal in der Blockreihenfolge stehen.",
+                        nameof(motionModes));
+                }
+            }
 
             if (repetitions < 1)
             {
@@ -498,8 +510,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// <summary>
     /// Die Warteschlange mit den Durchgängen, die noch kommen.
     ///
-    /// Ging etwas schief, wird der Durchgang ganz hinten angehängt und nicht
-    /// sofort wiederholt. Sonst käme zweimal hintereinander dasselbe Bild.
+    /// Ging etwas schief, wird der Durchgang am Ende seines Unterblocks angehängt
+    /// und nicht sofort wiederholt. Sonst käme zweimal hintereinander dasselbe Bild.
     /// </summary>
     public sealed class RandomDotTrialQueue
     {
