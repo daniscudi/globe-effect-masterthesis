@@ -122,11 +122,16 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private List<float> contentZoomValues = new() { 1f };
 
         [SerializeField]
-        [Tooltip("SimulatedYaw heißt, der Computer macht die Bewegung. Das ist der normale Fall. Bei HeadTracked dreht die Person den Kopf selbst.")]
+        [Tooltip("Basisreihenfolge der getrennten Bewegungsblöcke. SimulatedYaw heißt, der Computer macht die Bewegung; bei HeadTracked dreht die Person den Kopf selbst.")]
         private List<RandomDotMotionMode> motionModes = new()
         {
-            RandomDotMotionMode.SimulatedYaw
+            RandomDotMotionMode.SimulatedYaw,
+            RandomDotMotionMode.HeadTracked
         };
+
+        [SerializeField]
+        [Tooltip("Kehrt die Blockreihenfolge für jede zweite Versuchsperson anhand der Kennung um. pilot_001 erhält die Basisreihenfolge, pilot_002 die umgekehrte Reihenfolge.")]
+        private bool counterbalanceMotionBlockOrderByParticipantId = true;
 
         [FormerlySerializedAs("repetitionsPerCondition")]
         [SerializeField, Min(1)]
@@ -419,13 +424,15 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             try
             {
+                IReadOnlyList<RandomDotMotionMode> orderedMotionModes =
+                    BuildMotionBlockOrder();
                 trialPlan = RandomDotTrialPlanner.CreateRandomizedPlan(
                     fieldOfViewValues,
                     eyePresentations,
                     instrumentDistortionKValues,
                     instrumentMagnificationMValues,
                     contentZoomValues,
-                    motionModes,
+                    orderedMotionModes,
                     repeatsPerCondition,
                     repeatsPerBlock,
                     randomSeed,
@@ -630,7 +637,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             stimulusEndUnitySeconds = Time.realtimeSinceStartupAsDouble;
-            stimulus.Hide();
+            // Nur die Punkte ausblenden. Der graue Kreis und das Fixationskreuz
+            // bleiben stehen, damit der Wechsel zur Antwortphase keinen globalen
+            // Helligkeitssprung im Headset erzeugt.
+            stimulus.ShowFixationOnly();
             sessionState = RandomDotSessionState.WaitingForResponse;
             WriteMarker(string.Format(
                 CultureInfo.InvariantCulture,
@@ -895,10 +905,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private void FinishAttemptAndScheduleNext()
         {
             // Punkte ausblenden, kurz warten und dann den nächsten Durchgang holen.
-            // Der Bildschirm bleibt in der Pause leer, damit die vorige Bewegung
-            // nicht in die nächste hineinwirkt.
+            // Der neutrale graue Kreis bleibt durchgehend sichtbar. So wechseln
+            // weder mittlere Helligkeit noch Größe der kreisförmigen Öffnung.
             StopMotionCoroutine();
-            stimulus.Hide();
+            stimulus.ShowFixationOnly();
             RandomDotTrial finishedTrial = currentTrial;
             currentTrial = null;
 
@@ -1237,6 +1247,48 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             currentInvalidGazeSeconds = 0f;
             longestOffTargetSeconds = 0f;
             longestInvalidGazeSeconds = 0f;
+        }
+
+        private IReadOnlyList<RandomDotMotionMode> BuildMotionBlockOrder()
+        {
+            var orderedModes = new List<RandomDotMotionMode>(motionModes);
+            if (counterbalanceMotionBlockOrderByParticipantId &&
+                ShouldReverseMotionBlockOrder(participantId))
+            {
+                orderedModes.Reverse();
+            }
+
+            return orderedModes;
+        }
+
+        private static bool ShouldReverseMotionBlockOrder(string identifier)
+        {
+            string value = identifier ?? string.Empty;
+            int digitStart = value.Length;
+            while (digitStart > 0 && char.IsDigit(value[digitStart - 1]))
+            {
+                digitStart--;
+            }
+
+            if (digitStart < value.Length &&
+                long.TryParse(
+                    value.Substring(digitStart),
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out long participantNumber))
+            {
+                return (participantNumber & 1L) == 0L;
+            }
+
+            // Auch Kennungen ohne Zahl bekommen eine reproduzierbare Zuordnung.
+            uint stableHash = 2166136261u;
+            foreach (char character in value.ToUpperInvariant())
+            {
+                stableHash ^= character;
+                stableHash *= 16777619u;
+            }
+
+            return (stableHash & 1u) == 0u;
         }
 
         private void WriteMarker(string message)
