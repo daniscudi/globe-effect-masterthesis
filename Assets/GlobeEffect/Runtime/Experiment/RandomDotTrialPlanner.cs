@@ -27,7 +27,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             int repetitions,
             int repetitionsPerMiniBlock,
             int randomSeed,
-            int dotSeedBase)
+            int dotSeedBase,
+            RandomDotSweepAxis simulatedSweepAxis = RandomDotSweepAxis.Horizontal)
         {
             // Erst prüfen, ob die Werte stimmen. Lieber hier abbrechen, als mitten
             // in der Messung zu merken, dass etwas nicht passt.
@@ -136,7 +137,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                                 sweepDirection: rightFirst
                                     ? RandomDotSweepDirection.RightFirst
                                     : RandomDotSweepDirection.LeftFirst,
-                                dotSeed: dotSeed));
+                                dotSeed: dotSeed,
+                                sweepAxis: motionMode == RandomDotMotionMode.SimulatedYaw
+                                    ? simulatedSweepAxis
+                                    : RandomDotSweepAxis.Horizontal));
                         }
                     }
 
@@ -321,6 +325,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public float VisualSpaceL => InstrumentDistortionK;
         public float ContentZoom { get; }
         public RandomDotMotionMode MotionMode { get; }
+        public RandomDotSweepAxis SweepAxis { get; }
         public RandomDotSweepDirection SweepDirection { get; }
         public int DotSeed { get; }
 
@@ -338,7 +343,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             float contentZoom,
             RandomDotMotionMode motionMode,
             RandomDotSweepDirection sweepDirection,
-            int dotSeed)
+            int dotSeed,
+            RandomDotSweepAxis sweepAxis = RandomDotSweepAxis.Horizontal)
         {
             SequenceIndex = sequenceIndex;
             ConditionIndex = conditionIndex;
@@ -352,6 +358,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             InstrumentMagnificationM = instrumentMagnificationM;
             ContentZoom = contentZoom;
             MotionMode = motionMode;
+            SweepAxis = sweepAxis;
             SweepDirection = sweepDirection;
             DotSeed = dotSeed;
         }
@@ -374,7 +381,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 ContentZoom,
                 MotionMode,
                 SweepDirection,
-                DotSeed);
+                DotSeed,
+                SweepAxis);
         }
 
         public RandomDotTrial CreateRepeatedAttempt()
@@ -396,7 +404,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 ContentZoom,
                 MotionMode,
                 SweepDirection,
-                DotSeed);
+                DotSeed,
+                SweepAxis);
         }
     }
 
@@ -423,6 +432,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public float MaximumAbsoluteYawDegrees { get; }
         public float MeanAbsoluteYawSpeedDegreesPerSecond { get; }
         public float PeakAbsoluteYawSpeedDegreesPerSecond { get; }
+        public float ProfileErrorDegrees { get; }
+        public float FirstExtremeErrorDegrees { get; }
+        public float SecondExtremeErrorDegrees { get; }
         public float SweepAmplitudeDegrees { get; }
         public float SweepSpeedDegreesPerSecond { get; }
         public float ApertureEdgeSoftnessDegrees { get; }
@@ -459,6 +471,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             float maximumAbsoluteYawDegrees,
             float meanAbsoluteYawSpeedDegreesPerSecond,
             float peakAbsoluteYawSpeedDegreesPerSecond,
+            float profileErrorDegrees,
+            float firstExtremeErrorDegrees,
+            float secondExtremeErrorDegrees,
             float sweepAmplitudeDegrees,
             float sweepSpeedDegreesPerSecond,
             float apertureEdgeSoftnessDegrees,
@@ -490,6 +505,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 meanAbsoluteYawSpeedDegreesPerSecond;
             PeakAbsoluteYawSpeedDegreesPerSecond =
                 peakAbsoluteYawSpeedDegreesPerSecond;
+            ProfileErrorDegrees = profileErrorDegrees;
+            FirstExtremeErrorDegrees = firstExtremeErrorDegrees;
+            SecondExtremeErrorDegrees = secondExtremeErrorDegrees;
             SweepAmplitudeDegrees = sweepAmplitudeDegrees;
             SweepSpeedDegreesPerSecond = sweepSpeedDegreesPerSecond;
             ApertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees;

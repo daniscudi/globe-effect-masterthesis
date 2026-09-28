@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using GlobeEffect.VRCheckerboard.RandomDots;
 
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
@@ -21,7 +22,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         // Nach jedem Durchgang wird sofort geschrieben. Stürzt Unity ab, sind die
         // bisherigen Daten trotzdem da. Auch schiefgegangene Versuche kommen rein.
         public const string MappingVersion =
-            "merlitz-instrument-k-m-blocked-motion-v4";
+            "merlitz-instrument-k-m-sinusoidal-motion-axis-v6";
 
         private static readonly UTF8Encoding Utf8WithoutBom = new(false);
 
@@ -124,7 +125,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "motion_block_index,mini_block_index," +
                 "eye_presentation,angular_diameter_deg,instrument_distortion_k," +
                 "instrument_magnification_m,content_zoom,motion_mode," +
-                "sweep_direction,dot_seed");
+                "sweep_axis,sweep_direction,dot_seed");
 
             foreach (RandomDotTrial trial in trials)
             {
@@ -141,7 +142,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 AppendFloat(builder, trial.InstrumentMagnificationM);
                 AppendFloat(builder, trial.ContentZoom);
                 AppendCsv(builder, trial.MotionMode.ToString());
-                AppendCsv(builder, trial.SweepDirection.ToString());
+                AppendCsv(builder, trial.SweepAxis.ToString());
+                AppendCsv(builder, RandomDotSimulatedSweep.DirectionLabel(
+                    trial.SweepAxis, trial.SweepDirection));
                 AppendInteger(builder, trial.DotSeed, terminateRow: true);
             }
 
@@ -184,7 +187,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             AppendFloat(builder, trial.InstrumentMagnificationM);
             AppendFloat(builder, trial.ContentZoom);
             AppendCsv(builder, trial.MotionMode.ToString());
-            AppendCsv(builder, trial.SweepDirection.ToString());
+            AppendCsv(builder, trial.SweepAxis.ToString());
+            AppendCsv(builder, RandomDotSimulatedSweep.DirectionLabel(
+                trial.SweepAxis, trial.SweepDirection));
             AppendFloat(builder, result.SweepAmplitudeDegrees);
             AppendFloat(builder, result.SweepSpeedDegreesPerSecond);
             AppendInteger(builder, result.CompletedHalfSweeps);
@@ -193,6 +198,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             AppendFloat(builder, result.MaximumAbsoluteYawDegrees);
             AppendFloat(builder, result.MeanAbsoluteYawSpeedDegreesPerSecond);
             AppendFloat(builder, result.PeakAbsoluteYawSpeedDegreesPerSecond);
+            AppendFloat(builder, result.ProfileErrorDegrees);
+            AppendFloat(builder, result.FirstExtremeErrorDegrees);
+            AppendFloat(builder, result.SecondExtremeErrorDegrees);
             AppendInteger(builder, trial.DotSeed);
             AppendInteger(builder, result.DotCount);
             AppendFloat(builder, result.WorldCoverageDiameterDegrees);
@@ -223,10 +231,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "stimulus_duration_s,response_time_s,eye_presentation," +
                 "angular_diameter_deg,aperture_edge_softness_deg," +
                 "instrument_distortion_k,instrument_magnification_m," +
-                "content_zoom,motion_mode,sweep_direction,sweep_amplitude_deg," +
-                "sweep_speed_deg_per_s,completed_half_sweeps,min_yaw_deg,max_yaw_deg," +
-                "max_abs_yaw_deg,mean_abs_yaw_speed_deg_per_s," +
-                "peak_abs_yaw_speed_deg_per_s," +
+                "content_zoom,motion_mode,sweep_axis,sweep_direction,sweep_amplitude_deg," +
+                "sweep_speed_deg_per_s,completed_half_sweeps,min_sweep_deg,max_sweep_deg," +
+                "max_abs_sweep_deg,mean_abs_sweep_speed_deg_per_s," +
+                "peak_abs_sweep_speed_deg_per_s," +
+                "profile_rmse_deg,first_turn_error_deg,second_turn_error_deg," +
                 "dot_seed,dot_count,world_coverage_diameter_deg,carrier_radius_m," +
                 "response,valid_for_analysis,fixation_sample_valid," +
                 "fixation_inside_tolerance,fixation_angle_deg,continuous_fixation_s," +

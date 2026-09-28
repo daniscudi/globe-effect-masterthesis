@@ -403,10 +403,39 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
 * `Motion Seconds`: sichtbare Dauer der Bewegung; der Pilotwert beträgt
   `5 s`
 
+* `Simulated Sweep Axis`: `Horizontal` (Standard, links/rechts) oder
+  `Vertical` (oben/unten) für den simulierten Block. Der aktive
+  `HeadTracked`-Block und sein Training bleiben horizontal. Die Achse und
+  die passende Startrichtung (`RightFirst`/`LeftFirst` bzw.
+  `UpFirst`/`DownFirst`) werden in Plan, Ergebnissen und Trial-Markern
+  gespeichert. Die Auswahl erzeugt keine zusätzlichen Trials; für einen
+  Vergleich beider Achsen sind getrennte Sitzungen nötig.
+
 * `Sweep Amplitude Degrees`: Zielschwenkweite je Seite; für `10x` zunächst `2°`
 
 * `Sweep Speed`: reale Instrument-/Kopfgeschwindigkeit;
-  für `10x` zunächst `1,2°/s`, entsprechend ungefähr `12°/s` in der Bildmitte
+  für `10x` zunächst `1,2°/s` als mittlere absolute Geschwindigkeit,
+  entsprechend ungefähr `12°/s` mittlerer Bildgeschwindigkeit in der Bildmitte
+
+* Der simulierte Schwenk ist sinusförmig. Mit `±2°`, `1,2°/s` und `5 s`
+  startet er in der Mitte, erreicht nach etwa `1,67 s` die erste Seite und
+  nach `5 s` die andere Seite. An den Umkehrpunkten steht die Bewegung kurz.
+
+* `Train Head Movement`: zeigt vor dem aktiven Block ein Kopfbewegungstraining
+  mit blauem Sollmarker, gelbem Marker für den echten Kopf und kurzen Tönen
+  an den Umkehrpunkten. `F5` startet das Training; `F6` bricht die Sitzung ab.
+
+* `Required Good Training Sweeps`: Anzahl unmittelbar aufeinanderfolgender
+  gelungener Übungsschwenks, voreingestellt auf vier. Die Anfangsrichtung
+  wechselt zwischen den Versuchen.
+
+* `Maximum Profile Error Degrees`: tolerierte mittlere Abweichung der
+  tatsächlichen Kopfbewegung vom Sinusprofil, im Training und in aktiven
+  Haupttrials voreingestellt auf `0,9°`. Zusätzlich werden Auslenkung,
+  Seitenwechsel und Geschwindigkeitsgrenzen geprüft.
+
+* `Maximum Training Endpoint Error Degrees`: tolerierter Fehler an den beiden
+  Umkehrpunkten während des Trainings, voreingestellt auf `0,9°`.
 
 * `Motion Modes`: Basisreihenfolge der getrennten Bewegungsblöcke
 
@@ -433,6 +462,14 @@ Schwenks wird über die Wiederholungen möglichst gleich auf links und rechts
 verteilt. Gleiche Wiederholungen verschiedener `k`-Stufen und beider
 Bewegungsarten verwenden vergleichbare Punkt-Seeds, damit die Punktverteilung
 nicht mit einer Bedingung verwechselt wird.
+
+Vor dem ersten Head-Tracked-Trial eines Blocks erscheint die Anleitung im
+Headset. Nach `F5` folgt die Person dem blauen Marker mit langsamen, kleinen
+Kopfdrehungen und beobachtet den gelben Ist-Marker. Die Anzeige verlangt
+zwischen Übungsdurchgängen eine Rückkehr zur Mitte. Nach vier passenden
+Durchgängen startet der Block automatisch. Das Display und die Töne erscheinen
+im Hauptversuch nicht. Auch dort wird das tatsächliche Bewegungsprofil
+kontrolliert; stark abweichende Versuche werden später wiederholt.
 
 Nach einer Bewegungsphase verschwinden nur die Punkte. Der neutrale graue Kreis
 und das Fixationskreuz bleiben während der Antwort, zwischen den Trials und in
@@ -506,7 +543,10 @@ Beim Random-Dot-Test werden zusätzlich unter anderem festgehalten:
 * die vorgegebenen Werte `instrument_distortion_k`,
   `instrument_magnification_m` und `content_zoom`
 
-* Schwenkrichtung, Amplitude und Geschwindigkeit
+* Schwenkachse, Startrichtung, Amplitude und Geschwindigkeit
+
+* bei aktiver Kopfbewegung der mittlere Profilfehler und die Abweichungen
+  an den beiden Soll-Umkehrpositionen
 
 * Bewegungsdauer und Reaktionszeit nach dem Ausblenden
 
