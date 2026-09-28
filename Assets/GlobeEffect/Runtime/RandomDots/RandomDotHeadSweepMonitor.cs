@@ -63,6 +63,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private float accumulatedMeasurementSeconds;
         private float smoothedAbsoluteYawSpeedDegreesPerSecond;
         private bool hasPreviousYawSample;
+        private RandomDotSweepProfileEvaluator profileEvaluator;
+        private double profileStartSeconds;
+        private bool trackingProfile;
+        private bool trackingYaw;
 
         public event Action<int, float> HalfSweepCompleted;
 
@@ -78,6 +82,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public float MinimumYawDegrees => counter?.MinimumYawDegrees ?? 0f;
         public float MaximumYawDegrees => counter?.MaximumYawDegrees ?? 0f;
         public bool RequirementMet => completedHalfSweeps >= requiredHalfSweeps;
+        public float ProfileErrorDegrees => profileEvaluator?.RootMeanSquareErrorDegrees ??
+            float.PositiveInfinity;
+        public float FirstExtremeErrorDegrees => profileEvaluator?.FirstExtremeErrorDegrees ??
+            float.PositiveInfinity;
+        public float SecondExtremeErrorDegrees => profileEvaluator?.SecondExtremeErrorDegrees ??
+            float.PositiveInfinity;
 
         private void Awake()
         {
@@ -88,17 +98,29 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private void Update()
         {
             // Solange nichts zu sehen ist, gibt es auch nichts mitzuschreiben.
-            if (stimulus == null || !stimulus.IsVisible)
+            if (!trackingYaw || stimulus == null || !stimulus.IsVisible)
             {
                 return;
             }
 
-            // Bei SimulatedYaw kommt der Wert direkt aus der programmierten Bewegung.
-            // Bei HeadTracked wird stattdessen die echte Kopfdrehung gemessen.
+            // Im simulierten Modus ist dies der programmierte Winkel der gewählten
+            // Achse (Yaw oder Pitch). HeadTracked misst weiterhin echten Yaw.
             currentYawDegrees = stimulus.MotionMode == RandomDotMotionMode.SimulatedYaw
-                ? stimulus.CurrentSimulatedYawDegrees
+                ? stimulus.CurrentSimulatedSweepDegrees
                 : MeasureRealHeadYaw();
             UpdateYawSpeed(currentYawDegrees);
+
+            if (trackingProfile && profileEvaluator != null)
+            {
+                double elapsed = Time.realtimeSinceStartupAsDouble -
+                    profileStartSeconds;
+                float deltaSeconds = hasPreviousProfileSample
+                    ? (float)(elapsed - previousProfileElapsedSeconds)
+                    : 0f;
+                profileEvaluator.AddSample(elapsed, currentYawDegrees, deltaSeconds);
+                previousProfileElapsedSeconds = elapsed;
+                hasPreviousProfileSample = true;
+            }
 
             counter ??= new AlternatingHeadSweepCounter(turnaroundDegrees);
             if (counter.Update(currentYawDegrees))
@@ -148,6 +170,37 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             accumulatedMeasurementSeconds = 0f;
             smoothedAbsoluteYawSpeedDegreesPerSecond = 0f;
             hasPreviousYawSample = false;
+            profileEvaluator = null;
+            trackingProfile = false;
+            trackingYaw = true;
+            hasPreviousProfileSample = false;
+            previousProfileElapsedSeconds = 0d;
+        }
+
+        private double previousProfileElapsedSeconds;
+        private bool hasPreviousProfileSample;
+
+        public void StartProfileTracking(
+            float amplitudeDegrees,
+            float speedDegreesPerSecond,
+            RandomDotSweepDirection direction)
+        {
+            profileEvaluator = new RandomDotSweepProfileEvaluator(
+                amplitudeDegrees,
+                speedDegreesPerSecond,
+                direction);
+            profileStartSeconds = Time.realtimeSinceStartupAsDouble;
+            previousProfileElapsedSeconds = 0d;
+            hasPreviousProfileSample = false;
+            trackingProfile = true;
+        }
+
+        public void StopProfileTracking()
+        {
+            trackingProfile = false;
+            // Nach Ausblenden der Punkte bleibt der graue Kreis sichtbar.
+            // Antworten und Pausen dürfen die Bewegungskennwerte nicht ändern.
+            trackingYaw = false;
         }
 
         private void UpdateYawSpeed(float yawDegrees)

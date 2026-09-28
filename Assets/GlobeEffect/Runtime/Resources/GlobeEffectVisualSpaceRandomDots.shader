@@ -15,7 +15,8 @@ Shader "GlobeEffect/Visual Space Random Dots"
         _EyeMode ("Eye Mode", Float) = 0
         _DotsEnabled ("Dots Enabled", Float) = 1
         _DotHalfSizeRad ("Dot Half Size [rad]", Float) = 0.00191986
-        [HideInInspector] _SimulatedYawRad ("Simulated Yaw [rad]", Float) = 0
+        [HideInInspector] _SimulatedSweepRad ("Simulated Sweep [rad]", Float) = 0
+        [HideInInspector] _SimulatedSweepAxis ("Simulated Sweep Axis", Float) = 0
         [HideInInspector] _ObserverWorldPosition ("Observer World Position", Vector) = (0, 0, 0, 1)
         [HideInInspector] _ObserverWorldRight ("Observer World Right", Vector) = (1, 0, 0, 0)
     }
@@ -67,7 +68,8 @@ Shader "GlobeEffect/Visual Space Random Dots"
             float _EyeMode;
             float _DotsEnabled;
             float _DotHalfSizeRad;
-            float _SimulatedYawRad;
+            float _SimulatedSweepRad;
+            float _SimulatedSweepAxis;
             float4 _ObserverWorldPosition;
             float4 _ObserverWorldRight;
 
@@ -187,18 +189,29 @@ Shader "GlobeEffect/Visual Space Random Dots"
                     float4(worldDirection, 0.0)).xyz;
 
                 // Das Kreuz bleibt in der Mitte. Nur das Punktfeld führt den
-                // kontrollierten Links-Rechts-Schwenk aus.
+                // kontrollierten horizontalen oder vertikalen Schwenk aus.
                 if (isFixation > 0.5)
                 {
                     viewPosition = float3(0.0, 0.0, -1.0);
                 }
                 else
                 {
-                    float cosine = cos(_SimulatedYawRad);
-                    float sine = sin(_SimulatedYawRad);
-                    viewPosition.xz = float2(
-                        cosine * viewPosition.x + sine * viewPosition.z,
-                        -sine * viewPosition.x + cosine * viewPosition.z);
+                    float cosine = cos(_SimulatedSweepRad);
+                    float sine = sin(_SimulatedSweepRad);
+                    if (_SimulatedSweepAxis < 0.5)
+                    {
+                        // Positiver virtueller Yaw: Blick nach rechts, Punkte nach links.
+                        viewPosition.xz = float2(
+                            cosine * viewPosition.x + sine * viewPosition.z,
+                            -sine * viewPosition.x + cosine * viewPosition.z);
+                    }
+                    else
+                    {
+                        // Positiver virtueller Pitch: Blick nach oben, Punkte nach unten.
+                        viewPosition.yz = float2(
+                            cosine * viewPosition.y + sine * viewPosition.z,
+                            -sine * viewPosition.y + cosine * viewPosition.z);
+                    }
                 }
 
                 float forwardDistance = -viewPosition.z;

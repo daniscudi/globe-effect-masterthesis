@@ -677,6 +677,10 @@ MonoBehaviour:
   motionDurationSeconds: 5
   sweepAmplitudeDegrees: 2
   sweepSpeedDegreesPerSecond: 1.2
+  trainHeadMovement: 1
+  requiredGoodTrainingSweeps: 4
+  maximumProfileErrorDegrees: 0.9
+  maximumTrainingEndpointErrorDegrees: 0.9
   headTrackedCoverageYawDegrees: 15
   validateHeadTrackedMotion: 1
   headTrackedTurnaroundThresholdDegrees: 1.5

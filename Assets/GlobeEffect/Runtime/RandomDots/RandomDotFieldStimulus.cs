@@ -136,16 +136,20 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [SerializeField]
         private RandomDotMotionMode motionMode = RandomDotMotionMode.SimulatedYaw;
 
+        [SerializeField]
+        [Tooltip("Achse des simulierten Schwenks: horizontal (links/rechts) oder vertikal (oben/unten). HeadTracked bleibt horizontal.")]
+        private RandomDotSweepAxis sweepAxis = RandomDotSweepAxis.Horizontal;
+
         [SerializeField, Range(0.1f, 30f)]
-        [Tooltip("Wie weit die Bewegung zu jeder Seite geht. Beim Start einer Sitzung überschreibt der Experiment Manager diesen Wert.")]
+        [Tooltip("Wie weit die Bewegung horizontal oder vertikal zu jedem Umkehrpunkt geht. Beim Start einer Sitzung überschreibt der Experiment Manager diesen Wert.")]
         private float simulatedYawAmplitudeDegrees = 2f;
 
         [SerializeField, Range(0.1f, 60f)]
-        [Tooltip("Wie schnell die Bewegung läuft, in Grad pro Sekunde. Beim Start einer Sitzung überschreibt der Experiment Manager diesen Wert.")]
+        [Tooltip("Mittlere absolute Geschwindigkeit des sinusförmigen Schwenks in Grad pro Sekunde. Beim Start einer Sitzung überschreibt der Experiment Manager diesen Wert.")]
         private float simulatedYawSpeedDegreesPerSecond = 1.2f;
 
         [SerializeField]
-        [Tooltip("Zu welcher Seite die Bewegung zuerst losgeht.")]
+        [Tooltip("RightFirst bedeutet bei vertikaler Achse zuerst nach oben, LeftFirst zuerst nach unten. Der Experiment Manager setzt die Richtung pro Trial.")]
         private RandomDotSweepDirection sweepDirection =
             RandomDotSweepDirection.RightFirst;
 
@@ -201,6 +205,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public float ContentZoom => contentZoom;
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
         public RandomDotMotionMode MotionMode => motionMode;
+        public RandomDotSweepAxis SweepAxis => sweepAxis;
         public RandomDotSweepDirection SweepDirection => sweepDirection;
         public float SweepAmplitudeDegrees => simulatedYawAmplitudeDegrees;
         public float SweepSpeedDegreesPerSecond =>
@@ -214,7 +219,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         /// Dreht die Person den Kopf selbst, steht hier null. Dann rechnet der
         /// Sweep-Monitor die echte Kopfdrehung aus.
         /// </summary>
-        public float CurrentSimulatedYawDegrees
+        public float CurrentSimulatedSweepDegrees
         {
             get
             {
@@ -226,13 +231,17 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
                 double elapsed = Time.realtimeSinceStartupAsDouble -
                     motionStartSeconds;
-                return RandomDotSimulatedSweep.EvaluateYawDegrees(
+                return RandomDotSimulatedSweep.EvaluateSweepDegrees(
                     elapsed,
                     simulatedYawAmplitudeDegrees,
                     simulatedYawSpeedDegreesPerSecond,
                     sweepDirection);
             }
         }
+
+        // Alter Name für Code, der nur den horizontalen Modus verwendet.
+        public float CurrentSimulatedYawDegrees => sweepAxis ==
+            RandomDotSweepAxis.Horizontal ? CurrentSimulatedSweepDegrees : 0f;
 
         public Vector3 FixationWorldPosition => observer != null
             ? observer.position + observer.forward * fieldRadiusMeters
@@ -420,7 +429,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             float speedDegreesPerSecond)
         {
             // Amplitude ist, wie weit es zu jeder Seite geht.
-            // Speed ist, wie schnell, also Grad pro Sekunde.
+            // Speed ist die mittlere absolute Geschwindigkeit des Sinusprofils.
             simulatedYawAmplitudeDegrees = Mathf.Clamp(amplitudeDegrees, 0.1f, 30f);
             simulatedYawSpeedDegreesPerSecond = Mathf.Clamp(
                 speedDegreesPerSecond,
@@ -434,6 +443,14 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         {
             sweepDirection = value;
             RestartMotionPhase();
+            ParametersChanged?.Invoke(CaptureSnapshot());
+        }
+
+        public void SetSweepAxis(RandomDotSweepAxis value)
+        {
+            sweepAxis = value;
+            RestartMotionPhase();
+            SendFrameValuesToShader();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 
@@ -545,10 +562,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 contentZoom = contentZoom,
                 eyePresentation = eyePresentation,
                 motionMode = motionMode,
+                sweepAxis = sweepAxis,
                 sweepDirection = sweepDirection,
                 sweepAmplitudeDegrees = simulatedYawAmplitudeDegrees,
                 sweepSpeedDegreesPerSecond = simulatedYawSpeedDegreesPerSecond,
-                simulatedYawDegrees = CurrentSimulatedYawDegrees
+                simulatedYawDegrees = CurrentSimulatedYawDegrees,
+                simulatedSweepDegrees = CurrentSimulatedSweepDegrees
             };
         }
 
@@ -805,8 +824,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
             propertyBlock ??= new MaterialPropertyBlock();
             meshRenderer.GetPropertyBlock(propertyBlock);
-            propertyBlock.SetFloat("_SimulatedYawRad",
-                CurrentSimulatedYawDegrees * Mathf.Deg2Rad);
+            propertyBlock.SetFloat("_SimulatedSweepRad",
+                CurrentSimulatedSweepDegrees * Mathf.Deg2Rad);
+            propertyBlock.SetFloat("_SimulatedSweepAxis", (float)sweepAxis);
 
             if (observer != null)
             {
@@ -901,6 +921,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         RightFirst = 1
     }
 
+    public enum RandomDotSweepAxis
+    {
+        Horizontal = 0,
+        Vertical = 1
+    }
+
     // Ein Foto von den Werten, die gerade wirklich gezeigt werden.
     // Das wandert ins Protokoll und in die Eye-Tracking-Marker.
     [Serializable]
@@ -920,9 +946,11 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public float contentZoom;
         public CheckerboardEyePresentation eyePresentation;
         public RandomDotMotionMode motionMode;
+        public RandomDotSweepAxis sweepAxis;
         public RandomDotSweepDirection sweepDirection;
         public float sweepAmplitudeDegrees;
         public float sweepSpeedDegreesPerSecond;
         public float simulatedYawDegrees;
+        public float simulatedSweepDegrees;
     }
 }

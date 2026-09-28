@@ -145,6 +145,32 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [Test]
+        public void VerticalAxisOnlyAffectsSimulatedBlockAndSurvivesRepeat()
+        {
+            var plan = RandomDotTrialPlanner.CreateRandomizedPlan(
+                new[] { 90f },
+                new[] { CheckerboardEyePresentation.BothEyes },
+                new[] { 0.5f },
+                new[] { 10f },
+                new[] { 1f },
+                new[]
+                {
+                    RandomDotMotionMode.SimulatedYaw,
+                    RandomDotMotionMode.HeadTracked
+                },
+                repetitions: 1,
+                repetitionsPerMiniBlock: 1,
+                randomSeed: 23,
+                dotSeedBase: 5000,
+                simulatedSweepAxis: RandomDotSweepAxis.Vertical);
+
+            Assert.That(plan[0].SweepAxis, Is.EqualTo(RandomDotSweepAxis.Vertical));
+            Assert.That(plan[1].SweepAxis, Is.EqualTo(RandomDotSweepAxis.Horizontal));
+            Assert.That(plan[0].CreateRepeatedAttempt().SweepAxis,
+                Is.EqualTo(RandomDotSweepAxis.Vertical));
+        }
+
+        [Test]
         public void InvalidTrialRepeatStaysInsideItsMiniBlock()
         {
             var plan = RandomDotTrialPlanner.CreateRandomizedPlan(
