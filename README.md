@@ -389,7 +389,7 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   Checkerboard
 
 * `Instrument Magnification M Values`: eine oder mehrere
-  Fernglasvergrößerungen; voreingestellt ist `10`
+  Fernglasvergrößerungen zwischen `1` und `14`; voreingestellt ist `10`
 
 * `Content Zoom Values`: optionaler Nach-Zoom; für die Instrumentensimulation
   normalerweise `1`
@@ -400,26 +400,48 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   mit `25` insgesamt und `5` pro Unterblock entstehen fünf Abschnitte je
   Bewegungsart
 
-* `Motion Seconds`: sichtbare Dauer der Bewegung; der Pilotwert beträgt
-  `5 s`
+* `Simulated Sweep Seconds`: wie lange die Punkte im simulierten Block zu
+  sehen sind; voreingestellt `0,8 s`. In dieser Zeit schwenkt das Feld
+  einmal in eine Richtung und kehrt nicht um.
+
+* `Head Tracked Seconds`: wie lange die Punkte im aktiven
+  `HeadTracked`-Block zu sehen sind; der Pilotwert beträgt `5 s`
 
 * `Simulated Sweep Axis`: `Horizontal` (Standard, links/rechts) oder
   `Vertical` (oben/unten) für den simulierten Block. Der aktive
   `HeadTracked`-Block und sein Training bleiben horizontal. Die Achse und
-  die passende Startrichtung (`RightFirst`/`LeftFirst` bzw.
-  `UpFirst`/`DownFirst`) werden in Plan, Ergebnissen und Trial-Markern
-  gespeichert. Die Auswahl erzeugt keine zusätzlichen Trials; für einen
+  die Richtung werden in Plan, Ergebnissen und Trial-Markern gespeichert:
+  beim simulierten Schwenk `Right`/`Left` bzw. `Up`/`Down`, beim
+  Kopfschwenk die Seite des ersten Schwenks (`RightFirst`/`LeftFirst`). Die Auswahl erzeugt keine zusätzlichen Trials; für einen
   Vergleich beider Achsen sind getrennte Sitzungen nötig.
 
-* `Sweep Amplitude Degrees`: Zielschwenkweite je Seite; für `10x` zunächst `2°`
+* `Sweep Amplitude Degrees`: Zielschwenkweite des Kopfes je Seite im
+  `HeadTracked`-Block; für `10x` zunächst `2°`
 
-* `Sweep Speed`: reale Instrument-/Kopfgeschwindigkeit;
-  für `10x` zunächst `1,2°/s` als mittlere absolute Geschwindigkeit,
-  entsprechend ungefähr `12°/s` mittlerer Bildgeschwindigkeit in der Bildmitte
+* `Sweep Speed`: reale Instrument-/Kopfgeschwindigkeit; für `10x` zunächst
+  `1,2°/s`, entsprechend ungefähr `12°/s` Bildgeschwindigkeit in der
+  Bildmitte. Im simulierten Block ist das die feste Geschwindigkeit des
+  Schwenks, im `HeadTracked`-Block die mittlere Geschwindigkeit des
+  Sinusprofils. So bleiben beide Blöcke gleich schnell.
 
-* Der simulierte Schwenk ist sinusförmig. Mit `±2°`, `1,2°/s` und `5 s`
-  startet er in der Mitte, erreicht nach etwa `1,67 s` die erste Seite und
-  nach `5 s` die andere Seite. An den Umkehrpunkten steht die Bewegung kurz.
+* Der simulierte Schwenk geht nur in eine Richtung und hat eine feste
+  Geschwindigkeit. Mit `1,2°/s` und `0,8 s` läuft er von `-0,48°` nach
+  `+0,48°`, die Mitte der Bewegung liegt also genau geradeaus. Ob nach links
+  oder rechts, wechselt von Trial zu Trial in zufälliger Reihenfolge; beide
+  Richtungen kommen pro Bedingung gleich oft vor.
+
+* Vorschau: Solange keine Sitzung läuft, schwenkt das Feld im Play Mode immer
+  weiter (`Loop Sweep In Preview` am `Random Dot Field`). Der Schwenk läuft
+  dabei über die ganze Punktwelt und fängt am Ende wieder von vorne an; mit
+  `40,6°` World Coverage und `1,2°/s` dauert ein Durchlauf etwa `26 s`. Die
+  Vorschau benutzt die Werte am `Random Dot Field` (`m`, `k`, FOV,
+  Geschwindigkeit, Richtung). Erst mit `F5` gelten die Werte des Experiment
+  Managers, und jeder Schwenk läuft genau einmal.
+
+* Der Kopfschwenk im `HeadTracked`-Block ist sinusförmig. Mit `±2°`,
+  `1,2°/s` und `5 s` startet er in der Mitte, erreicht nach etwa `1,67 s` die
+  erste Seite und nach `5 s` die andere Seite. An den Umkehrpunkten steht die
+  Bewegung kurz.
 
 * `Train Head Movement`: zeigt vor dem aktiven Block ein Kopfbewegungstraining
   mit blauem Sollmarker, gelbem Marker für den echten Kopf und kurzen Tönen
@@ -443,8 +465,8 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   automatisch für jede zweite fortlaufende Versuchsperson um (`pilot_001` Basis,
   `pilot_002` umgekehrt)
 
-* `Head Tracked Coverage Yaw Degrees`: unsichtbarer Sicherheitspuffer der
-  Punktwelt; voreingestellt auf `15°` je Seite
+* `Head Turn Safety Degrees`: unsichtbarer Sicherheitspuffer der
+  Punktwelt im `HeadTracked`-Block; voreingestellt auf `15°` je Seite
 
 * `Validate Head Tracked Motion`: wiederholt aktive Durchgänge, wenn der
   Seitenwechsel fehlt oder Auslenkung beziehungsweise Geschwindigkeit außerhalb
@@ -457,9 +479,10 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
 Die beiden Bewegungsarten werden nicht trialweise vermischt, sondern als
 getrennte Blöcke in der Reihenfolge der Liste ausgeführt. Nach jedem Unterblock
 und zwischen den Bewegungsblöcken hält die Sitzung an; `F5` setzt sie fort. Nur
-innerhalb eines Unterblocks wird mit dem Seed gemischt. Die Richtung des ersten
-Schwenks wird über die Wiederholungen möglichst gleich auf links und rechts
-verteilt. Gleiche Wiederholungen verschiedener `k`-Stufen und beider
+innerhalb eines Unterblocks wird mit dem Seed gemischt. Die Schwenkrichtung
+(beim Kopfschwenk die Richtung des ersten Schwenks) wechselt über die
+Wiederholungen jeder Bedingung, sodass links und rechts gleich oft vorkommen;
+durch das Mischen ist die Reihenfolge zufällig. Gleiche Wiederholungen verschiedener `k`-Stufen und beider
 Bewegungsarten verwenden vergleichbare Punkt-Seeds, damit die Punktverteilung
 nicht mit einer Bedingung verwechselt wird.
 
@@ -479,12 +502,45 @@ der Hintergrund in allen Phasen unverändert schwarz.
 
 Das sichtbare Feld hat innen einen neutralgrauen Hintergrund für symmetrischen
 Kontrast der schwarzen und weißen Punkte. Außerhalb der kreisförmigen Feldblende
-ist der Hintergrund nahezu schwarz. Für Head-Tracked-Trials wird die erzeugte
-Punktwelt automatisch bis zum Sicherheitspuffer erweitert. Die Punktzahl wächst
-dabei proportional zur Kugelkappenfläche, damit die sichtbare Punktdichte nicht
-vom Bewegungsbereich abhängt. Für die aktuellen `70°`, `10x` und `±15°`
-Sicherheitsabdeckung sind rund `40,6°` Quellenfeld und `24.500` Punkte
-voreingestellt.
+ist der Hintergrund nahezu schwarz.
+
+### Punktdichte
+
+Die Punktzahl wird nicht direkt eingestellt. Am `Random Dot Field` steht
+stattdessen `Dot Density`: wie viele Punkte pro Quadratgrad in der Bildmitte
+liegen sollen, voreingestellt `0,19` (ungefähr ein Punkt alle `2,3°`). Daraus
+rechnet das Skript für jeden Trial selbst aus, wie groß die Punktwelt sein muss
+und wie viele Punkte hineingehören. So sieht das Feld bei jedem `m` gleich dicht
+aus; ohne diese Anpassung wäre es bei `14x` etwa doppelt so dünn wie bei `10x`.
+
+Die Rechnung dahinter: In der Bildmitte vergrößert das Instrument bei jedem
+`k` genau um `m`, ein optionaler Content Zoom noch einmal um seinen Wert. Eine
+kleine Fläche der Außenwelt erscheint im Bild also `(m * Zoom)²`-mal so groß,
+und genau um diesen Faktor dichter werden die Punkte in der Außenwelt gesetzt:
+
+    Punktzahl = Dichte * (m * Zoom)² * Fläche der Punktwelt
+
+Die Punktwelt ist eine Kugelkappe. Sie deckt ab, was man durch den Kreis
+sieht, plus die Schwenkweite zu jeder Seite und `1°` Reserve. Im
+`HeadTracked`-Block kommt statt der Schwenkweite der Sicherheitspuffer dazu.
+Am Rand des Kreises staucht oder streckt das Instrument je nach `k`; dort ist
+die Dichte deshalb nicht überall gleich. Das ist gewollt, denn genau so
+verhält sich auch ein echtes Fernglas. Alle `k`-Stufen zeigen bei gleichem `m`
+dieselbe Außenwelt.
+
+Mit `70°` FOV, `0,19` Dichte und den Werten oben ergeben sich pro Trial:
+
+| m | simulierter Block | HeadTracked-Block |
+|---|---|---|
+| 5 | 1.100 - 1.500 Punkte | 7.800 - 8.800 Punkte |
+| 10 | 1.500 - 2.000 Punkte | 22.500 - 24.300 Punkte |
+| 14 | 1.900 - 2.400 Punkte | 39.700 - 42.100 Punkte |
+
+Beim Start einer Sitzung wird für alle Trials nachgerechnet, ob die Punktwelt
+unter `170°` und unter `60.000` Punkten bleibt; sonst startet die Sitzung nicht
+und die Konsole nennt die Ursache. Punktzahl und Größe der Punktwelt stehen für
+jeden Trial in `dot_count` und `world_coverage_diameter_deg`, die Dichte im
+Marker `SessionStart`.
 
 ## Eye Tracking und Messdateien
 

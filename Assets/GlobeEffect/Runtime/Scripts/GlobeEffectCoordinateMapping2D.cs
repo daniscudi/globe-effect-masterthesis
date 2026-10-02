@@ -20,24 +20,17 @@ namespace GlobeEffect.VRCheckerboard
         // fast nichts geteilt und die Zahlen würden explodieren.
         private const double MinimumMagnitude = 1e-12;
 
-        public static Vector2 ObjectToLinearImage(
-            Vector2 objectGnomonic,
-            double magnification)
+        public static Vector2 ObjectToLinearImage(Vector2 objectGnomonic, double magnification)
         {
             ValidateMagnification(magnification);
-            return new Vector2(
-                (float)(magnification * objectGnomonic.x),
-                (float)(magnification * objectGnomonic.y));
+            return Scale(objectGnomonic, magnification);
         }
 
-        public static Vector2 LinearImageToObject(
-            Vector2 linearImage,
-            double magnification)
+        public static Vector2 LinearImageToObject(Vector2 linearImage, double magnification)
         {
             ValidateMagnification(magnification);
             return new Vector2(
-                (float)(linearImage.x / magnification),
-                (float)(linearImage.y / magnification));
+                (float)(linearImage.x / magnification), (float)(linearImage.y / magnification));
         }
 
         /// <summary>
@@ -49,14 +42,10 @@ namespace GlobeEffect.VRCheckerboard
         /// Bei k = 1 kommt genau der normale Bildpunkt (u,v) = m(x,y) heraus.
         /// </summary>
         public static Vector2 ObjectToMerlitzInstrumentImage(
-            Vector2 objectGnomonic,
-            double magnification,
-            double k)
+            Vector2 objectGnomonic, double magnification, double k)
         {
             // Wie weit ist der Punkt von der Mitte weg?
-            double objectRadius = Math.Sqrt(
-                objectGnomonic.x * objectGnomonic.x +
-                objectGnomonic.y * objectGnomonic.y);
+            double objectRadius = Length(objectGnomonic);
 
             // Genau in der Mitte gibt es keine Richtung, also bleibt er da.
             if (objectRadius <= MinimumMagnitude)
@@ -66,26 +55,20 @@ namespace GlobeEffect.VRCheckerboard
 
             double objectAngle = Math.Atan(objectRadius);
             double apparentAngle = MerlitzBinocularReferenceMath.ApparentAngleFromObject(
-                objectAngle,
-                magnification,
-                k);
+                objectAngle, magnification, k);
 
             // Ab 90 Grad läge der Punkt seitlich oder hinter einem. Auf einer
             // flachen Bildfläche lässt sich das nicht mehr darstellen.
             if (apparentAngle >= Math.PI / 2.0)
             {
-                throw new ArgumentOutOfRangeException(
-                    nameof(objectGnomonic),
+                throw new ArgumentOutOfRangeException(nameof(objectGnomonic),
                     "Dieser Punkt liegt zu weit außen und passt nicht mehr aufs flache Bild.");
             }
 
             // Der Punkt wird auf seiner Linie zur Mitte nur nach außen oder innen
             // geschoben. Deshalb reicht ein gemeinsamer Faktor für x und y.
             double imageRadius = Math.Tan(apparentAngle);
-            double scale = imageRadius / objectRadius;
-            return new Vector2(
-                (float)(scale * objectGnomonic.x),
-                (float)(scale * objectGnomonic.y));
+            return Scale(objectGnomonic, imageRadius / objectRadius);
         }
 
         /// <summary>
@@ -95,13 +78,9 @@ namespace GlobeEffect.VRCheckerboard
         /// Wo er vor der Drehung lag, wird schon als (u,v) übergeben.
         /// </summary>
         public static Vector2 LinearImageAfterHorizontalPan(
-            Vector2 linearImageAtZero,
-            double panRadians,
-            double magnification)
+            Vector2 linearImageAtZero, double panRadians, double magnification)
         {
-            Vector2 objectAtZero = LinearImageToObject(
-                linearImageAtZero,
-                magnification);
+            Vector2 objectAtZero = LinearImageToObject(linearImageAtZero, magnification);
             double sin = Math.Sin(panRadians);
             double cos = Math.Cos(panRadians);
             double denominator = objectAtZero.x * sin + cos;
@@ -110,16 +89,14 @@ namespace GlobeEffect.VRCheckerboard
             // Dann gibt es keine Stelle im Bild mehr für ihn.
             if (Math.Abs(denominator) <= MinimumMagnitude)
             {
-                throw new ArgumentOutOfRangeException(
-                    nameof(panRadians),
-                    "Bei diesem Drehwinkel liegt der Punkt genau seitlich und hat keine Bildposition mehr.");
+                throw new ArgumentOutOfRangeException(nameof(panRadians),
+                    "Bei diesem Drehwinkel liegt der Punkt genau seitlich und hat keine "
+                    + "Bildposition mehr.");
             }
 
             double x = (objectAtZero.x * cos - sin) / denominator;
             double y = objectAtZero.y / denominator;
-            return ObjectToLinearImage(
-                new Vector2((float)x, (float)y),
-                magnification);
+            return ObjectToLinearImage(new Vector2((float)x, (float)y), magnification);
         }
 
         /// <summary>
@@ -127,15 +104,13 @@ namespace GlobeEffect.VRCheckerboard
         /// wenn sich die Kamera dreht? Der Wert gilt pro Radiant Drehung.
         /// </summary>
         public static Vector2 LinearImageVelocityForHorizontalPan(
-            Vector2 linearImage,
-            double magnification)
+            Vector2 linearImage, double magnification)
         {
             ValidateMagnification(magnification);
             double u = linearImage.x;
             double v = linearImage.y;
             return new Vector2(
-                (float)(-(magnification + u * u / magnification)),
-                (float)(-u * v / magnification));
+                (float)(-(magnification + u * u / magnification)), (float)(-u * v / magnification));
         }
 
         /// <summary>
@@ -146,9 +121,7 @@ namespace GlobeEffect.VRCheckerboard
         /// </summary>
         public static Vector2 LinearImageToSchoenAngular(Vector2 linearImage)
         {
-            return new Vector2(
-                (float)Math.Atan(linearImage.x),
-                (float)Math.Atan(linearImage.y));
+            return new Vector2((float)Math.Atan(linearImage.x), (float)Math.Atan(linearImage.y));
         }
 
         /// <summary>
@@ -160,28 +133,29 @@ namespace GlobeEffect.VRCheckerboard
         /// </summary>
         public static Vector2 LinearImageToMerlitzAngular(Vector2 linearImage)
         {
-            double radius = Math.Sqrt(
-                linearImage.x * linearImage.x +
-                linearImage.y * linearImage.y);
-
+            double radius = Length(linearImage);
             if (radius <= MinimumMagnitude)
             {
                 return Vector2.zero;
             }
 
-            double scale = Math.Atan(radius) / radius;
-            return new Vector2(
-                (float)(scale * linearImage.x),
-                (float)(scale * linearImage.y));
+            return Scale(linearImage, Math.Atan(radius) / radius);
         }
+
+        // Abstand eines Punktes von der Mitte.
+        private static double Length(Vector2 point) =>
+            Math.Sqrt(point.x * point.x + point.y * point.y);
+
+        // Beide Koordinaten mit demselben Faktor multiplizieren.
+        private static Vector2 Scale(Vector2 point, double factor) =>
+            new Vector2((float)(factor * point.x), (float)(factor * point.y));
 
         private static void ValidateMagnification(double magnification)
         {
             if (magnification <= 0.0)
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(magnification),
-                    "Die Vergrößerung muss positiv sein.");
+                    nameof(magnification), "Die Vergrößerung muss positiv sein.");
             }
         }
     }

@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using GlobeEffect.VRCheckerboard.Experiment;
 using GlobeEffect.VRCheckerboard.EyeTracking;
 using GlobeEffect.VRCheckerboard.RandomDots;
@@ -19,13 +19,14 @@ namespace GlobeEffect.VRCheckerboard.Editor
     {
         // Das Fenster liest nur ab, was die Manager und Monitore gerade melden.
         // Es fasst weder den Plan noch die Antworten noch den Stimulus an.
-        internal const string AutoOpenPreference =
-            "GlobeEffect.ExperimentMonitor.AutoOpenOnPlay";
+        internal const string AutoOpenPreference = "GlobeEffect.ExperimentMonitor.AutoOpenOnPlay";
 
-        private const string OpenMenuPath =
-            "Tools/Globe Effect/Open Experiment Monitor";
-        private const string AutoOpenMenuPath =
-            "Tools/Globe Effect/Auto Open Experiment Monitor on Play";
+        private const string WindowTitle = "Experiment Monitor";
+        private const string OpenMenuPath = "Tools/Globe Effect/Open Experiment Monitor";
+        private const string AutoOpenMenuPath = "Tools/Globe Effect/Auto Open Experiment Monitor on Play";
+
+        // Das steht da, wo es gerade keinen Wert gibt.
+        private const string Missing = "–";
 
         private CheckerboardFixationMonitor checkerboardFixation;
         private RandomDotFixationMonitor randomDotFixation;
@@ -38,6 +39,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
         private GUIStyle statusStyle;
         private GUIStyle centeredLabelStyle;
 
+        internal static bool AutoOpenEnabled => EditorPrefs.GetBool(AutoOpenPreference, true);
+
         [MenuItem(OpenMenuPath)]
         public static void OpenWindow()
         {
@@ -46,14 +49,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         internal static void OpenWindow(bool focus)
         {
-            ExperimenterMonitorWindow window =
-                GetWindow<ExperimenterMonitorWindow>(
-                    utility: false,
-                    title: "Experiment Monitor",
-                    focus: focus);
-            window.titleContent = new GUIContent("Experiment Monitor");
-            window.minSize = new Vector2(360f, 390f);
-            window.Repaint();
+            // Titel und Mindestgröße setzt OnEnable, sobald das Fenster entsteht.
+            GetWindow<ExperimenterMonitorWindow>(utility: false, title: WindowTitle, focus: focus).Repaint();
         }
 
         [MenuItem(AutoOpenMenuPath)]
@@ -71,12 +68,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
             return true;
         }
 
-        internal static bool AutoOpenEnabled =>
-            EditorPrefs.GetBool(AutoOpenPreference, true);
-
         private void OnEnable()
         {
-            titleContent = new GUIContent("Experiment Monitor");
+            titleContent = new GUIContent(WindowTitle);
             minSize = new Vector2(360f, 390f);
             RefreshReferences(force: true);
         }
@@ -98,9 +92,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
             if (!EditorApplication.isPlaying)
             {
-                DrawStatusBlock(
-                    "PLAY MODE STOPPED",
-                    new Color(0.27f, 0.32f, 0.38f));
+                DrawStatusBlock("PLAY MODE STOPPED", new Color(0.27f, 0.32f, 0.38f));
                 EditorGUILayout.HelpBox(
                     "Das Fenster liest die Fixationsdaten automatisch, sobald der Play Mode läuft.",
                     MessageType.Info);
@@ -112,11 +104,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             // In einer Szene liegt normalerweise nur einer der beiden Tests.
             // Sind aus Versehen doch beide drin, wird das Checkerboard angezeigt.
             // Hauptsache, es ist eindeutig und flackert nicht hin und her.
-            if (randomDotFixation != null && checkerboardFixation == null)
-            {
-                DrawRandomDotMonitor();
-            }
-            else if (checkerboardFixation != null)
+            if (checkerboardFixation != null)
             {
                 DrawCheckerboardMonitor();
             }
@@ -126,11 +114,10 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
             else
             {
-                DrawStatusBlock(
-                    "NO FIXATION MONITOR",
-                    new Color(0.65f, 0.36f, 0.08f));
+                DrawStatusBlock("NO FIXATION MONITOR", new Color(0.65f, 0.36f, 0.08f));
                 EditorGUILayout.HelpBox(
-                    "In der geöffneten Szene wurde kein Checkerboard- oder Random-Dot-Fixationsmonitor gefunden.",
+                    "In der geöffneten Szene wurde kein Checkerboard- oder " +
+                    "Random-Dot-Fixationsmonitor gefunden.",
                     MessageType.Warning);
             }
 
@@ -141,9 +128,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
         {
             EditorGUILayout.Space(5f);
             EditorGUILayout.LabelField(
-                "Globe Effect – Experimenter Monitor",
-                centeredLabelStyle,
-                GUILayout.Height(28f));
+                "Globe Effect – Experimenter Monitor", centeredLabelStyle, GUILayout.Height(28f));
             EditorGUILayout.Space(3f);
         }
 
@@ -151,78 +136,36 @@ namespace GlobeEffect.VRCheckerboard.Editor
         {
             // Zeigt an: Wo schaut die Person hin, wie weit ist die Sitzung, und
             // welche Bedingung läuft gerade.
-            DrawFixationStatus(
-                checkerboardFixation.TargetState,
-                checkerboardFixation.CurrentAngleDegrees,
-                checkerboardFixation.ToleranceDegrees,
-                checkerboardFixation.ContinuousFixationSeconds,
-                checkerboardFixation.RequiredContinuousSeconds,
-                checkerboardFixation.RequirementMet);
+            DrawFixationStatus(checkerboardFixation);
 
             EditorGUILayout.Space(6f);
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                EditorGUILayout.LabelField("Test", "Checkerboard");
-                EditorGUILayout.LabelField(
-                    "Session",
-                    checkerboardSession != null
-                        ? checkerboardSession.SessionState.ToString()
-                        : "Nicht gefunden");
-                EditorGUILayout.LabelField(
-                    "Trial",
-                    FormatTrial(
-                        checkerboardSession?.CurrentTrialNumber ?? 0,
-                        checkerboardSession?.TotalTrials ?? 0));
-                EditorGUILayout.LabelField(
-                    "Gültig abgeschlossen",
-                    checkerboardSession != null
-                        ? checkerboardSession.ValidTrialsCompleted.ToString(
-                            CultureInfo.InvariantCulture)
-                        : "–");
-                EditorGUILayout.LabelField(
-                    "Präsentationen",
-                    checkerboardSession != null
-                        ? checkerboardSession.PresentationCount.ToString(
-                            CultureInfo.InvariantCulture)
-                        : "–");
-                EditorGUILayout.LabelField(
-                    "Visual-Space l",
-                    checkerboardStimulus != null
-                        ? checkerboardStimulus.VisualSpaceL.ToString(
-                            "F3",
-                            CultureInfo.InvariantCulture)
-                        : "–");
-                EditorGUILayout.LabelField(
-                    "FOV",
-                    checkerboardStimulus != null
-                        ? checkerboardStimulus.AngularDiameterDegrees.ToString(
-                            "F1",
-                            CultureInfo.InvariantCulture) + "°"
-                        : "–");
-                EditorGUILayout.LabelField(
-                    "Augenmodus",
-                    checkerboardStimulus != null
-                        ? checkerboardStimulus.EyePresentation.ToString()
-                        : "–");
-                EditorGUILayout.LabelField(
-                    "Antwort",
-                    checkerboardSession != null
-                        ? checkerboardSession.ConvexResponseKeyName +
-                          " Category A   |   " +
-                          checkerboardSession.ConcaveResponseKeyName +
-                          " Category B"
-                        : "–");
-                EditorGUILayout.LabelField(
-                    "Training",
-                    checkerboardSession != null &&
-                    checkerboardSession.TrainingCompleted
-                        ? "abgeschlossen"
-                        : "noch nicht abgeschlossen");
-                EditorGUILayout.LabelField(
-                    "Fixationsbruch",
-                    checkerboardSession != null && checkerboardSession.RequireFixation
-                        ? "Trial ungültig, Wiederholung hinten"
-                        : "Kontrolle ausgeschaltet");
+                // Fehlt der Manager oder der Stimulus, steht in den Zeilen nur ein Strich.
+                CheckerboardExperimentManager session = checkerboardSession;
+                VrCheckerboardStimulus stimulus = checkerboardStimulus;
+                bool hasSession = session != null;
+                bool hasStimulus = stimulus != null;
+
+                Row("Test", "Checkerboard");
+                Row("Session", hasSession ? session.SessionState.ToString() : "Nicht gefunden");
+                Row("Trial",
+                    hasSession ? FormatTrial(session.CurrentTrialNumber, session.TotalTrials) : Missing);
+                Row("Gültig abgeschlossen", hasSession ? Number(session.ValidTrialsCompleted) : Missing);
+                Row("Präsentationen", hasSession ? Number(session.PresentationCount) : Missing);
+                Row("Visual-Space l", hasStimulus ? Number(stimulus.VisualSpaceL, "F3") : Missing);
+                Row("FOV", hasStimulus ? Number(stimulus.AngularDiameterDegrees, "F1", "°") : Missing);
+                Row("Augenmodus", hasStimulus ? stimulus.EyePresentation.ToString() : Missing);
+                Row("Antwort", hasSession
+                    ? session.ConvexResponseKeyName + " Category A   |   " +
+                      session.ConcaveResponseKeyName + " Category B"
+                    : Missing);
+                Row("Training", hasSession && session.TrainingCompleted
+                    ? "abgeschlossen"
+                    : "noch nicht abgeschlossen");
+                Row("Fixationsbruch", hasSession && session.RequireFixation
+                    ? "Trial ungültig, Wiederholung hinten"
+                    : "Kontrolle ausgeschaltet");
             }
         }
 
@@ -230,125 +173,60 @@ namespace GlobeEffect.VRCheckerboard.Editor
         {
             // Zeigt an: Wo schaut die Person hin, wie weit ist die Sitzung, und wo
             // steht die Bewegung der Punkte gerade.
-            DrawFixationStatus(
-                randomDotFixation.TargetState,
-                randomDotFixation.CurrentAngleDegrees,
-                randomDotFixation.ToleranceDegrees,
-                randomDotFixation.ContinuousFixationSeconds,
-                randomDotFixation.RequiredContinuousSeconds,
-                randomDotFixation.RequirementMet);
+            DrawFixationStatus(randomDotFixation);
 
             EditorGUILayout.Space(6f);
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                EditorGUILayout.LabelField("Test", "Random Dot Instrument");
-                EditorGUILayout.LabelField(
-                    "Session",
-                    randomDotSession != null
-                        ? randomDotSession.SessionState.ToString()
-                        : "Nicht gefunden");
-                EditorGUILayout.LabelField(
-                    "Trial",
-                    FormatTrial(
-                        randomDotSession?.CurrentTrialNumber ?? 0,
-                        randomDotSession?.TotalTrials ?? 0));
-                EditorGUILayout.LabelField(
-                    "Bewegungsblock",
-                    randomDotSession != null
-                        ? randomDotSession.CurrentMotionBlock.ToString(
-                            CultureInfo.InvariantCulture)
-                        : "–");
-                EditorGUILayout.LabelField(
-                    "Unterblock",
-                    randomDotSession != null
-                        ? randomDotSession.CurrentMiniBlock.ToString(
-                            CultureInfo.InvariantCulture)
-                        : "–");
-                if (randomDotSession != null &&
-                    (randomDotSession.SessionState ==
-                        RandomDotSessionState.PausedBetweenMiniBlocks ||
-                     randomDotSession.SessionState ==
-                        RandomDotSessionState.PausedBetweenMotionBlocks))
+                // Fehlt eines der Objekte, steht in den passenden Zeilen nur ein Strich.
+                RandomDotExperimentManager session = randomDotSession;
+                RandomDotFieldStimulus stimulus = randomDotStimulus;
+                RandomDotHeadSweepMonitor sweep = sweepMonitor;
+                bool hasSession = session != null;
+                bool hasStimulus = stimulus != null;
+                bool hasSweep = sweep != null;
+
+                Row("Test", "Random Dot Instrument");
+                Row("Session", hasSession ? session.SessionState.ToString() : "Nicht gefunden");
+                Row("Trial",
+                    hasSession ? FormatTrial(session.CurrentTrialNumber, session.TotalTrials) : Missing);
+                Row("Bewegungsblock", hasSession ? Number(session.CurrentMotionBlock) : Missing);
+                Row("Unterblock", hasSession ? Number(session.CurrentMiniBlock) : Missing);
+                if (hasSession && (session.SessionState is RandomDotSessionState.PausedBetweenMiniBlocks
+                    or RandomDotSessionState.PausedBetweenMotionBlocks))
                 {
-                    EditorGUILayout.HelpBox(
-                        "Pause – mit F5 fortsetzen.",
-                        MessageType.Info);
+                    EditorGUILayout.HelpBox("Pause – mit F5 fortsetzen.", MessageType.Info);
                 }
-                EditorGUILayout.LabelField(
-                    "Instrument k",
-                    randomDotStimulus != null
-                        ? randomDotStimulus.InstrumentDistortionK.ToString(
-                            "F3",
-                            CultureInfo.InvariantCulture)
-                        : "–");
-                EditorGUILayout.LabelField(
-                    "Vergrößerung m",
-                    randomDotStimulus != null
-                        ? randomDotStimulus.InstrumentMagnificationM.ToString(
-                            "F2",
-                            CultureInfo.InvariantCulture) + "x"
-                        : "–");
-                EditorGUILayout.LabelField(
-                    "Content Zoom",
-                    randomDotStimulus != null
-                        ? randomDotStimulus.ContentZoom.ToString("F2", CultureInfo.InvariantCulture)
-                        : "–");
-                EditorGUILayout.LabelField(
-                    "Gierwinkel",
-                    sweepMonitor != null
-                        ? sweepMonitor.CurrentYawDegrees.ToString("F2", CultureInfo.InvariantCulture) + "°"
-                        : "–");
-                EditorGUILayout.LabelField(
-                    "Bewegungswechsel",
-                    sweepMonitor != null
-                        ? sweepMonitor.CompletedHalfSweeps.ToString(
-                            CultureInfo.InvariantCulture)
-                        : "–");
-                EditorGUILayout.LabelField(
-                    "Mittlere Kopfgeschwindigkeit",
-                    sweepMonitor != null
-                        ? sweepMonitor.MeanAbsoluteYawSpeedDegreesPerSecond.ToString(
-                            "F2",
-                            CultureInfo.InvariantCulture) + "°/s"
-                        : "–");
-                EditorGUILayout.LabelField(
-                    "Spitzen-Kopfgeschwindigkeit",
-                    sweepMonitor != null
-                        ? sweepMonitor.PeakAbsoluteYawSpeedDegreesPerSecond.ToString(
-                            "F2",
-                            CultureInfo.InvariantCulture) + "°/s"
-                        : "–");
-                EditorGUILayout.LabelField(
-                    "Maximale Kopfauslenkung",
-                    sweepMonitor != null
-                        ? sweepMonitor.MaximumAbsoluteYawDegrees.ToString(
-                            "F2",
-                            CultureInfo.InvariantCulture) + "°"
-                        : "–");
-                EditorGUILayout.LabelField(
-                    "Antwort",
-                    randomDotSession != null && randomDotSession.ResponseKeysSwapped
-                        ? "← konvex   |   konkav →"
-                        : "← konkav   |   konvex →");
-                EditorGUILayout.LabelField(
-                    "Fixationsbruch",
-                    randomDotSession != null && randomDotSession.RequireFixation
-                        ? "Trial ungültig, Wiederholung hinten"
-                        : "Kontrolle ausgeschaltet");
+
+                Row("Instrument k", hasStimulus ? Number(stimulus.InstrumentDistortionK, "F3") : Missing);
+                Row("Vergrößerung m",
+                    hasStimulus ? Number(stimulus.InstrumentMagnificationM, "F2", "x") : Missing);
+                Row("Content Zoom", hasStimulus ? Number(stimulus.ContentZoom, "F2") : Missing);
+                Row("Gierwinkel", hasSweep ? Number(sweep.CurrentYawDegrees, "F2", "°") : Missing);
+                Row("Bewegungswechsel", hasSweep ? Number(sweep.CompletedHalfSweeps) : Missing);
+                Row("Mittlere Kopfgeschwindigkeit",
+                    hasSweep ? Number(sweep.MeanAbsoluteYawSpeedDegreesPerSecond, "F2", "°/s") : Missing);
+                Row("Spitzen-Kopfgeschwindigkeit",
+                    hasSweep ? Number(sweep.PeakAbsoluteYawSpeedDegreesPerSecond, "F2", "°/s") : Missing);
+                Row("Maximale Kopfauslenkung",
+                    hasSweep ? Number(sweep.MaximumAbsoluteYawDegrees, "F2", "°") : Missing);
+                Row("Antwort", hasSession && session.ResponseKeysSwapped
+                    ? "← konvex   |   konkav →"
+                    : "← konkav   |   konvex →");
+                Row("Fixationsbruch", hasSession && session.RequireFixation
+                    ? "Trial ungültig, Wiederholung hinten"
+                    : "Kontrolle ausgeschaltet");
             }
         }
 
-        private void DrawFixationStatus(
-            FixationTargetState state,
-            float angleDegrees,
-            float toleranceDegrees,
-            float continuousSeconds,
-            float requiredSeconds,
-            bool requirementMet)
+        // Klappt mit beiden Fixation Monitoren, weil beide dieselbe Basisklasse
+        // haben. TStimulus ist nur der Platzhalter für den jeweiligen Stimulus.
+        private void DrawFixationStatus<TStimulus>(FixationMonitorBase<TStimulus> fixation)
+            where TStimulus : MonoBehaviour, IFixationStimulus
         {
             string label;
             Color color;
-            switch (state)
+            switch (fixation.TargetState)
             {
                 case FixationTargetState.OnTarget:
                     label = "ON TARGET";
@@ -367,48 +245,49 @@ namespace GlobeEffect.VRCheckerboard.Editor
             DrawStatusBlock(label, color);
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                EditorGUILayout.LabelField(
-                    "Blickabweichung",
-                    float.IsNaN(angleDegrees)
-                        ? "–"
-                        : angleDegrees.ToString("F2", CultureInfo.InvariantCulture) + "°");
-                EditorGUILayout.LabelField(
-                    "Toleranz",
-                    toleranceDegrees.ToString("F2", CultureInfo.InvariantCulture) + "°");
-                EditorGUILayout.LabelField(
-                    "Kontinuierliche Fixation",
-                    string.Format(
-                        CultureInfo.InvariantCulture,
-                        "{0:F2} / {1:F2} s",
-                        continuousSeconds,
-                        requiredSeconds));
-                EditorGUILayout.LabelField(
-                    "Fixationskriterium",
-                    requirementMet ? "ERFÜLLT" : "NICHT ERFÜLLT");
+                float angle = fixation.CurrentAngleDegrees;
+                Row("Blickabweichung", float.IsNaN(angle) ? Missing : Number(angle, "F2", "°"));
+                Row("Toleranz", Number(fixation.ToleranceDegrees, "F2", "°"));
+                Row("Kontinuierliche Fixation",
+                    Number(fixation.ContinuousFixationSeconds, "F2") + " / " +
+                    Number(fixation.RequiredContinuousSeconds, "F2") + " s");
+                Row("Fixationskriterium", fixation.RequirementMet ? "ERFÜLLT" : "NICHT ERFÜLLT");
             }
         }
 
         private void DrawStatusBlock(string label, Color backgroundColor)
         {
-            Rect statusRect = GUILayoutUtility.GetRect(
-                100f,
-                88f,
-                GUILayout.ExpandWidth(true));
+            Rect statusRect = GUILayoutUtility.GetRect(100f, 88f, GUILayout.ExpandWidth(true));
             EditorGUI.DrawRect(statusRect, backgroundColor);
             GUI.Label(statusRect, label, statusStyle);
         }
 
+        // Eine Zeile im Fenster: links die Beschriftung, rechts der Wert.
+        private static void Row(string label, string value)
+        {
+            EditorGUILayout.LabelField(label, value);
+        }
+
+        // Zahlen immer mit Punkt als Dezimalzeichen, dahinter die Einheit.
+        private static string Number(float value, string format, string unit = "")
+        {
+            return value.ToString(format, CultureInfo.InvariantCulture) + unit;
+        }
+
+        private static string Number(int value)
+        {
+            return value.ToString(CultureInfo.InvariantCulture);
+        }
+
         private static string FormatTrial(int current, int total)
         {
-            return total > 0 ? $"{current} / {total}" : "–";
+            return total > 0 ? $"{current} / {total}" : Missing;
         }
 
         private static void DrawAutoOpenSetting()
         {
             EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField(
-                "Automatisch bei Play öffnen",
-                AutoOpenEnabled ? "JA" : "NEIN");
+            Row("Automatisch bei Play öffnen", AutoOpenEnabled ? "JA" : "NEIN");
         }
 
         private void EnsureStyles()
@@ -440,20 +319,13 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
 
             nextReferenceRefresh = now + 0.5d;
-            checkerboardFixation =
-                Object.FindAnyObjectByType<CheckerboardFixationMonitor>();
-            randomDotFixation =
-                Object.FindAnyObjectByType<RandomDotFixationMonitor>();
-            checkerboardSession =
-                Object.FindAnyObjectByType<CheckerboardExperimentManager>();
-            randomDotSession =
-                Object.FindAnyObjectByType<RandomDotExperimentManager>();
-            checkerboardStimulus =
-                Object.FindAnyObjectByType<VrCheckerboardStimulus>();
-            randomDotStimulus =
-                Object.FindAnyObjectByType<RandomDotFieldStimulus>();
-            sweepMonitor =
-                Object.FindAnyObjectByType<RandomDotHeadSweepMonitor>();
+            checkerboardFixation = Object.FindAnyObjectByType<CheckerboardFixationMonitor>();
+            randomDotFixation = Object.FindAnyObjectByType<RandomDotFixationMonitor>();
+            checkerboardSession = Object.FindAnyObjectByType<CheckerboardExperimentManager>();
+            randomDotSession = Object.FindAnyObjectByType<RandomDotExperimentManager>();
+            checkerboardStimulus = Object.FindAnyObjectByType<VrCheckerboardStimulus>();
+            randomDotStimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
+            sweepMonitor = Object.FindAnyObjectByType<RandomDotHeadSweepMonitor>();
         }
     }
 
@@ -473,13 +345,10 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private static void HandlePlayModeStateChanged(PlayModeStateChange state)
         {
-            if (state != PlayModeStateChange.EnteredPlayMode ||
-                !ExperimenterMonitorWindow.AutoOpenEnabled)
+            if (state == PlayModeStateChange.EnteredPlayMode && ExperimenterMonitorWindow.AutoOpenEnabled)
             {
-                return;
+                EditorApplication.delayCall += OpenIfExperimentSceneIsActive;
             }
-
-            EditorApplication.delayCall += OpenIfExperimentSceneIsActive;
         }
 
         private static void OpenIfExperimentSceneIsActive()

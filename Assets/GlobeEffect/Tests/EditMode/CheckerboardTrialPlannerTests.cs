@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using GlobeEffect.VRCheckerboard.Experiment;
 using NUnit.Framework;
 
@@ -22,14 +22,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(second.Count, Is.EqualTo(first.Count));
             for (int index = 0; index < first.Count; index++)
             {
-                Assert.That(second[index].ConditionIndex,
-                    Is.EqualTo(first[index].ConditionIndex));
-                Assert.That(second[index].Repetition,
-                    Is.EqualTo(first[index].Repetition));
-                Assert.That(second[index].VisualSpaceL,
-                    Is.EqualTo(first[index].VisualSpaceL));
-                Assert.That(second[index].EyePresentation,
-                    Is.EqualTo(first[index].EyePresentation));
+                Assert.That(second[index].ConditionIndex, Is.EqualTo(first[index].ConditionIndex));
+                Assert.That(second[index].Repetition, Is.EqualTo(first[index].Repetition));
+                Assert.That(second[index].VisualSpaceL, Is.EqualTo(first[index].VisualSpaceL));
+                Assert.That(second[index].EyePresentation, Is.EqualTo(first[index].EyePresentation));
             }
         }
 
@@ -64,11 +60,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         {
             Assert.Throws<System.ArgumentOutOfRangeException>(() =>
                 CheckerboardTrialPlanner.CreateRandomizedPlan(
-                    new[] { 90f },
-                    new[] { CheckerboardEyePresentation.BothEyes },
-                    new[] { 1.5f },
-                    1,
-                    1));
+                    new[] { 90f }, new[] { CheckerboardEyePresentation.BothEyes }, new[] { 1.5f }, 1, 1));
         }
 
         [TestCase("pilot 01", "pilot_01")]
@@ -76,23 +68,18 @@ namespace GlobeEffect.VRCheckerboard.Tests
         [TestCase("", "fallback")]
         public void SessionIdentifier_IsMadeFileSafe(string input, string expected)
         {
-            Assert.That(
-                CheckerboardExperimentFiles.SanitizeIdentifier(input, "fallback"),
-                Is.EqualTo(expected));
+            Assert.That(ExperimentFilesBase.SanitizeIdentifier(input, "fallback"), Is.EqualTo(expected));
         }
 
         private static IReadOnlyList<CheckerboardTrial> CreatePlan(int seed)
         {
+            var eyes = new[]
+            {
+                CheckerboardEyePresentation.BothEyes,
+                CheckerboardEyePresentation.LeftEyeOnly
+            };
             return CheckerboardTrialPlanner.CreateRandomizedPlan(
-                new[] { 70f, 90f },
-                new[]
-                {
-                    CheckerboardEyePresentation.BothEyes,
-                    CheckerboardEyePresentation.LeftEyeOnly
-                },
-                new[] { 0.5f, 1f },
-                2,
-                seed);
+                new[] { 70f, 90f }, eyes, new[] { 0.5f, 1f }, 2, seed);
         }
     }
 }

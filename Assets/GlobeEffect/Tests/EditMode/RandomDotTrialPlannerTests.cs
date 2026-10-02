@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using GlobeEffect.VRCheckerboard.Experiment;
 using GlobeEffect.VRCheckerboard.RandomDots;
@@ -15,6 +16,12 @@ namespace GlobeEffect.VRCheckerboard.Tests
     /// </summary>
     public sealed class RandomDotTrialPlannerTests
     {
+        private static readonly RandomDotMotionMode[] BothModes =
+        {
+            RandomDotMotionMode.SimulatedYaw,
+            RandomDotMotionMode.HeadTracked
+        };
+
         [Test]
         public void SameSeed_ProducesSameOrderAndDotSeeds()
         {
@@ -24,12 +31,9 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(first.Count, Is.EqualTo(second.Count));
             for (int index = 0; index < first.Count; index++)
             {
-                Assert.That(first[index].ConditionIndex,
-                    Is.EqualTo(second[index].ConditionIndex));
-                Assert.That(first[index].DotSeed,
-                    Is.EqualTo(second[index].DotSeed));
-                Assert.That(first[index].SweepDirection,
-                    Is.EqualTo(second[index].SweepDirection));
+                Assert.That(first[index].ConditionIndex, Is.EqualTo(second[index].ConditionIndex));
+                Assert.That(first[index].DotSeed, Is.EqualTo(second[index].DotSeed));
+                Assert.That(first[index].SweepDirection, Is.EqualTo(second[index].SweepDirection));
                 Assert.That(first[index].SequenceIndex, Is.EqualTo(index + 1));
             }
         }
@@ -42,14 +46,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
             // 2 FOV * 1 Auge * 2 k-Werte * 2 m-Werte * 1 Content Zoom *
             // 1 Bewegungsart * 4 Wiederholungen.
             Assert.That(plan.Count, Is.EqualTo(32));
-            Assert.That(plan.Count(t => t.InstrumentDistortionK == 0.5f),
-                Is.EqualTo(16));
-            Assert.That(plan.Count(t => t.InstrumentDistortionK == 1f),
-                Is.EqualTo(16));
-            Assert.That(plan.Count(t => t.InstrumentMagnificationM == 4f),
-                Is.EqualTo(16));
-            Assert.That(plan.Count(t => t.InstrumentMagnificationM == 10f),
-                Is.EqualTo(16));
+            Assert.That(plan.Count(t => t.InstrumentDistortionK == 0.5f), Is.EqualTo(16));
+            Assert.That(plan.Count(t => t.InstrumentDistortionK == 1f), Is.EqualTo(16));
+            Assert.That(plan.Count(t => t.InstrumentMagnificationM == 4f), Is.EqualTo(16));
+            Assert.That(plan.Count(t => t.InstrumentMagnificationM == 10f), Is.EqualTo(16));
             Assert.That(plan.All(t => t.AttemptNumber == 1), Is.True);
         }
 
@@ -58,39 +58,24 @@ namespace GlobeEffect.VRCheckerboard.Tests
         {
             var plan = CreatePlan(17);
 
-            foreach (var group in plan.GroupBy(t => new
-                     {
-                         t.AngularDiameterDegrees,
-                         t.InstrumentDistortionK,
-                         t.InstrumentMagnificationM
-                     }))
+            var groups = plan.GroupBy(t =>
+                new { t.AngularDiameterDegrees, t.InstrumentDistortionK, t.InstrumentMagnificationM });
+            foreach (var group in groups)
             {
-                Assert.That(group.Count(
-                    t => t.SweepDirection == RandomDotSweepDirection.LeftFirst),
-                    Is.EqualTo(2));
-                Assert.That(group.Count(
-                    t => t.SweepDirection == RandomDotSweepDirection.RightFirst),
-                    Is.EqualTo(2));
+                int leftFirst = group.Count(t => t.SweepDirection == RandomDotSweepDirection.LeftFirst);
+                int rightFirst = group.Count(t => t.SweepDirection == RandomDotSweepDirection.RightFirst);
+                Assert.That(leftFirst, Is.EqualTo(2));
+                Assert.That(rightFirst, Is.EqualTo(2));
             }
 
             foreach (float fov in new[] { 40f, 70f })
             {
                 foreach (float magnification in new[] { 4f, 10f })
                 {
-                    int[] helmholtzSeeds = plan
-                        .Where(t => t.AngularDiameterDegrees == fov &&
-                            t.InstrumentDistortionK == 0.5f &&
-                            t.InstrumentMagnificationM == magnification)
-                        .OrderBy(t => t.Repetition)
-                        .Select(t => t.DotSeed)
-                        .ToArray();
-                    int[] straightSeeds = plan
-                        .Where(t => t.AngularDiameterDegrees == fov &&
-                            t.InstrumentDistortionK == 1f &&
-                            t.InstrumentMagnificationM == magnification)
-                        .OrderBy(t => t.Repetition)
-                        .Select(t => t.DotSeed)
-                        .ToArray();
+                    var sameView = plan.Where(t =>
+                        t.AngularDiameterDegrees == fov && t.InstrumentMagnificationM == magnification);
+                    int[] helmholtzSeeds = DotSeeds(sameView.Where(t => t.InstrumentDistortionK == 0.5f));
+                    int[] straightSeeds = DotSeeds(sameView.Where(t => t.InstrumentDistortionK == 1f));
                     Assert.That(straightSeeds, Is.EqualTo(helmholtzSeeds));
                 }
             }
@@ -99,91 +84,40 @@ namespace GlobeEffect.VRCheckerboard.Tests
         [Test]
         public void MotionModesStayInSeparateBlocksAndMiniBlocksStayComplete()
         {
-            var plan = RandomDotTrialPlanner.CreateRandomizedPlan(
-                new[] { 90f },
-                new[] { CheckerboardEyePresentation.BothEyes },
-                new[] { 0.5f, 1f },
-                new[] { 10f },
-                new[] { 1f },
-                new[]
-                {
-                    RandomDotMotionMode.SimulatedYaw,
-                    RandomDotMotionMode.HeadTracked
-                },
-                repetitions: 4,
-                repetitionsPerMiniBlock: 2,
-                randomSeed: 23,
-                dotSeedBase: 5000);
+            var plan = CreateSimplePlan(
+                new[] { 0.5f, 1f }, BothModes, repetitions: 4, perMiniBlock: 2, seed: 23);
 
             Assert.That(plan.Count, Is.EqualTo(16));
             Assert.That(plan.Take(8).All(t =>
-                t.MotionMode == RandomDotMotionMode.SimulatedYaw &&
-                t.MotionBlockIndex == 1), Is.True);
+                t.MotionMode == RandomDotMotionMode.SimulatedYaw && t.MotionBlockIndex == 1), Is.True);
             Assert.That(plan.Skip(8).All(t =>
-                t.MotionMode == RandomDotMotionMode.HeadTracked &&
-                t.MotionBlockIndex == 2), Is.True);
-            Assert.That(plan.GroupBy(t => new
-                {
-                    t.MotionBlockIndex,
-                    t.MiniBlockIndex,
-                    t.InstrumentDistortionK
-                }).All(group => group.Count() == 2), Is.True);
+                t.MotionMode == RandomDotMotionMode.HeadTracked && t.MotionBlockIndex == 2), Is.True);
+            var miniBlocks = plan.GroupBy(t =>
+                new { t.MotionBlockIndex, t.MiniBlockIndex, t.InstrumentDistortionK });
+            Assert.That(miniBlocks.All(group => group.Count() == 2), Is.True);
 
-            int[] simulatedSeeds = plan
-                .Where(t => t.MotionMode == RandomDotMotionMode.SimulatedYaw)
-                .OrderBy(t => t.InstrumentDistortionK)
-                .ThenBy(t => t.Repetition)
-                .Select(t => t.DotSeed)
-                .ToArray();
-            int[] headTrackedSeeds = plan
-                .Where(t => t.MotionMode == RandomDotMotionMode.HeadTracked)
-                .OrderBy(t => t.InstrumentDistortionK)
-                .ThenBy(t => t.Repetition)
-                .Select(t => t.DotSeed)
-                .ToArray();
-            Assert.That(headTrackedSeeds, Is.EqualTo(simulatedSeeds));
+            var simulated = plan.Where(t => t.MotionMode == RandomDotMotionMode.SimulatedYaw);
+            var headTracked = plan.Where(t => t.MotionMode == RandomDotMotionMode.HeadTracked);
+            Assert.That(DotSeeds(headTracked), Is.EqualTo(DotSeeds(simulated)));
         }
 
         [Test]
         public void VerticalAxisOnlyAffectsSimulatedBlockAndSurvivesRepeat()
         {
-            var plan = RandomDotTrialPlanner.CreateRandomizedPlan(
-                new[] { 90f },
-                new[] { CheckerboardEyePresentation.BothEyes },
-                new[] { 0.5f },
-                new[] { 10f },
-                new[] { 1f },
-                new[]
-                {
-                    RandomDotMotionMode.SimulatedYaw,
-                    RandomDotMotionMode.HeadTracked
-                },
-                repetitions: 1,
-                repetitionsPerMiniBlock: 1,
-                randomSeed: 23,
-                dotSeedBase: 5000,
+            var plan = CreateSimplePlan(
+                new[] { 0.5f }, BothModes, repetitions: 1, perMiniBlock: 1, seed: 23,
                 simulatedSweepAxis: RandomDotSweepAxis.Vertical);
 
             Assert.That(plan[0].SweepAxis, Is.EqualTo(RandomDotSweepAxis.Vertical));
             Assert.That(plan[1].SweepAxis, Is.EqualTo(RandomDotSweepAxis.Horizontal));
-            Assert.That(plan[0].CreateRepeatedAttempt().SweepAxis,
-                Is.EqualTo(RandomDotSweepAxis.Vertical));
+            Assert.That(plan[0].CreateRepeatedAttempt().SweepAxis, Is.EqualTo(RandomDotSweepAxis.Vertical));
         }
 
         [Test]
         public void InvalidTrialRepeatStaysInsideItsMiniBlock()
         {
-            var plan = RandomDotTrialPlanner.CreateRandomizedPlan(
-                new[] { 90f },
-                new[] { CheckerboardEyePresentation.BothEyes },
-                new[] { 0.5f, 1f },
-                new[] { 10f },
-                new[] { 1f },
-                new[] { RandomDotMotionMode.SimulatedYaw },
-                repetitions: 2,
-                repetitionsPerMiniBlock: 1,
-                randomSeed: 31,
-                dotSeedBase: 5000);
+            var plan = CreateSimplePlan(new[] { 0.5f, 1f }, new[] { RandomDotMotionMode.SimulatedYaw },
+                repetitions: 2, perMiniBlock: 1, seed: 31);
             var queue = new RandomDotTrialQueue(plan);
 
             Assert.That(queue.TryTakeNext(out RandomDotTrial invalid), Is.True);
@@ -197,8 +131,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(next.MiniBlockIndex, Is.EqualTo(2));
         }
 
-        private static System.Collections.Generic.IReadOnlyList<RandomDotTrial>
-            CreatePlan(int randomSeed)
+        private static IReadOnlyList<RandomDotTrial> CreatePlan(int randomSeed)
         {
             return RandomDotTrialPlanner.CreateRandomizedPlan(
                 new[] { 40f, 70f },
@@ -211,6 +144,36 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 repetitionsPerMiniBlock: 2,
                 randomSeed,
                 dotSeedBase: 5000);
+        }
+
+        // Ein kleiner Plan mit festen Werten: FOV 90, beide Augen, m = 10, kein
+        // Zusatzzoom. Nur k, Bewegungsarten, Wiederholungen und Seed ändern sich.
+        private static IReadOnlyList<RandomDotTrial> CreateSimplePlan(
+            float[] kValues, RandomDotMotionMode[] motionModes, int repetitions, int perMiniBlock, int seed,
+            RandomDotSweepAxis simulatedSweepAxis = RandomDotSweepAxis.Horizontal)
+        {
+            return RandomDotTrialPlanner.CreateRandomizedPlan(
+                new[] { 90f },
+                new[] { CheckerboardEyePresentation.BothEyes },
+                kValues,
+                new[] { 10f },
+                new[] { 1f },
+                motionModes,
+                repetitions,
+                perMiniBlock,
+                seed,
+                dotSeedBase: 5000,
+                simulatedSweepAxis);
+        }
+
+        // Die Punkt-Seeds der Durchgänge, sortiert nach k und dann nach Wiederholung.
+        private static int[] DotSeeds(IEnumerable<RandomDotTrial> trials)
+        {
+            return trials
+                .OrderBy(t => t.InstrumentDistortionK)
+                .ThenBy(t => t.Repetition)
+                .Select(t => t.DotSeed)
+                .ToArray();
         }
     }
 }

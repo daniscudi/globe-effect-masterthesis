@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
@@ -30,10 +31,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 throw new ArgumentNullException(nameof(observer));
             }
 
-            root = new GameObject("Runtime Random Dot Head Training")
-            {
-                hideFlags = HideFlags.HideAndDontSave
-            };
+            // Das Display hängt am Kopf und steht immer 2 m vor den Augen.
+            root = new GameObject("Runtime Random Dot Head Training");
+            root.hideFlags = HideFlags.HideAndDontSave;
             root.transform.SetParent(observer, false);
             root.transform.localPosition = new Vector3(0f, 0f, 2f);
             root.transform.localRotation = Quaternion.identity;
@@ -42,27 +42,25 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             heading = CreateText("Heading", font, 0.30f, 0.010f);
             footer = CreateText("Footer", font, -0.43f, 0.007f);
 
+            // Zwei graue Schienen: oben läuft das blaue Ziel, unten der gelbe Kopf.
+            // Der senkrechte Strich in der Mitte zeigt die Geradeaus-Stellung.
             trackGroup = new GameObject("Motion Guide");
             trackGroup.transform.SetParent(root.transform, false);
             Material trackMaterial = CreateMaterial(new Color(0.12f, 0.12f, 0.12f));
-            Material targetMaterial = CreateMaterial(new Color(0f, 0.55f, 0.9f));
-            Material headMaterial = CreateMaterial(new Color(1f, 0.75f, 0f));
+            var trackSize = new Vector3(0.43f, 0.008f, 0.008f);
+            Vector3 markerSize = Vector3.one * 0.035f;
             CreatePrimitive("Target Track", PrimitiveType.Cube,
-                new Vector3(0f, -0.15f, 0f),
-                new Vector3(0.43f, 0.008f, 0.008f), trackMaterial);
+                new Vector3(0f, -0.15f, 0f), trackSize, trackMaterial);
             CreatePrimitive("Head Track", PrimitiveType.Cube,
-                new Vector3(0f, -0.30f, 0f),
-                new Vector3(0.43f, 0.008f, 0.008f), trackMaterial);
+                new Vector3(0f, -0.30f, 0f), trackSize, trackMaterial);
             CreatePrimitive("Center Tick", PrimitiveType.Cube,
-                new Vector3(0f, -0.225f, -0.005f),
-                new Vector3(0.006f, 0.17f, 0.006f), trackMaterial);
+                new Vector3(0f, -0.225f, -0.005f), new Vector3(0.006f, 0.17f, 0.006f), trackMaterial);
             targetMarker = CreatePrimitive("Blue Target", PrimitiveType.Sphere,
-                new Vector3(0f, -0.15f, -0.02f),
-                Vector3.one * 0.035f, targetMaterial);
+                new Vector3(0f, -0.15f, -0.02f), markerSize, CreateMaterial(new Color(0f, 0.55f, 0.9f)));
             headMarker = CreatePrimitive("Yellow Head", PrimitiveType.Sphere,
-                new Vector3(0f, -0.30f, -0.02f),
-                Vector3.one * 0.035f, headMaterial);
+                new Vector3(0f, -0.30f, -0.02f), markerSize, CreateMaterial(new Color(1f, 0.75f, 0f)));
 
+            // Ein kurzer Ton bei jeder Wende: tief für links, hoch für rechts.
             audioSource = root.AddComponent<AudioSource>();
             audioSource.playOnAwake = false;
             audioSource.spatialBlend = 0f;
@@ -74,67 +72,45 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         public void ShowInstructions(float amplitudeDegrees)
         {
-            root.SetActive(true);
-            trackGroup.SetActive(false);
-            heading.text = "HEAD MOVEMENT PRACTICE\n\n" +
+            Show(false,
+                "HEAD MOVEMENT PRACTICE\n\n" +
                 "Follow the blue target by turning your head.\n" +
                 "Yellow shows your own head position.\n" +
                 "Look at the central cross and turn only " +
-                amplitudeDegrees.ToString("F1") + " deg to each side.";
-            footer.text = "F5 = START PRACTICE     F6 = STOP";
+                amplitudeDegrees.ToString("F1") + " deg to each side.",
+                "F5 = START PRACTICE     F6 = STOP");
         }
 
-        public void ShowPractice(int goodSweeps, int requiredSweeps,
-            RandomDotSweepDirection direction)
+        public void ShowPractice(int goodSweeps, int requiredSweeps, RandomDotSweepDirection direction)
         {
-            root.SetActive(true);
-            trackGroup.SetActive(true);
-            heading.text = "EYES ON CROSS - MOVE YOUR HEAD\n" +
-                (direction == RandomDotSweepDirection.RightFirst
-                    ? "Start toward the right"
-                    : "Start toward the left");
-            footer.text = "BLUE = TARGET     YELLOW = HEAD\n" +
-                "Good sweeps: " + goodSweeps + " / " + requiredSweeps;
+            string side = direction == RandomDotSweepDirection.RightFirst ? "right" : "left";
+            Show(true,
+                "EYES ON CROSS - MOVE YOUR HEAD\nStart toward the " + side,
+                "BLUE = TARGET     YELLOW = HEAD\n" + GoodSweepsText(goodSweeps, requiredSweeps));
         }
 
         public void ShowCentering(float actualYawDegrees, float amplitudeDegrees)
         {
-            root.SetActive(true);
-            trackGroup.SetActive(true);
-            heading.text = "RETURN YOUR HEAD TO CENTER";
-            footer.text = "Align yellow with the center mark";
+            Show(true, "RETURN YOUR HEAD TO CENTER", "Align yellow with the center mark");
             UpdateMarkers(0f, actualYawDegrees, amplitudeDegrees);
         }
 
-        public void ShowFeedback(string message, int goodSweeps,
-            int requiredSweeps)
+        public void ShowFeedback(string message, int goodSweeps, int requiredSweeps)
         {
-            root.SetActive(true);
-            trackGroup.SetActive(false);
-            heading.text = message;
-            footer.text = "Good sweeps: " + goodSweeps + " / " + requiredSweeps;
+            Show(false, message, GoodSweepsText(goodSweeps, requiredSweeps));
         }
 
         public void ShowCompleted()
         {
-            root.SetActive(true);
-            trackGroup.SetActive(false);
-            heading.text = "PRACTICE COMPLETE";
-            footer.text = "The random dots will start shortly.";
+            Show(false, "PRACTICE COMPLETE", "The random dots will start shortly.");
         }
 
-        public void UpdateMarkers(float targetYawDegrees, float actualYawDegrees,
-            float amplitudeDegrees)
+        public void UpdateMarkers(float targetYawDegrees, float actualYawDegrees, float amplitudeDegrees)
         {
-            float scale = MarkerHalfTravelMeters / Mathf.Max(0.1f,
-                amplitudeDegrees);
-            Vector3 targetPosition = targetMarker.localPosition;
-            targetPosition.x = Mathf.Clamp(targetYawDegrees * scale, -0.25f, 0.25f);
-            targetMarker.localPosition = targetPosition;
-
-            Vector3 headPosition = headMarker.localPosition;
-            headPosition.x = Mathf.Clamp(actualYawDegrees * scale, -0.25f, 0.25f);
-            headMarker.localPosition = headPosition;
+            // Der volle Ausschlag zur Seite entspricht 18 cm auf der Schiene.
+            float scale = MarkerHalfTravelMeters / Mathf.Max(0.1f, amplitudeDegrees);
+            MoveMarker(targetMarker, targetYawDegrees * scale);
+            MoveMarker(headMarker, actualYawDegrees * scale);
         }
 
         public void PlayTurnCue(float targetYawDegrees)
@@ -152,16 +128,39 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         {
             if (root != null)
             {
-                UnityEngine.Object.Destroy(root);
+                Object.Destroy(root);
             }
 
             foreach (Material material in materials)
             {
-                UnityEngine.Object.Destroy(material);
+                Object.Destroy(material);
             }
 
-            UnityEngine.Object.Destroy(leftTone);
-            UnityEngine.Object.Destroy(rightTone);
+            Object.Destroy(leftTone);
+            Object.Destroy(rightTone);
+        }
+
+        // Macht das Display sichtbar und setzt beide Texte.
+        // showTrack sagt, ob die Schienen mit den Kugeln zu sehen sind.
+        private void Show(bool showTrack, string headingText, string footerText)
+        {
+            root.SetActive(true);
+            trackGroup.SetActive(showTrack);
+            heading.text = headingText;
+            footer.text = footerText;
+        }
+
+        private static string GoodSweepsText(int goodSweeps, int requiredSweeps)
+        {
+            return "Good sweeps: " + goodSweeps + " / " + requiredSweeps;
+        }
+
+        // Schiebt eine Kugel nach links oder rechts, aber nie über die Schiene hinaus.
+        private static void MoveMarker(Transform marker, float x)
+        {
+            Vector3 position = marker.localPosition;
+            position.x = Mathf.Clamp(x, -0.25f, 0.25f);
+            marker.localPosition = position;
         }
 
         private TextMesh CreateText(string name, Font font, float y, float size)
@@ -180,6 +179,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             mesh.richText = false;
             if (font != null)
             {
+                // Eigenes Material mit hoher Render-Reihenfolge, damit der Text
+                // immer vor allem anderen gezeichnet wird.
                 var material = new Material(font.material)
                 {
                     hideFlags = HideFlags.HideAndDontSave,
@@ -192,8 +193,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             return mesh;
         }
 
-        private Transform CreatePrimitive(string name, PrimitiveType type,
-            Vector3 position, Vector3 scale, Material material)
+        private Transform CreatePrimitive(
+            string name, PrimitiveType type, Vector3 position, Vector3 scale, Material material)
         {
             GameObject primitive = GameObject.CreatePrimitive(type);
             primitive.name = name;
@@ -201,10 +202,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             primitive.transform.localPosition = position;
             primitive.transform.localScale = scale;
             primitive.GetComponent<Renderer>().sharedMaterial = material;
+
+            // Die Formen sind nur zum Anschauen. Ein Collider wird nicht gebraucht.
             Collider collider = primitive.GetComponent<Collider>();
             if (collider != null)
             {
-                UnityEngine.Object.Destroy(collider);
+                Object.Destroy(collider);
             }
 
             return primitive.transform;
@@ -212,8 +215,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         private Material CreateMaterial(Color color)
         {
-            Shader shader = Shader.Find("Unlit/Color");
-            var material = new Material(shader)
+            var material = new Material(Shader.Find("Unlit/Color"))
             {
                 hideFlags = HideFlags.HideAndDontSave,
                 color = color,
@@ -225,6 +227,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         private static AudioClip CreateTone(string name, float frequencyHz)
         {
+            // 0,1 s Sinuston, der sanft ein- und ausgeblendet wird, damit er nicht knackt.
             const int sampleRate = 44100;
             const int sampleCount = 4410;
             var samples = new float[sampleCount];
@@ -232,8 +235,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             {
                 float time = (float)index / sampleRate;
                 float envelope = Mathf.Sin(Mathf.PI * index / (sampleCount - 1));
-                samples[index] = 0.35f * envelope *
-                    Mathf.Sin(2f * Mathf.PI * frequencyHz * time);
+                samples[index] = 0.35f * envelope * Mathf.Sin(2f * Mathf.PI * frequencyHz * time);
             }
 
             AudioClip clip = AudioClip.Create(name, sampleCount, 1, sampleRate, false);

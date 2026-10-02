@@ -33,8 +33,7 @@ namespace GlobeEffect.VRCheckerboard
         /// einmal geändert wird, sieht man an den alten Dateien trotzdem, womit
         /// sie aufgenommen wurden.
         /// </summary>
-        public const string MappingVersion =
-            "visual-space-l-tangent-normalized-cartesian-grid-v2";
+        public const string MappingVersion = "visual-space-l-tangent-normalized-cartesian-grid-v2";
 
         /// <summary>
         /// Rechnet einen Radius im sichtbaren Kreis zurück auf die Stelle, an der
@@ -45,9 +44,7 @@ namespace GlobeEffect.VRCheckerboard
         /// visualSpaceL: l = 1 gibt ein gerades Gitter, l = 0,5 den Helmholtz-Punkt.
         /// Geht l gegen 0, sind die Abstände überall gleich groß.
         public static double SourceRadius(
-            double displayRadius,
-            double angularDiameterDegrees,
-            double visualSpaceL)
+            double displayRadius, double angularDiameterDegrees, double visualSpaceL)
         {
             ValidateFinite(displayRadius, nameof(displayRadius));
             ValidateParameters(angularDiameterDegrees, visualSpaceL);
@@ -62,13 +59,12 @@ namespace GlobeEffect.VRCheckerboard
                 return 0.0;
             }
 
-            double halfAngle = 0.5 * angularDiameterDegrees * Math.PI / 180.0;
+            double halfAngle = HalfAngleRadians(angularDiameterDegrees);
 
             // displayRadius ist erst mal nur ein gerader Abstand zwischen Mitte und
             // Rand. atan macht daraus den Winkel, den dieser Bildpunkt im Headset
             // wirklich einnimmt.
-            double visualAngle = Math.Atan(
-                displayRadius * Math.Tan(halfAngle));
+            double visualAngle = Math.Atan(displayRadius * Math.Tan(halfAngle));
 
             // Direkt durch l zu teilen geht bei l = 0 nicht. Nach dem Normieren
             // kürzt sich l für alle anderen Werte sowieso weg. Der Sonderfall hier
@@ -80,8 +76,7 @@ namespace GlobeEffect.VRCheckerboard
 
             // Das Ergebnis liegt wieder zwischen 0 und 1: 0 ist die Mitte, 1 ist der
             // Rand. Dazwischen verschiebt l, an welcher Stelle das Gitter abgelesen wird.
-            return Math.Tan(visualSpaceL * visualAngle) /
-                Math.Tan(visualSpaceL * halfAngle);
+            return Math.Tan(visualSpaceL * visualAngle) / Math.Tan(visualSpaceL * halfAngle);
         }
 
         /// <summary>
@@ -104,23 +99,18 @@ namespace GlobeEffect.VRCheckerboard
         /// gleichmäßiges Gitter.
         /// </summary>
         public static double NormalizedGridLineSpacing(
-            double angularDiameterDegrees,
-            double gridLineSpacingDegrees)
+            double angularDiameterDegrees, double gridLineSpacingDegrees)
         {
             ValidateAngularDiameter(angularDiameterDegrees);
-            ValidateFinite(
-                gridLineSpacingDegrees,
-                nameof(gridLineSpacingDegrees));
+            ValidateFinite(gridLineSpacingDegrees, nameof(gridLineSpacingDegrees));
 
             if (gridLineSpacingDegrees <= 0.0 || gridLineSpacingDegrees >= 90.0)
             {
-                throw new ArgumentOutOfRangeException(
-                    nameof(gridLineSpacingDegrees),
-                    "Der Abstand der Gitterlinien muss zwischen " +
-                    "0 und 90 Grad liegen.");
+                throw new ArgumentOutOfRangeException(nameof(gridLineSpacingDegrees),
+                    "Der Abstand der Gitterlinien muss zwischen 0 und 90 Grad liegen.");
             }
 
-            double halfAngle = 0.5 * angularDiameterDegrees * Math.PI / 180.0;
+            double halfAngle = HalfAngleRadians(angularDiameterDegrees);
             double spacingRadians = gridLineSpacingDegrees * Math.PI / 180.0;
 
             // Beide Tangenswerte liegen im selben geraden Bildraum. Teilt man sie,
@@ -128,9 +118,7 @@ namespace GlobeEffect.VRCheckerboard
             return Math.Tan(spacingRadians) / Math.Tan(halfAngle);
         }
 
-        public static void ValidateParameters(
-            double angularDiameterDegrees,
-            double visualSpaceL)
+        public static void ValidateParameters(double angularDiameterDegrees, double visualSpaceL)
         {
             ValidateAngularDiameter(angularDiameterDegrees);
             ValidateVisualSpaceL(visualSpaceL);
@@ -138,43 +126,40 @@ namespace GlobeEffect.VRCheckerboard
             // Bei sehr großen l und sehr großem FOV läuft der Tangens in seinen
             // Umkehrpunkt. Dann wäre das Gitter nicht mehr eindeutig, deshalb wird
             // so eine Kombination hier abgefangen.
-            double halfAngle = 0.5 * angularDiameterDegrees * Math.PI / 180.0;
-            if (visualSpaceL * halfAngle >=
-                Math.PI / 2.0 - SafetyMarginRadians)
+            if (visualSpaceL * HalfAngleRadians(angularDiameterDegrees)
+                >= Math.PI / 2.0 - SafetyMarginRadians)
             {
-                throw new ArgumentOutOfRangeException(
-                    nameof(visualSpaceL),
-                    "Diese Kombination aus l und FOV geht nicht. Der Tangens kippt " +
-                    "dabei um und das Gitter wäre nicht mehr eindeutig.");
+                throw new ArgumentOutOfRangeException(nameof(visualSpaceL),
+                    "Diese Kombination aus l und FOV geht nicht. Der Tangens kippt "
+                    + "dabei um und das Gitter wäre nicht mehr eindeutig.");
             }
         }
 
         public static void ValidateAngularDiameter(double angularDiameterDegrees)
         {
             ValidateFinite(angularDiameterDegrees, nameof(angularDiameterDegrees));
-            if (angularDiameterDegrees < MinimumAngularDiameterDegrees ||
-                angularDiameterDegrees > MaximumAngularDiameterDegrees)
+            if (angularDiameterDegrees < MinimumAngularDiameterDegrees
+                || angularDiameterDegrees > MaximumAngularDiameterDegrees)
             {
-                throw new ArgumentOutOfRangeException(
-                    nameof(angularDiameterDegrees),
-                    $"Der Winkeldurchmesser muss zwischen " +
-                    $"{MinimumAngularDiameterDegrees} und " +
-                    $"{MaximumAngularDiameterDegrees} Grad liegen.");
+                throw new ArgumentOutOfRangeException(nameof(angularDiameterDegrees),
+                    $"Der Winkeldurchmesser muss zwischen {MinimumAngularDiameterDegrees} und "
+                    + $"{MaximumAngularDiameterDegrees} Grad liegen.");
             }
         }
 
         public static void ValidateVisualSpaceL(double visualSpaceL)
         {
             ValidateFinite(visualSpaceL, nameof(visualSpaceL));
-            if (visualSpaceL < MinimumVisualSpaceL ||
-                visualSpaceL > MaximumVisualSpaceL)
+            if (visualSpaceL < MinimumVisualSpaceL || visualSpaceL > MaximumVisualSpaceL)
             {
-                throw new ArgumentOutOfRangeException(
-                    nameof(visualSpaceL),
-                    $"l muss zwischen {MinimumVisualSpaceL} und " +
-                    $"{MaximumVisualSpaceL} liegen.");
+                throw new ArgumentOutOfRangeException(nameof(visualSpaceL),
+                    $"l muss zwischen {MinimumVisualSpaceL} und {MaximumVisualSpaceL} liegen.");
             }
         }
+
+        // Halber Winkeldurchmesser im Bogenmaß, also der Winkel von der Mitte zum Rand.
+        private static double HalfAngleRadians(double angularDiameterDegrees) =>
+            0.5 * angularDiameterDegrees * Math.PI / 180.0;
 
         private static void ValidateFinite(double value, string parameterName)
         {

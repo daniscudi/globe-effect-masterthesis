@@ -1,5 +1,6 @@
 using System;
 using NUnit.Framework;
+using Merlitz = GlobeEffect.VRCheckerboard.MerlitzBinocularReferenceMath;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
@@ -21,14 +22,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
             const double magnification = 10.0;
             double objectAngle = 3.0 * Math.PI / 180.0;
 
-            double apparent = MerlitzBinocularReferenceMath.ApparentAngleFromObject(
-                objectAngle,
-                magnification,
-                k);
-            double reconstructed = MerlitzBinocularReferenceMath.ObjectAngleFromApparent(
-                apparent,
-                magnification,
-                k);
+            double apparent = Merlitz.ApparentAngleFromObject(objectAngle, magnification, k);
+            double reconstructed = Merlitz.ObjectAngleFromApparent(apparent, magnification, k);
 
             Assert.That(reconstructed, Is.EqualTo(objectAngle).Within(1e-12));
         }
@@ -39,13 +34,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
             const double objectAngle = 5.0 * Math.PI / 180.0;
             const double magnification = 10.0;
 
-            double apparent =
-                MerlitzBinocularReferenceMath.ApparentAngleFromObject(
-                    objectAngle,
-                    magnification,
-                    k: 1.0);
-            double expected = Math.Atan(
-                magnification * Math.Tan(objectAngle));
+            double apparent = Merlitz.ApparentAngleFromObject(objectAngle, magnification, k: 1.0);
+            double expected = Math.Atan(magnification * Math.Tan(objectAngle));
 
             Assert.That(apparent, Is.EqualTo(expected).Within(1e-12));
         }
@@ -58,11 +48,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         {
             const double objectAngle = 5.0 * Math.PI / 180.0;
 
-            double apparent =
-                MerlitzBinocularReferenceMath.ApparentAngleFromObject(
-                    objectAngle,
-                    magnification: 1.0,
-                    k: k);
+            double apparent = Merlitz.ApparentAngleFromObject(objectAngle, magnification: 1.0, k: k);
 
             Assert.That(apparent, Is.EqualTo(objectAngle).Within(1e-12));
         }
@@ -73,11 +59,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         public void NormalizedMapping_MapsBoundaryToBoundary(double k)
         {
             double halfAngle = 35.0 * Math.PI / 180.0;
-            double sourceRadius = MerlitzBinocularReferenceMath.NormalizedSourceRadius(
-                1.0,
-                halfAngle,
-                10.0,
-                k);
+            double sourceRadius = Merlitz.NormalizedSourceRadius(1.0, halfAngle, 10.0, k);
 
             Assert.That(sourceRadius, Is.EqualTo(1.0).Within(1e-12));
         }
@@ -86,15 +68,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
         [TestCase(0.2)]
         [TestCase(0.75)]
         [TestCase(1.0)]
-        public void TangentConditionK1_IsLinearAfterBoundaryNormalization(
-            double displayRadius)
+        public void TangentConditionK1_IsLinearAfterBoundaryNormalization(double displayRadius)
         {
             double halfAngle = 35.0 * Math.PI / 180.0;
-            double sourceRadius = MerlitzBinocularReferenceMath.NormalizedSourceRadius(
-                displayRadius,
-                halfAngle,
-                10.0,
-                1.0);
+            double sourceRadius = Merlitz.NormalizedSourceRadius(displayRadius, halfAngle, 10.0, 1.0);
 
             Assert.That(sourceRadius, Is.EqualTo(displayRadius).Within(1e-12));
         }

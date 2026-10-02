@@ -3,27 +3,57 @@ using System;
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
-    /// Rechnet die glatte Bewegung des simulierten Schwenks aus. Der Winkel
-    /// kann im Shader als horizontaler Yaw oder vertikaler Pitch benutzt werden.
+    /// Rechnet aus, wo der Schwenk gerade steht. Der Winkel kann im Shader als
+    /// horizontaler Yaw oder vertikaler Pitch benutzt werden.
     ///
-    /// Die Bewegung startet in der Mitte, erreicht nach einem Viertel der
-    /// Periode eine Seite und nach drei Vierteln die Gegenseite. An beiden
-    /// Umkehrpunkten ist die Geschwindigkeit null.
+    /// Es gibt zwei Bahnen:
+    /// - Einseitig: Im SimulatedYaw-Block schwenkt das Feld einmal mit fester
+    ///   Geschwindigkeit von der einen Seite zur anderen und kehrt nicht um.
+    /// - Hin und her: Im HeadTracked-Block folgt die Person mit dem Kopf einer
+    ///   Sinusbahn. Die startet in der Mitte, erreicht nach einem Viertel der
+    ///   Periode eine Seite und nach drei Vierteln die Gegenseite. An beiden
+    ///   Umkehrpunkten ist die Geschwindigkeit null.
     ///
     /// Hier steht nur Mathematik drin und nichts von Unity. Deshalb kann man das
     /// ohne Headset testen.
     /// </summary>
     public static class RandomDotSimulatedSweep
     {
-        public static float EvaluateSweepDegrees(
-            double elapsedSeconds,
-            float amplitudeDegrees,
-            float speedDegreesPerSecond,
+        /// <summary>
+        /// Der einseitige Schwenk. Er startet eine Amplitude vor der Mitte und
+        /// endet eine Amplitude dahinter. So liegt die Mitte der Bewegung genau
+        /// geradeaus, und die Punktwelt muss zu beiden Seiten gleich weit reichen.
+        /// Ist die Strecke geschafft, bleibt der Winkel am Ende stehen.
+        /// </summary>
+        public static float EvaluateOneWayDegrees(
+            double elapsedSeconds, float amplitudeDegrees, float speedDegreesPerSecond,
             RandomDotSweepDirection direction)
         {
-            if (elapsedSeconds <= 0d ||
-                amplitudeDegrees <= 0f ||
-                speedDegreesPerSecond <= 0f)
+            if (amplitudeDegrees <= 0f || speedDegreesPerSecond <= 0f)
+            {
+                return 0f;
+            }
+
+            // Zurückgelegte Strecke seit dem Start, höchstens aber die ganze Strecke
+            // von einer Seite zur anderen, also zwei Amplituden.
+            double travelled = Math.Min(
+                Math.Max(0d, elapsedSeconds) * speedDegreesPerSecond, 2d * amplitudeDegrees);
+            float angle = (float)travelled - amplitudeDegrees;
+
+            // RightFirst heißt hier einfach: Das Fernglas schwenkt nach rechts
+            // (bzw. nach oben), die Punkte wandern dabei zur anderen Seite.
+            return direction == RandomDotSweepDirection.LeftFirst ? -angle : angle;
+        }
+
+        /// <summary>
+        /// Die Sinusbahn hin und her, der die Person im HeadTracked-Block mit dem
+        /// Kopf folgt.
+        /// </summary>
+        public static float EvaluateBackAndForthDegrees(
+            double elapsedSeconds, float amplitudeDegrees, float speedDegreesPerSecond,
+            RandomDotSweepDirection direction)
+        {
+            if (elapsedSeconds <= 0d || amplitudeDegrees <= 0f || speedDegreesPerSecond <= 0f)
             {
                 return 0f;
             }
@@ -31,52 +61,25 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             // In einer Periode werden vier Amplituden zurückgelegt. Der Speed-
             // Parameter bezeichnet die mittlere absolute Geschwindigkeit und
             // bleibt dadurch mit der bisherigen Einstellung vergleichbar.
-            double phase = elapsedSeconds * Math.PI *
-                speedDegreesPerSecond / (2.0 * amplitudeDegrees);
-            float positiveFirstAngle = amplitudeDegrees * (float)Math.Sin(phase);
+            double phase =
+                elapsedSeconds * Math.PI * speedDegreesPerSecond / (2.0 * amplitudeDegrees);
+            float angle = amplitudeDegrees * (float)Math.Sin(phase);
 
             // Das Vorzeichen bestimmt rechts/links bzw. oben/unten zuerst.
-            return direction == RandomDotSweepDirection.LeftFirst
-                ? -positiveFirstAngle
-                : positiveFirstAngle;
-        }
-
-        public static float EvaluateYawDegrees(
-            double elapsedSeconds,
-            float amplitudeDegrees,
-            float speedDegreesPerSecond,
-            RandomDotSweepDirection direction)
-        {
-            return EvaluateSweepDegrees(
-                elapsedSeconds, amplitudeDegrees, speedDegreesPerSecond, direction);
+            return direction == RandomDotSweepDirection.LeftFirst ? -angle : angle;
         }
 
         public static string DirectionLabel(
-            RandomDotSweepAxis axis,
-            RandomDotSweepDirection direction)
+            RandomDotMotionMode mode, RandomDotSweepAxis axis, RandomDotSweepDirection direction)
         {
-            if (axis == RandomDotSweepAxis.Vertical)
-            {
-                return direction == RandomDotSweepDirection.RightFirst
-                    ? "UpFirst"
-                    : "DownFirst";
-            }
-
-            return direction.ToString();
-        }
-
-        public static float FullCycleDurationSeconds(
-            float amplitudeDegrees,
-            float speedDegreesPerSecond)
-        {
-            if (amplitudeDegrees <= 0f || speedDegreesPerSecond <= 0f)
-            {
-                return 0f;
-            }
-
-            // Von der Mitte zum ersten Rand, quer zum anderen Rand und zurück zur
-            // Mitte sind zusammen vier Amplituden.
-            return 4f * amplitudeDegrees / speedDegreesPerSecond;
+            // Der simulierte Schwenk geht nur in eine Richtung, deshalb heißt er
+            // einfach "Right" oder "Up". Der Kopfschwenk geht hin und her, da
+            // zählt, wohin es zuerst geht: "RightFirst" oder "LeftFirst".
+            bool positive = direction == RandomDotSweepDirection.RightFirst;
+            string side = axis == RandomDotSweepAxis.Vertical
+                ? positive ? "Up" : "Down"
+                : positive ? "Right" : "Left";
+            return mode == RandomDotMotionMode.SimulatedYaw ? side : side + "First";
         }
     }
 }

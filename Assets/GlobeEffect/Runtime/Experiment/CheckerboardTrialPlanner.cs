@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace GlobeEffect.VRCheckerboard.Experiment
@@ -25,10 +25,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // Erst einmal prüfen, ob die Werte überhaupt stimmen. Lieber hier
             // abbrechen, als mitten in der Messung zu merken, dass etwas fehlt.
             ValidateValues(
-                angularDiametersDegrees,
-                eyePresentations,
-                visualSpaceLValues,
-                repetitions);
+                angularDiametersDegrees, eyePresentations, visualSpaceLValues, repetitions);
 
             var trials = new List<CheckerboardTrial>();
             int conditionIndex = 0;
@@ -42,40 +39,23 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     foreach (float visualSpaceL in visualSpaceLValues)
                     {
                         conditionIndex++;
-                        for (int repetition = 1;
-                            repetition <= repetitions;
-                            repetition++)
+                        for (int repetition = 1; repetition <= repetitions; repetition++)
                         {
-                            trials.Add(new CheckerboardTrial(
-                                sequenceIndex: 0,
-                                conditionIndex: conditionIndex,
-                                repetition: repetition,
-                                attemptNumber: 1,
-                                angularDiameterDegrees: angularDiameter,
-                                eyePresentation: eye,
-                                visualSpaceL: visualSpaceL));
+                            trials.Add(new CheckerboardTrial(sequenceIndex: 0, conditionIndex,
+                                repetition, attemptNumber: 1, angularDiameter, eye, visualSpaceL));
                         }
                     }
                 }
             }
 
-            // Jetzt wird gemischt. Das Verfahren heißt Fisher-Yates: Man geht von
-            // hinten durch und tauscht jeden Eintrag mit einem zufälligen Eintrag
-            // weiter vorne. Der Seed sorgt dafür, dass dabei immer dasselbe
-            // Mischergebnis herauskommt.
-            var random = new Random(randomSeed);
-            for (int index = trials.Count - 1; index > 0; index--)
-            {
-                int swapIndex = random.Next(index + 1);
-                (trials[index], trials[swapIndex]) =
-                    (trials[swapIndex], trials[index]);
-            }
+            // Jetzt wird gemischt (Fisher-Yates, Erklärung in PlannerTools).
+            PlannerTools.Shuffle(trials, randomSeed);
 
             // Die Nummer 1, 2, 3 ... wird erst jetzt vergeben, nach dem Mischen.
             // So passt sie zu der Reihenfolge, die später wirklich gezeigt wird.
             for (int index = 0; index < trials.Count; index++)
             {
-                trials[index] = trials[index].WithSequenceIndex(index + 1);
+                trials[index].SequenceIndex = index + 1;
             }
 
             return trials;
@@ -87,11 +67,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             IReadOnlyList<float> visualSpaceLValues,
             int repetitions)
         {
-            // In jeder Liste muss mindestens ein Wert stehen, sonst gibt es gar
-            // keine Kombinationen und der Plan wäre leer.
-            RequireNonEmpty(angularDiametersDegrees, nameof(angularDiametersDegrees));
-            RequireNonEmpty(eyePresentations, nameof(eyePresentations));
-            RequireNonEmpty(visualSpaceLValues, nameof(visualSpaceLValues));
+            PlannerTools.RequireNonEmpty(angularDiametersDegrees, nameof(angularDiametersDegrees));
+            PlannerTools.RequireNonEmpty(eyePresentations, nameof(eyePresentations));
+            PlannerTools.RequireNonEmpty(visualSpaceLValues, nameof(visualSpaceLValues));
 
             if (repetitions < 1)
             {
@@ -116,18 +94,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             {
                 foreach (float visualSpaceL in visualSpaceLValues)
                 {
-                    VisualSpaceRadialMapping.ValidateParameters(
-                        angularDiameter,
-                        visualSpaceL);
+                    VisualSpaceRadialMapping.ValidateParameters(angularDiameter, visualSpaceL);
                 }
-            }
-        }
-
-        private static void RequireNonEmpty<T>(IReadOnlyCollection<T> values, string name)
-        {
-            if (values == null || values.Count == 0)
-            {
-                throw new ArgumentException("Mindestens ein Wert ist erforderlich.", name);
             }
         }
     }
@@ -145,10 +113,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     [Serializable]
     public sealed class CheckerboardTrial
     {
-        public int SequenceIndex { get; }
+        // Die Nummer setzt nur der Planer, einmal direkt nach dem Mischen.
+        public int SequenceIndex { get; internal set; }
         public int ConditionIndex { get; }
         public int Repetition { get; }
-        public int AttemptNumber { get; }
+        public int AttemptNumber { get; private set; }
         public float AngularDiameterDegrees { get; }
         public CheckerboardEyePresentation EyePresentation { get; }
         public float VisualSpaceL { get; }
@@ -171,32 +140,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             VisualSpaceL = visualSpaceL;
         }
 
-        internal CheckerboardTrial WithSequenceIndex(int sequenceIndex)
-        {
-            // An einem fertigen Durchgang wird nichts mehr geändert. Für die neue
-            // Nummer wird deshalb eine Kopie gemacht, bei der sonst alles gleich bleibt.
-            return new CheckerboardTrial(
-                sequenceIndex,
-                ConditionIndex,
-                Repetition,
-                AttemptNumber,
-                AngularDiameterDegrees,
-                EyePresentation,
-                VisualSpaceL);
-        }
-
         public CheckerboardTrial CreateRepeatedAttempt()
         {
             // Für eine Wiederholung: alles bleibt gleich, nur der Zähler für die
-            // Versuche geht eins hoch.
-            return new CheckerboardTrial(
-                SequenceIndex,
-                ConditionIndex,
-                Repetition,
-                AttemptNumber + 1,
-                AngularDiameterDegrees,
-                EyePresentation,
-                VisualSpaceL);
+            // Versuche geht eins hoch. MemberwiseClone macht dafür eine Kopie mit
+            // allen Werten, das Original bleibt unverändert.
+            var repeat = (CheckerboardTrial)MemberwiseClone();
+            repeat.AttemptNumber++;
+            return repeat;
         }
     }
 
@@ -209,43 +160,20 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// </summary>
     public sealed class CheckerboardTrialQueue
     {
-        private readonly Queue<CheckerboardTrial> pending = new();
-
-        public int Count => pending.Count;
+        private readonly Queue<CheckerboardTrial> pending;
 
         public CheckerboardTrialQueue(IReadOnlyList<CheckerboardTrial> plan)
         {
-            if (plan == null)
-            {
-                throw new ArgumentNullException(nameof(plan));
-            }
-
-            foreach (CheckerboardTrial trial in plan)
-            {
-                pending.Enqueue(trial);
-            }
+            pending = new Queue<CheckerboardTrial>(plan);
         }
 
-        public bool TryTakeNext(out CheckerboardTrial trial)
-        {
-            // Dequeue holt immer den vordersten Eintrag heraus.
-            if (pending.Count == 0)
-            {
-                trial = null;
-                return false;
-            }
+        public int Count => pending.Count;
 
-            trial = pending.Dequeue();
-            return true;
-        }
+        // Dequeue holt immer den vordersten Eintrag heraus.
+        public bool TryTakeNext(out CheckerboardTrial trial) => pending.TryDequeue(out trial);
 
         public CheckerboardTrial AppendRepeatedAttempt(CheckerboardTrial invalidTrial)
         {
-            if (invalidTrial == null)
-            {
-                throw new ArgumentNullException(nameof(invalidTrial));
-            }
-
             // Enqueue hängt hinten an. Genau das wollen wir hier: Der Durchgang
             // kommt noch einmal dran, aber erst ganz am Schluss.
             CheckerboardTrial repeat = invalidTrial.CreateRepeatedAttempt();

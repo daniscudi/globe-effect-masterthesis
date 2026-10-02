@@ -10,7 +10,7 @@ clear; close all; clc;
 %% settings
 
 % Change this path for each new participant.
-csv_path = "D:\Tolga\Globe-Effect-Master\VRCheckerboard\measurements\20260904_154429_checkerboard_pilot\20260904_154429_checkerboard_pilot\pilot_ys_checkerboard_pilot_20260904_154429_trials.csv";
+csv_path = "D:\Tolga\Globe-Effect-Master\VRCheckerboard\measurements\pilot_td_checkerboard_pilot_20260918_183240_trials.csv";
 
 % Change this only if the psignifit folder is moved.
 psignifit_path = "C:\Users\ZVSL-070\Downloads\psignifit-matlab\psignifit-master";
@@ -36,12 +36,12 @@ end
 % The fit should contain only one eye, FOV, and zoom condition.
 n_eyes = numel(unique(string(T.eye_presentation)));
 n_fovs = numel(unique(T.angular_diameter_deg));
-n_zooms = numel(unique(T.content_zoom));
+%% n_zooms = numel(unique(T.content_zoom));
 
-if n_eyes > 1 || n_fovs > 1 || n_zooms > 1
-    error(['The CSV contains several eye, FOV, or zoom conditions. ', ...
-           'Select one condition before fitting.']);
-end
+%if n_eyes > 1 || n_fovs > 1 || n_zooms > 1
+ %   error(['The CSV contains several eye, FOV, or zoom conditions. ', ...
+  %         'Select one condition before fitting.']);
+%end
 
 
 %% prepare responses
@@ -186,9 +186,11 @@ title({'Checkerboard psychometric function (psignifit)', ...
        char(participant_id)}, ...
        'Interpreter', 'none');
 grid on;
-legend([h_data(1), h_fit, h_straight], ...
+h_ci = plot(nan, nan, '--', 'Color', [1 0.4 0]);
+legend([h_data(1), h_fit, h_straight, h_ci], ...
     {'data', sprintf('fit (PSE = %.3f)', pse), ...
-     'l = 1 (geometrically straight)'}, ...
+     'l = 1 (geometrically straight)', ...
+     sprintf('95%% CI [%.3f, %.3f]', pse_ci95(1), pse_ci95(2))}, ...
     'Location', 'best');
 
 safe_id = regexprep(char(participant_id), '[^A-Za-z0-9_-]', '_');
