@@ -653,6 +653,138 @@ muss am `Checkerboard Experiment Manager` vorübergehend `Require Fixation`
 deaktiviert werden. Diese Einstellung ist nur für den technischen Test gedacht
 und darf bei einer Messung nicht ausgeschaltet bleiben.
 
+## Vive Pro Eye
+
+Derselbe Projektstand läuft ohne Umstellung auch mit der HTC Vive Pro Eye. Das
+Headset wird über OpenXR (SteamVR) angesprochen, das Eye Tracking über das
+SRanipal-SDK unter `Assets/ViveSR`.
+
+### Voraussetzungen auf dem Lab-PC
+
+* Unity 6000.5.6f1 und Git (das Varjo-Paket wird beim ersten Öffnen über Git
+  geladen)
+
+* SteamVR läuft und ist als OpenXR-Runtime festgelegt (SteamVR-Einstellungen,
+  Bereich OpenXR)
+
+* VIVE Console beziehungsweise die SRanipal-Runtime läuft (`sr_runtime.exe`,
+  Roboter-Symbol im Infobereich der Taskleiste)
+
+* Varjo Base läuft auf diesem PC nicht
+
+Danach genügt `git pull`. In Unity ist nichts einzustellen: keine Werte im
+Inspector, keine Project Settings, keine Pakete.
+
+### Was automatisch gewählt wird
+
+An der `Eye Tracking Toolbox` steht der Provider in beiden Szenen auf `Auto`.
+Beim Start des Play Mode wird entschieden:
+
+| Rechner | XR-Loader | Eye Tracker |
+| --- | --- | --- |
+| Varjo-PC, Varjo Base läuft | `VarjoLoader` | `Varjo` |
+| Vive-PC, SteamVR und SRanipal-Runtime laufen | `OpenXRLoader` | `SRanipal` |
+| Laptop ohne Headset und ohne Runtime | keiner | `Dummy` |
+
+XR Plug-in Management versucht die Loader in Listenreihenfolge, zuerst Varjo,
+dann OpenXR. Der erste Loader, der startet, gewinnt. Die Konsole zeigt die
+Entscheidung beim Start, zum Beispiel:
+
+```text
+XR-Loader aktiv: OpenXRLoader (OpenXR-Runtime: SteamVR/OpenXR). Eye-Tracker: SRanipal (eingestellt: Auto).
+SRanipal Eye Tracking bereit (Eye v2, Callback registriert).
+```
+
+Dieselben Angaben stehen im Experimenter Monitor und als Marker
+`EyeTrackingProvider;configured=…;active=…;xr_loader=…` am Anfang jeder
+Aufzeichnung.
+
+Der `Dummy` lässt den Blick der Maus folgen und ist nur für einen Tastaturtest
+am Laptop gedacht. Fällt `Auto` auf den `Dummy`, während ein XR-Headset aktiv
+ist oder `Require Fixation` eingeschaltet ist, startet `F5` keine Sitzung. Der
+Grund steht dann rot im Experimenter Monitor und in der Konsole.
+
+### Zwei Regeln
+
+* In `Project Settings -> XR Plug-in Management` keine Häkchen umschalten. Unity
+  sortiert die Loader dabei alphabetisch neu, OpenXR steht dann vor Varjo, und
+  auf dem Varjo-PC würde der falsche Loader starten. Der EditMode-Test
+  `XrLoaderSetupTests` meldet eine vertauschte Reihenfolge;
+  `git checkout -- Assets/XR` stellt sie wieder her.
+
+* Bleibt die Vive dunkel und die Konsole meldet `XR-Loader aktiv: VarjoLoader`,
+  läuft auf dem Vive-PC Varjo Base. Varjo Base beenden und den Play Mode neu
+  starten.
+
+### Unterschiede in der Gaze-Datei
+
+Die Spalten und ihre Reihenfolge sind bei allen Eye Trackern gleich. Bei
+SRanipal gilt:
+
+* Ursprünge und Richtungen sind wie bei Varjo ins Unity-Kamerasystem
+  umgerechnet (linkshändig, Meter, +x nach rechts).
+
+* `left_validata`, `right_validata` und `combined_validata` folgen dem
+  SRanipal-Bit „Blickrichtung gültig“.
+
+* `tracking_status`, `left_tracking_status` und `right_tracking_status`
+  enthalten die SRanipal-Validitätsmaske: 1 = Ursprung, 2 = Richtung,
+  4 = Pupillendurchmesser, 8 = Lidöffnung, 16 = Pupillenposition. Bei
+  `tracking_status` kommt 65536 hinzu, wenn SRanipal „kein Nutzer“ meldet.
+
+* `eye_timestamp` bleibt in Nanosekunden. SRanipal liefert Millisekunden, die
+  Auflösung ist deshalb 1 ms.
+
+* `ipd_mm` ist `NaN`, weil SRanipal keinen Augenabstand liefert.
+  `gaze_distance`, Pupillendurchmesser und Lidöffnung sind `NaN`, solange
+  SRanipal den jeweiligen Wert als ungültig markiert.
+
+### Checkliste für den ersten Test am Headset
+
+Die SRanipal-Anbindung wurde ohne Headset entwickelt. Vor der ersten Messung
+einmal vollständig durchgehen:
+
+1. Start: Die Konsole meldet `OpenXRLoader`, `SteamVR` als OpenXR-Runtime und
+   `SRanipal` als Eye Tracker. Der Experimenter Monitor zeigt dasselbe. Unity
+   bleibt beim Start nicht hängen.
+
+2. Bild: Das Muster erscheint im Headset. Mit Augenmodus „nur links“ und „nur
+   rechts“ sieht jeweils nur das genannte Auge das Bild.
+
+3. Kalibrierung: `C` startet die SRanipal-Kalibrierung im Headset. Unity läuft
+   währenddessen weiter, und danach meldet die Konsole
+   `SRanipal-Blickkalibrierung abgeschlossen`.
+
+4. Validität: Beim Blick auf das Kreuz zeigt der Experimenter Monitor
+   `ON TARGET`. Beim Schließen der Augen wechselt er auf `NO VALID GAZE`.
+
+5. Blickstrahl: Beim Blick auf das Fixationskreuz liegt die `Blickabweichung`
+   deutlich unter der Toleranz. Beim Blick nach rechts wird
+   `combined_eye_gaze.x` in der Gaze-Datei positiv, beim Blick nach oben
+   `combined_eye_gaze.y`.
+
+6. Augenpositionen: In der Gaze-Datei ist `left_eye_origin.x` negativ (etwa
+   -0,03) und `right_eye_origin.x` positiv. Sind die Vorzeichen vertauscht,
+   stimmt die Spiegelung in `SRanipalGazeConversion.cs` nicht.
+
+7. Abtastrate: Eine kurze Aufzeichnung mit `F9` enthält etwa 120 Zeilen pro
+   Sekunde, und `frame_number` steigt ohne Lücken.
+
+8. Fixationsabbruch: Wegschauen während eines Trials macht den Trial ungültig
+   und stellt ihn hinten an (`TrialInvalid`, `TrialRepeatQueued`).
+
+9. Antworten: Die Tasten am Vive-Controller (Trigger, Trackpad) lösen die
+   beiden Antworten aus.
+
+10. Messdatei: Am Anfang der Aufzeichnung steht der Marker
+    `EyeTrackingProvider;configured=Auto;active=SRanipal;xr_loader=OpenXRLoader`.
+
+11. Ende: Der Play Mode lässt sich beenden und erneut starten, ohne dass Unity
+    hängen bleibt.
+
+Zum Vergleich einmal auf dem Varjo-PC starten: Die Konsole meldet dort
+weiterhin `VarjoLoader` und `Varjo`.
+
 ## Wichtige Dateien
 
 ```text
@@ -679,13 +811,23 @@ Assets/GlobeEffect/
 │   │   ├── RandomDotSimulatedSweep.cs
 │   │   └── RandomDotKeyboardController.cs
 │   └── EyeTracking/
-│       └── CheckerboardFixationMonitor.cs
+│       ├── CheckerboardFixationMonitor.cs
+│       ├── EyeTrackingToolbox.cs
+│       ├── EyeTrackerProviderResolver.cs
+│       └── EyeTrackers/
+│           ├── VarjoEyeTracker.cs
+│           ├── SRanipalEyeTracker.cs
+│           ├── SRanipalGazeConversion.cs
+│           └── DummyEyeTracker.cs
 ├── Editor/
 │   └── ExperimenterMonitorWindow.cs
 └── Tests/EditMode/
     ├── VisualSpaceRadialMappingTests.cs
     ├── CheckerboardTrialPlannerTests.cs
-    └── CheckerboardTrialQueueTests.cs
+    ├── CheckerboardTrialQueueTests.cs
+    ├── SRanipalGazeConversionTests.cs
+    ├── EyeTrackerProviderResolverTests.cs
+    └── XrLoaderSetupTests.cs
 ```
 
 `VisualSpaceRadialMapping.cs` enthält die C#-Referenzrechnung. Der Shader führt

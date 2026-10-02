@@ -2,7 +2,12 @@
   "name": "GlobeEffect.VRCheckerboard.Tests",
   "rootNamespace": "GlobeEffect.VRCheckerboard.Tests",
   "references": [
-    "GlobeEffect.VRCheckerboard.Runtime"
+    "GlobeEffect.VRCheckerboard.Runtime",
+    "Unity.XR.Management",
+    "Unity.XR.Management.Editor",
+    "Unity.XR.OpenXR",
+    "Varjo.XR",
+    "ViveSR.SRanipal"
   ],
   "includePlatforms": [
     "Editor"

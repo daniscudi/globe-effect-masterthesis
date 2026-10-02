@@ -137,6 +137,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             // Zeigt an: Wo schaut die Person hin, wie weit ist die Sitzung, und
             // welche Bedingung läuft gerade.
             DrawFixationStatus(checkerboardFixation);
+            DrawEyeTrackerStatus(checkerboardSession != null && checkerboardSession.RequireFixation);
 
             EditorGUILayout.Space(6f);
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
@@ -174,6 +175,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             // Zeigt an: Wo schaut die Person hin, wie weit ist die Sitzung, und wo
             // steht die Bewegung der Punkte gerade.
             DrawFixationStatus(randomDotFixation);
+            DrawEyeTrackerStatus(randomDotSession != null && randomDotSession.RequireFixation);
 
             EditorGUILayout.Space(6f);
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
@@ -252,6 +254,27 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     Number(fixation.ContinuousFixationSeconds, "F2") + " / " +
                     Number(fixation.RequiredContinuousSeconds, "F2") + " s");
                 Row("Fixationskriterium", fixation.RequirementMet ? "ERFÜLLT" : "NICHT ERFÜLLT");
+            }
+        }
+
+        // Zeigt, über welchen XR-Loader das Headset läuft und welcher Eye Tracker
+        // gewählt wurde. Hat die Auswahl "Auto" nur den Dummy gefunden und startet
+        // F5 deshalb keine Sitzung, steht der Grund hier und nicht nur in der Konsole.
+        private static void DrawEyeTrackerStatus(bool requireFixation)
+        {
+            EyeTrackingToolbox toolbox = EyeTrackingToolbox.Instance;
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                Row("XR-Loader", EyeTrackerProviderResolver.GetActiveXrLoaderName());
+                Row("Eye Tracker", toolbox != null
+                    ? toolbox.ActiveProvider + " (eingestellt: " + toolbox.Provider + ")"
+                    : Missing);
+            }
+
+            if (EyeTrackerProviderResolver.TryGetSessionBlockReason(
+                toolbox, requireFixation, out string blockReason))
+            {
+                EditorGUILayout.HelpBox(blockReason, MessageType.Error);
             }
         }
 

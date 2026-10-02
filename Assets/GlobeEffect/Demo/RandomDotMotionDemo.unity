@@ -769,7 +769,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5e7f22e3d2364d1b8d66ab9d026af84b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.EyeTracking.EyeTrackingToolbox
-  provider: 1
+  provider: 3
   mainCameraTransform: {fileID: 684958492}
   persistAcrossScenes: 1
   calibrationMode: 0
