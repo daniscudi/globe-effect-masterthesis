@@ -1,322 +1,213 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.IO;
-using System.Text;
 using GlobeEffect.VRCheckerboard.RandomDots;
 
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
     /// <summary>
-    /// Schreibt die CSV-Dateien für den Random-Dot-Test.
+    /// Was bei einem gezeigten Durchgang herausgekommen ist.
     ///
-    /// Die vielen Blickdaten pro Sekunde landen nicht hier. Die schreibt die
-    /// Lab-Toolbox in ihre eigenen Dateien.
+    /// Auch schiefgegangene Versuche landen hier und kommen in die CSV. Sonst
+    /// könnte man später nicht mehr nachvollziehen, warum eine Bedingung noch
+    /// einmal gezeigt wurde.
     /// </summary>
-    public sealed class RandomDotExperimentFiles
+    public sealed class RandomDotTrialResult
     {
-        // Es entstehen zwei Dateien:
-        // plan.csv steht vorher fest und zeigt, was in welcher Reihenfolge kommen soll.
-        // trials.csv wächst während der Messung, nach jedem Durchgang eine Zeile mehr.
-        //
-        // Nach jedem Durchgang wird sofort geschrieben. Stürzt Unity ab, sind die
-        // bisherigen Daten trotzdem da. Auch schiefgegangene Versuche kommen rein.
-        public const string MappingVersion =
-            "merlitz-instrument-k-m-sinusoidal-motion-axis-v6";
+        public RandomDotTrial Trial { get; }
+        public int PresentationIndex { get; }
+        public DateTime TrialStartUtc { get; }
+        public double TrialStartUnitySeconds { get; }
+        public double StimulusEndUnitySeconds { get; }
+        public double ResponseUnitySeconds { get; }
+        public CheckerboardCurvatureResponse Response { get; }
+        public bool ValidForAnalysis { get; }
+        public int CompletedHalfSweeps { get; }
+        public float MinimumYawDegrees { get; }
+        public float MaximumYawDegrees { get; }
+        public float MaximumAbsoluteYawDegrees { get; }
+        public float MeanAbsoluteYawSpeedDegreesPerSecond { get; }
+        public float PeakAbsoluteYawSpeedDegreesPerSecond { get; }
+        public float ProfileErrorDegrees { get; }
+        public float FirstExtremeErrorDegrees { get; }
+        public float SecondExtremeErrorDegrees { get; }
+        public float SweepAmplitudeDegrees { get; }
+        public float SweepSpeedDegreesPerSecond { get; }
+        public float ApertureEdgeSoftnessDegrees { get; }
+        public bool FixationSampleValid { get; }
+        public bool FixationInsideTolerance { get; }
+        public float FixationAngleDegrees { get; }
+        public float ContinuousFixationSeconds { get; }
+        public float FixationValidSampleFraction { get; }
+        public float LongestOffTargetSeconds { get; }
+        public float LongestInvalidGazeSeconds { get; }
+        public int DotCount { get; }
+        public float WorldCoverageDiameterDegrees { get; }
+        public float CarrierRadiusMeters { get; }
+        public string Status { get; }
 
-        private static readonly UTF8Encoding Utf8WithoutBom = new(false);
+        public double StimulusDurationSeconds =>
+            Math.Max(0d, StimulusEndUnitySeconds - TrialStartUnitySeconds);
 
-        private readonly string participantId;
-        private readonly string sessionLabel;
-        private readonly DateTime sessionStartUtc;
-        private readonly int randomSeed;
+        public double ResponseTimeSeconds =>
+            Math.Max(0d, ResponseUnitySeconds - StimulusEndUnitySeconds);
 
-        private RandomDotExperimentFiles(
-            string sessionFolder,
-            string baseFileName,
-            string participantId,
-            string sessionLabel,
-            DateTime sessionStartUtc,
-            int randomSeed)
+        public RandomDotTrialResult(
+            RandomDotTrial trial,
+            int presentationIndex,
+            DateTime trialStartUtc,
+            double trialStartUnitySeconds,
+            double stimulusEndUnitySeconds,
+            double responseUnitySeconds,
+            CheckerboardCurvatureResponse response,
+            bool validForAnalysis,
+            int completedHalfSweeps,
+            float minimumYawDegrees,
+            float maximumYawDegrees,
+            float maximumAbsoluteYawDegrees,
+            float meanAbsoluteYawSpeedDegreesPerSecond,
+            float peakAbsoluteYawSpeedDegreesPerSecond,
+            float profileErrorDegrees,
+            float firstExtremeErrorDegrees,
+            float secondExtremeErrorDegrees,
+            float sweepAmplitudeDegrees,
+            float sweepSpeedDegreesPerSecond,
+            float apertureEdgeSoftnessDegrees,
+            bool fixationSampleValid,
+            bool fixationInsideTolerance,
+            float fixationAngleDegrees,
+            float continuousFixationSeconds,
+            float fixationValidSampleFraction,
+            float longestOffTargetSeconds,
+            float longestInvalidGazeSeconds,
+            int dotCount,
+            float worldCoverageDiameterDegrees,
+            float carrierRadiusMeters,
+            string status)
         {
-            SessionFolder = sessionFolder;
-            BaseFileName = baseFileName;
-            PlanFile = Path.Combine(sessionFolder, baseFileName + "_plan.csv");
-            TrialResultsFile = Path.Combine(sessionFolder, baseFileName + "_trials.csv");
-            this.participantId = participantId;
-            this.sessionLabel = sessionLabel;
-            this.sessionStartUtc = sessionStartUtc;
-            this.randomSeed = randomSeed;
+            Trial = trial ?? throw new ArgumentNullException(nameof(trial));
+            PresentationIndex = presentationIndex;
+            TrialStartUtc = trialStartUtc;
+            TrialStartUnitySeconds = trialStartUnitySeconds;
+            StimulusEndUnitySeconds = stimulusEndUnitySeconds;
+            ResponseUnitySeconds = responseUnitySeconds;
+            Response = response;
+            ValidForAnalysis = validForAnalysis;
+            CompletedHalfSweeps = completedHalfSweeps;
+            MinimumYawDegrees = minimumYawDegrees;
+            MaximumYawDegrees = maximumYawDegrees;
+            MaximumAbsoluteYawDegrees = maximumAbsoluteYawDegrees;
+            MeanAbsoluteYawSpeedDegreesPerSecond = meanAbsoluteYawSpeedDegreesPerSecond;
+            PeakAbsoluteYawSpeedDegreesPerSecond = peakAbsoluteYawSpeedDegreesPerSecond;
+            ProfileErrorDegrees = profileErrorDegrees;
+            FirstExtremeErrorDegrees = firstExtremeErrorDegrees;
+            SecondExtremeErrorDegrees = secondExtremeErrorDegrees;
+            SweepAmplitudeDegrees = sweepAmplitudeDegrees;
+            SweepSpeedDegreesPerSecond = sweepSpeedDegreesPerSecond;
+            ApertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees;
+            FixationSampleValid = fixationSampleValid;
+            FixationInsideTolerance = fixationInsideTolerance;
+            FixationAngleDegrees = fixationAngleDegrees;
+            ContinuousFixationSeconds = continuousFixationSeconds;
+            FixationValidSampleFraction = fixationValidSampleFraction;
+            LongestOffTargetSeconds = longestOffTargetSeconds;
+            LongestInvalidGazeSeconds = longestInvalidGazeSeconds;
+            DotCount = dotCount;
+            WorldCoverageDiameterDegrees = worldCoverageDiameterDegrees;
+            CarrierRadiusMeters = carrierRadiusMeters;
+            Status = status ?? string.Empty;
         }
+    }
 
-        public string SessionFolder { get; }
-        public string BaseFileName { get; }
-        public string PlanFile { get; }
-        public string TrialResultsFile { get; }
+    /// <summary>
+    /// Schreibt die CSV-Dateien für den Random-Dot-Test.
+    /// Ordner, Session-Spalten und CSV-Regeln kommen aus ExperimentFilesBase.
+    /// </summary>
+    public sealed class RandomDotExperimentFiles : ExperimentFilesBase
+    {
+        public const string MappingVersion = "merlitz-instrument-k-m-oneway-sweep-center-density-v7";
 
-        public static RandomDotExperimentFiles Create(
+        private const string PlanHeader = SessionColumns +
+            "sequence_index,total_planned_trials,condition_index,repetition,motion_block_index," +
+            "mini_block_index,eye_presentation,angular_diameter_deg,instrument_distortion_k," +
+            "instrument_magnification_m,content_zoom,motion_mode,sweep_axis,sweep_direction," +
+            "dot_seed";
+
+        // Die Kopfzeile der Ergebnisdatei. Sie wird einmal am Anfang geschrieben
+        // und muss Spalte für Spalte zu AppendResult passen.
+        private const string TrialHeader = SessionColumns +
+            "presentation_index,sequence_index,total_planned_trials,condition_index,repetition," +
+            "attempt_number,motion_block_index,mini_block_index,trial_start_utc," +
+            "trial_start_unity_s,stimulus_end_unity_s,response_unity_s,stimulus_duration_s," +
+            "response_time_s,eye_presentation,angular_diameter_deg,aperture_edge_softness_deg," +
+            "instrument_distortion_k,instrument_magnification_m,content_zoom,motion_mode," +
+            "sweep_axis,sweep_direction,sweep_amplitude_deg,sweep_speed_deg_per_s," +
+            "completed_half_sweeps,min_sweep_deg,max_sweep_deg,max_abs_sweep_deg," +
+            "mean_abs_sweep_speed_deg_per_s,peak_abs_sweep_speed_deg_per_s,profile_rmse_deg," +
+            "first_turn_error_deg,second_turn_error_deg,dot_seed,dot_count," +
+            "world_coverage_diameter_deg,carrier_radius_m,response,valid_for_analysis," +
+            "fixation_sample_valid,fixation_inside_tolerance,fixation_angle_deg," +
+            "continuous_fixation_s,fixation_valid_sample_fraction,longest_off_target_s," +
+            "longest_invalid_gaze_s,status";
+
+        public RandomDotExperimentFiles(
             string outputRoot,
             string participantId,
             string sessionLabel,
             DateTime sessionStartUtc,
             int randomSeed)
+            : base(outputRoot, participantId, sessionLabel, "random_dot", sessionStartUtc,
+                randomSeed, MappingVersion)
         {
-            // Legt für jede Sitzung einen eigenen Ordner an, benannt nach Person,
-            // Datum und Uhrzeit.
-            if (string.IsNullOrWhiteSpace(outputRoot))
-            {
-                throw new ArgumentException(
-                    "Ein Ausgabeverzeichnis ist erforderlich.",
-                    nameof(outputRoot));
-            }
-
-            string safeParticipant = CheckerboardExperimentFiles.SanitizeIdentifier(
-                participantId,
-                "pilot");
-            string safeSession = CheckerboardExperimentFiles.SanitizeIdentifier(
-                sessionLabel,
-                "random_dot");
-            string timestamp = sessionStartUtc.ToLocalTime().ToString(
-                "yyyyMMdd_HHmmss",
-                CultureInfo.InvariantCulture);
-            string participantFolder = Path.Combine(
-                Path.GetFullPath(outputRoot),
-                safeParticipant);
-            Directory.CreateDirectory(participantFolder);
-
-            // Gibt es den Ordner schon, wird hinten eine Zahl angehängt. So wird
-            // niemals eine vorhandene Messung überschrieben.
-            string folderStem = timestamp + "_" + safeSession;
-            string sessionFolder = Path.Combine(participantFolder, folderStem);
-            int suffix = 1;
-            while (Directory.Exists(sessionFolder))
-            {
-                sessionFolder = Path.Combine(
-                    participantFolder,
-                    folderStem + "_" + suffix.ToString(CultureInfo.InvariantCulture));
-                suffix++;
-            }
-
-            Directory.CreateDirectory(sessionFolder);
-            string baseName = safeParticipant + "_" + safeSession + "_" + timestamp;
-            return new RandomDotExperimentFiles(
-                sessionFolder,
-                baseName,
-                safeParticipant,
-                safeSession,
-                sessionStartUtc,
-                randomSeed);
         }
 
         public void WritePlan(IReadOnlyList<RandomDotTrial> trials)
         {
-            // Wird einmal vor der Messung aufgerufen und schreibt die gemischte
-            // Reihenfolge weg. Danach wird gleich noch die Kopfzeile für die
-            // Ergebnisdatei angelegt.
-            if (trials == null)
-            {
-                throw new ArgumentNullException(nameof(trials));
-            }
-
-            var builder = new StringBuilder(2048);
-            builder.AppendLine(
-                "participant_id,session_label,session_start_utc,random_seed,mapping_version," +
-                "sequence_index,total_planned_trials,condition_index,repetition," +
-                "motion_block_index,mini_block_index," +
-                "eye_presentation,angular_diameter_deg,instrument_distortion_k," +
-                "instrument_magnification_m,content_zoom,motion_mode," +
-                "sweep_axis,sweep_direction,dot_seed");
-
+            var rows = new List<CsvRow>();
             foreach (RandomDotTrial trial in trials)
             {
-                AppendSessionPrefix(builder);
-                AppendInteger(builder, trial.SequenceIndex);
-                AppendInteger(builder, trials.Count);
-                AppendInteger(builder, trial.ConditionIndex);
-                AppendInteger(builder, trial.Repetition);
-                AppendInteger(builder, trial.MotionBlockIndex);
-                AppendInteger(builder, trial.MiniBlockIndex);
-                AppendCsv(builder, trial.EyePresentation.ToString());
-                AppendFloat(builder, trial.AngularDiameterDegrees);
-                AppendFloat(builder, trial.InstrumentDistortionK);
-                AppendFloat(builder, trial.InstrumentMagnificationM);
-                AppendFloat(builder, trial.ContentZoom);
-                AppendCsv(builder, trial.MotionMode.ToString());
-                AppendCsv(builder, trial.SweepAxis.ToString());
-                AppendCsv(builder, RandomDotSimulatedSweep.DirectionLabel(
-                    trial.SweepAxis, trial.SweepDirection));
-                AppendInteger(builder, trial.DotSeed, terminateRow: true);
+                rows.Add(StartRow()
+                    .Add(trial.SequenceIndex).Add(trials.Count)
+                    .Add(trial.ConditionIndex).Add(trial.Repetition)
+                    .Add(trial.MotionBlockIndex).Add(trial.MiniBlockIndex)
+                    .Add(trial.EyePresentation.ToString()).Add(trial.AngularDiameterDegrees)
+                    .Add(trial.InstrumentDistortionK).Add(trial.InstrumentMagnificationM)
+                    .Add(trial.ContentZoom).Add(trial.MotionMode.ToString())
+                    .Add(trial.SweepAxis.ToString()).Add(trial.DirectionLabel).Add(trial.DotSeed));
             }
 
-            File.WriteAllText(PlanFile, builder.ToString(), Utf8WithoutBom);
-            WriteTrialHeader();
+            WritePlanFile(PlanHeader, rows, TrialHeader);
         }
 
         public void AppendResult(RandomDotTrialResult result, int plannedTrials)
         {
-            // Hängt für einen gezeigten Durchgang genau eine Zeile an. Die
-            // Reihenfolge der Werte hier muss exakt zur Kopfzeile in
-            // WriteTrialHeader passen, sonst stehen die Zahlen später in den
+            // Die Reihenfolge der Werte hier muss exakt zur Kopfzeile in
+            // TrialHeader passen, sonst stehen die Zahlen später in den
             // falschen Spalten.
-            if (result == null)
-            {
-                throw new ArgumentNullException(nameof(result));
-            }
-
-            var builder = new StringBuilder(1200);
             RandomDotTrial trial = result.Trial;
-            AppendSessionPrefix(builder);
-            AppendInteger(builder, result.PresentationIndex);
-            AppendInteger(builder, trial.SequenceIndex);
-            AppendInteger(builder, plannedTrials);
-            AppendInteger(builder, trial.ConditionIndex);
-            AppendInteger(builder, trial.Repetition);
-            AppendInteger(builder, trial.AttemptNumber);
-            AppendInteger(builder, trial.MotionBlockIndex);
-            AppendInteger(builder, trial.MiniBlockIndex);
-            AppendCsv(builder, result.TrialStartUtc.ToString("O", CultureInfo.InvariantCulture));
-            AppendDouble(builder, result.TrialStartUnitySeconds);
-            AppendDouble(builder, result.StimulusEndUnitySeconds);
-            AppendDouble(builder, result.ResponseUnitySeconds);
-            AppendDouble(builder, result.StimulusDurationSeconds);
-            AppendDouble(builder, result.ResponseTimeSeconds);
-            AppendCsv(builder, trial.EyePresentation.ToString());
-            AppendFloat(builder, trial.AngularDiameterDegrees);
-            AppendFloat(builder, result.ApertureEdgeSoftnessDegrees);
-            AppendFloat(builder, trial.InstrumentDistortionK);
-            AppendFloat(builder, trial.InstrumentMagnificationM);
-            AppendFloat(builder, trial.ContentZoom);
-            AppendCsv(builder, trial.MotionMode.ToString());
-            AppendCsv(builder, trial.SweepAxis.ToString());
-            AppendCsv(builder, RandomDotSimulatedSweep.DirectionLabel(
-                trial.SweepAxis, trial.SweepDirection));
-            AppendFloat(builder, result.SweepAmplitudeDegrees);
-            AppendFloat(builder, result.SweepSpeedDegreesPerSecond);
-            AppendInteger(builder, result.CompletedHalfSweeps);
-            AppendFloat(builder, result.MinimumYawDegrees);
-            AppendFloat(builder, result.MaximumYawDegrees);
-            AppendFloat(builder, result.MaximumAbsoluteYawDegrees);
-            AppendFloat(builder, result.MeanAbsoluteYawSpeedDegreesPerSecond);
-            AppendFloat(builder, result.PeakAbsoluteYawSpeedDegreesPerSecond);
-            AppendFloat(builder, result.ProfileErrorDegrees);
-            AppendFloat(builder, result.FirstExtremeErrorDegrees);
-            AppendFloat(builder, result.SecondExtremeErrorDegrees);
-            AppendInteger(builder, trial.DotSeed);
-            AppendInteger(builder, result.DotCount);
-            AppendFloat(builder, result.WorldCoverageDiameterDegrees);
-            AppendFloat(builder, result.CarrierRadiusMeters);
-            AppendCsv(builder, result.Response.ToString());
-            AppendBoolean(builder, result.ValidForAnalysis);
-            AppendBoolean(builder, result.FixationSampleValid);
-            AppendBoolean(builder, result.FixationInsideTolerance);
-            AppendFloat(builder, result.FixationAngleDegrees);
-            AppendFloat(builder, result.ContinuousFixationSeconds);
-            AppendFloat(builder, result.FixationValidSampleFraction);
-            AppendFloat(builder, result.LongestOffTargetSeconds);
-            AppendFloat(builder, result.LongestInvalidGazeSeconds);
-            AppendCsv(builder, result.Status, terminateRow: true);
-            File.AppendAllText(TrialResultsFile, builder.ToString(), Utf8WithoutBom);
-        }
-
-        private void WriteTrialHeader()
-        {
-            // Die Kopfzeile der Ergebnisdatei. Sie wird einmal am Anfang geschrieben
-            // und muss Spalte für Spalte zu AppendResult passen.
-            const string header =
-                "participant_id,session_label,session_start_utc,random_seed,mapping_version," +
-                "presentation_index,sequence_index,total_planned_trials," +
-                "condition_index,repetition,attempt_number,motion_block_index," +
-                "mini_block_index,trial_start_utc," +
-                "trial_start_unity_s,stimulus_end_unity_s,response_unity_s," +
-                "stimulus_duration_s,response_time_s,eye_presentation," +
-                "angular_diameter_deg,aperture_edge_softness_deg," +
-                "instrument_distortion_k,instrument_magnification_m," +
-                "content_zoom,motion_mode,sweep_axis,sweep_direction,sweep_amplitude_deg," +
-                "sweep_speed_deg_per_s,completed_half_sweeps,min_sweep_deg,max_sweep_deg," +
-                "max_abs_sweep_deg,mean_abs_sweep_speed_deg_per_s," +
-                "peak_abs_sweep_speed_deg_per_s," +
-                "profile_rmse_deg,first_turn_error_deg,second_turn_error_deg," +
-                "dot_seed,dot_count,world_coverage_diameter_deg,carrier_radius_m," +
-                "response,valid_for_analysis,fixation_sample_valid," +
-                "fixation_inside_tolerance,fixation_angle_deg,continuous_fixation_s," +
-                "fixation_valid_sample_fraction,longest_off_target_s," +
-                "longest_invalid_gaze_s,status";
-            File.WriteAllText(
-                TrialResultsFile,
-                header + Environment.NewLine,
-                Utf8WithoutBom);
-        }
-
-        private void AppendSessionPrefix(StringBuilder builder)
-        {
-            // Diese fünf Angaben stehen am Anfang jeder Zeile, in beiden Dateien.
-            // Dadurch weiß man bei jeder einzelnen Zeile, aus welcher Sitzung sie
-            // stammt, auch wenn man die Datei später woanders hinkopiert.
-            AppendCsv(builder, participantId);
-            AppendCsv(builder, sessionLabel);
-            AppendCsv(builder, sessionStartUtc.ToString("O", CultureInfo.InvariantCulture));
-            AppendInteger(builder, randomSeed);
-            AppendCsv(builder, MappingVersion);
-        }
-
-        private static void AppendFloat(
-            StringBuilder builder,
-            float value,
-            bool terminateRow = false)
-        {
-            AppendCsv(builder, value.ToString("G9", CultureInfo.InvariantCulture), terminateRow);
-        }
-
-        private static void AppendDouble(
-            StringBuilder builder,
-            double value,
-            bool terminateRow = false)
-        {
-            AppendCsv(builder, value.ToString("G17", CultureInfo.InvariantCulture), terminateRow);
-        }
-
-        private static void AppendInteger(
-            StringBuilder builder,
-            int value,
-            bool terminateRow = false)
-        {
-            AppendCsv(builder, value.ToString(CultureInfo.InvariantCulture), terminateRow);
-        }
-
-        private static void AppendBoolean(
-            StringBuilder builder,
-            bool value,
-            bool terminateRow = false)
-        {
-            AppendCsv(builder, value ? "1" : "0", terminateRow);
-        }
-
-        private static void AppendCsv(
-            StringBuilder builder,
-            string value,
-            bool terminateRow = false)
-        {
-            // Steht in einem Wert ein Komma, ein Anführungszeichen oder ein
-            // Zeilenumbruch, würde die CSV-Datei durcheinanderkommen. Solche Werte
-            // werden deshalb in Anführungszeichen gesetzt, und Anführungszeichen
-            // darin werden verdoppelt. Das sind die normalen CSV-Regeln.
-            string safeValue = value ?? string.Empty;
-            bool quote = safeValue.IndexOf(',') >= 0 ||
-                safeValue.IndexOf('"') >= 0 ||
-                safeValue.IndexOf('\n') >= 0 ||
-                safeValue.IndexOf('\r') >= 0;
-            if (quote)
-            {
-                builder.Append('"')
-                    .Append(safeValue.Replace("\"", "\"\""))
-                    .Append('"');
-            }
-            else
-            {
-                builder.Append(safeValue);
-            }
-
-            builder.Append(terminateRow ? Environment.NewLine : ",");
+            AppendResultRow(StartRow()
+                .Add(result.PresentationIndex).Add(trial.SequenceIndex).Add(plannedTrials)
+                .Add(trial.ConditionIndex).Add(trial.Repetition).Add(trial.AttemptNumber)
+                .Add(trial.MotionBlockIndex).Add(trial.MiniBlockIndex).Add(result.TrialStartUtc)
+                .Add(result.TrialStartUnitySeconds).Add(result.StimulusEndUnitySeconds)
+                .Add(result.ResponseUnitySeconds).Add(result.StimulusDurationSeconds)
+                .Add(result.ResponseTimeSeconds).Add(trial.EyePresentation.ToString())
+                .Add(trial.AngularDiameterDegrees).Add(result.ApertureEdgeSoftnessDegrees)
+                .Add(trial.InstrumentDistortionK).Add(trial.InstrumentMagnificationM)
+                .Add(trial.ContentZoom).Add(trial.MotionMode.ToString())
+                .Add(trial.SweepAxis.ToString()).Add(trial.DirectionLabel)
+                .Add(result.SweepAmplitudeDegrees).Add(result.SweepSpeedDegreesPerSecond)
+                .Add(result.CompletedHalfSweeps).Add(result.MinimumYawDegrees)
+                .Add(result.MaximumYawDegrees).Add(result.MaximumAbsoluteYawDegrees)
+                .Add(result.MeanAbsoluteYawSpeedDegreesPerSecond)
+                .Add(result.PeakAbsoluteYawSpeedDegreesPerSecond).Add(result.ProfileErrorDegrees)
+                .Add(result.FirstExtremeErrorDegrees).Add(result.SecondExtremeErrorDegrees)
+                .Add(trial.DotSeed).Add(result.DotCount).Add(result.WorldCoverageDiameterDegrees)
+                .Add(result.CarrierRadiusMeters).Add(result.Response.ToString())
+                .Add(result.ValidForAnalysis).Add(result.FixationSampleValid)
+                .Add(result.FixationInsideTolerance).Add(result.FixationAngleDegrees)
+                .Add(result.ContinuousFixationSeconds).Add(result.FixationValidSampleFraction)
+                .Add(result.LongestOffTargetSeconds).Add(result.LongestInvalidGazeSeconds)
+                .Add(result.Status));
         }
     }
 }

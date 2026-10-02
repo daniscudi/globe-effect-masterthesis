@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using GlobeEffect.VRCheckerboard.EyeTracking;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -19,7 +20,7 @@ namespace GlobeEffect.VRCheckerboard
     [ExecuteAlways]
     [DisallowMultipleComponent]
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
-    public sealed class VrCheckerboardStimulus : MonoBehaviour
+    public sealed class VrCheckerboardStimulus : MonoBehaviour, IFixationStimulus
     {
         // So läuft das hier ab:
         // 1. CreateQuad baut ein einfaches Viereck.
@@ -158,22 +159,27 @@ namespace GlobeEffect.VRCheckerboard
         public bool UseCircularAperture => useCircularAperture;
         public float VisualSpaceL => visualSpaceL;
         public float GridLineSpacingDegrees => gridSpacingDegrees;
-        public float GridLineSpacingUv => GridSpacingInUv();
+        public float GridLineSpacingUv => DegreesToUv(gridSpacingDegrees);
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
         public bool IsVisible => isVisible;
-        public bool IsCheckerboardVisible => isVisible && checkerboardVisible;
-        public bool IsNoiseVisible => isVisible && noiseVisible;
-        public bool IsResponsePromptVisible => isVisible && responsePromptVisible;
-        public Vector3 FixationDirectionWorld => observer != null
-            ? observer.forward
-            : transform.forward;
+
+        public bool TryGetFixationDirection(out Vector3 directionWorld)
+        {
+            // Beide Augen schauen parallel geradeaus. Deshalb zählt nur, in welche
+            // Richtung geschaut wird. Wo der Blickstrahl anfängt, ist egal.
+            directionWorld = observer != null ? observer.forward : transform.forward;
+            if (directionWorld.sqrMagnitude <= 1e-8f)
+            {
+                return false;
+            }
+
+            directionWorld = directionWorld.normalized;
+            return true;
+        }
 
         private void Reset()
         {
-            // Wenn man die Komponente neu ans Objekt hängt, wird gleich die Main
-            // Camera eingetragen. In VR ist das die Kamera im Headset.
-            Camera mainCamera = Camera.main;
-            observer = mainCamera != null ? mainCamera.transform : null;
+            observer = UnityTools.MainCameraTransform();
         }
 
         private void OnEnable()
@@ -182,7 +188,6 @@ namespace GlobeEffect.VRCheckerboard
             Application.onBeforeRender -= UpdateBeforeRendering;
             Application.onBeforeRender += UpdateBeforeRendering;
             ClampInspectorValues();
-            SetupMeshAndMaterial();
             isVisible = Application.isPlaying ? visibleAtStart : true;
             checkerboardVisible = true;
             noiseVisible = false;
@@ -196,13 +201,10 @@ namespace GlobeEffect.VRCheckerboard
             // Dadurch sieht man Änderungen im Inspector sofort, auch ohne Play Mode.
             // Werte außerhalb des erlaubten Bereichs werden hier gleich zurechtgerückt.
             ClampInspectorValues();
-            if (!isActiveAndEnabled)
+            if (isActiveAndEnabled)
             {
-                return;
+                UpdateEverything();
             }
-
-            SetupMeshAndMaterial();
-            UpdateEverything();
         }
 
         private void OnDisable()
@@ -223,15 +225,10 @@ namespace GlobeEffect.VRCheckerboard
         {
             // Weggeräumt wird nur das, was dieses Skript selbst angelegt hat.
             Application.onBeforeRender -= UpdateBeforeRendering;
-            DeleteObject(quadMesh);
-            DeleteObject(shaderMaterial);
-            DeleteObject(textMaterial);
-            DeleteObject(textObject);
-            quadMesh = null;
-            shaderMaterial = null;
-            textMaterial = null;
-            textObject = null;
-            textMesh = null;
+            UnityTools.DeleteObject(quadMesh);
+            UnityTools.DeleteObject(shaderMaterial);
+            UnityTools.DeleteObject(textMaterial);
+            UnityTools.DeleteObject(textObject);
         }
 
         private void UpdateBeforeRendering()
@@ -246,62 +243,34 @@ namespace GlobeEffect.VRCheckerboard
         public void SetAngularDiameter(float value)
         {
             // Wie groß der runde Ausschnitt ist, von einem Rand zum anderen.
-            fieldOfViewDegrees = Mathf.Clamp(value, 1f, 170f);
-            SendValuesToShader();
-            ParametersChanged?.Invoke(CaptureSnapshot());
+            fieldOfViewDegrees = value;
+            ApplyChange();
         }
 
         public void SetApertureEdgeSoftness(float value)
         {
-            edgeSoftnessDegrees = Mathf.Clamp(value, 0f, 10f);
-            SendValuesToShader();
-            ParametersChanged?.Invoke(CaptureSnapshot());
-        }
-
-        public void SetCircularApertureEnabled(bool value)
-        {
-            // Aus heißt: man sieht das ganze viereckige Gitter. Das ist nur zum
-            // Nachschauen. Im Versuch ist der Kreis normalerweise an.
-            useCircularAperture = value;
-            SendValuesToShader();
-            ParametersChanged?.Invoke(CaptureSnapshot());
+            edgeSoftnessDegrees = value;
+            ApplyChange();
         }
 
         public void SetVisualSpaceL(float value)
         {
             // l wird hier nicht ausgerechnet. Es wird als Bedingung vorgegeben.
             // Die Formel dazu läuft danach im Shader für jeden Bildpunkt.
-            visualSpaceL = Mathf.Clamp(value, 0f, 1.4f);
-            SendValuesToShader();
-            ParametersChanged?.Invoke(CaptureSnapshot());
-        }
-
-        public void SetGridLineSpacing(float value)
-        {
-            // Eingegeben wird in Grad, weil man sich das besser vorstellen kann.
-            // GridSpacingInUv rechnet das vor dem Zeichnen in u/v-Weite um.
-            gridSpacingDegrees = Mathf.Clamp(value, 0.5f, 45f);
-            SendValuesToShader();
-            ParametersChanged?.Invoke(CaptureSnapshot());
+            visualSpaceL = value;
+            ApplyChange();
         }
 
         public void SetEyePresentation(CheckerboardEyePresentation value)
         {
             eyePresentation = value;
-            SendValuesToShader();
-            ParametersChanged?.Invoke(CaptureSnapshot());
+            ApplyChange();
         }
 
         /// <summary>Zeigt das ganze Schachbrett mit Fixationskreuz.</summary>
         public void Show()
         {
-            isVisible = true;
-            checkerboardVisible = true;
-            noiseVisible = false;
-            fixationVisible = true;
-            responsePromptVisible = false;
-            SendValuesToShader();
-            ShowOrHideObjects();
+            ShowParts(checkerboard: true, noise: false, fixation: true, prompt: false);
             StimulusPresented?.Invoke(CaptureSnapshot());
         }
 
@@ -311,13 +280,7 @@ namespace GlobeEffect.VRCheckerboard
         /// </summary>
         public void ShowFixationOnly()
         {
-            isVisible = true;
-            checkerboardVisible = false;
-            noiseVisible = false;
-            fixationVisible = true;
-            responsePromptVisible = false;
-            SendValuesToShader();
-            ShowOrHideObjects();
+            ShowParts(checkerboard: false, noise: false, fixation: true, prompt: false);
         }
 
         // Zeigt direkt nach dem Muster eine neue Schwarz-Weiß-Maske.
@@ -325,36 +288,19 @@ namespace GlobeEffect.VRCheckerboard
         // jeder Durchgang einen neuen Seed.
         public void ShowNoise(int noiseSeed)
         {
-            isVisible = true;
-            checkerboardVisible = false;
-            noiseVisible = true;
             // Das Kreuz bleibt auch während der Maske stehen. So kann die Person
             // bis zur Antwort an derselben Stelle weiterschauen.
-            fixationVisible = true;
-            responsePromptVisible = false;
             currentNoiseSeed = noiseSeed;
-            SendValuesToShader();
-            ShowOrHideObjects();
+            ShowParts(checkerboard: false, noise: true, fixation: true, prompt: false);
         }
 
         // Begrüßung, Trainingstexte und Hinweise werden als Text vor dem Kopf
         // eingeblendet. Der Text ist immer auf beiden Augen zu sehen.
         public void ShowResponsePrompt(string promptText)
         {
-            isVisible = true;
-            checkerboardVisible = false;
-            noiseVisible = false;
-            fixationVisible = false;
-            responsePromptVisible = true;
             SetupTextObject();
-            if (textMesh != null)
-            {
-                textMesh.text = promptText ?? string.Empty;
-                textMesh.color = textColor;
-            }
-
-            SendValuesToShader();
-            ShowOrHideObjects();
+            textMesh.text = promptText ?? string.Empty;
+            ShowParts(checkerboard: false, noise: false, fixation: false, prompt: true);
         }
 
         public void Hide()
@@ -385,9 +331,31 @@ namespace GlobeEffect.VRCheckerboard
                 // ausliest, und steht deshalb fest auf 1.
                 contentZoom = 1f,
                 gridLineSpacingDegrees = gridSpacingDegrees,
-                gridLineSpacingUv = GridSpacingInUv(),
+                gridLineSpacingUv = DegreesToUv(gridSpacingDegrees),
                 eyePresentation = eyePresentation
             };
+        }
+
+        private void ApplyChange()
+        {
+            // Nach jeder Änderung von außen: Grenzen prüfen, alles an den Shader
+            // geben und allen Zuhörern Bescheid sagen.
+            ClampInspectorValues();
+            SendValuesToShader();
+            ParametersChanged?.Invoke(CaptureSnapshot());
+        }
+
+        private void ShowParts(bool checkerboard, bool noise, bool fixation, bool prompt)
+        {
+            // Stellt ein, welche Teile gerade zu sehen sind, und gibt das an den
+            // Shader und an den Text weiter.
+            isVisible = true;
+            checkerboardVisible = checkerboard;
+            noiseVisible = noise;
+            fixationVisible = fixation;
+            responsePromptVisible = prompt;
+            SendValuesToShader();
+            ShowOrHideObjects();
         }
 
         private void UpdateEverything()
@@ -426,37 +394,27 @@ namespace GlobeEffect.VRCheckerboard
 
             propertyBlock ??= new MaterialPropertyBlock();
             meshRenderer.GetPropertyBlock(propertyBlock);
-            propertyBlock.SetFloat("_ApparentHalfAngleRad",
-                0.5f * fieldOfViewDegrees * Mathf.Deg2Rad);
-            propertyBlock.SetFloat("_ApertureEdgeSoftnessRad",
-                edgeSoftnessDegrees * Mathf.Deg2Rad);
-            propertyBlock.SetFloat("_UseCircularAperture",
-                useCircularAperture ? 1f : 0f);
+            propertyBlock.SetFloat("_ApparentHalfAngleRad", 0.5f * fieldOfViewDegrees * Mathf.Deg2Rad);
+            propertyBlock.SetFloat("_ApertureEdgeSoftnessRad", edgeSoftnessDegrees * Mathf.Deg2Rad);
+            propertyBlock.SetFloat("_UseCircularAperture", useCircularAperture ? 1f : 0f);
             propertyBlock.SetFloat("_VisualSpaceL", visualSpaceL);
-            propertyBlock.SetFloat(
-                "_GridLineSpacingUv",
-                GridSpacingInUv());
+            propertyBlock.SetFloat("_GridLineSpacingUv", DegreesToUv(gridSpacingDegrees));
             propertyBlock.SetColor("_DarkColor", darkColor);
             propertyBlock.SetColor("_LightColor", lightColor);
             propertyBlock.SetColor("_FixationBackgroundColor", fixationBackgroundColor);
             propertyBlock.SetFloat("_CheckerboardEnabled", checkerboardVisible ? 1f : 0f);
             propertyBlock.SetFloat("_NoiseEnabled", noiseVisible ? 1f : 0f);
-            propertyBlock.SetFloat("_NoiseCellSizeUv", NoiseSizeInUv());
+            propertyBlock.SetFloat("_NoiseCellSizeUv", DegreesToUv(noiseSizeDegrees));
             // Als echte ganze Zahl übertragen. Ein Float kann große Seeds wie
             // 20260901 nicht mehr exakt speichern und würde benachbarte Seeds runden.
             propertyBlock.SetInteger("_NoiseSeed", currentNoiseSeed);
             // Beim Antworttext wird immer auf beiden Augen gezeigt, damit der Text
             // auch im Monokular-Durchgang gut lesbar bleibt.
-            propertyBlock.SetFloat(
-                "_EyeMode",
-                responsePromptVisible
-                    ? (float)CheckerboardEyePresentation.BothEyes
-                    : (float)eyePresentation);
-            propertyBlock.SetFloat(
-                "_FixationEnabled",
-                showFixationTarget && fixationVisible ? 1f : 0f);
-            propertyBlock.SetFloat("_FixationHalfSizeRad",
-                0.5f * fixationSizeDegrees * Mathf.Deg2Rad);
+            CheckerboardEyePresentation eyeMode =
+                responsePromptVisible ? CheckerboardEyePresentation.BothEyes : eyePresentation;
+            propertyBlock.SetFloat("_EyeMode", (float)eyeMode);
+            propertyBlock.SetFloat("_FixationEnabled", showFixationTarget && fixationVisible ? 1f : 0f);
+            propertyBlock.SetFloat("_FixationHalfSizeRad", 0.5f * fixationSizeDegrees * Mathf.Deg2Rad);
             propertyBlock.SetColor("_FixationColor", fixationColor);
             AddHeadPose(propertyBlock);
             meshRenderer.SetPropertyBlock(propertyBlock);
@@ -488,21 +446,15 @@ namespace GlobeEffect.VRCheckerboard
             block.SetVector("_ObserverWorldForward", head.forward);
         }
 
-        private float GridSpacingInUv()
+        private float DegreesToUv(float degrees)
         {
+            // Eingegeben wird in Grad, weil man sich das besser vorstellen kann.
+            // Hier wird das vor dem Zeichnen in u/v-Weite umgerechnet, fürs Gitter
+            // und genauso für die Noise-Kästchen.
             // Beispiel: Bei 90 Grad FOV werden aus 10 Grad ungefähr 0,1763
             // in u/v-Koordinaten.
             return (float)VisualSpaceRadialMapping.NormalizedGridLineSpacing(
-                fieldOfViewDegrees,
-                gridSpacingDegrees);
-        }
-
-        private float NoiseSizeInUv()
-        {
-            // Läuft genauso wie beim Gitter: von Grad in u/v-Koordinaten umrechnen.
-            return (float)VisualSpaceRadialMapping.NormalizedGridLineSpacing(
-                fieldOfViewDegrees,
-                noiseSizeDegrees);
+                fieldOfViewDegrees, degrees);
         }
 
         private void ShowOrHideObjects()
@@ -559,8 +511,8 @@ namespace GlobeEffect.VRCheckerboard
             textMesh.color = textColor;
             // Der Text steht weiter vorne als das Viereck. Deshalb wird der
             // Abstand des Vierecks hier wieder abgezogen.
-            textObject.transform.localPosition = Vector3.forward *
-                Mathf.Max(0.01f, textDistanceMeters - QuadDistanceMeters);
+            textObject.transform.localPosition =
+                Vector3.forward * Mathf.Max(0.01f, textDistanceMeters - QuadDistanceMeters);
             textObject.transform.localRotation = Quaternion.identity;
             textObject.transform.localScale = Vector3.one;
         }
@@ -587,23 +539,15 @@ namespace GlobeEffect.VRCheckerboard
             if (materialToUse == null)
             {
                 // Ist im Inspector kein eigenes Material eingetragen, baut sich das
-                // Skript selbst eins mit dem richtigen Shader. Das wird nicht
-                // gespeichert und ist nach dem Schließen wieder weg.
+                // Skript selbst eins mit dem richtigen Shader.
                 if (shaderMaterial == null)
                 {
-                    Shader shader = Resources.Load<Shader>(ShaderResourceName);
-                    shader ??= Shader.Find(ShaderFallbackName);
-                    if (shader == null)
+                    shaderMaterial = UnityTools.CreateShaderMaterial(ShaderResourceName,
+                        ShaderFallbackName, "Runtime Helmholtz Checkerboard Material", this);
+                    if (shaderMaterial == null)
                     {
-                        Debug.LogError($"Shader '{ShaderFallbackName}' wurde nicht gefunden.", this);
                         return;
                     }
-
-                    shaderMaterial = new Material(shader)
-                    {
-                        name = "Runtime Helmholtz Checkerboard Material",
-                        hideFlags = HideFlags.HideAndDontSave
-                    };
                 }
 
                 materialToUse = shaderMaterial;
@@ -626,17 +570,12 @@ namespace GlobeEffect.VRCheckerboard
                 hideFlags = HideFlags.HideAndDontSave,
                 vertices = new[]
                 {
-                    new Vector3(-0.5f, -0.5f, 0f),
-                    new Vector3(0.5f, -0.5f, 0f),
-                    new Vector3(0.5f, 0.5f, 0f),
-                    new Vector3(-0.5f, 0.5f, 0f)
+                    new Vector3(-0.5f, -0.5f, 0f), new Vector3(0.5f, -0.5f, 0f),
+                    new Vector3(0.5f, 0.5f, 0f), new Vector3(-0.5f, 0.5f, 0f)
                 },
                 uv = new[]
                 {
-                    new Vector2(0f, 0f),
-                    new Vector2(1f, 0f),
-                    new Vector2(1f, 1f),
-                    new Vector2(0f, 1f)
+                    new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(0f, 1f)
                 },
                 triangles = new[] { 0, 2, 1, 0, 3, 2 }
             };
@@ -647,40 +586,16 @@ namespace GlobeEffect.VRCheckerboard
         private void ClampInspectorValues()
         {
             // Fängt Werte ab, die jemand von Hand eingetippt hat. Und alte Szenen,
-            // in denen noch Werte von früher stehen.
+            // in denen noch Werte von früher stehen. Die Set-Methoden oben nutzen
+            // das ebenfalls, damit jede Grenze nur an dieser einen Stelle steht.
             fieldOfViewDegrees = Mathf.Clamp(fieldOfViewDegrees, 1f, 170f);
-            edgeSoftnessDegrees = Mathf.Clamp(
-                edgeSoftnessDegrees,
-                0f,
-                10f);
+            edgeSoftnessDegrees = Mathf.Clamp(edgeSoftnessDegrees, 0f, 10f);
             visualSpaceL = Mathf.Clamp(visualSpaceL, 0f, 1.4f);
             gridSpacingDegrees = Mathf.Clamp(gridSpacingDegrees, 0.5f, 45f);
             noiseSizeDegrees = Mathf.Clamp(noiseSizeDegrees, 0.25f, 10f);
             fixationSizeDegrees = Mathf.Clamp(fixationSizeDegrees, 0.05f, 5f);
             textDistanceMeters = Mathf.Max(0.5f, textDistanceMeters);
-            textSize = Mathf.Clamp(
-                textSize,
-                0.005f,
-                0.1f);
-        }
-
-        private static void DeleteObject(UnityEngine.Object objectToDelete)
-        {
-            if (objectToDelete == null)
-            {
-                return;
-            }
-
-            if (Application.isPlaying)
-            {
-                // Im Play Mode räumt Unity das am Ende vom Frame weg.
-                Destroy(objectToDelete);
-            }
-            else
-            {
-                // Außerhalb vom Play Mode sofort, damit die Vorschau gleich stimmt.
-                DestroyImmediate(objectToDelete);
-            }
+            textSize = Mathf.Clamp(textSize, 0.005f, 0.1f);
         }
     }
 

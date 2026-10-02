@@ -36,9 +36,7 @@ namespace GlobeEffect.VRCheckerboard
         /// vielleicht für einen eigenen Fernglasmodus beim Random-Dot-Test.
         /// </summary>
         public static double ApparentAngleFromObject(
-            double objectAngleRadians,
-            double magnification,
-            double k)
+            double objectAngleRadians, double magnification, double k)
         {
             Validate(magnification, k);
 
@@ -49,8 +47,7 @@ namespace GlobeEffect.VRCheckerboard
                 return magnification * objectAngleRadians;
             }
 
-            return Math.Atan(
-                magnification * Math.Tan(k * objectAngleRadians)) / k;
+            return Math.Atan(magnification * Math.Tan(k * objectAngleRadians)) / k;
         }
 
         /// <summary>
@@ -60,9 +57,7 @@ namespace GlobeEffect.VRCheckerboard
         /// Diese Richtung wird für die Vergleichsrechnungen und die Plots benutzt.
         /// </summary>
         public static double ObjectAngleFromApparent(
-            double apparentAngleRadians,
-            double magnification,
-            double k)
+            double apparentAngleRadians, double magnification, double k)
         {
             Validate(magnification, k);
 
@@ -71,8 +66,7 @@ namespace GlobeEffect.VRCheckerboard
                 return apparentAngleRadians / magnification;
             }
 
-            return Math.Atan(
-                Math.Tan(k * apparentAngleRadians) / magnification) / k;
+            return Math.Atan(Math.Tan(k * apparentAngleRadians) / magnification) / k;
         }
 
         /// <summary>
@@ -88,9 +82,7 @@ namespace GlobeEffect.VRCheckerboard
         /// nicht, wie groß der Kreis ist.
         /// </summary>
         public static double NormalizedSourceRadius(
-            double normalizedDisplayRadius,
-            double apparentHalfAngleRadians,
-            double magnification,
+            double normalizedDisplayRadius, double apparentHalfAngleRadians, double magnification,
             double k)
         {
             if (normalizedDisplayRadius < 0.0 || normalizedDisplayRadius > 1.0)
@@ -98,8 +90,7 @@ namespace GlobeEffect.VRCheckerboard
                 throw new ArgumentOutOfRangeException(nameof(normalizedDisplayRadius));
             }
 
-            if (apparentHalfAngleRadians <= 0.0 ||
-                apparentHalfAngleRadians >= Math.PI / 2.0)
+            if (apparentHalfAngleRadians <= 0.0 || apparentHalfAngleRadians >= Math.PI / 2.0)
             {
                 throw new ArgumentOutOfRangeException(nameof(apparentHalfAngleRadians));
             }
@@ -107,22 +98,16 @@ namespace GlobeEffect.VRCheckerboard
             // Schritt 1: Von der Stelle im Kreis auf den Winkel kommen, unter dem
             // man diesen Punkt sieht. Der halbe Winkel ist der eingestellte Rand.
             double tangentAtBoundary = Math.Tan(apparentHalfAngleRadians);
-            double apparentAngle = Math.Atan(
-                normalizedDisplayRadius * tangentAtBoundary);
+            double apparentAngle = Math.Atan(normalizedDisplayRadius * tangentAtBoundary);
 
             // Schritt 2: Mit der Formel rückwärts nachschauen, von welchem
             // wirklichen Winkel dieser gesehene Winkel kommt.
-            double objectAngle = ObjectAngleFromApparent(
-                apparentAngle,
-                magnification,
-                k);
+            double objectAngle = ObjectAngleFromApparent(apparentAngle, magnification, k);
 
             // Schritt 3: Dasselbe noch einmal für den äußeren Rand. Durch das
             // Teilen landet das Ergebnis wieder sauber zwischen 0 und 1.
-            double maximumObjectAngle = ObjectAngleFromApparent(
-                apparentHalfAngleRadians,
-                magnification,
-                k);
+            double maximumObjectAngle =
+                ObjectAngleFromApparent(apparentHalfAngleRadians, magnification, k);
 
             return Math.Tan(objectAngle) / Math.Tan(maximumObjectAngle);
         }
@@ -134,17 +119,14 @@ namespace GlobeEffect.VRCheckerboard
             if (magnification <= 0.0)
             {
                 throw new ArgumentOutOfRangeException(
-                    nameof(magnification),
-                    "Die Vergrößerung muss positiv sein.");
+                    nameof(magnification), "Die Vergrößerung muss positiv sein.");
             }
 
             if (k < MinimumDistortionK || k > MaximumDistortionK)
             {
-                throw new ArgumentOutOfRangeException(
-                    nameof(k),
-                    "k muss zwischen 0 und 1,4 liegen. Der Bereich über 1 " +
-                    "setzt die Abbildungsfamilie in die tonnenförmige " +
-                    "Richtung fort.");
+                throw new ArgumentOutOfRangeException(nameof(k),
+                    "k muss zwischen 0 und 1,4 liegen. Der Bereich über 1 "
+                    + "setzt die Abbildungsfamilie in die tonnenförmige Richtung fort.");
             }
         }
     }

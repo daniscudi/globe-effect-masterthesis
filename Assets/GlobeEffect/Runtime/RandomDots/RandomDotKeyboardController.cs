@@ -31,46 +31,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [SerializeField]
         private bool logResponses;
 
-        private RandomDotFieldStimulus stimulus;
-
         public event Action<CheckerboardCurvatureResponse> ResponseSubmitted;
 
         public bool SwapResponseKeys => swapResponseKeys;
-
-        private void Awake()
-        {
-            stimulus = GetComponent<RandomDotFieldStimulus>();
-        }
-
-        private void Update()
-        {
-            // Links und rechts können im Inspector vertauscht sein. Das macht man,
-            // damit nicht bei allen Personen dieselbe Seite dieselbe Antwort ist.
-            Keyboard keyboard = Keyboard.current;
-            if (keyboard == null)
-            {
-                return;
-            }
-
-            if (keyboard[concaveKey].wasPressedThisFrame)
-            {
-                SubmitResponse(swapResponseKeys
-                    ? CheckerboardCurvatureResponse.Convex
-                    : CheckerboardCurvatureResponse.Concave);
-            }
-
-            if (keyboard[convexKey].wasPressedThisFrame)
-            {
-                SubmitResponse(swapResponseKeys
-                    ? CheckerboardCurvatureResponse.Concave
-                    : CheckerboardCurvatureResponse.Convex);
-            }
-        }
-
-        public void SetSwapResponseKeys(bool value)
-        {
-            swapResponseKeys = value;
-        }
 
         public void SubmitResponse(CheckerboardCurvatureResponse response)
         {
@@ -85,9 +48,43 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             ResponseSubmitted?.Invoke(response);
             if (logResponses)
             {
-                stimulus ??= GetComponent<RandomDotFieldStimulus>();
-                Debug.Log("Random-Dot-Antwort: " + response, stimulus);
+                Debug.Log("Random-Dot-Antwort: " + response, this);
             }
+        }
+
+        private void Update()
+        {
+            // Links und rechts können im Inspector vertauscht sein. Das macht man,
+            // damit nicht bei allen Personen dieselbe Seite dieselbe Antwort ist.
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard == null)
+            {
+                return;
+            }
+
+            if (keyboard[concaveKey].wasPressedThisFrame)
+            {
+                SubmitResponse(Swapped(CheckerboardCurvatureResponse.Concave));
+            }
+
+            if (keyboard[convexKey].wasPressedThisFrame)
+            {
+                SubmitResponse(Swapped(CheckerboardCurvatureResponse.Convex));
+            }
+        }
+
+        // Ist die Belegung für diese Person vertauscht, wird aus konkav konvex
+        // und umgekehrt. Sonst bleibt die Antwort, wie sie ist.
+        private CheckerboardCurvatureResponse Swapped(CheckerboardCurvatureResponse response)
+        {
+            if (!swapResponseKeys)
+            {
+                return response;
+            }
+
+            return response == CheckerboardCurvatureResponse.Concave
+                ? CheckerboardCurvatureResponse.Convex
+                : CheckerboardCurvatureResponse.Concave;
         }
     }
 }

@@ -10,7 +10,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
         _ApertureHalfAngleRad ("Aperture Half Angle [rad]", Float) = 0.785398
         _ApertureEdgeSoftnessRad ("Aperture Edge Softness [rad]", Float) = 0.0174533
         _InstrumentDistortionK ("Instrument distortion k", Range(0, 1.4)) = 0.5
-        _InstrumentMagnificationM ("Instrument magnification m", Range(1, 20)) = 10
+        _InstrumentMagnificationM ("Instrument magnification m", Range(1, 14)) = 10
         _ContentZoom ("Content Zoom", Float) = 1
         _EyeMode ("Eye Mode", Float) = 0
         _DotsEnabled ("Dots Enabled", Float) = 1
@@ -52,7 +52,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
             {
                 float4 position : SV_POSITION;
                 float2 dotUv : TEXCOORD0;
-                float displayedAngle : TEXCOORD1;
+                float2 aperturePosition : TEXCOORD1;
                 float validProjection : TEXCOORD2;
                 float isFixationTarget : TEXCOORD3;
                 float isApertureBackground : TEXCOORD4;
@@ -167,10 +167,10 @@ Shader "GlobeEffect/Visual Space Random Dots"
                         UNITY_MATRIX_P,
                         float4(backgroundViewPosition, 1.0));
                     output.dotUv = input.uv;
-                    // Der genaue Winkel wird im Fragment aus den interpolierten
-                    // UV-Koordinaten berechnet. An allen vier Ecken wäre er sonst
-                    // gleich und könnte keinen Kreis ergeben.
-                    output.displayedAngle = 0.0;
+                    // Wo diese Ecke im Bild liegt, gemessen von der Bildmitte. Der
+                    // Fragment-Shader rechnet daraus für jedes Pixel den Winkel aus
+                    // und schneidet so den Kreis.
+                    output.aperturePosition = input.uv * tangentAtBoundary;
                     output.validProjection = 1.0;
                     output.isFixationTarget = 0.0;
                     output.isApertureBackground = 1.0;
@@ -248,14 +248,34 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 // Danach wird die feste Winkelgröße des sternähnlichen Markers
                 // ergänzt; k und m verändern damit seine Bahn, nicht seine Größe.
                 float angularHalfSize = _DotHalfSizeRad * input.sizeData.x;
-                viewPosition.xy += input.uv * forwardDistance *
-                    tan(angularHalfSize);
+                float tanHalfSize = tan(angularHalfSize);
+
+                // Das Viereck wird rundherum anderthalb Bildpixel größer gezeichnet
+                // als der Punkt selbst. Der Punkt bleibt dabei gleich groß. Der Platz
+                // ist für den weichen Rand da: Ohne ihn würde der Rand oben, unten,
+                // links und rechts an der Kante des Vierecks abgeschnitten, und
+                // kleine Punkte sähen eckig aus. pixelTan ist die Breite eines
+                // Bildpixels, im selben Maß wie tanHalfSize.
+                float pixelTan = 2.0 /
+                    (abs(UNITY_MATRIX_P[1][1]) * _ScreenParams.y);
+                float quadScale = isFixation > 0.5
+                    ? 1.0
+                    : 1.0 + 1.5 * pixelTan / max(tanHalfSize, 1e-6);
+                viewPosition.xy += input.uv * quadScale * forwardDistance *
+                    tanHalfSize;
 
                 output.position = mul(
                     UNITY_MATRIX_P,
                     float4(viewPosition, 1.0));
-                output.dotUv = input.uv;
-                output.displayedAngle = displayedAngle;
+                // Der Punktrand liegt weiter bei 1. Die Ecken des größeren Vierecks
+                // liegen entsprechend weiter draußen.
+                output.dotUv = input.uv * quadScale;
+                // Auch hier wandert die Stelle im Bild mit, und zwar für jede Ecke
+                // des Punktes einzeln. So schneidet der Kreisrand einen Punkt genau
+                // dort ab, wo er über den Rand ragt. Früher zählte nur der
+                // Mittelpunkt, und Punkte am Rand standen über den Kreis hinaus.
+                output.aperturePosition = viewPosition.xy /
+                    max(forwardDistance, 1e-4);
                 output.validProjection = validFront *
                     validInstrumentDomain * validAngle;
                 output.isFixationTarget = isFixation;
@@ -283,10 +303,9 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 clip(visibleForEye - 0.5);
                 clip(input.validProjection - 0.5);
 
-                float apertureAngle = input.isApertureBackground > 0.5
-                    ? atan(length(input.dotUv) *
-                        tan(_ApertureHalfAngleRad))
-                    : input.displayedAngle;
+                // Winkel dieses Pixels zur Bildmitte. Daraus ergibt sich, ob es
+                // innerhalb der runden Öffnung liegt.
+                float apertureAngle = atan(length(input.aperturePosition));
                 float apertureAlpha = ResolveApertureAlpha(apertureAngle);
                 if (input.isApertureBackground > 0.5)
                 {
