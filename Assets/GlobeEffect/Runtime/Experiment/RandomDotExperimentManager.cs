@@ -410,6 +410,15 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return false;
             }
 
+            // Hat die Auswahl "Auto" keinen echten Eye Tracker gefunden, darf eine
+            // Messung nicht unbemerkt mit dem Dummy (Maus-Blick) laufen.
+            if (EyeTrackerProviderResolver.TryGetSessionBlockReason(
+                eyeTrackingToolbox, requireFixation, out string eyeTrackerBlockReason))
+            {
+                Debug.LogError(eyeTrackerBlockReason, this);
+                return false;
+            }
+
             // Im HeadTracked-Block kommt der zweite Umkehrpunkt erst nach
             // 3 * Amplitude / Geschwindigkeit.
             if (headTrackedSeconds + 0.001f < 3f * sweepAmplitudeDegrees / sweepSpeed)

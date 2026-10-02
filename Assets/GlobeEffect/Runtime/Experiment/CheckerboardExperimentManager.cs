@@ -698,6 +698,15 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return false;
             }
 
+            // Hat die Auswahl "Auto" keinen echten Eye Tracker gefunden, darf eine
+            // Messung nicht unbemerkt mit dem Dummy (Maus-Blick) laufen.
+            if (EyeTrackerProviderResolver.TryGetSessionBlockReason(
+                eyeTrackingToolbox, requireFixation, out string eyeTrackerBlockReason))
+            {
+                Debug.LogError(eyeTrackerBlockReason, this);
+                return false;
+            }
+
             // Die Tastenbelegung wird mit Absicht hier gesetzt und nicht im
             // Keyboard Controller. So gilt sie auch in älteren Szenen, in denen
             // am Controller noch die alten Tasten eingetragen sind.

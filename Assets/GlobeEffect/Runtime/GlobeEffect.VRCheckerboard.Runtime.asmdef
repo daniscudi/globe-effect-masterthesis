@@ -3,6 +3,9 @@
   "rootNamespace": "GlobeEffect.VRCheckerboard",
   "references": [
     "Unity.InputSystem",
-    "Varjo.XR"
+    "Unity.XR.Management",
+    "Unity.XR.OpenXR",
+    "Varjo.XR",
+    "ViveSR.SRanipal"
   ]
 }

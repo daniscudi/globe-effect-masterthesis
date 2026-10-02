@@ -25,7 +25,9 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         public enum ETProvider
         {
             Dummy,
-            Varjo
+            Varjo,
+            SRanipal,
+            Auto
         }
 
         public enum TrackingOptions
@@ -114,6 +116,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         private readonly AutoResetEvent writerWakeUp = new(false);
 
         private IEyeTracker eyeTracker;
+        private ETProvider activeProvider;
         private GazeData currentGazeData;
         private Thread savingThread;
         private volatile bool writerThreadRunning;
@@ -129,6 +132,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         public event Action<GazeData> GazeDataAvailable;
 
         public ETProvider Provider => provider;
+        public ETProvider ActiveProvider => activeProvider;
         public bool IsRecording => recording;
         public string ObjectTrackingFile => objectTrackingFile;
         public string GazeTrackingFile => gazeTrackingFile;
@@ -317,6 +321,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
             recording = true;
             WriteMessage("RecordingStarted");
+            WriteMessage(EyeTrackerProviderResolver.BuildProviderMarker(provider, activeProvider));
             StartBackgroundWriter();
 
             Debug.Log(
@@ -381,7 +386,10 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         private void CreateProvider()
         {
-            switch (provider)
+            // "Auto" wird außerhalb der Toolbox aufgelöst; ausdrücklich gewählte
+            // Provider kommen unverändert zurück.
+            activeProvider = EyeTrackerProviderResolver.ResolveForCurrentSystem(provider, this);
+            switch (activeProvider)
             {
                 case ETProvider.Dummy:
                     var dummy = GetComponent<DummyEyeTracker>();
@@ -404,12 +412,22 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
                     eyeTracker = varjo;
                     break;
 
+                case ETProvider.SRanipal:
+                    var sranipal = GetComponent<SRanipalEyeTracker>();
+                    if (sranipal == null)
+                    {
+                        sranipal = gameObject.AddComponent<SRanipalEyeTracker>();
+                    }
+
+                    eyeTracker = sranipal;
+                    break;
+
                 default:
                     throw new ArgumentOutOfRangeException();
             }
 
             eyeTracker.Initialize();
-            Debug.Log($"Eye-Tracking-Provider initialisiert: {provider}", this);
+            Debug.Log($"Eye-Tracking-Provider initialisiert: {activeProvider}", this);
         }
 
         private void HandleProviderData(GazeData gazeData)
