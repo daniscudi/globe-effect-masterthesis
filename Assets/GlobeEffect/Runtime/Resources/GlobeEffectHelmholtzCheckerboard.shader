@@ -147,6 +147,20 @@
                 return value ^ (value >> 16);
             }
 
+            float NoiseCellValue(int2 cell)
+            {
+                // Aus Zellnummer und Seed entsteht reproduzierbar ein schwarzer
+                // oder weißer Punkt. Seed und Zellnummern bleiben ganze Zahlen,
+                // auch negative Zellnummern werden über ihre Bits eindeutig
+                // einbezogen. Früher steckte der große Seed in einer Sinusrechnung;
+                // dabei gingen Unterschiede verloren und die Maske konnte je nach
+                // Grafikkarte fast ganz schwarz werden.
+                uint bits = MixNoiseBits(asuint(cell.x) ^ asuint(_NoiseSeed));
+                bits = MixNoiseBits(bits ^ asuint(cell.y) ^ 0x9e3779b9u);
+                // Das oberste Bit entscheidet: 0 = dunkel, 1 = hell.
+                return (float)(bits >> 31);
+            }
+
             fixed4 Frag(VertexToFragment input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
@@ -198,13 +212,10 @@
                 // quadratische Gitter wird sichtbar. Das ist nur zur Kontrolle
                 // gedacht; im eigentlichen Versuch bleibt die Öffnung aktiv.
                 //
-                // Außerhalb vom Kreis ist nur der graue Hintergrund zu sehen.
-                // Das wird hier gleich zurückgegeben, auch weil die Formel weiter
-                // unten so weit außen keine sinnvollen Werte mehr liefert.
-                if (apertureAlpha <= 0.001)
-                {
-                    return fixed4(_FixationBackgroundColor.rgb, 1.0);
-                }
+                // Außerhalb vom Kreis ist nur der graue Hintergrund zu sehen. Das
+                // wird ganz am Ende ausgewählt und nicht schon hier mit return,
+                // weil die Kantenglättung (fwidth) weiter unten bei allen
+                // Nachbarpixeln mitrechnen muss.
 
                 float sourceRadius;
                 if (_VisualSpaceL < 1e-6)
@@ -253,21 +264,28 @@
                 // schwarzer oder weißer Punkt. Das ist keine weitere l-Verzerrung.
                 // Das C#-Skript wechselt den Seed mit der eingestellten Rate; dadurch
                 // flimmert die Maske wie ein Fernseher ohne Empfang.
-                int2 noiseCell = (int2)floor(
-                    displayPosition / max(_NoiseCellSizeUv, 1e-6));
-                // Früher wurde der große Seed direkt in eine Sinusrechnung
-                // eingesetzt. Dabei gingen Unterschiede zwischen Zellen verloren;
-                // je nach Grafikkarte konnte die Maske fast oder ganz schwarz werden.
-                // Jetzt bleiben Seed und Zellnummern ganze Zahlen. Auch negative
-                // Zellnummern werden anhand ihrer Bits eindeutig mit einbezogen.
-                uint noiseBits = MixNoiseBits(asuint(noiseCell.x) ^ asuint(_NoiseSeed));
-                noiseBits = MixNoiseBits(noiseBits ^ asuint(noiseCell.y) ^ 0x9e3779b9u);
-                // Das oberste Bit entscheidet: 0 = dunkel, 1 = hell.
-                float noiseValue = (float)(noiseBits >> 31);
-                fixed4 noiseColor = lerp(
-                    _DarkColor,
-                    _LightColor,
-                    step(0.5, noiseValue));
+                //
+                // Die Kanten zwischen den Zellen werden geglättet, genau wie beim
+                // Schachbrett. Ohne das springt jede harte Kante im Headset bei
+                // jeder winzigen Kopfbewegung um ein Pixel hin und her, und man
+                // sieht wandernde waagrechte und senkrechte Linien.
+                //
+                // So geht das Glätten: noisePosition zählt in Zellen. Zwischen den
+                // Mitten zweier Nachbarzellen wird nur auf einer Breite von einem
+                // Bildpixel (pixelWidth) weich von der einen zur anderen Farbe
+                // übergeblendet. Innerhalb einer Zelle bleibt sie rein schwarz
+                // oder rein weiß.
+                float2 noisePosition = displayPosition / max(_NoiseCellSizeUv, 1e-6);
+                float2 pixelWidth = max(fwidth(noisePosition), 1e-4);
+                float2 shifted = noisePosition - 0.5;
+                int2 cell = (int2)floor(shifted);
+                float2 between = shifted - floor(shifted);
+                float2 blend = saturate((between - 0.5) / pixelWidth + 0.5);
+                float noiseValue = lerp(
+                    lerp(NoiseCellValue(cell), NoiseCellValue(cell + int2(1, 0)), blend.x),
+                    lerp(NoiseCellValue(cell + int2(0, 1)), NoiseCellValue(cell + int2(1, 1)), blend.x),
+                    blend.y);
+                fixed4 noiseColor = lerp(_DarkColor, _LightColor, noiseValue);
 
                 fixed4 visiblePattern = lerp(
                     checkerColor,
@@ -309,6 +327,10 @@
                 #else
                     finalColor.rgb = lerp(background, finalColor.rgb, apertureAlpha);
                 #endif
+
+                // Ganz außen liefert die l-Formel keine sinnvollen Werte mehr.
+                // Dort wird deshalb direkt das Grau genommen.
+                finalColor.rgb = apertureAlpha <= 0.001 ? background : finalColor.rgb;
                 finalColor.a = 1.0;
                 return finalColor;
             }
