@@ -107,6 +107,67 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(stationary.SecondExtremeErrorDegrees, Is.EqualTo(2f).Within(0.0001f));
         }
 
+        [Test]
+        public void ImageCenterReference_GivesTheSameImageSpeedAtEveryMagnification()
+        {
+            // Gewünscht: 12 Grad pro Sekunde in der Bildmitte. Das Instrument muss
+            // dafür bei großem m langsamer über die Außenwelt schwenken.
+            foreach (float m in new[] { 5f, 10f, 14f, 20f })
+            {
+                float objectSpeed = Sweep.ObjectSpeed(
+                    RandomDotSweepSpeedReference.ImageCenter, 1.2f, 12f, m, contentZoom: 1f);
+                Assert.That(objectSpeed, Is.EqualTo(12f / m).Within(0.0001f));
+                Assert.That(Sweep.ImageCenterSpeed(objectSpeed, m, 1f), Is.EqualTo(12f).Within(0.0001f));
+            }
+        }
+
+        [Test]
+        public void ImageCenterReference_ReproducesTheOldSetupAtMagnificationTen()
+        {
+            // Bisher: m = 10 und 1,2 Grad pro Sekunde. Das sind 12 Grad pro Sekunde
+            // in der Bildmitte; mit der Voreinstellung ändert sich dort also nichts.
+            Assert.That(
+                Sweep.ObjectSpeed(RandomDotSweepSpeedReference.ImageCenter, 1.2f, 12f, 10f, 1f),
+                Is.EqualTo(1.2f).Within(0.0001f));
+        }
+
+        [Test]
+        public void ObjectAngleReference_KeepsTheOldDefinition()
+        {
+            // Das Instrument schwenkt bei jedem m gleich schnell. Die Punkte laufen
+            // dann in der Bildmitte m-mal so schnell.
+            foreach (float m in new[] { 5f, 20f })
+            {
+                float objectSpeed = Sweep.ObjectSpeed(
+                    RandomDotSweepSpeedReference.ObjectAngle, 1.2f, 12f, m, contentZoom: 1f);
+                Assert.That(objectSpeed, Is.EqualTo(1.2f));
+                Assert.That(Sweep.ImageCenterSpeed(objectSpeed, m, 1f), Is.EqualTo(1.2f * m).Within(0.0001f));
+            }
+        }
+
+        [Test]
+        public void ContentZoom_CountsLikeExtraMagnificationForTheImageSpeed()
+        {
+            Assert.That(
+                Sweep.ObjectSpeed(RandomDotSweepSpeedReference.ImageCenter, 1.2f, 12f, 5f, contentZoom: 2f),
+                Is.EqualTo(1.2f).Within(0.0001f));
+        }
+
+        [Test]
+        public void ImageCenterSpeed_MatchesTheInstrumentFormulaForEveryK()
+        {
+            // Die Aussage "in der Mitte m-mal so schnell" gegen die Merlitz-Formel
+            // geprüft: Ein kleiner Objektwinkel nahe der Achse erscheint bei jedem k
+            // m-mal so groß.
+            const double smallObjectAngle = 1e-4;
+            foreach (double k in new[] { 0.0, 0.2, 0.5, 1.0, 1.2 })
+            {
+                double apparent = MerlitzBinocularReferenceMath.ApparentAngleFromObject(
+                    smallObjectAngle, 20.0, k);
+                Assert.That(apparent / smallObjectAngle, Is.EqualTo(20.0).Within(0.001));
+            }
+        }
+
         private static float OneWay(double elapsedSeconds, RandomDotSweepDirection direction)
         {
             return Sweep.EvaluateOneWayDegrees(elapsedSeconds, 2f, 5f, direction);

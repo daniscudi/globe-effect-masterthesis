@@ -69,6 +69,44 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             return direction == RandomDotSweepDirection.LeftFirst ? -angle : angle;
         }
 
+        /// <summary>
+        /// Wie schnell das Instrument im simulierten Schwenk dreht, in Grad
+        /// Objektwinkel pro Sekunde. Das ist der Wert, den der Shader braucht.
+        ///
+        /// Drei Geschwindigkeiten muss man auseinanderhalten:
+        /// - Objektwinkel: wie schnell das Instrument über die Außenwelt schwenkt.
+        /// - Sichtbarer Bildwinkel: wie schnell ein Punkt im Bild wandert. In der
+        ///   Bildmitte ist das bei jedem k genau m * Content Zoom mal so schnell
+        ///   wie der Objektwinkel. Zum Rand hin wird es je nach k schneller oder
+        ///   langsamer; dieser Unterschied ist der eigentliche Reiz.
+        /// - Kartesische Bildkoordinate (Tangens des Bildwinkels): In der Bildmitte
+        ///   gleich dem Bildwinkel, zum Rand hin wächst sie zusätzlich mit
+        ///   1 / cos².
+        ///
+        /// ImageCenter rechnet die gewünschte sichtbare Geschwindigkeit der
+        /// Bildmitte auf den Objektwinkel zurück. Dadurch laufen die Punkte in der
+        /// Bildmitte bei jedem m gleich schnell, und das Verhältnis zwischen Mitte
+        /// und Rand bleibt unberührt.
+        /// </summary>
+        public static float ObjectSpeed(
+            RandomDotSweepSpeedReference reference, float objectSpeedDegreesPerSecond,
+            float imageCenterSpeedDegreesPerSecond, float magnificationM, float contentZoom)
+        {
+            return reference == RandomDotSweepSpeedReference.ImageCenter
+                ? imageCenterSpeedDegreesPerSecond / (magnificationM * contentZoom)
+                : objectSpeedDegreesPerSecond;
+        }
+
+        /// <summary>
+        /// Die sichtbare Winkelgeschwindigkeit in der Bildmitte, die zu einer
+        /// Objektgeschwindigkeit gehört.
+        /// </summary>
+        public static float ImageCenterSpeed(
+            float objectSpeedDegreesPerSecond, float magnificationM, float contentZoom)
+        {
+            return objectSpeedDegreesPerSecond * magnificationM * contentZoom;
+        }
+
         public static string DirectionLabel(
             RandomDotMotionMode mode, RandomDotSweepAxis axis, RandomDotSweepDirection direction)
         {

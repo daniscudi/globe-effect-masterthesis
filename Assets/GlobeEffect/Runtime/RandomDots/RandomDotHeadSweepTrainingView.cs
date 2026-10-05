@@ -8,7 +8,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     /// <summary>
     /// Kleines binokulares Trainingsdisplay vor dem Headset. Die zwei Marker
     /// zeigen die Sollbewegung und die gemessene Kopfbewegung auf getrennten
-    /// Zeilen; im eigentlichen Versuch ist das Display ausgeblendet.
+    /// Zeilen; im eigentlichen Versuch ist das Display ausgeblendet. Vor dem
+    /// ersten Durchgang zeigt es außerdem, welche Taste welche Antwort gibt.
     /// </summary>
     public sealed class RandomDotHeadSweepTrainingView : IDisposable
     {
@@ -70,7 +71,18 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             Hide();
         }
 
-        public void ShowInstructions(float amplitudeDegrees)
+        // responseLines sind die beiden Zeilen mit der Tastenbelegung. Der
+        // Experiment Manager baut sie aus der eingestellten Zuordnung.
+        public void ShowResponseInstructions(string responseLines, string startKeyName)
+        {
+            Show(false,
+                "RANDOM DOT EXPERIMENT\n\n" +
+                "Keep looking at the cross.\n" +
+                "Answer after the dots have disappeared.",
+                responseLines + "\n\n" + startKeyName + " = START");
+        }
+
+        public void ShowInstructions(float amplitudeDegrees, string responseLines)
         {
             Show(false,
                 "HEAD MOVEMENT PRACTICE\n\n" +
@@ -78,6 +90,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 "Yellow shows your own head position.\n" +
                 "Look at the central cross and turn only " +
                 amplitudeDegrees.ToString("F1") + " deg to each side.",
+                "After each trial answer with:\n" + responseLines + "\n\n" +
                 "F5 = START PRACTICE     F6 = STOP");
         }
 

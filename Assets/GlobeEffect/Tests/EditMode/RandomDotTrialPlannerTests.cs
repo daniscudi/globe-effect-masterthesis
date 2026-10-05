@@ -131,6 +131,29 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(next.MiniBlockIndex, Is.EqualTo(2));
         }
 
+        [Test]
+        public void Planner_AcceptsMagnificationTwentyAndRejectsMore()
+        {
+            Assert.That(CreatePlanWithMagnification(20f).Count, Is.EqualTo(1));
+            Assert.That(CreatePlanWithMagnification(20f)[0].InstrumentMagnificationM, Is.EqualTo(20f));
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => CreatePlanWithMagnification(20.5f));
+        }
+
+        private static IReadOnlyList<RandomDotTrial> CreatePlanWithMagnification(float magnificationM)
+        {
+            return RandomDotTrialPlanner.CreateRandomizedPlan(
+                new[] { 70f },
+                new[] { CheckerboardEyePresentation.BothEyes },
+                new[] { 0.5f },
+                new[] { magnificationM },
+                new[] { 1f },
+                new[] { RandomDotMotionMode.SimulatedYaw },
+                repetitions: 1,
+                repetitionsPerMiniBlock: 1,
+                randomSeed: 1,
+                dotSeedBase: 5000);
+        }
+
         private static IReadOnlyList<RandomDotTrial> CreatePlan(int randomSeed)
         {
             return RandomDotTrialPlanner.CreateRandomizedPlan(

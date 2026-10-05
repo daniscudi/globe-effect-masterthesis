@@ -241,9 +241,11 @@
                     _LightColor,
                     checkerMix);
 
-                // Für die kurze Maske wird die angezeigte Fläche in kleine Zellen
+                // Für die Maske wird die angezeigte Fläche in kleine Zellen
                 // geteilt. Aus Zellkoordinate und Seed entsteht reproduzierbar ein
-                // schwarzes oder weißes Feld. Das ist keine weitere l-Verzerrung.
+                // schwarzer oder weißer Punkt. Das ist keine weitere l-Verzerrung.
+                // Das C#-Skript wechselt den Seed mit der eingestellten Rate; dadurch
+                // flimmert die Maske wie ein Fernseher ohne Empfang.
                 int2 noiseCell = (int2)floor(
                     displayPosition / max(_NoiseCellSizeUv, 1e-6));
                 // Früher wurde der große Seed direkt in eine Sinusrechnung
