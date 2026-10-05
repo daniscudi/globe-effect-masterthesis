@@ -93,11 +93,18 @@ namespace GlobeEffect.VRCheckerboard
         [Tooltip("Hintergrund in der Fixationsphase, also kurz bevor das Muster kommt.")]
         private Color fixationBackgroundColor = Color.gray;
 
+        // Die Maske sieht aus wie das "Ameisenmuster" eines alten Fernsehers ohne
+        // Empfang: viele kleine schwarze und weiße Punkte, die sich ständig ändern.
+        // Die frühere Kästchengröße (1 Grad) wird absichtlich nicht übernommen,
+        // sie gehörte zur alten, stehenden Maske.
         [Header("Noise Mask")]
-        [FormerlySerializedAs("noiseCellSizeDegrees")]
-        [SerializeField, Range(0.25f, 10f)]
-        [Tooltip("Wie groß ein einzelnes Noise-Kästchen ist, in Grad. Die Maske kommt direkt nach dem Schachbrett.")]
-        private float noiseSizeDegrees = 1f;
+        [SerializeField, Range(0.02f, 2f)]
+        [Tooltip("Wie groß ein einzelner Punkt des Rauschens ist, in Grad in der Bildmitte. Kleine Werte ergeben das feine Ameisenmuster. Unter etwa 0,08 Grad ist ein Punkt in der Vive Pro Eye kleiner als ein Bildpixel.")]
+        private float noiseDotSizeDegrees = 0.15f;
+
+        [SerializeField, Range(0f, 120f)]
+        [Tooltip("Wie oft pro Sekunde das Rauschen neu ausgewürfelt wird. 0 lässt das Bild stehen. Mehr als die Bildrate des Headsets (90 Hz) bringt nichts.")]
+        private float noiseRefreshRateHz = 30f;
 
         [Header("Response Text")]
         [FormerlySerializedAs("responsePromptColor")]
@@ -133,7 +140,12 @@ namespace GlobeEffect.VRCheckerboard
         private bool noiseVisible;
         private bool fixationVisible = true;
         private bool responsePromptVisible;
+
+        // Der Seed der Maske, ab wann sie zu sehen ist, und der Seed des gerade
+        // gezeigten Rauschbilds. Der letzte wechselt mit der Aktualisierungsrate.
         private int currentNoiseSeed;
+        private double noiseStartSeconds;
+        private int noiseFrameSeed;
         private GameObject textObject;
         private TextMesh textMesh;
         private Material textMaterial;
@@ -161,7 +173,41 @@ namespace GlobeEffect.VRCheckerboard
         public float GridLineSpacingDegrees => gridSpacingDegrees;
         public float GridLineSpacingUv => DegreesToUv(gridSpacingDegrees);
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
+        public float NoiseDotSizeDegrees => noiseDotSizeDegrees;
+        public float NoiseRefreshRateHz => noiseRefreshRateHz;
         public bool IsVisible => isVisible;
+
+        /// <summary>
+        /// Das wievielte Rauschbild gerade dran ist. 0 ist das erste; bei einer
+        /// Rate von 0 bleibt es dabei.
+        /// </summary>
+        public static int NoiseFrameIndex(double elapsedSeconds, float refreshRateHz)
+        {
+            return refreshRateHz <= 0f || elapsedSeconds <= 0d
+                ? 0
+                : (int)Math.Floor(elapsedSeconds * refreshRateHz);
+        }
+
+        /// <summary>
+        /// Der Seed für ein bestimmtes Rauschbild. Das erste Bild benutzt den
+        /// Seed der Maske selbst. Für jedes weitere werden Seed und Bildnummer so
+        /// vermischt, dass aufeinanderfolgende Bilder nichts miteinander zu tun haben.
+        /// </summary>
+        public static int NoiseFrameSeed(int maskSeed, int frameIndex)
+        {
+            if (frameIndex == 0)
+            {
+                return maskSeed;
+            }
+
+            // Dieselbe Bitmischung wie im Shader. Die Überläufe sind Absicht.
+            uint value = unchecked((uint)maskSeed + (uint)frameIndex * 0x9e3779b9u);
+            value ^= value >> 16;
+            value = unchecked(value * 0x7feb352du);
+            value ^= value >> 15;
+            value = unchecked(value * 0x846ca68bu);
+            return unchecked((int)(value ^ (value >> 16)));
+        }
 
         public bool TryGetFixationDirection(out Vector3 directionWorld)
         {
@@ -217,8 +263,17 @@ namespace GlobeEffect.VRCheckerboard
             // Das Bild soll mit dem Kopf mitgehen, das ist so gewollt.
             // Das Viereck wird nur nachgezogen, damit Unity es nicht wegoptimiert.
             // Wo das Muster wirklich hinkommt, rechnet allein der Shader aus.
+            //
+            // Das Rauschbild wird hier einmal pro Frame festgelegt und nicht erst
+            // kurz vor dem Zeichnen. So bekommen beide Augen sicher dasselbe Bild.
+            if (noiseVisible)
+            {
+                noiseFrameSeed = NoiseFrameSeed(currentNoiseSeed, NoiseFrameIndex(
+                    Time.realtimeSinceStartupAsDouble - noiseStartSeconds, noiseRefreshRateHz));
+            }
+
             MoveQuadInFrontOfHead();
-            SendHeadPoseToShader();
+            SendFrameValuesToShader();
         }
 
         private void OnDestroy()
@@ -237,7 +292,7 @@ namespace GlobeEffect.VRCheckerboard
             // Wir holen sie hier ab, damit das Bild bei schnellen Kopfbewegungen
             // nicht einen Frame hinterherhängt.
             MoveQuadInFrontOfHead();
-            SendHeadPoseToShader();
+            SendFrameValuesToShader();
         }
 
         public void SetAngularDiameter(float value)
@@ -283,14 +338,17 @@ namespace GlobeEffect.VRCheckerboard
             ShowParts(checkerboard: false, noise: false, fixation: true, prompt: false);
         }
 
-        // Zeigt direkt nach dem Muster eine neue Schwarz-Weiß-Maske.
+        // Zeigt die Schwarz-Weiß-Maske in derselben runden Öffnung wie das Muster.
         // Der Seed legt fest, wie die Punkte verteilt sind. Deshalb bekommt
-        // jeder Durchgang einen neuen Seed.
+        // jeder Durchgang einen neuen Seed. Danach würfelt LateUpdate das Bild
+        // mit der eingestellten Rate immer wieder neu aus.
         public void ShowNoise(int noiseSeed)
         {
             // Das Kreuz bleibt auch während der Maske stehen. So kann die Person
-            // bis zur Antwort an derselben Stelle weiterschauen.
+            // an derselben Stelle weiterschauen.
             currentNoiseSeed = noiseSeed;
+            noiseFrameSeed = noiseSeed;
+            noiseStartSeconds = Time.realtimeSinceStartupAsDouble;
             ShowParts(checkerboard: false, noise: true, fixation: true, prompt: false);
         }
 
@@ -404,10 +462,7 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetColor("_FixationBackgroundColor", fixationBackgroundColor);
             propertyBlock.SetFloat("_CheckerboardEnabled", checkerboardVisible ? 1f : 0f);
             propertyBlock.SetFloat("_NoiseEnabled", noiseVisible ? 1f : 0f);
-            propertyBlock.SetFloat("_NoiseCellSizeUv", DegreesToUv(noiseSizeDegrees));
-            // Als echte ganze Zahl übertragen. Ein Float kann große Seeds wie
-            // 20260901 nicht mehr exakt speichern und würde benachbarte Seeds runden.
-            propertyBlock.SetInteger("_NoiseSeed", currentNoiseSeed);
+            propertyBlock.SetFloat("_NoiseCellSizeUv", DegreesToUv(noiseDotSizeDegrees));
             // Beim Antworttext wird immer auf beiden Augen gezeigt, damit der Text
             // auch im Monokular-Durchgang gut lesbar bleibt.
             CheckerboardEyePresentation eyeMode =
@@ -416,14 +471,15 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetFloat("_FixationEnabled", showFixationTarget && fixationVisible ? 1f : 0f);
             propertyBlock.SetFloat("_FixationHalfSizeRad", 0.5f * fixationSizeDegrees * Mathf.Deg2Rad);
             propertyBlock.SetColor("_FixationColor", fixationColor);
-            AddHeadPose(propertyBlock);
+            AddFrameValues(propertyBlock);
             meshRenderer.SetPropertyBlock(propertyBlock);
         }
 
-        private void SendHeadPoseToShader()
+        private void SendFrameValuesToShader()
         {
-            // Die Kopfposition ändert sich dauernd, der Rest meist nur am Anfang
-            // eines Durchgangs. Deshalb gibt es hier eine kurze eigene Methode.
+            // Die Kopfposition und das Rauschbild ändern sich dauernd, der Rest
+            // meist nur am Anfang eines Durchgangs. Deshalb gibt es hier eine
+            // kurze eigene Methode.
             if (meshRenderer == null)
             {
                 return;
@@ -431,11 +487,11 @@ namespace GlobeEffect.VRCheckerboard
 
             propertyBlock ??= new MaterialPropertyBlock();
             meshRenderer.GetPropertyBlock(propertyBlock);
-            AddHeadPose(propertyBlock);
+            AddFrameValues(propertyBlock);
             meshRenderer.SetPropertyBlock(propertyBlock);
         }
 
-        private void AddHeadPose(MaterialPropertyBlock block)
+        private void AddFrameValues(MaterialPropertyBlock block)
         {
             // Aus diesen vier Angaben baut sich der Shader sein eigenes
             // Koordinatensystem, das am Kopf hängt.
@@ -444,6 +500,10 @@ namespace GlobeEffect.VRCheckerboard
             block.SetVector("_ObserverWorldRight", head.right);
             block.SetVector("_ObserverWorldUp", head.up);
             block.SetVector("_ObserverWorldForward", head.forward);
+
+            // Als echte ganze Zahl übertragen. Ein Float kann große Seeds wie
+            // 20260901 nicht mehr exakt speichern und würde benachbarte Seeds runden.
+            block.SetInteger("_NoiseSeed", noiseFrameSeed);
         }
 
         private float DegreesToUv(float degrees)
@@ -592,7 +652,8 @@ namespace GlobeEffect.VRCheckerboard
             edgeSoftnessDegrees = Mathf.Clamp(edgeSoftnessDegrees, 0f, 10f);
             visualSpaceL = Mathf.Clamp(visualSpaceL, 0f, 1.4f);
             gridSpacingDegrees = Mathf.Clamp(gridSpacingDegrees, 0.5f, 45f);
-            noiseSizeDegrees = Mathf.Clamp(noiseSizeDegrees, 0.25f, 10f);
+            noiseDotSizeDegrees = Mathf.Clamp(noiseDotSizeDegrees, 0.02f, 2f);
+            noiseRefreshRateHz = Mathf.Clamp(noiseRefreshRateHz, 0f, 120f);
             fixationSizeDegrees = Mathf.Clamp(fixationSizeDegrees, 0.05f, 5f);
             textDistanceMeters = Mathf.Max(0.5f, textDistanceMeters);
             textSize = Mathf.Clamp(textSize, 0.005f, 0.1f);

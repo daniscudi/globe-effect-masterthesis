@@ -23,10 +23,13 @@ methodische Grundlage, mit der wir Oomes' und Merlitz' Versuche in VR nachbilden
 - kopffeste Darstellung ohne Nahdisparität, also virtuelle Unendlichkeit
 - Darstellung für beide Augen, nur links oder nur rechts
 - feste `l`-Werte, Wiederholungen und Reihenfolge über den Inspector
-- fester Ablauf: Fixation, 600 ms Checkerboard und danach eine statische
-  Noise-Maske mit Fixationskreuz bis zur Antwort; höchstens 5 Sekunden
-  Antwortzeit; anschließend noch 500 ms neue Noise statt eines schwarzen
-  Zwischenbildschirms
+- zwei wählbare Abläufe (`Trial Sequence`): A = 600 ms Checkerboard, dann
+  flimmernde Noise-Maske mit Antwort, dann graue Fläche; B = Checkerboard,
+  dann graue Fläche mit Antwort, dann Noise-Maske. Die Phase vor dem nächsten
+  Checkerboard dauert mindestens `Pre Stimulus Seconds`; die Antwortzeit
+  begrenzt weiterhin `Response Timeout Seconds`
+- Antwort mit Pfeiltasten oder mit Trigger und Trackpad-Klick am VR-Controller;
+  die Zuordnung ist im Inspector wählbar und wird im Headset angezeigt
 - englischer Welcome Screen und Training über `T`; zwei deutliche Beispiele
   erklären die Kategorien, danach folgen die eingetragenen Übungswerte in
   zufälliger Reihenfolge
@@ -51,7 +54,10 @@ Rekonstruktion der in Oomes et al. nicht angegebenen Zwischenformel.
 - automatisch simulierte Schwenkbewegung; die Person muss den Kopf nicht drehen
 - in der aktuellen Pilotfassung feste `l`-Werte und ein davon unabhängiger
   Content Zoom
-- Antwort erst nach der Bewegung: Pfeil links = konkav, Pfeil rechts = konvex
+- Antwort erst nach der Bewegung: Pfeil links = konkav, Pfeil rechts = konvex,
+  oder Trigger und Trackpad-Klick am VR-Controller (Zuordnung wählbar)
+- Vergrößerung `m` bis 20; im simulierten Block laufen die Punkte in der
+  Bildmitte bei jedem `m` gleich schnell (`Simulated Speed Reference`)
 - dieselbe Fixationskontrolle und Wiedervorlage wie beim Checkerboard
 
 
@@ -68,7 +74,9 @@ Rekonstruktion der in Oomes et al. nicht angegebenen Zwischenformel.
    Checkerboard mit `T` das Training durchlaufen. Danach bereitet `F5` die
    Sitzung vor; `SPACE` startet den ersten Trial, sobald die Person bereit ist.
 6. Beim Checkerboard mit der im Training gelernten Category-A-/B-Taste
-   antworten. Beim Random-Dot-Test bleiben es vorerst Pfeil links oder rechts.
+   antworten. Beim Random-Dot-Test zeigt `F5` zuerst die Tastenbelegung im
+   Headset; ein zweites `F5` startet den ersten Trial. Geantwortet wird mit
+   Pfeil links oder rechts beziehungsweise Trigger und Trackpad-Klick.
    `F6` bricht die Sitzung ab.
 
 Die Eye-Tracking-Aufzeichnung startet und endet zusammen mit der Sitzung. Für

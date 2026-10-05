@@ -46,9 +46,11 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         // Wie wenige und wie viele Punkte erlaubt sind. Die beiden Zahlen stehen
         // absichtlich nur hier, damit der Regler im Inspector und die Prüfungen
-        // weiter unten nie auseinanderlaufen.
+        // weiter unten nie auseinanderlaufen. Die Obergrenze reicht für m = 20 im
+        // HeadTracked-Block (rund 78.000 Punkte bei 70 Grad FOV, Dichte 0,19 und
+        // 15 Grad Sicherheitsbereich).
         public const int MinimumDotCount = 100;
-        public const int MaximumDotCount = 60000;
+        public const int MaximumDotCount = 100000;
 
         // Wie klein und wie groß der Zoom sein darf. Die beiden Zahlen stehen
         // nur hier, damit der Regler im Inspector, die Set-Methode und die
@@ -56,7 +58,15 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public const float MinimumContentZoom = 0.25f;
         public const float MaximumContentZoom = 10f;
         public const float MinimumInstrumentMagnification = 1f;
-        public const float MaximumInstrumentMagnification = 14f;
+        public const float MaximumInstrumentMagnification = 20f;
+
+        // Der erlaubte Bereich für den simulierten Schwenk. Der Experiment Manager
+        // prüft vor einer Sitzung gegen dieselben Zahlen, damit hier nie
+        // stillschweigend ein Wert abgeschnitten wird.
+        public const float MinimumSweepAmplitudeDegrees = 0.01f;
+        public const float MaximumSweepAmplitudeDegrees = 30f;
+        public const float MinimumSweepSpeed = 0.01f;
+        public const float MaximumSweepSpeed = 60f;
 
         // Größer als 170 Grad darf die Punktwelt nicht werden. Dazu kommt rundherum
         // noch 1 Grad Reserve, damit am Rand des Kreises nie eine Lücke entsteht.
@@ -152,12 +162,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [Tooltip("Achse des simulierten Schwenks: horizontal (links/rechts) oder vertikal (oben/unten). HeadTracked bleibt horizontal.")]
         private RandomDotSweepAxis sweepAxis = RandomDotSweepAxis.Horizontal;
 
-        [SerializeField, Range(0.01f, 30f)]
+        [SerializeField, Range(MinimumSweepAmplitudeDegrees, MaximumSweepAmplitudeDegrees)]
         [Tooltip("Wie weit der simulierte Schwenk zu jeder Seite der Mitte reicht. Er läuft einmal von der einen Seite zur anderen, insgesamt also die doppelte Strecke. Beim Start einer Sitzung überschreibt der Experiment Manager diesen Wert.")]
         private float simulatedYawAmplitudeDegrees = 2f;
 
-        [SerializeField, Range(0.1f, 60f)]
-        [Tooltip("Wie schnell der simulierte Schwenk läuft, in Grad pro Sekunde. Die Geschwindigkeit bleibt dabei die ganze Zeit gleich. Beim Start einer Sitzung überschreibt der Experiment Manager diesen Wert.")]
+        [SerializeField, Range(MinimumSweepSpeed, MaximumSweepSpeed)]
+        [Tooltip("Wie schnell das Instrument im simulierten Schwenk über die Außenwelt schwenkt, in Grad Objektwinkel pro Sekunde. Im Bild laufen die Punkte in der Mitte m-mal so schnell. Die Geschwindigkeit bleibt die ganze Zeit gleich. Beim Start einer Sitzung überschreibt der Experiment Manager diesen Wert.")]
         private float simulatedYawSpeedDegreesPerSecond = 1.2f;
 
         [SerializeField]
@@ -822,9 +832,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 MinimumInstrumentMagnification, MaximumInstrumentMagnification);
             contentZoom = Mathf.Clamp(contentZoom, MinimumContentZoom, MaximumContentZoom);
             fixationSizeDegrees = Mathf.Clamp(fixationSizeDegrees, 0.05f, 3f);
-            simulatedYawAmplitudeDegrees = Mathf.Clamp(simulatedYawAmplitudeDegrees, 0.01f, 30f);
+            simulatedYawAmplitudeDegrees = Mathf.Clamp(simulatedYawAmplitudeDegrees,
+                MinimumSweepAmplitudeDegrees, MaximumSweepAmplitudeDegrees);
             simulatedYawSpeedDegreesPerSecond =
-                Mathf.Clamp(simulatedYawSpeedDegreesPerSecond, 0.1f, 60f);
+                Mathf.Clamp(simulatedYawSpeedDegreesPerSecond, MinimumSweepSpeed, MaximumSweepSpeed);
         }
     }
 
@@ -847,5 +858,15 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     {
         Horizontal = 0,
         Vertical = 1
+    }
+
+    // Worauf sich die Geschwindigkeit des simulierten Schwenks bezieht.
+    public enum RandomDotSweepSpeedReference
+    {
+        [InspectorName("Objektwinkel (bisher): das Instrument schwenkt mit Sweep Speed")]
+        ObjectAngle = 0,
+
+        [InspectorName("Bildmitte: gleiche sichtbare Geschwindigkeit bei jedem m")]
+        ImageCenter = 1
     }
 }

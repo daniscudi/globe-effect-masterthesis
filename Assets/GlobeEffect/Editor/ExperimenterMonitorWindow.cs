@@ -157,10 +157,10 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 Row("Visual-Space l", hasStimulus ? Number(stimulus.VisualSpaceL, "F3") : Missing);
                 Row("FOV", hasStimulus ? Number(stimulus.AngularDiameterDegrees, "F1", "°") : Missing);
                 Row("Augenmodus", hasStimulus ? stimulus.EyePresentation.ToString() : Missing);
-                Row("Antwort", hasSession
-                    ? session.ConvexResponseKeyName + " Category A   |   " +
-                      session.ConcaveResponseKeyName + " Category B"
-                    : Missing);
+                // Konvex ist Category A, konkav Category B.
+                Row("Ablauf", hasSession ? session.TrialSequence.ToString() : Missing);
+                Row("Antwort Controller", hasSession ? session.ControllerSummary : Missing);
+                Row("Antwort Tastatur", hasSession ? session.KeyboardSummary : Missing);
                 Row("Training", hasSession && session.TrainingCompleted
                     ? "abgeschlossen"
                     : "noch nicht abgeschlossen");
@@ -199,6 +199,11 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 {
                     EditorGUILayout.HelpBox("Pause – mit F5 fortsetzen.", MessageType.Info);
                 }
+                else if (hasSession && session.SessionState == RandomDotSessionState.ResponseInstructions)
+                {
+                    EditorGUILayout.HelpBox(
+                        "Die Person liest die Tastenbelegung – mit F5 starten.", MessageType.Info);
+                }
 
                 Row("Instrument k", hasStimulus ? Number(stimulus.InstrumentDistortionK, "F3") : Missing);
                 Row("Vergrößerung m",
@@ -212,9 +217,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     hasSweep ? Number(sweep.PeakAbsoluteYawSpeedDegreesPerSecond, "F2", "°/s") : Missing);
                 Row("Maximale Kopfauslenkung",
                     hasSweep ? Number(sweep.MaximumAbsoluteYawDegrees, "F2", "°") : Missing);
-                Row("Antwort", hasSession && session.ResponseKeysSwapped
-                    ? "← konvex   |   konkav →"
-                    : "← konkav   |   konvex →");
+                Row("Antwort Controller", hasSession ? session.ControllerSummary : Missing);
+                Row("Antwort Tastatur", hasSession ? session.KeyboardSummary : Missing);
                 Row("Fixationsbruch", hasSession && session.RequireFixation
                     ? "Trial ungültig, Wiederholung hinten"
                     : "Kontrolle ausgeschaltet");

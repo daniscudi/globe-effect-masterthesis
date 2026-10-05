@@ -30,12 +30,15 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public float LongestOffTargetSeconds { get; }
         public float LongestInvalidGazeSeconds { get; }
         public string Status { get; }
+        public CheckerboardTrialSequence TrialSequence { get; }
 
         public double StimulusDurationSeconds =>
             Math.Max(0d, StimulusEndUnitySeconds - TrialStartUnitySeconds);
 
+        // Wie lange die Noise-Maske in der Antwortphase zu sehen war. Bei Ablauf B
+        // steht dort die graue Fläche; die Maske kommt erst vor dem nächsten Muster.
         public double NoiseMaskDurationSeconds =>
-            Math.Max(0d, TrialEndUnitySeconds - ResponseWindowStartUnitySeconds);
+            TrialSequence.ShowsNoiseDuringResponse() ? ResponseTimeSeconds : 0d;
 
         public double ResponseTimeSeconds =>
             Math.Max(0d, TrialEndUnitySeconds - ResponseWindowStartUnitySeconds);
@@ -61,7 +64,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             float fixationValidSampleFraction,
             float longestOffTargetSeconds,
             float longestInvalidGazeSeconds,
-            string status)
+            string status,
+            CheckerboardTrialSequence trialSequence)
         {
             Trial = trial ?? throw new ArgumentNullException(nameof(trial));
             PresentationIndex = presentationIndex;
@@ -84,6 +88,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             LongestOffTargetSeconds = longestOffTargetSeconds;
             LongestInvalidGazeSeconds = longestInvalidGazeSeconds;
             Status = status ?? string.Empty;
+            TrialSequence = trialSequence;
         }
     }
 
@@ -98,7 +103,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "angular_diameter_deg,grid_line_spacing_deg,grid_line_spacing_uv,visual_space_l," +
             "oomes_endpoint_equivalent,stimulus_duration_s,noise_until_response," +
             "post_response_noise_s,response_timeout_s,category_a_key,category_b_key," +
-            "response_keys_swapped";
+            "response_keys_swapped,trial_sequence,pre_stimulus_s,controller_mapping";
 
         // Die Kopfzeile der Ergebnisdatei. Sie wird einmal am Anfang geschrieben
         // und muss Spalte für Spalte zu AppendResult passen.
@@ -111,7 +116,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "grid_line_spacing_uv,visual_space_l,oomes_endpoint_equivalent,response," +
             "valid_for_analysis,fixation_sample_valid,fixation_inside_tolerance," +
             "fixation_angle_deg,continuous_fixation_s,fixation_valid_sample_fraction," +
-            "longest_off_target_s,longest_invalid_gaze_s,status";
+            "longest_off_target_s,longest_invalid_gaze_s,status,trial_sequence";
 
         public CheckerboardExperimentFiles(
             string outputRoot,
@@ -128,12 +133,20 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             IReadOnlyList<CheckerboardTrial> trials,
             float gridLineSpacingDegrees,
             float stimulusDurationSeconds,
-            float postResponseNoiseSeconds,
+            CheckerboardTrialSequence trialSequence,
+            float preStimulusSeconds,
             float responseTimeoutSeconds,
             string categoryAKey,
             string categoryBKey,
-            bool responseKeysSwapped)
+            bool responseKeysSwapped,
+            VrControllerMapping controllerMapping)
         {
+            // Die beiden alten Spalten bleiben für bestehende Auswertungen stehen:
+            // noise_until_response sagt, ob die Maske in der Antwortphase zu sehen
+            // ist (Ablauf A), post_response_noise_s nennt die Mindestdauer der
+            // Maske nach der Antwort (Ablauf B, sonst 0).
+            bool noiseDuringResponse = trialSequence.ShowsNoiseDuringResponse();
+            float postResponseNoiseSeconds = noiseDuringResponse ? 0f : preStimulusSeconds;
             var rows = new List<CsvRow>();
             foreach (CheckerboardTrial trial in trials)
             {
@@ -146,9 +159,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     .Add(trial.EyePresentation.ToString()).Add(trial.AngularDiameterDegrees)
                     .Add(gridLineSpacingDegrees).Add(gridSpacingUv).Add(trial.VisualSpaceL)
                     .Add(VisualSpaceRadialMapping.OomesEndpointEquivalent(trial.VisualSpaceL))
-                    .Add(stimulusDurationSeconds).Add(true).Add(postResponseNoiseSeconds)
+                    .Add(stimulusDurationSeconds).Add(noiseDuringResponse).Add(postResponseNoiseSeconds)
                     .Add(responseTimeoutSeconds).Add(categoryAKey).Add(categoryBKey)
-                    .Add(responseKeysSwapped));
+                    .Add(responseKeysSwapped).Add(trialSequence.ToString()).Add(preStimulusSeconds)
+                    .Add(controllerMapping.ToString()));
             }
 
             WritePlanFile(PlanHeader, rows, TrialHeader);
@@ -176,7 +190,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 .Add(result.FixationSampleValid).Add(result.FixationInsideTolerance)
                 .Add(result.FixationAngleDegrees).Add(result.ContinuousFixationSeconds)
                 .Add(result.FixationValidSampleFraction).Add(result.LongestOffTargetSeconds)
-                .Add(result.LongestInvalidGazeSeconds).Add(result.Status));
+                .Add(result.LongestInvalidGazeSeconds).Add(result.Status)
+                .Add(result.TrialSequence.ToString()));
         }
     }
 }

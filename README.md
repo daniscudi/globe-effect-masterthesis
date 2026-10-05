@@ -10,16 +10,24 @@ Eine kurze Bedienungs- und Arbeitsübersicht steht in `AKTUELLER_STAND.md`.
 ## Was der Checkerboard-Test macht
 
 Die Versuchsperson fixiert zuerst das rote Kreuz und sieht danach kurz ein
-kreisrundes Schachbrett mit einem festen Verzerrungswert. Anschließend erscheint
-eine Schwarz-Weiß-Noise-Maske. Sie bleibt zusammen mit dem Fixationskreuz bis
-zur Antwort sichtbar. Im Hauptversuch wird kein zusätzlicher Antworttext mehr
-eingeblendet, damit er nicht vom Reiz oder von der Fixation ablenkt.
+kreisrundes Schachbrett mit einem festen Verzerrungswert. Direkt danach beginnt
+die Antwortphase. Je nach gewähltem Ablauf ist dabei eine flimmernde
+Schwarz-Weiß-Noise-Maske (Ablauf A) oder eine graue Fläche (Ablauf B) zu sehen,
+jeweils mit Fixationskreuz. Die andere Darstellung folgt nach der Antwort als
+kurze Phase vor dem nächsten Schachbrett. Im Hauptversuch wird kein zusätzlicher
+Antworttext mehr eingeblendet, damit er nicht vom Reiz oder von der Fixation
+ablenkt.
 
-Im Training wird die feste Tastenbelegung vorher erklärt:
+Die Tastenbelegung steht auf dem Welcome Screen, im Training und vor dem
+Hauptversuch im Headset. Sie richtet sich nach der im Inspector gewählten
+Zuordnung, zum Beispiel:
 
-* `UP = CATEGORY A`
+* `TRIGGER = A / OUTWARD`
 
-* `DOWN = CATEGORY B`
+* `TRACKPAD CLICK = B / INWARD`
+
+Auf der Tastatur gelten zusätzlich Pfeil hoch (Category A) und Pfeil runter
+(Category B).
 
 Category A wird dort als nach außen gewölbt und Category B als nach innen
 gewölbt beschrieben. Dazu werden zuerst zwei deutliche Beispiele gezeigt.
@@ -51,6 +59,10 @@ wieder nur die Entscheidung:
 * Pfeil links: Bewegung wirkt konkav.
 
 * Pfeil rechts: Bewegung wirkt konvex.
+
+Im Headset antwortet die Person stattdessen mit Trigger und Trackpad-Klick am
+VR-Controller. Welche Taste welche Antwort gibt, liest sie nach `F5` vor dem
+ersten Durchgang im Headset; ein weiteres `F5` startet dann den ersten Trial.
 
 Aus `P(konvex | k, m)` kann später für jede Vergrößerung der Übergang bestimmt
 werden, an dem konkav und konvex gleich häufig geantwortet werden. Dieser
@@ -264,18 +276,40 @@ laufen.
 
 ## Ablauf eines Durchgangs
 
-1. Auf neutralem Hintergrund erscheint zunächst nur das Fixationskreuz.
-2. Nach stabiler Fixation wird das Checkerboard für die eingestellte Zeit
-   eingeblendet. Der Startwert beträgt 600 ms.
-3. Direkt danach erscheint eine statische Schwarz-Weiß-Noise-Maske mit
-   Fixationskreuz. Sie bleibt bis zur Antwort sichtbar.
+Am `Checkerboard Experiment Manager` wird unter `Trial Sequence` einer von zwei
+Abläufen gewählt:
+
+* A: Checkerboard → Noise-Maske mit Antwort → graue Fläche → nächstes
+  Checkerboard
+
+* B: Checkerboard → graue Fläche mit Antwort → Noise-Maske → nächstes
+  Checkerboard
+
+Die Schritte im Einzelnen:
+
+1. Vor dem Checkerboard steht die Phase vor dem Stimulus: bei A die graue
+   Fläche, bei B die Noise-Maske, jeweils mit Fixationskreuz. Sie dauert
+   mindestens `Pre Stimulus Seconds` (voreingestellt 0,5 s). Mit
+   Fixationskontrolle geht es erst weiter, wenn zusätzlich der Blick ruhig auf
+   dem Kreuz liegt.
+2. Das Checkerboard wird für die eingestellte Zeit eingeblendet. Der Startwert
+   beträgt 600 ms.
+3. Direkt danach beginnt die Antwortphase: bei A mit der Noise-Maske, bei B mit
+   der grauen Fläche, jeweils mit Fixationskreuz.
 4. Die im Training gelernte Antwort wird ohne erneuten Hinweistext gegeben. Die
-   voreingestellte maximale Antwortzeit beträgt 5 Sekunden.
+   Antwortzeit begrenzt `Response Timeout Seconds`; `0` bedeutet ohne Zeitlimit.
 5. Antwort, Reaktionszeit, `l`, FOV, Augenmodus und Fixationswerte werden sofort
-   gespeichert.
-6. Nach der Antwort erscheint für 500 ms eine neue Noise-Verteilung. Danach
-   beginnt direkt die graue Fixationsphase des nächsten Durchgangs. Ein schwarzer
-   Zwischenbildschirm wird vermieden.
+   gespeichert. Pro Durchgang zählt nur die erste Antwort; weitere Tastendrücke
+   werden bis zur nächsten Antwortphase ignoriert.
+6. Nach der Antwort beginnt sofort die Phase vor dem nächsten Stimulus mit der
+   jeweils anderen Darstellung. Ein schwarzer Zwischenbildschirm wird vermieden.
+
+Die Noise-Maske sieht aus wie das Ameisenmuster eines Fernsehers ohne Empfang:
+viele kleine schwarze und weiße Punkte, die ständig neu ausgewürfelt werden. Sie
+erscheint in derselben runden Öffnung wie das Checkerboard. Punktgröße und
+Aktualisierungsrate stehen am `Checkerboard Stimulus` (`Noise Dot Size Degrees`,
+voreingestellt 0,15°, und `Noise Refresh Rate Hz`, voreingestellt 30 Hz; `0`
+lässt das Bild stehen).
 
 ## Welcome Screen und Training
 
@@ -318,18 +352,30 @@ stattdessen eine Obergrenze.
 
 * Pfeil runter: Category B
 
+* Trigger und Trackpad-Klick am VR-Controller: die beiden Antworten, in beiden
+  Tests
+
 * `C`: Eye-Tracking-Kalibrierung der vorhandenen Toolbox
 
-Beim Random-Dot-Test werden die Pfeiltasten erst angenommen, nachdem die
+Beim Random-Dot-Test werden Antworten erst angenommen, nachdem die
 Bewegungsphase beendet und das Punktfeld ausgeblendet wurde.
 
-Am `Checkerboard Keyboard Controller` kann `Swap Response Keys` aktiviert
-werden. Dadurch lässt sich die Zuordnung zwischen Versuchspersonen
+Für die VR-Controller gibt es in beiden Tests dieselbe Auswahl:
+
+* Trackpad-Klick = konkav, Trigger = konvex
+
+* Trackpad-Klick = konvex, Trigger = konkav
+
+Beim Checkerboard steht sie am `Checkerboard Experiment Manager`
+(`Controller Mapping`), beim Random-Dot-Test am `Random Dot Keyboard Controller`
+(`Vr Controller Mapping`). Gemeint ist ein Klick auf das Trackpad; eine bloße
+Berührung zählt nicht, und Halten oder Loslassen löst keine weitere Antwort aus.
+Mit der Auswahl lässt sich die Zuordnung zwischen Versuchspersonen
 ausbalancieren. Innerhalb einer Person bleibt sie für Training und Hauptversuch
-fest, damit nicht bei jedem Trial eine neue Belegung gelesen werden muss. Der
-Experimenter Monitor und alle Antwortanzeigen zeigen automatisch die gerade
-gültige Belegung. Die verwendete Zuordnung steht zusätzlich im Trialplan und in
-den Eye-Tracking-Markern.
+fest. Die Anzeigen im Headset und der Experimenter Monitor zeigen automatisch
+die gerade gültige Belegung. Sie steht zusätzlich im Trialplan und in den
+Eye-Tracking-Markern. Die Tastatur funktioniert daneben weiter;
+`Swap Response Keys` vertauscht nur die beiden Tasten der Tastatur.
 
 ## Einstellungen im Inspector
 
@@ -356,12 +402,17 @@ Die wichtigsten Einstellungen befinden sich am Objekt
 
 * `Stimulus Duration Seconds`: Dauer des Checkerboards; voreingestellt auf 0,6 s
 
-* `Post Response Noise Seconds`: Dauer der neuen Noise-Verteilung nach der
-  Antwort; voreingestellt auf 0,5 s
+* `Trial Sequence`: Ablauf A (Noise-Maske in der Antwortphase, danach graue
+  Fläche) oder B (graue Fläche in der Antwortphase, danach Noise-Maske)
+
+* `Pre Stimulus Seconds`: Mindestdauer der Phase vor dem nächsten Checkerboard;
+  voreingestellt auf 0,5 s
 
 * `Response Timeout Seconds`: maximale Antwortzeit; 0 bedeutet ohne Zeitlimit
 
 * `Convex Response Key` und `Concave Response Key`: Tasten der beiden Antworten
+
+* `Controller Mapping`: welche Controller-Taste welche Antwort gibt
 
 * `Require Training Before Session`: verlangt ein abgeschlossenes Training vor F5
 
@@ -378,7 +429,8 @@ technischen Pilotlauf gedacht. Sie sind noch keine festgelegten Bedingungen der
 Masterarbeit. Die Listen können im Inspector vollständig geändert werden.
 
 Am Objekt `Checkerboard Stimulus` werden Aussehen, Felderzahl, Farben, Größe des
-Fixationskreuzes und die weiche Blendenkante eingestellt. Während einer Sitzung
+Fixationskreuzes, die weiche Blendenkante sowie Punktgröße und
+Aktualisierungsrate der Noise-Maske eingestellt. Während einer Sitzung
 setzt der Experiment Manager FOV, `l`, Content Zoom und Augenmodus automatisch.
 
 Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
@@ -389,7 +441,7 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   Checkerboard
 
 * `Instrument Magnification M Values`: eine oder mehrere
-  Fernglasvergrößerungen zwischen `1` und `14`; voreingestellt ist `10`
+  Fernglasvergrößerungen zwischen `1` und `20`; voreingestellt ist `10`
 
 * `Content Zoom Values`: optionaler Nach-Zoom; für die Instrumentensimulation
   normalerweise `1`
@@ -418,17 +470,28 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
 * `Sweep Amplitude Degrees`: Zielschwenkweite des Kopfes je Seite im
   `HeadTracked`-Block; für `10x` zunächst `2°`
 
-* `Sweep Speed`: reale Instrument-/Kopfgeschwindigkeit; für `10x` zunächst
-  `1,2°/s`, entsprechend ungefähr `12°/s` Bildgeschwindigkeit in der
-  Bildmitte. Im simulierten Block ist das die feste Geschwindigkeit des
-  Schwenks, im `HeadTracked`-Block die mittlere Geschwindigkeit des
-  Sinusprofils. So bleiben beide Blöcke gleich schnell.
+* `Simulated Speed Reference`: worauf sich die Geschwindigkeit des simulierten
+  Schwenks bezieht. `Bildmitte` (Voreinstellung): Die Punkte laufen in der
+  Bildmitte bei jedem `m` gleich schnell, nämlich mit
+  `Simulated Image Center Speed`. `Objektwinkel`: die bisherige Definition, das
+  Instrument schwenkt bei jedem `m` mit `Sweep Speed` über die Außenwelt, und
+  die Punkte laufen in der Bildmitte `m`-mal so schnell. Siehe Abschnitt
+  „Geschwindigkeit des simulierten Schwenks“.
+
+* `Simulated Image Center Speed`: sichtbare Winkelgeschwindigkeit der Punkte in
+  der Bildmitte, voreingestellt `12°/s`. Das entspricht dem bisherigen Stand
+  mit `10x` und `1,2°/s`.
+
+* `Sweep Speed`: reale Instrument-/Kopfgeschwindigkeit in Grad Objektwinkel pro
+  Sekunde, voreingestellt `1,2°/s`. Im `HeadTracked`-Block ist das die mittlere
+  Geschwindigkeit des Sinusprofils. Im simulierten Block gilt der Wert nur bei
+  der Einstellung `Objektwinkel`.
 
 * Der simulierte Schwenk geht nur in eine Richtung und hat eine feste
-  Geschwindigkeit. Mit `1,2°/s` und `0,8 s` läuft er von `-0,48°` nach
-  `+0,48°`, die Mitte der Bewegung liegt also genau geradeaus. Ob nach links
-  oder rechts, wechselt von Trial zu Trial in zufälliger Reihenfolge; beide
-  Richtungen kommen pro Bedingung gleich oft vor.
+  Geschwindigkeit. Bei `10x` läuft er mit `1,2°/s` und `0,8 s` von `-0,48°`
+  nach `+0,48°`, die Mitte der Bewegung liegt also genau geradeaus. Ob nach
+  links oder rechts, wechselt von Trial zu Trial in zufälliger Reihenfolge;
+  beide Richtungen kommen pro Bedingung gleich oft vor.
 
 * Vorschau: Solange keine Sitzung läuft, schwenkt das Feld im Play Mode immer
   weiter (`Loop Sweep In Preview` am `Random Dot Field`). Der Schwenk läuft
@@ -476,6 +539,10 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
 
 * Fixations- und Wiederholungsgrenzen wie beim Checkerboard
 
+Am `Random Dot Keyboard Controller` (am Objekt `Random Dot Field`) stehen die
+Antworttasten: die beiden Tasten der Tastatur, `Use Vr Controller Buttons` und
+`Vr Controller Mapping`.
+
 Die beiden Bewegungsarten werden nicht trialweise vermischt, sondern als
 getrennte Blöcke in der Reihenfolge der Liste ausgeführt. Nach jedem Unterblock
 und zwischen den Bewegungsblöcken hält die Sitzung an; `F5` setzt sie fort. Nur
@@ -503,6 +570,47 @@ der Hintergrund in allen Phasen unverändert schwarz.
 Das sichtbare Feld hat innen einen neutralgrauen Hintergrund für symmetrischen
 Kontrast der schwarzen und weißen Punkte. Außerhalb der kreisförmigen Feldblende
 ist der Hintergrund nahezu schwarz.
+
+### Geschwindigkeit des simulierten Schwenks
+
+Drei Geschwindigkeiten sind zu unterscheiden:
+
+* Objektwinkel: wie schnell das Instrument über die Außenwelt schwenkt. Das
+  ist die Größe, mit der der Shader rechnet.
+
+* Sichtbarer Bildwinkel: wie schnell ein Punkt im Bild wandert. In der
+  Bildmitte ist das bei jedem `k` genau `m * Content Zoom` mal so schnell wie
+  der Objektwinkel. Zum Rand hin wird es je nach `k` schneller oder langsamer;
+  dieser Unterschied ist der eigentliche Reiz.
+
+* Kartesische Bildkoordinate (Tangens des Bildwinkels): in der Bildmitte
+  gleich dem Bildwinkel, zum Rand hin wächst sie zusätzlich mit `1 / cos²`.
+
+Mit `Simulated Speed Reference = Bildmitte` wird die Objektgeschwindigkeit für
+jeden Trial so gewählt, dass die Punkte in der Bildmitte immer mit
+`Simulated Image Center Speed` laufen:
+
+    Objektgeschwindigkeit = Bildmitte-Geschwindigkeit / (m * Content Zoom)
+
+Das Verhältnis zwischen Mitte und Rand bleibt dabei für jedes `k` unverändert.
+Die Dauer des Schwenks bleibt bei jedem `m` gleich; in der Außenwelt wird die
+Schwenkweite mit wachsendem `m` kleiner. Mit `12°/s` und `0,8 s`:
+
+| m | Objektgeschwindigkeit | Schwenkweite je Seite | sichtbarer Weg in der Bildmitte |
+|---|---|---|---|
+| 5 | 2,4°/s | 0,96° | 9,6° |
+| 10 | 1,2°/s | 0,48° | 9,6° |
+| 14 | 0,86°/s | 0,34° | 9,6° |
+| 20 | 0,6°/s | 0,24° | 9,6° |
+
+Mit `Objektwinkel` (bisherige Definition, `1,2°/s`) laufen die Punkte in der
+Bildmitte dagegen mit `6`, `12`, `16,8` und `24°/s`.
+
+Der `HeadTracked`-Block ist davon nicht betroffen: Dort bestimmt die echte
+Kopfbewegung die Bildbewegung, und die Punkte laufen in der Bildmitte weiterhin
+`m`-mal so schnell wie der Kopf dreht. Objekt- und Bildmitte-Geschwindigkeit
+stehen für jeden Trial in `sweep_speed_deg_per_s` und
+`image_center_speed_deg_per_s`.
 
 ### Punktdichte
 
@@ -532,12 +640,18 @@ Mit `70°` FOV, `0,19` Dichte und den Werten oben ergeben sich pro Trial:
 
 | m | simulierter Block | HeadTracked-Block |
 |---|---|---|
-| 5 | 1.100 - 1.500 Punkte | 7.800 - 8.800 Punkte |
+| 5 | 1.200 - 1.600 Punkte | 7.800 - 8.800 Punkte |
 | 10 | 1.500 - 2.000 Punkte | 22.500 - 24.300 Punkte |
-| 14 | 1.900 - 2.400 Punkte | 39.700 - 42.100 Punkte |
+| 14 | 1.700 - 2.300 Punkte | 39.700 - 42.100 Punkte |
+| 20 | 2.100 - 2.700 Punkte | 74.700 - 78.000 Punkte |
+
+Die Werte des simulierten Blocks gelten für die Voreinstellung `Bildmitte` mit
+`12°/s`. Der `HeadTracked`-Block braucht bei `20x` knapp `78.000` Punkte; der
+Aufbau dauert auf dem Entwicklungsrechner etwa `35 ms` und passiert einmal pro
+Trial, während nur das Kreuz zu sehen ist.
 
 Beim Start einer Sitzung wird für alle Trials nachgerechnet, ob die Punktwelt
-unter `170°` und unter `60.000` Punkten bleibt; sonst startet die Sitzung nicht
+unter `170°` und unter `100.000` Punkten bleibt; sonst startet die Sitzung nicht
 und die Konsole nennt die Ursache. Punktzahl und Größe der Punktwelt stehen für
 jeden Trial in `dot_count` und `world_coverage_diameter_deg`, die Dichte im
 Marker `SessionStart`.
@@ -591,8 +705,11 @@ In `*_trials.csv` stehen unter anderem:
 * Versionskennung der verwendeten Abbildung
 
 Marker wie `TrialStart`, `StimulusEnded`, `NoiseMaskStarted`,
-`ResponsePromptShown`, `TrialResponse`, `TrialInvalid` und `TrialRepeatQueued`
-verbinden den Versuchsablauf zeitlich mit den Rohdaten.
+`GrayScreenStarted`, `TrialResponse`, `TrialInvalid` und `TrialRepeatQueued`
+verbinden den Versuchsablauf zeitlich mit den Rohdaten. `NoiseMaskStarted` und
+`GrayScreenStarted` nennen mit `phase=response` oder `phase=pre_stimulus`, zu
+welcher Phase die Darstellung gehört. Der gewählte Ablauf steht als
+`trial_sequence` im Plan, in jeder Ergebniszeile und in den Markern.
 
 Beim Random-Dot-Test werden zusätzlich unter anderem festgehalten:
 
@@ -773,8 +890,10 @@ einmal vollständig durchgehen:
 8. Fixationsabbruch: Wegschauen während eines Trials macht den Trial ungültig
    und stellt ihn hinten an (`TrialInvalid`, `TrialRepeatQueued`).
 
-9. Antworten: Die Tasten am Vive-Controller (Trigger, Trackpad) lösen die
-   beiden Antworten aus.
+9. Antworten: In beiden Tests lösen Trigger und Trackpad-Klick am
+   Vive-Controller die beiden Antworten aus, passend zur eingestellten
+   Zuordnung. Eine bloße Berührung des Trackpads, Halten und Loslassen lösen
+   nichts aus.
 
 10. Messdatei: Am Anfang der Aufzeichnung steht der Marker
     `EyeTrackingProvider;configured=Auto;active=SRanipal;xr_loader=OpenXRLoader`.
@@ -796,6 +915,7 @@ Assets/GlobeEffect/
 │   ├── Scripts/
 │   │   ├── VisualSpaceRadialMapping.cs
 │   │   ├── VrCheckerboardStimulus.cs
+│   │   ├── ResponseInputController.cs
 │   │   └── CheckerboardKeyboardController.cs
 │   ├── Resources/
 │   │   ├── GlobeEffectHelmholtzCheckerboard.shader
@@ -825,6 +945,9 @@ Assets/GlobeEffect/
     ├── VisualSpaceRadialMappingTests.cs
     ├── CheckerboardTrialPlannerTests.cs
     ├── CheckerboardTrialQueueTests.cs
+    ├── CheckerboardTrialSequenceTests.cs
+    ├── ResponseInputControllerTests.cs
+    ├── ExperimentFlowPlayTests.cs
     ├── SRanipalGazeConversionTests.cs
     ├── EyeTrackerProviderResolverTests.cs
     └── XrLoaderSetupTests.cs

@@ -25,7 +25,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         PausedBetweenMiniBlocks,
         PausedBetweenMotionBlocks,
         Completed,
-        Aborted
+        Aborted,
+        ResponseInstructions
     }
 
     /// <summary>
@@ -34,7 +35,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// So läuft ein Durchgang ab: Die Person schaut auf das Kreuz. Liegt der Blick
     /// ruhig genug, kommen die Punkte. Im SimulatedYaw-Block schwenken sie kurz in
     /// eine Richtung, im HeadTracked-Block dreht die Person den Kopf hin und her.
-    /// Erst wenn die Bewegung vorbei ist, antwortet die Person konkav oder konvex.
+    /// Erst wenn die Bewegung vorbei ist, antwortet die Person konkav oder konvex,
+    /// mit den Pfeiltasten oder mit Trigger und Trackpad-Klick am VR-Controller.
+    /// Welche Taste was bedeutet, liest sie vor dem ersten Durchgang im Headset.
     ///
     /// Welche Instrumentenwerte k und m gezeigt werden, steht vorher fest. Schaut
     /// die Person zwischendurch zu lange weg, zählt der Durchgang nicht und kommt
@@ -149,9 +152,17 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [Tooltip("Wie lange die Punkte im SimulatedYaw-Block zu sehen sind, in Sekunden. In dieser Zeit schwenkt das Feld einmal in eine Richtung, ohne umzukehren. Ob nach links oder rechts, wechselt von Trial zu Trial in zufälliger Reihenfolge, und beide Richtungen kommen gleich oft dran.")]
         private float simulatedSweepSeconds = 0.8f;
 
+        [SerializeField]
+        [Tooltip("Worauf sich die Geschwindigkeit des simulierten Schwenks bezieht. Bildmitte: Die Punkte laufen in der Bildmitte bei jedem m gleich schnell durch das Bild (Simulated Image Center Speed). Objektwinkel: bisherige Definition, das Instrument schwenkt bei jedem m mit Sweep Speed, und das Bild läuft in der Mitte m-mal so schnell. Die durch k erzeugten Unterschiede zwischen Mitte und Rand bleiben in beiden Fällen erhalten. Der HeadTracked-Block ist davon nicht betroffen.")]
+        private RandomDotSweepSpeedReference simulatedSpeedReference = RandomDotSweepSpeedReference.ImageCenter;
+
+        [SerializeField, Range(0.5f, 120f)]
+        [Tooltip("Sichtbare Winkelgeschwindigkeit der Punkte in der Bildmitte, in Grad pro Sekunde. Gilt nur bei der Einstellung Bildmitte. 12 entspricht dem bisherigen Stand mit m = 10 und 1,2 Grad pro Sekunde.")]
+        private float simulatedImageCenterSpeed = 12f;
+
         [FormerlySerializedAs("sweepSpeedDegreesPerSecond")]
         [SerializeField, Range(0.1f, 60f)]
-        [Tooltip("Wie schnell geschwenkt wird, in Grad pro Sekunde. Im SimulatedYaw-Block bleibt die Geschwindigkeit die ganze Zeit gleich. Im HeadTracked-Block ist es die mittlere Geschwindigkeit der Kopfbewegung, die an den Umkehrpunkten langsamer wird. Überschreibt den Vorschauwert am Random Dot Field.")]
+        [Tooltip("Wie schnell über die Außenwelt geschwenkt wird, in Grad Objektwinkel pro Sekunde. Im HeadTracked-Block ist es die mittlere Geschwindigkeit der Kopfbewegung, die an den Umkehrpunkten langsamer wird. Im SimulatedYaw-Block gilt der Wert nur bei der Einstellung Objektwinkel; dann bleibt die Geschwindigkeit die ganze Zeit gleich. Überschreibt den Vorschauwert am Random Dot Field.")]
         private float sweepSpeed = 1.2f;
 
         [Header("Active Head Tracked Sweep")]
@@ -297,10 +308,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public RandomDotSessionState SessionState => sessionState;
         public int CurrentTrialNumber => currentTrialNumber;
         public int TotalTrials => totalTrials;
+        public int ValidTrialsCompleted => validTrialsCompleted;
         public int CurrentMotionBlock => currentMotionBlock;
         public int CurrentMiniBlock => currentMiniBlock;
         public bool RequireFixation => requireFixation;
-        public bool ResponseKeysSwapped => keyboardController != null && keyboardController.SwapResponseKeys;
+        public string ControllerSummary => keyboardController != null ? keyboardController.ControllerSummary : "–";
+        public string KeyboardSummary => keyboardController != null ? keyboardController.KeyboardSummary : "–";
 
         // Aktiv ist alles außer: noch nicht gestartet, fertig oder abgebrochen.
         public bool IsSessionActive => sessionState is not (State.Idle or State.Completed or State.Aborted);
@@ -333,7 +346,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null && keyboard[startSessionKey].wasPressedThisFrame)
             {
-                if (sessionState == State.HeadTrainingInstructions)
+                if (sessionState == State.ResponseInstructions)
+                {
+                    ConfirmResponseInstructions();
+                }
+                else if (sessionState == State.HeadTrainingInstructions)
                 {
                     headTrainingCoroutine = StartCoroutine(RunHeadMovementTraining());
                 }
@@ -470,8 +487,56 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             Debug.Log($"Random-Dot-Sitzung gestartet: {totalTrials} gültige Trials geplant.\n" +
                 activeSessionFolder, this);
-            BeginTrainingOrNextAttempt();
+            ShowResponseInstructions();
             return true;
+        }
+
+        private void ShowResponseInstructions()
+        {
+            // Vor dem ersten Durchgang liest die Person im Headset, welche Taste
+            // welche Antwort gibt. Der Text richtet sich nach der Zuordnung, die
+            // am Random Dot Keyboard Controller eingestellt ist. Mit Auto Start
+            // (nur zum schnellen Ausprobieren) wird die Anzeige übersprungen.
+            Debug.Log("Random-Dot-Antworten: Controller " + ControllerSummary +
+                "; Tastatur " + KeyboardSummary + ".", this);
+            Transform observer = stimulus.Observer;
+            if (autoStartOnPlay || observer == null)
+            {
+                BeginTrainingOrNextAttempt();
+                return;
+            }
+
+            headTrainingView ??= new RandomDotHeadSweepTrainingView(observer);
+            stimulus.PlaceAroundObserver();
+            stimulus.ShowFixationOnly();
+            sessionState = State.ResponseInstructions;
+            headTrainingView.ShowResponseInstructions(
+                BuildResponseLines(), ResponseInputController.GetReadableKeyName(startSessionKey));
+            WriteMarker("ResponseInstructionsShown;task=random_dot_instrument");
+        }
+
+        /// <summary>
+        /// Beendet die Anzeige der Tastenbelegung. Danach beginnt der erste
+        /// Durchgang oder, im HeadTracked-Block, das Kopfbewegungstraining.
+        /// </summary>
+        public void ConfirmResponseInstructions()
+        {
+            if (sessionState != State.ResponseInstructions)
+            {
+                return;
+            }
+
+            headTrainingView.Hide();
+            WriteMarker("ResponseInstructionsConfirmed;task=random_dot_instrument");
+            sessionState = State.InterTrial;
+            BeginTrainingOrNextAttempt();
+        }
+
+        // Die beiden Zeilen mit der Tastenbelegung für die Anzeigen im Headset.
+        private string BuildResponseLines()
+        {
+            return keyboardController.BuildResponseLines(
+                "CONVEX (curves outward)", "CONCAVE (curves inward)");
         }
 
         public void AbortSession(string reason = "ManualAbort")
@@ -534,7 +599,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulus.ShowFixationOnly();
             trainingCenterForward = RandomDotHeadSweepMonitor.RemoveUpDownTilt(observer.forward);
             sessionState = State.HeadTrainingInstructions;
-            headTrainingView.ShowInstructions(sweepAmplitudeDegrees);
+            headTrainingView.ShowInstructions(sweepAmplitudeDegrees, BuildResponseLines());
             WriteMarker(
                 "HeadTrainingInstructions;task=random_dot_instrument;motion_block={0};" +
                 "amplitude_deg={1:F3};mean_speed_deg_s={2:F3}",
@@ -741,7 +806,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulus.SetEyePresentation(currentTrial.EyePresentation);
             stimulus.SetMotionMode(currentTrial.MotionMode);
             stimulus.SetSweepAxis(currentTrial.SweepAxis);
-            stimulus.SetSimulatedSweep(SweepAmplitude(currentTrial), sweepSpeed);
+            stimulus.SetSimulatedSweep(SweepAmplitude(currentTrial), SweepSpeed(currentTrial));
             stimulus.SetSweepDirection(currentTrial.SweepDirection);
             // Jeder Trial bekommt seine eigene Punktwelt: so groß wie nötig und so
             // dicht, dass es in der Bildmitte bei jedem m gleich aussieht.
@@ -849,17 +914,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 HeadTrackedOnly(sweepMonitor.ProfileErrorDegrees),
                 HeadTrackedOnly(sweepMonitor.FirstExtremeErrorDegrees),
                 HeadTrackedOnly(sweepMonitor.SecondExtremeErrorDegrees));
-
-            string responseHint = ResponseKeysSwapped
-                ? "Links = konvex, rechts = konkav."
-                : "Links = konkav, rechts = konvex.";
-            Debug.Log("Random-Dot-Antwort: " + responseHint, this);
         }
 
         private void HandleResponseSubmitted(CheckerboardCurvatureResponse response)
         {
             // Drückt die Person schon während der Bewegung, zählt das nicht. Sie
             // soll sich erst die ganze Bewegung ansehen und dann entscheiden.
+            // Die erste Antwort beendet die Antwortphase sofort. Ein zweiter
+            // Tastendruck landet deshalb in keinem Durchgang, auch nicht im nächsten.
             if (sessionState != State.WaitingForResponse || currentTrial == null
                 || response == CheckerboardCurvatureResponse.None)
             {
@@ -1154,11 +1216,19 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             eyeTrackingToolbox.StartRecording(experimentFiles.BaseFileName);
             WriteMarker(
                 "SessionStart;task=random_dot_instrument;participant={0};session={1};seed={2};" +
-                "planned_trials={3};utc={4};mapping={5};dot_density_per_deg2={6:F4}",
+                "planned_trials={3};utc={4};mapping={5};dot_density_per_deg2={6:F4};" +
+                "simulated_speed_reference={7};simulated_image_center_speed_deg_s={8:F3};" +
+                "object_speed_deg_s={9:F3};controller_mapping={10};convex_control={11};" +
+                "concave_control={12};response_keys_swapped={13}",
                 ExperimentFilesBase.SanitizeIdentifier(participantId, "pilot"),
                 ExperimentFilesBase.SanitizeIdentifier(sessionLabel, "random_dot"),
                 randomSeed, trialPlan.Count, sessionStartUtc.ToString("O", CultureInfo.InvariantCulture),
-                RandomDotExperimentFiles.MappingVersion, stimulus.DotDensity);
+                RandomDotExperimentFiles.MappingVersion, stimulus.DotDensity,
+                simulatedSpeedReference, simulatedImageCenterSpeed, sweepSpeed,
+                keyboardController.VrControllerMapping,
+                keyboardController.GetResponseControlName(CheckerboardCurvatureResponse.Convex),
+                keyboardController.GetResponseControlName(CheckerboardCurvatureResponse.Concave),
+                keyboardController.SwapResponseKeys ? 1 : 0);
         }
 
         private string BuildTrialStartMarker(RandomDotTrial trial)
@@ -1172,13 +1242,16 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "condition={2};repetition={3};attempt={4};eye={5};fov_deg={6:F3};edge_softness_deg={7:F3};" +
                 "instrument_distortion_k={8:F4};instrument_magnification_m={9:F4};" +
                 "content_zoom={10:F4};motion={11};direction={12};duration_s={13:F3};" +
-                "amplitude_deg={14:F3};speed_deg_s={15:F3};dot_seed={16};axis={17};dot_count={18}",
+                "amplitude_deg={14:F3};speed_deg_s={15:F3};dot_seed={16};axis={17};dot_count={18};" +
+                "image_center_speed_deg_s={19:F3}",
                 presentationCount, trial.SequenceIndex, trial.ConditionIndex, trial.Repetition,
                 trial.AttemptNumber, trial.EyePresentation, trial.AngularDiameterDegrees,
                 stimulus.ApertureEdgeSoftnessDegrees, trial.InstrumentDistortionK,
                 trial.InstrumentMagnificationM, trial.ContentZoom, trial.MotionMode,
-                trial.DirectionLabel, MotionSeconds(trial), SweepAmplitude(trial), sweepSpeed,
-                trial.DotSeed, trial.SweepAxis, stimulus.DotCount);
+                trial.DirectionLabel, MotionSeconds(trial), SweepAmplitude(trial), SweepSpeed(trial),
+                trial.DotSeed, trial.SweepAxis, stimulus.DotCount,
+                RandomDotSimulatedSweep.ImageCenterSpeed(
+                    SweepSpeed(trial), trial.InstrumentMagnificationM, trial.ContentZoom));
         }
 
         private void ResolveReferences()
@@ -1205,13 +1278,26 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             fixationMonitor = UnityTools.FindIfMissing(fixationMonitor);
         }
 
+        // Wie schnell im Trial über die Außenwelt geschwenkt wird, in Grad
+        // Objektwinkel pro Sekunde. Im HeadTracked-Block ist das die mittlere
+        // Kopfgeschwindigkeit. Im simulierten Block hängt es von der gewählten
+        // Definition ab: Bei "Bildmitte" wird so geschwenkt, dass die Punkte in der
+        // Bildmitte bei jedem m gleich schnell laufen, also bei großem m langsamer.
+        private float SweepSpeed(RandomDotTrial trial) =>
+            trial.MotionMode == RandomDotMotionMode.HeadTracked
+                ? sweepSpeed
+                : RandomDotSimulatedSweep.ObjectSpeed(simulatedSpeedReference, sweepSpeed,
+                    simulatedImageCenterSpeed, trial.InstrumentMagnificationM, trial.ContentZoom);
+
         // Wie weit das Feld im Trial zu jeder Seite der Mitte schwenkt, in Grad. Der
         // simulierte Schwenk läuft in der eingestellten Zeit mit fester Geschwindigkeit
         // einmal von der einen Seite zur anderen, also die halbe Strecke zu jeder Seite.
+        // Die Dauer bleibt bei jedem m gleich; bei "Bildmitte" wird deshalb die
+        // Schwenkweite in der Außenwelt mit wachsendem m kleiner.
         private float SweepAmplitude(RandomDotTrial trial) =>
             trial.MotionMode == RandomDotMotionMode.HeadTracked
                 ? sweepAmplitudeDegrees
-                : 0.5f * sweepSpeed * simulatedSweepSeconds;
+                : 0.5f * SweepSpeed(trial) * simulatedSweepSeconds;
 
         // Wie lange die Punkte im Trial zu sehen sind, in Sekunden.
         private float MotionSeconds(RandomDotTrial trial) =>
@@ -1238,6 +1324,25 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             int mostDots = 0;
             foreach (RandomDotTrial trial in plan)
             {
+                // Der Stimulus würde zu kleine oder zu große Werte stillschweigend
+                // abschneiden. Dann liefe der Schwenk anders als eingestellt.
+                float speed = SweepSpeed(trial);
+                float amplitude = SweepAmplitude(trial);
+                if (speed < RandomDotFieldStimulus.MinimumSweepSpeed
+                    || speed > RandomDotFieldStimulus.MaximumSweepSpeed
+                    || amplitude < RandomDotFieldStimulus.MinimumSweepAmplitudeDegrees
+                    || amplitude > RandomDotFieldStimulus.MaximumSweepAmplitudeDegrees)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(simulatedImageCenterSpeed), string.Format(
+                        CultureInfo.InvariantCulture,
+                        "Bei m = {0} ergibt sich im {1}-Block ein Schwenk mit {2:F4} Grad pro Sekunde und " +
+                        "{3:F4} Grad je Seite. Erlaubt sind {4} bis {5} Grad pro Sekunde und {6} bis {7} Grad.",
+                        trial.InstrumentMagnificationM, trial.MotionMode, speed, amplitude,
+                        RandomDotFieldStimulus.MinimumSweepSpeed, RandomDotFieldStimulus.MaximumSweepSpeed,
+                        RandomDotFieldStimulus.MinimumSweepAmplitudeDegrees,
+                        RandomDotFieldStimulus.MaximumSweepAmplitudeDegrees));
+                }
+
                 float coverage = WorldCoverageFor(trial);
                 if (coverage > RandomDotFieldStimulus.MaximumCoverageDegrees)
                 {
@@ -1402,6 +1507,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             headTrackedSeconds = Mathf.Max(0.1f, headTrackedSeconds);
             sweepAmplitudeDegrees = Mathf.Clamp(sweepAmplitudeDegrees, 0.1f, 30f);
             sweepSpeed = Mathf.Clamp(sweepSpeed, 0.1f, 60f);
+            simulatedImageCenterSpeed = Mathf.Clamp(simulatedImageCenterSpeed, 0.5f, 120f);
             requiredGoodTrainingSweeps = Mathf.Clamp(requiredGoodTrainingSweeps, 2, 10);
             maximumProfileErrorDegrees = Mathf.Clamp(maximumProfileErrorDegrees, 0.1f, 3f);
             maximumTrainingEndpointErrorDegrees = Mathf.Clamp(maximumTrainingEndpointErrorDegrees, 0.1f, 3f);

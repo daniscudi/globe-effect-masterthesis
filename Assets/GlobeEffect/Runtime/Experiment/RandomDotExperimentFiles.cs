@@ -147,7 +147,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "world_coverage_diameter_deg,carrier_radius_m,response,valid_for_analysis," +
             "fixation_sample_valid,fixation_inside_tolerance,fixation_angle_deg," +
             "continuous_fixation_s,fixation_valid_sample_fraction,longest_off_target_s," +
-            "longest_invalid_gaze_s,status";
+            "longest_invalid_gaze_s,status,image_center_speed_deg_per_s";
 
         public RandomDotExperimentFiles(
             string outputRoot,
@@ -207,7 +207,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 .Add(result.FixationInsideTolerance).Add(result.FixationAngleDegrees)
                 .Add(result.ContinuousFixationSeconds).Add(result.FixationValidSampleFraction)
                 .Add(result.LongestOffTargetSeconds).Add(result.LongestInvalidGazeSeconds)
-                .Add(result.Status));
+                .Add(result.Status)
+                // sweep_speed_deg_per_s ist der Objektwinkel. Hier steht zusätzlich,
+                // wie schnell die Punkte dabei in der Bildmitte liefen.
+                .Add(RandomDotSimulatedSweep.ImageCenterSpeed(result.SweepSpeedDegreesPerSecond,
+                    trial.InstrumentMagnificationM, trial.ContentZoom)));
         }
     }
 }

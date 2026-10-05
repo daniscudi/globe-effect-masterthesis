@@ -46,6 +46,73 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [Test]
+        public void MagnificationTwenty_FitsIntoThePointLimitWithTheSceneSettings()
+        {
+            // Szenenwerte: 70 Grad FOV, Dichte 0,19, kein Zusatzzoom. Im HeadTracked-
+            // Block kommen 15 Grad Sicherheitsbereich dazu, im simulierten Block nur
+            // die Schwenkweite. Geprüft werden alle k-Werte der Szene.
+            Assert.That(Field.MaximumInstrumentMagnification, Is.EqualTo(20f));
+            foreach (float k in new[] { 1.2f, 1f, 0.9f, 0.8f, 0.7f, 0.6f, 0.2f })
+            {
+                float headTracked = Field.CoverageNeeded(70f, 1f, 20f, k, 15f);
+                float simulated = Field.CoverageNeeded(70f, 1f, 20f, k, 0.24f);
+                Assert.That(headTracked, Is.LessThan(Field.MaximumCoverageDegrees));
+                Assert.That(Field.DotCountFor(0.19f, 20f, 1f, headTracked),
+                    Is.InRange(70000, Field.MaximumDotCount));
+                Assert.That(Field.DotCountFor(0.19f, 20f, 1f, simulated), Is.InRange(2000, 3000));
+            }
+        }
+
+        [Test]
+        public void PointWorldForMagnificationTwenty_IsBuiltCompletely()
+        {
+            // Der größte Fall der Szene: m = 20, k = 1,2, HeadTracked-Block. Das
+            // Punktfeld muss alle rund 78.000 Punkte wirklich erzeugen und darf
+            // die Zahl nicht an der Obergrenze abschneiden.
+            var fieldObject = new UnityEngine.GameObject("Dot field test");
+            try
+            {
+                Field field = fieldObject.AddComponent<Field>();
+                field.SetInstrumentMagnification(20f);
+                float coverage = Field.CoverageNeeded(70f, 1f, 20f, 1.2f, 15f);
+
+                var watch = System.Diagnostics.Stopwatch.StartNew();
+                field.ConfigurePointField(24680, coverage);
+                watch.Stop();
+
+                Assert.That(field.InstrumentMagnificationM, Is.EqualTo(20f));
+                Assert.That(field.DotCount,
+                    Is.EqualTo(Field.DotCountFor(field.DotDensity, 20f, 1f, coverage)));
+                UnityEngine.Debug.Log($"Punktwelt für m = 20: {field.DotCount} Punkte, " +
+                    $"gebaut in {watch.ElapsedMilliseconds} ms.");
+
+                // Der Aufbau passiert einmal pro Durchgang, während nur das Kreuz
+                // zu sehen ist. Eine Sekunde wäre dafür deutlich zu lang.
+                Assert.That(watch.ElapsedMilliseconds, Is.LessThan(1000));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(fieldObject);
+            }
+        }
+
+        [Test]
+        public void CenterDensity_StaysTheSameAtEveryMagnification()
+        {
+            // Punkte pro Quadratgrad Außenwelt, geteilt durch die Flächenvergrößerung
+            // m², ergibt die Dichte im Bild. Sie muss bei jedem m 0,19 sein.
+            foreach (float m in new[] { 5f, 10f, 14f, 20f })
+            {
+                const float coverage = 12f;
+                float halfAngle = 0.5f * coverage * UnityEngine.Mathf.Deg2Rad;
+                float capArea = 2f * UnityEngine.Mathf.PI * (1f - UnityEngine.Mathf.Cos(halfAngle))
+                    * UnityEngine.Mathf.Rad2Deg * UnityEngine.Mathf.Rad2Deg;
+                float imageDensity = Field.DotCountFor(0.19f, m, 1f, coverage) / capArea / (m * m);
+                Assert.That(imageDensity, Is.EqualTo(0.19f).Within(0.001f));
+            }
+        }
+
+        [Test]
         public void Coverage_IsInfiniteBehindTheTurningPoint()
         {
             // k = 1,4 und 170 Grad FOV: 1,4 * 85 Grad liegt hinter 90 Grad.

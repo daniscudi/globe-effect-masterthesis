@@ -11,9 +11,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
     {
         // Liest das tatsächlich gerenderte Bild aus. Ein reiner Rechentest auf
         // der CPU würde Fehler der Shaderberechnung auf der Grafikkarte übersehen.
+        [TestCase(0.15f)]
         [TestCase(0.5f)]
         [TestCase(1f)]
-        public void NoiseContainsBothColorsAndRespondsToLargeSeeds(float cellSize)
+        public void NoiseContainsBothColorsAndRespondsToLargeSeeds(float dotSize)
         {
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
                 Assert.Ignore("Der Bildtest braucht eine aktive Grafikausgabe.");
@@ -43,12 +44,20 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 stimulus.SetAngularDiameter(70f);
                 stimulus.SetApertureEdgeSoftness(0f);
                 var settings = new SerializedObject(stimulus);
-                settings.FindProperty("noiseSizeDegrees").floatValue = cellSize;
+                settings.FindProperty("noiseDotSizeDegrees").floatValue = dotSize;
                 settings.ApplyModifiedPropertiesWithoutUndo();
 
                 // Zwei benachbarte große Zahlen dürfen nicht zum gleichen Float
                 // gerundet werden. Dazu prüfen wir die Grenzen des Seed-Bereichs.
-                int[] seeds = { 20260900, 20260901, 20310902, 0, int.MinValue, int.MaxValue };
+                // Die beiden letzten Einträge sind zwei aufeinanderfolgende
+                // Rauschbilder derselben Maske: Auch sie müssen sich unterscheiden,
+                // sonst würde die Maske im Versuch nicht flimmern.
+                int[] seeds =
+                {
+                    20260900, 20260901, 20310902, 0, int.MinValue, int.MaxValue,
+                    VrCheckerboardStimulus.NoiseFrameSeed(20260901, 1),
+                    VrCheckerboardStimulus.NoiseFrameSeed(20260901, 2)
+                };
                 Color32[] previous = null;
                 foreach (int seed in seeds)
                 {
@@ -84,6 +93,34 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 Object.DestroyImmediate(target);
                 Object.DestroyImmediate(readback);
             }
+        }
+
+        [Test]
+        public void NoiseFrameIndex_AdvancesWithTheRefreshRate()
+        {
+            // 30 Bilder pro Sekunde: Ein Bild steht 33 ms.
+            Assert.That(VrCheckerboardStimulus.NoiseFrameIndex(0d, 30f), Is.EqualTo(0));
+            Assert.That(VrCheckerboardStimulus.NoiseFrameIndex(0.03d, 30f), Is.EqualTo(0));
+            Assert.That(VrCheckerboardStimulus.NoiseFrameIndex(0.04d, 30f), Is.EqualTo(1));
+            Assert.That(VrCheckerboardStimulus.NoiseFrameIndex(1d, 30f), Is.EqualTo(30));
+
+            // Bei 0 Hz bleibt die Maske stehen.
+            Assert.That(VrCheckerboardStimulus.NoiseFrameIndex(100d, 0f), Is.EqualTo(0));
+        }
+
+        [Test]
+        public void NoiseFrameSeed_StartsWithTheMaskSeedAndChangesEveryFrame()
+        {
+            const int maskSeed = 20260901;
+            Assert.That(VrCheckerboardStimulus.NoiseFrameSeed(maskSeed, 0), Is.EqualTo(maskSeed));
+
+            var seen = new System.Collections.Generic.HashSet<int>();
+            for (int frame = 0; frame < 1000; frame++)
+            {
+                seen.Add(VrCheckerboardStimulus.NoiseFrameSeed(maskSeed, frame));
+            }
+
+            Assert.That(seen.Count, Is.EqualTo(1000), "Jedes Rauschbild braucht einen eigenen Seed.");
         }
 
         private static Color32[] ReadImage(Camera camera, RenderTexture target, Texture2D readback)

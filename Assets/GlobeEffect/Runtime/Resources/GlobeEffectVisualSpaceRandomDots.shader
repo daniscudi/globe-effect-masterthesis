@@ -10,7 +10,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
         _ApertureHalfAngleRad ("Aperture Half Angle [rad]", Float) = 0.785398
         _ApertureEdgeSoftnessRad ("Aperture Edge Softness [rad]", Float) = 0.0174533
         _InstrumentDistortionK ("Instrument distortion k", Range(0, 1.4)) = 0.5
-        _InstrumentMagnificationM ("Instrument magnification m", Range(1, 14)) = 10
+        _InstrumentMagnificationM ("Instrument magnification m", Range(1, 20)) = 10
         _ContentZoom ("Content Zoom", Float) = 1
         _EyeMode ("Eye Mode", Float) = 0
         _DotsEnabled ("Dots Enabled", Float) = 1

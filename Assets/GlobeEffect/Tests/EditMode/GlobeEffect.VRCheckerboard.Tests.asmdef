@@ -3,6 +3,8 @@
   "rootNamespace": "GlobeEffect.VRCheckerboard.Tests",
   "references": [
     "GlobeEffect.VRCheckerboard.Runtime",
+    "Unity.InputSystem",
+    "Unity.InputSystem.TestFramework",
     "Unity.XR.Management",
     "Unity.XR.Management.Editor",
     "Unity.XR.OpenXR",
