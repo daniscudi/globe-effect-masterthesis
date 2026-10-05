@@ -152,23 +152,25 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.VrCheckerboardStimulus
   observer: {fileID: 799610645}
-  angularDiameterDegrees: 60
-  apertureEdgeSoftnessDegrees: 10
+  fieldOfViewDegrees: 60
+  edgeSoftnessDegrees: 10
   useCircularAperture: 1
   visualSpaceL: 0.5
-  contentZoom: 1
-  gridLineSpacingDegrees: 8
+  gridSpacingDegrees: 8
   darkColor: {r: 0, g: 0, b: 0, a: 1}
   lightColor: {r: 1, g: 1, b: 1, a: 1}
   eyePresentation: 0
   showFixationTarget: 1
-  fixationTargetSizeDegrees: 0.5
+  fixationSizeDegrees: 0.5
   fixationColor: {r: 1, g: 0, b: 0, a: 1}
-  fixationBackgroundColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-  noiseCellSizeDegrees: 1
-  responsePromptColor: {r: 1, g: 1, b: 1, a: 1}
-  responsePromptDistanceMeters: 9
-  responsePromptCharacterSize: 0.04
+  backgroundColor: {r: 0.7294118, g: 0.7294118, b: 0.7294118, a: 1}
+  noiseSizeInPixels: 1
+  noiseDotSizePixels: 1.5
+  noiseDotSizeDegrees: 0.064
+  noiseRefreshRateHz: 0
+  textColor: {r: 1, g: 1, b: 1, a: 1}
+  textDistanceMeters: 9
+  textSize: 0.04
   visibleAtStart: 1
   materialOverride: {fileID: 0}
 --- !u!23 &607094976
@@ -257,9 +259,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.CheckerboardKeyboardController
   concaveKey: 61
   convexKey: 62
-  logResponses: 0
   swapResponseKeys: 0
+  logResponses: 0
   useVrControllerButtons: 1
+  vrControllerMapping: 0
 --- !u!1 &661361068
 GameObject:
   m_ObjectHideFlags: 0
@@ -700,7 +703,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5e7f22e3d2364d1b8d66ab9d026af84b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.EyeTracking.EyeTrackingToolbox
-  provider: 3
+  provider: 0
   mainCameraTransform: {fileID: 799610645}
   persistAcrossScenes: 1
   calibrationMode: 0
@@ -732,7 +735,7 @@ MonoBehaviour:
   eyeTrackingToolbox: {fileID: 1800000003}
   stimulus: {fileID: 607094975}
   toleranceDegrees: 3
-  requiredContinuousSeconds: 0.3
+  requiredSteadySeconds: 0.3
   currentSampleValid: 0
   isInsideTolerance: 0
   currentAngleDegrees: 0
@@ -792,7 +795,7 @@ MonoBehaviour:
   randomSeed: 20260901
   outputRoot: 
   autoStartOnPlay: 0
-  angularDiametersDegrees:
+  fieldOfViewValues:
   - 60
   eyePresentations: 00000000
   visualSpaceLValues:
@@ -803,37 +806,36 @@ MonoBehaviour:
   - 0.7
   - 0.6
   - 0.2
-  contentZoomValues:
-  - 1
-  repetitionsPerCondition: 15
+  repeatsPerCondition: 15
   requireFixation: 0
-  maximumOffTargetSeconds: 0.15
-  maximumInvalidGazeSeconds: 0.2
-  maximumGazeSampleAgeSeconds: 0.1
-  maximumAttemptsPerTrial: 0
-  stimulusDurationSeconds: 0.6
-  responseTimeoutSeconds: 5
-  postResponseNoiseSeconds: 0
+  maxLookAwaySeconds: 0.15
+  maxNoDataSeconds: 0.2
+  maxSampleAgeSeconds: 0.1
+  maxRepeatsPerTrial: 0
+  trialSequence: 1
+  patternSeconds: 0.8
+  answerTimeoutSeconds: 50
+  preStimulusSeconds: 0.5
   convexResponseKey: 63
   concaveResponseKey: 64
   useVrControllerButtons: 1
-  swapResponseButtons: 0
-  categoryAResponseText: CATEGORY A
-  categoryBResponseText: CATEGORY B
+  controllerMapping: 1
+  categoryALabel: CATEGORY A
+  categoryBLabel: CATEGORY B
   trainingKey: 34
   continueTrainingKey: 1
   requireTrainingBeforeSession: 0
-  trainingCategoryAVisualSpaceL: 1.4
-  trainingCategoryBVisualSpaceL: 0
-  trainingVisualSpaceLValues:
+  trainingExampleA: 1.4
+  trainingExampleB: 0
+  trainingLValues:
   - 0.2
   - 0.4
   - 0.8
   - 1.2
-  trainingRepetitionsPerValue: 3
-  trainingExampleStimulusSeconds: 2
-  trainingExampleNoiseSeconds: 0.5
-  trainingFixationSecondsWithoutEyeTracking: 0.5
+  trainingRepeatsPerValue: 3
+  trainingExampleSeconds: 2
+  trainingNoiseSeconds: 0.5
+  trainingFixationSeconds: 0.5
   startSessionKey: 98
   abortSessionKey: 99
   sessionState: 0

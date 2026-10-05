@@ -399,6 +399,16 @@ namespace GlobeEffect.VRCheckerboard
             ShowParts(checkerboard: false, noise: true, fixation: true, prompt: false);
         }
 
+        // Zum Anschauen der Maske: im Inspector auf die drei Punkte (oder
+        // Rechtsklick) an dieser Komponente und "Preview Noise Mask" wählen. Die
+        // Maske bleibt dann stehen, bis der Experiment Manager etwas anderes zeigt,
+        // zum Beispiel auf dem Startbildschirm, solange man keine Taste drückt.
+        [ContextMenu("Preview Noise Mask")]
+        private void PreviewNoiseMask()
+        {
+            ShowNoise(Environment.TickCount);
+        }
+
         // Begrüßung, Trainingstexte und Hinweise werden als Text vor dem Kopf
         // eingeblendet. Der Text ist immer auf beiden Augen zu sehen.
         public void ShowResponsePrompt(string promptText)
