@@ -1213,12 +1213,15 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             eyeTrackingToolbox.StartRecording(experimentFiles.BaseFileName);
             WriteMarker(
                 "SessionStart;participant={0};session={1};seed={2};planned_trials={3};utc={4};mapping={5};" +
-                "noise_dot_deg={6:F4};noise_refresh_hz={7:F2};{8}",
+                "noise_dot_deg={6:F4};noise_dot_px={7:F2};noise_refresh_hz={8:F2};" +
+                "background_rgb={9:F3}/{10:F3}/{11:F3};{12}",
                 ExperimentFilesBase.SanitizeIdentifier(participantId, "pilot"),
                 ExperimentFilesBase.SanitizeIdentifier(sessionLabel, "session"),
                 randomSeed, trialPlan.Count, sessionStartUtc.ToString("O", CultureInfo.InvariantCulture),
                 VisualSpaceRadialMapping.MappingVersion,
-                stimulus.NoiseDotSizeDegrees, stimulus.NoiseRefreshRateHz, BuildTimingAndResponseFields());
+                stimulus.NoiseDotSizeDegrees, stimulus.NoiseDotSizePixels, stimulus.NoiseRefreshRateHz,
+                stimulus.BackgroundColor.r, stimulus.BackgroundColor.g, stimulus.BackgroundColor.b,
+                BuildTimingAndResponseFields());
         }
 
         // Ablauf, Zeiten und Tastenbelegung für die Marker SessionStart und
