@@ -11,6 +11,16 @@ namespace GlobeEffect.VRCheckerboard.Tests
     {
         // Liest das tatsächlich gerenderte Bild aus. Ein reiner Rechentest auf
         // der CPU würde Fehler der Shaderberechnung auf der Grafikkarte übersehen.
+        // Bei 90 Grad Blickwinkel ist m11 = 1. Dann ist ein Pixel in der Bildmitte
+        // 2 / Höhe im Bogenmaß groß, bei 1000 Pixeln also etwa 0,1146 Grad.
+        [Test]
+        public void DegreesPerPixel_MatchesHandCalculation()
+        {
+            Matrix4x4 projection = Matrix4x4.Perspective(90f, 1f, 0.1f, 100f);
+            float degreesPerPixel = VrCheckerboardStimulus.DegreesPerPixel(projection, 1000);
+            Assert.That(degreesPerPixel, Is.EqualTo(Mathf.Rad2Deg * 0.002f).Within(1e-4f));
+        }
+
         [TestCase(0.15f)]
         [TestCase(0.5f)]
         [TestCase(1f)]
@@ -44,6 +54,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 stimulus.SetAngularDiameter(70f);
                 stimulus.SetApertureEdgeSoftness(0f);
                 var settings = new SerializedObject(stimulus);
+                // Hier wird bewusst in Grad getestet, damit die drei Größen fest sind.
+                settings.FindProperty("noiseSizeInPixels").boolValue = false;
                 settings.FindProperty("noiseDotSizeDegrees").floatValue = dotSize;
                 settings.ApplyModifiedPropertiesWithoutUndo();
 

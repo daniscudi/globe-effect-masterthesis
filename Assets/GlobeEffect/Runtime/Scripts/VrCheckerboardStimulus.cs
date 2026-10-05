@@ -2,6 +2,7 @@ using System;
 using GlobeEffect.VRCheckerboard.EyeTracking;
 using UnityEngine;
 using UnityEngine.Serialization;
+using UnityEngine.XR;
 
 namespace GlobeEffect.VRCheckerboard
 {
@@ -89,17 +90,38 @@ namespace GlobeEffect.VRCheckerboard
         [SerializeField]
         private Color fixationColor = Color.red;
 
+        // Dieses Grau ist überall zu sehen, wo gerade kein Muster ist: in der
+        // Fixationsphase, rundherum um den Kreis und am weichen Rand. Es sollte
+        // genauso hell sein wie Schwarz und Weiß im Schnitt. Dann bleibt die
+        // mittlere Helligkeit überall gleich, und der Rand wirkt nicht wie eine
+        // Kugel. Das Projekt läuft im Gamma-Farbraum, deshalb ist dieses Grau
+        // nicht 0,5, sondern ungefähr 0,73 (0,73 hoch 2,2 ergibt 0,5).
+        [FormerlySerializedAs("fixationBackgroundColor")]
         [SerializeField]
-        [Tooltip("Hintergrund in der Fixationsphase, also kurz bevor das Muster kommt.")]
-        private Color fixationBackgroundColor = Color.gray;
+        [Tooltip("Grauer Hintergrund in der Fixationsphase und rund um den Kreis. Bei Schwarz und Weiß als Musterfarben passt 0,73 (RGB 186): Das ist genauso hell wie beide im Schnitt. 0,5 wäre im Headset deutlich dunkler.")]
+        private Color backgroundColor = new Color(0.73f, 0.73f, 0.73f);
 
         // Die Maske sieht aus wie das "Ameisenmuster" eines alten Fernsehers ohne
         // Empfang: viele kleine schwarze und weiße Punkte, die sich ständig ändern.
         // Die frühere Kästchengröße (1 Grad) wird absichtlich nicht übernommen,
         // sie gehörte zur alten, stehenden Maske.
+        //
+        // Kleiner als ein Bildpixel geht nicht: Dann trifft jedes Pixel zufällig
+        // nur einen von mehreren Punkten. Das gibt ein Raster, Flackern bei jeder
+        // kleinen Kopfbewegung, und die beiden Augen sehen verschiedene Bilder,
+        // was fast dreidimensional wirkt. Deshalb wird die Größe normalerweise
+        // in Pixeln eingestellt.
         [Header("Noise Mask")]
+        [SerializeField]
+        [Tooltip("An: Die Punktgröße wird in Bildpixeln eingestellt (Noise Dot Size Pixels). Das Skript rechnet selbst aus, wie viele Grad ein Pixel im Headset groß ist. So ist die Maske so fein wie möglich und bleibt trotzdem ruhig. Aus: Die Größe wird in Grad eingestellt (Noise Dot Size Degrees).")]
+        private bool noiseSizeInPixels = true;
+
+        [SerializeField, Range(1f, 10f)]
+        [Tooltip("Wie groß ein Punkt des Rauschens ist, in Bildpixeln. 1 ist das Feinste, was das Headset zeigen kann. Ab etwa 1,5 bleibt das Bild auch bei kleinen Kopfbewegungen ruhig. Gemeint sind die Pixel, die Unity rendert. Steht die Auflösung in SteamVR über 100 %, ist so ein Pixel etwas kleiner als ein Pixel im Display.")]
+        private float noiseDotSizePixels = 1.5f;
+
         [SerializeField, Range(0.02f, 2f)]
-        [Tooltip("Wie groß ein einzelner Punkt des Rauschens ist, in Grad in der Bildmitte. Kleine Werte ergeben das feine Ameisenmuster. Unter etwa 0,08 Grad ist ein Punkt in der Vive Pro Eye kleiner als ein Bildpixel.")]
+        [Tooltip("Wie groß ein einzelner Punkt des Rauschens ist, in Grad in der Bildmitte. Gilt nur, wenn Noise Size In Pixels aus ist. Unter etwa 0,08 Grad ist ein Punkt in der Vive Pro Eye kleiner als ein Bildpixel.")]
         private float noiseDotSizeDegrees = 0.15f;
 
         [SerializeField, Range(0f, 120f)]
@@ -173,9 +195,34 @@ namespace GlobeEffect.VRCheckerboard
         public float GridLineSpacingDegrees => gridSpacingDegrees;
         public float GridLineSpacingUv => DegreesToUv(gridSpacingDegrees);
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
-        public float NoiseDotSizeDegrees => noiseDotSizeDegrees;
         public float NoiseRefreshRateHz => noiseRefreshRateHz;
+        public Color BackgroundColor => backgroundColor;
         public bool IsVisible => isVisible;
+
+        // Die Punktgröße, die gerade wirklich benutzt wird, in Grad in der
+        // Bildmitte. Im Pixel-Modus ohne Kamera wird der Gradwert genommen.
+        public float NoiseDotSizeDegrees =>
+            noiseSizeInPixels && TryGetDegreesPerPixel(out float degreesPerPixel)
+                ? noiseDotSizePixels * degreesPerPixel
+                : noiseDotSizeDegrees;
+
+        // Dieselbe Größe in Bildpixeln. NaN, wenn keine Kamera da ist.
+        public float NoiseDotSizePixels =>
+            TryGetDegreesPerPixel(out float degreesPerPixel)
+                ? NoiseDotSizeDegrees / degreesPerPixel
+                : float.NaN;
+
+        /// <summary>
+        /// Wie viele Grad ein Bildpixel in der Bildmitte groß ist.
+        ///
+        /// Die Projektion streckt tan(Winkel) mit dem Faktor m11 auf die Bildhöhe
+        /// von -1 bis +1. In der Bildmitte ist ein Pixel deshalb 2 / (m11 * Höhe)
+        /// im Bogenmaß groß.
+        /// </summary>
+        public static float DegreesPerPixel(Matrix4x4 projection, int pixelHeight)
+        {
+            return Mathf.Rad2Deg * 2f / (projection.m11 * pixelHeight);
+        }
 
         /// <summary>
         /// Das wievielte Rauschbild gerade dran ist. 0 ist das erste; bei einer
@@ -459,10 +506,10 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetFloat("_GridLineSpacingUv", DegreesToUv(gridSpacingDegrees));
             propertyBlock.SetColor("_DarkColor", darkColor);
             propertyBlock.SetColor("_LightColor", lightColor);
-            propertyBlock.SetColor("_FixationBackgroundColor", fixationBackgroundColor);
+            propertyBlock.SetColor("_FixationBackgroundColor", backgroundColor);
             propertyBlock.SetFloat("_CheckerboardEnabled", checkerboardVisible ? 1f : 0f);
             propertyBlock.SetFloat("_NoiseEnabled", noiseVisible ? 1f : 0f);
-            propertyBlock.SetFloat("_NoiseCellSizeUv", DegreesToUv(noiseDotSizeDegrees));
+            propertyBlock.SetFloat("_NoiseCellSizeUv", DegreesToUv(NoiseDotSizeDegrees));
             // Beim Antworttext wird immer auf beiden Augen gezeigt, damit der Text
             // auch im Monokular-Durchgang gut lesbar bleibt.
             CheckerboardEyePresentation eyeMode =
@@ -473,6 +520,26 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetColor("_FixationColor", fixationColor);
             AddFrameValues(propertyBlock);
             meshRenderer.SetPropertyBlock(propertyBlock);
+            PaintCameraBackground();
+        }
+
+        private void PaintCameraBackground()
+        {
+            // Außerhalb vom Viereck sieht man den Hintergrund der Kamera. Der wird
+            // auf dasselbe Grau gestellt, damit rundherum keine schwarze Fläche
+            // bleibt. Das passiert nur im Play Mode, damit die Szene selbst nicht
+            // verändert wird. Nach dem Play Mode stellt Unity alles zurück.
+            if (!Application.isPlaying || observer == null)
+            {
+                return;
+            }
+
+            Camera headCamera = observer.GetComponent<Camera>();
+            if (headCamera != null)
+            {
+                headCamera.clearFlags = CameraClearFlags.SolidColor;
+                headCamera.backgroundColor = backgroundColor;
+            }
         }
 
         private void SendFrameValuesToShader()
@@ -504,6 +571,33 @@ namespace GlobeEffect.VRCheckerboard
             // Als echte ganze Zahl übertragen. Ein Float kann große Seeds wie
             // 20260901 nicht mehr exakt speichern und würde benachbarte Seeds runden.
             block.SetInteger("_NoiseSeed", noiseFrameSeed);
+        }
+
+        private bool TryGetDegreesPerPixel(out float degreesPerPixel)
+        {
+            // Die Pixelgröße hängt an der Kamera im Kopf: an ihrem Blickwinkel
+            // und daran, wie viele Pixel hoch ihr Bild ist.
+            degreesPerPixel = 0f;
+            Camera headCamera = observer != null ? observer.GetComponent<Camera>() : null;
+            if (headCamera == null)
+            {
+                return false;
+            }
+
+            // Im Headset bekommt jedes Auge ein eigenes Bild. Beide sind gleich
+            // groß, deshalb reicht das linke. Am Bildschirm zählt das Game View.
+            bool headset = headCamera.stereoEnabled && XRSettings.eyeTextureHeight > 0;
+            Matrix4x4 projection = headset
+                ? headCamera.GetStereoProjectionMatrix(Camera.StereoscopicEye.Left)
+                : headCamera.projectionMatrix;
+            int pixelHeight = headset ? XRSettings.eyeTextureHeight : headCamera.pixelHeight;
+            if (pixelHeight <= 0 || projection.m11 <= 0f)
+            {
+                return false;
+            }
+
+            degreesPerPixel = DegreesPerPixel(projection, pixelHeight);
+            return true;
         }
 
         private float DegreesToUv(float degrees)
@@ -653,6 +747,7 @@ namespace GlobeEffect.VRCheckerboard
             visualSpaceL = Mathf.Clamp(visualSpaceL, 0f, 1.4f);
             gridSpacingDegrees = Mathf.Clamp(gridSpacingDegrees, 0.5f, 45f);
             noiseDotSizeDegrees = Mathf.Clamp(noiseDotSizeDegrees, 0.02f, 2f);
+            noiseDotSizePixels = Mathf.Clamp(noiseDotSizePixels, 1f, 10f);
             noiseRefreshRateHz = Mathf.Clamp(noiseRefreshRateHz, 0f, 120f);
             fixationSizeDegrees = Mathf.Clamp(fixationSizeDegrees, 0.05f, 5f);
             textDistanceMeters = Mathf.Max(0.5f, textDistanceMeters);

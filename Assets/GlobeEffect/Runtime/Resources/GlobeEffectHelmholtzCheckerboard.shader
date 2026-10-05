@@ -8,7 +8,7 @@
     {
         _DarkColor ("Dark Color", Color) = (0, 0, 0, 1)
         _LightColor ("Light Color", Color) = (1, 1, 1, 1)
-        _FixationBackgroundColor ("Fixation Background", Color) = (0.5, 0.5, 0.5, 1)
+        _FixationBackgroundColor ("Background", Color) = (0.73, 0.73, 0.73, 1)
         _FixationColor ("Fixation Color", Color) = (1, 0, 0, 1)
         _ApparentHalfAngleRad ("Apparent Half Angle [rad]", Float) = 0.785398
         _ApertureEdgeSoftnessRad ("Aperture Edge Softness [rad]", Float) = 0.0174533
@@ -197,7 +197,14 @@
                 // Ohne Kreisblende bleibt apertureAlpha bei 1 und das ganze
                 // quadratische Gitter wird sichtbar. Das ist nur zur Kontrolle
                 // gedacht; im eigentlichen Versuch bleibt die Öffnung aktiv.
-                clip(apertureAlpha - 0.001);
+                //
+                // Außerhalb vom Kreis ist nur der graue Hintergrund zu sehen.
+                // Das wird hier gleich zurückgegeben, auch weil die Formel weiter
+                // unten so weit außen keine sinnvollen Werte mehr liefert.
+                if (apertureAlpha <= 0.001)
+                {
+                    return fixed4(_FixationBackgroundColor.rgb, 1.0);
+                }
 
                 float sourceRadius;
                 if (_VisualSpaceL < 1e-6)
@@ -283,7 +290,26 @@
                     * step(0.5, _FixationEnabled);
 
                 fixed4 finalColor = lerp(color, _FixationColor, fixationMask);
-                finalColor.a *= apertureAlpha;
+
+                // Am weichen Rand wird das Bild nicht durchsichtig, sondern in den
+                // grauen Hintergrund übergeblendet. Schwarz und Weiß werden dabei
+                // also nur immer grauer, die mittlere Helligkeit bleibt gleich.
+                // Ein Rand, der nach Schwarz dunkler wird, sieht dagegen aus wie
+                // eine beleuchtete Kugel und kann "konvex" vortäuschen.
+                //
+                // Im Gamma-Farbraum sind die Farbwerte nicht die echte Helligkeit.
+                // Deshalb wird zum Mischen kurz in echte (lineare) Helligkeit
+                // umgerechnet und danach zurück.
+                float3 background = _FixationBackgroundColor.rgb;
+                #if defined(UNITY_COLORSPACE_GAMMA)
+                    finalColor.rgb = LinearToGammaSpace(lerp(
+                        GammaToLinearSpace(background),
+                        GammaToLinearSpace(finalColor.rgb),
+                        apertureAlpha));
+                #else
+                    finalColor.rgb = lerp(background, finalColor.rgb, apertureAlpha);
+                #endif
+                finalColor.a = 1.0;
                 return finalColor;
             }
             ENDCG
