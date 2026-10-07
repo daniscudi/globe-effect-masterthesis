@@ -15,6 +15,12 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         bool TryGetFixationDirection(out Vector3 directionWorld);
     }
 
+    public interface IFixationCriterion
+    {
+        float ToleranceDegrees { get; }
+        float RequiredContinuousSeconds { get; }
+    }
+
     /// <summary>
     /// Die Blickwerte aus einem bestimmten Moment. Einmal festgehalten, ändern
     /// sie sich nicht mehr, auch wenn die Person danach woanders hinschaut.
@@ -61,7 +67,7 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
     /// Es wird nur der Winkel zwischen Blickrichtung und Kreuz gemessen. Eine
     /// Entfernung spielt dabei keine Rolle, weil beide Bilder am Kopf hängen.
     /// </summary>
-    public abstract class FixationMonitorBase<TStimulus> : MonoBehaviour
+    public abstract class FixationMonitorBase<TStimulus> : MonoBehaviour, IFixationCriterion
         where TStimulus : MonoBehaviour, IFixationStimulus
     {
         // Für jeden neuen Messwert läuft immer dasselbe ab:
@@ -140,6 +146,18 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
             return Time.realtimeSinceStartupAsDouble - lastSampleRealtimeSeconds
                 <= Mathf.Max(0f, maximumAgeSeconds);
+        }
+
+        // Ein alter, damals ruhiger Blick reicht nicht zum Start. Wenn der Tracker
+        // keine neuen Werte mehr liefert, muss die nächste Darbietung warten.
+        public bool IsReadyForPresentation(float maximumAgeSeconds)
+        {
+            return RequirementMet && HasRecentSample(maximumAgeSeconds);
+        }
+
+        public bool Tracks(TStimulus expectedStimulus, EyeTrackingToolbox expectedToolbox)
+        {
+            return stimulus == expectedStimulus && eyeTrackingToolbox == expectedToolbox;
         }
 
         private void OnEnable()

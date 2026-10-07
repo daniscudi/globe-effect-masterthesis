@@ -44,6 +44,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public float WorldCoverageDiameterDegrees { get; }
         public float CarrierRadiusMeters { get; }
         public string Status { get; }
+        public bool FreeHeadMovement { get; }
+        public string MotionConstraint => Trial.MotionMode == RandomDotMotionMode.SimulatedYaw
+            ? "simulated" : FreeHeadMovement ? "free" : "guided";
 
         public double StimulusDurationSeconds =>
             Math.Max(0d, StimulusEndUnitySeconds - TrialStartUnitySeconds);
@@ -82,7 +85,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             int dotCount,
             float worldCoverageDiameterDegrees,
             float carrierRadiusMeters,
-            string status)
+            string status,
+            bool freeHeadMovement = false)
         {
             Trial = trial ?? throw new ArgumentNullException(nameof(trial));
             PresentationIndex = presentationIndex;
@@ -115,6 +119,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             WorldCoverageDiameterDegrees = worldCoverageDiameterDegrees;
             CarrierRadiusMeters = carrierRadiusMeters;
             Status = status ?? string.Empty;
+            FreeHeadMovement = freeHeadMovement;
         }
     }
 
@@ -124,7 +129,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// </summary>
     public sealed class RandomDotExperimentFiles : ExperimentFilesBase
     {
-        public const string MappingVersion = "merlitz-instrument-k-m-oneway-sweep-center-density-v7";
+        public const string MappingVersion = "merlitz-instrument-k-m-free-or-guided-head-v8";
 
         private const string PlanHeader = SessionColumns +
             "sequence_index,total_planned_trials,condition_index,repetition,motion_block_index," +
@@ -147,7 +152,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "world_coverage_diameter_deg,carrier_radius_m,response,valid_for_analysis," +
             "fixation_sample_valid,fixation_inside_tolerance,fixation_angle_deg," +
             "continuous_fixation_s,fixation_valid_sample_fraction,longest_off_target_s," +
-            "longest_invalid_gaze_s,status,image_center_speed_deg_per_s";
+            "longest_invalid_gaze_s,status,image_center_speed_deg_per_s,head_motion_constraint";
 
         public RandomDotExperimentFiles(
             string outputRoot,
@@ -211,7 +216,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 // sweep_speed_deg_per_s ist der Objektwinkel. Hier steht zusätzlich,
                 // wie schnell die Punkte dabei in der Bildmitte liefen.
                 .Add(RandomDotSimulatedSweep.ImageCenterSpeed(result.SweepSpeedDegreesPerSecond,
-                    trial.InstrumentMagnificationM, trial.ContentZoom)));
+                    trial.InstrumentMagnificationM, trial.ContentZoom))
+                .Add(result.MotionConstraint));
         }
     }
 }

@@ -4,23 +4,45 @@
 % We fit P(response = Convex) as a function of visual_space_l.
 % The PSE is the l-value at which Concave and Convex are equally likely.
 
-clear; close all; clc;
+% Optional: set csv_path in the workspace before running this script.
+% Otherwise choose a trials.csv file. Never silently analyse an old pilot.
+clearvars -except csv_path psignifit_path; close all; clc;
 
 
 %% settings
 
-% Change this path for each new participant.
-csv_path = "D:\Tolga\Globe-Effect-Master\VRCheckerboard\measurements\pilot_td_checkerboard_pilot_20260918_183240_trials.csv";
+if ~exist('csv_path', 'var') || strlength(string(csv_path)) == 0
+    project_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
+    [file_name, folder_name] = uigetfile( ...
+        fullfile(project_root, 'measurements', '*_trials.csv'), ...
+        'Choose the checkerboard trials CSV');
+    if isequal(file_name, 0)
+        disp('No file selected. Analysis cancelled.');
+        return;
+    end
+    csv_path = fullfile(folder_name, file_name);
+end
+csv_path = string(csv_path);
+fprintf('input file: %s\n', csv_path);
 
 % Change this only if the psignifit folder is moved.
-psignifit_path = "C:\Users\ZVSL-070\Downloads\psignifit-matlab\psignifit-master";
-addpath(genpath(psignifit_path));
+if ~exist('psignifit_path', 'var')
+    psignifit_path = "C:\Users\ZVSL-070\Downloads\psignifit-matlab\psignifit-master";
+end
+if isfolder(psignifit_path)
+    addpath(genpath(psignifit_path));
+end
 
 
 %% load data
 
 T = readtable(csv_path);
 fprintf('rows in CSV: %d\n', height(T));
+required_columns = {'response', 'valid_for_analysis', 'visual_space_l', ...
+    'participant_id', 'eye_presentation', 'angular_diameter_deg'};
+if ~all(ismember(required_columns, T.Properties.VariableNames))
+    error('This is not a checkerboard trials CSV. Required columns are missing.');
+end
 
 % Keep only valid trials with a Concave or Convex response.
 valid_response = strcmpi(string(T.response), "Concave") | ...
@@ -33,15 +55,24 @@ if isempty(T)
     error('No valid Concave/Convex trials were found.');
 end
 
-% The fit should contain only one eye, FOV, and zoom condition.
-n_eyes = numel(unique(string(T.eye_presentation)));
-n_fovs = numel(unique(T.angular_diameter_deg));
-%% n_zooms = numel(unique(T.content_zoom));
-
-%if n_eyes > 1 || n_fovs > 1 || n_zooms > 1
- %   error(['The CSV contains several eye, FOV, or zoom conditions. ', ...
-  %         'Select one condition before fitting.']);
-%end
+% A single fit must not mix people, sessions, eyes, FOVs, mappings or sequences.
+% Only visual_space_l is allowed to vary within this fit.
+condition_columns = {'participant_id', 'session_start_utc', 'eye_presentation', ...
+    'angular_diameter_deg', 'mapping_version', 'trial_sequence', ...
+    'grid_line_spacing_deg', 'aperture_edge_softness_deg', 'circular_aperture_enabled'};
+for column = condition_columns
+    name = column{1};
+    if ismember(name, T.Properties.VariableNames) && numel(unique(string(T.(name)))) > 1
+        error('Mixed condition in column %s. Select one condition before fitting.', name);
+    end
+end
+if any(~isfinite(T.visual_space_l))
+    error('Stimulus values contain NaN or Inf. Check the input CSV.');
+end
+if ismember('sequence_index', T.Properties.VariableNames) ...
+        && numel(unique(T.sequence_index)) ~= height(T)
+    error('Duplicate valid trials (sequence_index). Check the input CSV.');
+end
 
 
 %% prepare responses
@@ -55,6 +86,9 @@ if numel(unique(T.convex)) < 2
 end
 
 [l_values, n_convex, n_trials, prop_convex] = aggregateResponses(T);
+if numel(l_values) < 3
+    error('Fewer than three stimulus levels. Add levels before fitting a pilot PSE.');
+end
 
 fprintf('\naggregated data:\n');
 for k = 1:length(l_values)
@@ -122,6 +156,10 @@ width_ci95 = squeeze(result.conf_Intervals(2, :, 1));
 lapse_ci95 = squeeze(result.conf_Intervals(3, :, 1));
 eta_ci95 = squeeze(result.conf_Intervals(5, :, 1));
 jnd_ci95 = width_ci95 * jnd_factor;
+if pse_ci95(1) < min(l_values) || pse_ci95(2) > max(l_values)
+    warning(['The 95%% credible interval extends beyond the tested range. ', ...
+        'Do not interpret this PSE as a well-covered neutral point.']);
+end
 
 
 %% print results
@@ -153,6 +191,12 @@ result_table = table( ...
     'jnd_l', 'jnd_ci95_low', 'jnd_ci95_high', 'width_5_to_95', ...
     'symmetric_lapse_rate', 'lapse_ci95_low', 'lapse_ci95_high', ...
     'eta', 'eta_ci95_low', 'eta_ci95_high'});
+% Keep the source and condition with the fitted value, not only the person's ID.
+result_table.source_csv = csv_path;
+result_table.eye_presentation = string(T.eye_presentation(1));
+result_table.angular_diameter_deg = T.angular_diameter_deg(1);
+result_table.sigmoid_name = string(sigmoid_name);
+result_table.n_stimulus_levels = numel(l_values);
 
 data_folder = fileparts(csv_path);
 result_file = fullfile(data_folder, 'checkerboard_pse_result_psignifit.xlsx');
@@ -190,7 +234,7 @@ h_ci = plot(nan, nan, '--', 'Color', [1 0.4 0]);
 legend([h_data(1), h_fit, h_straight, h_ci], ...
     {'data', sprintf('fit (PSE = %.3f)', pse), ...
      'l = 1 (geometrically straight)', ...
-     sprintf('95%% CI [%.3f, %.3f]', pse_ci95(1), pse_ci95(2))}, ...
+     sprintf('95%% credible interval [%.3f, %.3f]', pse_ci95(1), pse_ci95(2))}, ...
     'Location', 'best');
 
 safe_id = regexprep(char(participant_id), '[^A-Za-z0-9_-]', '_');

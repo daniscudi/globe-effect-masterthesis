@@ -112,7 +112,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         {
             // Gewünscht: 12 Grad pro Sekunde in der Bildmitte. Das Instrument muss
             // dafür bei großem m langsamer über die Außenwelt schwenken.
-            foreach (float m in new[] { 5f, 10f, 14f, 20f })
+            foreach (float m in new[] { 1f, 5f, 10f, 14f, 20f })
             {
                 float objectSpeed = Sweep.ObjectSpeed(
                     RandomDotSweepSpeedReference.ImageCenter, 1.2f, 12f, m, contentZoom: 1f);

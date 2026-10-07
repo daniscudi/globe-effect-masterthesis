@@ -193,9 +193,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 Row("Trial",
                     hasSession ? FormatTrial(session.CurrentTrialNumber, session.TotalTrials) : Missing);
                 Row("Bewegungsblock", hasSession ? Number(session.CurrentMotionBlock) : Missing);
-                Row("Unterblock", hasSession ? Number(session.CurrentMiniBlock) : Missing);
-                if (hasSession && (session.SessionState is RandomDotSessionState.PausedBetweenMiniBlocks
-                    or RandomDotSessionState.PausedBetweenMotionBlocks))
+                if (hasSession && session.SessionState == RandomDotSessionState.PausedBetweenMotionBlocks)
                 {
                     EditorGUILayout.HelpBox("Pause – mit F5 fortsetzen.", MessageType.Info);
                 }

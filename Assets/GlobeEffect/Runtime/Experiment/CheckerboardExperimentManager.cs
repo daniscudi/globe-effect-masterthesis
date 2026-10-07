@@ -222,6 +222,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private Key trainingKey = Key.T;
 
         [SerializeField]
+        [Tooltip("Schaltet eine reine Muster-Vorschau ohne Training, Trials oder Aufzeichnung ein/aus.")]
+        private Key previewKey = Key.P;
+
+        [SerializeField]
         [Tooltip("Taste zum Weiterblättern im Training. Damit startet später auch der erste Durchgang.")]
         private Key continueTrainingKey = Key.Space;
 
@@ -306,6 +310,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private bool trainingCompleted;
         private bool trainingAdvanceRequested;
         private bool trainingResponseReceived;
+        private bool previewActive;
+        private string settingsBeforePreview;
 
         // Die Blickwerte vom Ende des Durchgangs. Leer (null), solange der
         // Durchgang noch läuft.
@@ -314,6 +320,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         // ja weiter dorthin schauen. Deshalb werden die Blickwerte erst
         // festgehalten, wenn die Antwort kommt oder abgebrochen wird.
         private FixationSnapshot? gazeAtTrialEnd;
+        private int lastFixationCheckFrame = -1;
 
         public CheckerboardSessionState SessionState => sessionState;
         public int CurrentTrialNumber => currentTrialNumber;
@@ -322,6 +329,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public int PresentationCount => presentationCount;
         public bool RequireFixation => requireFixation;
         public bool TrainingCompleted => trainingCompleted;
+        public bool IsPreviewActive => previewActive;
         public CheckerboardTrialSequence TrialSequence => trialSequence;
         public bool ResponseKeysSwapped => keyboardController != null && keyboardController.SwapResponseKeys;
         public string ConvexResponseKeyName => ResponseKeyName(CheckerboardCurvatureResponse.Convex);
@@ -380,12 +388,25 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void Update()
         {
+            if (!CheckRequiredRecording()) return;
             // Hier werden nur die Tasten vom Versuchsleiter abgefragt: starten,
             // trainieren, abbrechen, weiter. Die Antworttasten A und B laufen
             // weiter über den Keyboard Controller.
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null)
             {
+                if (!IsSessionActive && !IsTrainingActive && keyboard[previewKey].wasPressedThisFrame)
+                {
+                    TogglePreview();
+                    return;
+                }
+
+                if (previewActive && keyboard[abortSessionKey].wasPressedThisFrame)
+                {
+                    StopPreview();
+                    return;
+                }
+
                 if (IsTrainingActive)
                 {
                     if (keyboard[abortSessionKey].wasPressedThisFrame)
@@ -433,7 +454,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             if (sessionState == State.WaitingForFixation
-                && (!requireFixation || (fixationMonitor != null && fixationMonitor.RequirementMet)))
+                && (!requireFixation || (fixationMonitor != null
+                    && fixationMonitor.IsReadyForPresentation(maxSampleAgeSeconds))))
             {
                 PresentCurrentTrial();
                 return;
@@ -447,6 +469,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void OnDisable()
         {
+            RestorePreviewSettings();
             UnsubscribeKeyboardEvents();
             StopAndClear(ref trainingCoroutine);
             if (Application.isPlaying && IsSessionActive)
@@ -457,6 +480,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public void ShowWelcomeScreen(string notice = "")
         {
+            RestorePreviewSettings();
             // Der Startbildschirm ist der ruhige Punkt, an dem nichts läuft. Von
             // hier geht es ins Training oder in den Versuch.
             //
@@ -472,12 +496,47 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulus.ShowResponsePrompt(BuildWelcomePrompt(notice));
         }
 
+        /// <summary>Reine Live-Vorschau: Werte direkt am Stimulus ändern, keine Messung.</summary>
+        public void TogglePreview()
+        {
+            if (IsSessionActive || IsTrainingActive) return;
+            if (previewActive)
+            {
+                StopPreview();
+                return;
+            }
+
+            ResolveReferences();
+            if (stimulus == null) return;
+            settingsBeforePreview = JsonUtility.ToJson(stimulus);
+            previewActive = true;
+            stimulus.Show();
+        }
+
+        public void StopPreview()
+        {
+            if (!previewActive) return;
+            ShowWelcomeScreen();
+        }
+
+        private void RestorePreviewSettings()
+        {
+            if (!previewActive) return;
+            previewActive = false;
+            if (stimulus != null && !string.IsNullOrEmpty(settingsBeforePreview))
+                stimulus.RestorePreviewSettings(settingsBeforePreview);
+            settingsBeforePreview = null;
+        }
+
         public bool StartTraining()
         {
-            if (IsSessionActive || IsTrainingActive || !CheckSceneSetup())
+            if (IsSessionActive || IsTrainingActive)
             {
                 return false;
             }
+
+            StopPreview();
+            if (!CheckSceneSetup()) return false;
 
             ApplyResponseKeySettings();
             StopAndClear(ref trainingCoroutine);
@@ -611,7 +670,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             yield return WaitForTrainingSeconds(
                 Mathf.Max(preStimulusSeconds, requireFixation ? 0f : trainingFixationSeconds));
             while (requireFixation && IsTrainingActive
-                && fixationMonitor != null && !fixationMonitor.RequirementMet)
+                && fixationMonitor != null && !fixationMonitor.IsReadyForPresentation(maxSampleAgeSeconds))
             {
                 yield return null;
             }
@@ -731,6 +790,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return false;
             }
 
+            StopPreview();
+
             if (requireTrainingBeforeSession && !trainingCompleted)
             {
                 ShowWelcomeScreen("PLEASE COMPLETE THE PRACTICE FIRST");
@@ -756,6 +817,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // am Controller noch die alten Tasten eingetragen sind.
             ApplyResponseKeySettings();
 
+
             try
             {
                 trialPlan = CheckerboardTrialPlanner.CreateRandomizedPlan(
@@ -772,10 +834,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     ConcaveResponseKeyName, ResponseKeysSwapped, controllerMapping);
                 activeSessionFolder = experimentFiles.SessionFolder;
                 StartEyeTracking(sessionStartUtc);
+                experimentFiles.WriteSessionSettings(ExperimentSessionSettings.Capture(
+                    this, stimulus, fixationMonitor, keyboardController, eyeTrackingToolbox));
             }
             catch (Exception exception)
             {
-                sessionState = State.Aborted;
+                EndSession(State.Aborted);
                 Debug.LogError(
                     "Checkerboard-Sitzung konnte nicht gestartet werden: " + exception.Message, this);
                 return false;
@@ -948,8 +1012,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private IEnumerator RunPresentationSequence(CheckerboardTrial presentedTrial)
         {
-            // Das Muster ist bei allen Personen exakt gleich lange zu sehen.
-            // Sonst könnte man die Antworten hinterher nicht vergleichen.
+            // Die Soll-Dauer ist gleich. Unity schaltet aber nur an Frame-Grenzen
+            // um; die tatsächlich verstrichene Softwarezeit wird mitgespeichert.
+            // Das ist noch keine Messung des Displays mit einer Photodiode.
             yield return new WaitForSecondsRealtime(patternSeconds);
             if (sessionState != State.RunningTrial || currentTrial != presentedTrial)
             {
@@ -1012,6 +1077,15 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             StopAndClear(ref presentationCoroutine);
+            CheckerboardTrial answeredTrial = currentTrial;
+            if (!CheckRequiredRecording()) return;
+            if (requireFixation)
+            {
+                // Die Eingabe kann vor Manager.Update kommen. Auch dann muss der
+                // Blick im Antwort-Frame noch geprüft werden, bevor die Antwort zählt.
+                MonitorFixationDuringTrial();
+                if (sessionState != State.WaitingForResponse || currentTrial != answeredTrial) return;
+            }
             gazeAtTrialEnd = TakeFixationSnapshot();
 
             CheckerboardTrialResult result = CaptureCurrentResult(response, validForAnalysis: true, "valid");
@@ -1028,6 +1102,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void MonitorFixationDuringTrial()
         {
+            // Eingabe und Update können diese Prüfung im selben Frame aufrufen.
+            // Die verstrichene Zeit darf dabei nicht zweimal gezählt werden.
+            if (lastFixationCheckFrame == Time.frameCount) return;
+            lastFixationCheckFrame = Time.frameCount;
             // Zwei Dinge werden getrennt mitgezählt: wie lange die Person am Kreuz
             // vorbeigeschaut hat, und wie lange gar keine Daten da waren.
             //
@@ -1256,6 +1334,21 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return false;
             }
 
+            if (requireFixation && (eyeTrackingToolbox == null
+                || !fixationMonitor.Tracks(stimulus, eyeTrackingToolbox) || !stimulus.FixationTargetEnabled))
+            {
+                Debug.LogError("Blickkontrolle braucht die passende Toolbox, denselben Stimulus im " +
+                    "Fixation Monitor und ein sichtbares Fixationskreuz.", this);
+                return false;
+            }
+
+            if (concaveResponseKey == Key.None || convexResponseKey == Key.None
+                || concaveResponseKey == convexResponseKey)
+            {
+                Debug.LogError("Für konkav und konvex zwei unterschiedliche Antworttasten einstellen.", this);
+                return false;
+            }
+
             return true;
         }
 
@@ -1320,6 +1413,16 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             lookAway.Reset();
+            lastFixationCheckFrame = -1;
+        }
+
+        private bool CheckRequiredRecording()
+        {
+            if (!IsSessionActive || !requireFixation
+                || (eyeTrackingToolbox != null && eyeTrackingToolbox.IsRecording)) return true;
+            AbortSession("eye_tracking_recording_stopped");
+            Debug.LogError("Blickaufzeichnung wurde während der Messung beendet. Sitzung abgebrochen.", this);
+            return false;
         }
 
         // Hält eine laufende Coroutine an und merkt sich, dass keine mehr läuft.
@@ -1403,6 +1506,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 noticeLine +
                 CheckerboardKeyboardController.GetReadableKeyName(trainingKey) + " = PRACTICE\n" +
                 CheckerboardKeyboardController.GetReadableKeyName(startSessionKey) + " = START\n\n" +
+                CheckerboardKeyboardController.GetReadableKeyName(previewKey) + " = PREVIEW (NO DATA)\n\n" +
                 practiceState + "\n\n" +
                 "Always look at the cross.\n\n" +
                 "RESPONSES\n" + BuildResponsePrompt();

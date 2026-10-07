@@ -159,12 +159,23 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private RandomDotMotionMode motionMode = RandomDotMotionMode.SimulatedYaw;
 
         [SerializeField]
-        [Tooltip("Achse des simulierten Schwenks: horizontal (links/rechts) oder vertikal (oben/unten). HeadTracked bleibt horizontal.")]
+        [Tooltip("Achse des simulierten Schwenks. Aktive Kopfbewegung funktioniert auch oben/unten.")]
         private RandomDotSweepAxis sweepAxis = RandomDotSweepAxis.Horizontal;
 
         [SerializeField, Range(MinimumSweepAmplitudeDegrees, MaximumSweepAmplitudeDegrees)]
         [Tooltip("Wie weit der simulierte Schwenk zu jeder Seite der Mitte reicht. Er läuft einmal von der einen Seite zur anderen, insgesamt also die doppelte Strecke. Beim Start einer Sitzung überschreibt der Experiment Manager diesen Wert.")]
         private float simulatedYawAmplitudeDegrees = 2f;
+
+        [SerializeField]
+        [Tooltip("Nur Vorschau: Bildmitte hält die sichtbare Geschwindigkeit bei jedem m gleich. " +
+            "Objektwinkel hält stattdessen den virtuellen Schwenk gleich schnell. " +
+            "Für Trainings-/Mess-Trials gelten die Einstellungen am Experiment Manager.")]
+        private RandomDotSweepSpeedReference previewSpeedReference = RandomDotSweepSpeedReference.ImageCenter;
+
+        [SerializeField, Range(0.5f, 120f)]
+        [Tooltip("Nur Vorschau: gewünschte Punktgeschwindigkeit nahe der Bildmitte in Grad pro Sekunde. " +
+            "Der virtuelle Schwenk wird durch m und Content Zoom geteilt.")]
+        private float previewImageCenterSpeed = 12f;
 
         [SerializeField, Range(MinimumSweepSpeed, MaximumSweepSpeed)]
         [Tooltip("Wie schnell das Instrument im simulierten Schwenk über die Außenwelt schwenkt, in Grad Objektwinkel pro Sekunde. Im Bild laufen die Punkte in der Mitte m-mal so schnell. Die Geschwindigkeit bleibt die ganze Zeit gleich. Beim Start einer Sitzung überschreibt der Experiment Manager diesen Wert.")]
@@ -178,6 +189,22 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [SerializeField]
         [Tooltip("Solange keine Sitzung läuft, schwenkt das Feld immer weiter, damit man sich die Bewegung in Ruhe anschauen kann. Der Schwenk läuft dabei über die ganze Punktwelt und fängt am Ende wieder von vorne an. Je größer World Coverage Degrees, desto länger dauert ein Durchlauf. Im Versuch läuft der Schwenk immer nur einmal und so lang wie am Experiment Manager eingestellt.")]
         private bool loopSweepInPreview = true;
+
+        [Header("Preview Reference Grid (Not An Experimental Stimulus)")]
+        [SerializeField]
+        [Tooltip("Gerades, kopffestes Karopapier zum Vergleichen der Punktbahnen. Keine Verzeichnung, " +
+            "kein Mitschwenken. Während Training und Messung immer aus.")]
+        private bool showReferenceGrid;
+
+        [SerializeField, Range(0.5f, 20f)]
+        [Tooltip("Linienabstand in der flachen u,v-Bildebene, als Winkelabstand nahe der Mitte angegeben.")]
+        private float referenceGridSpacingDegrees = 5f;
+
+        [SerializeField, Range(0.5f, 4f)]
+        private float referenceGridWidthPixels = 1f;
+
+        [SerializeField]
+        private Color referenceGridColor = new Color(0.15f, 0.15f, 0.15f, 0.7f);
 
         [Header("Display And Advanced")]
         [SerializeField]
@@ -195,6 +222,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private bool isVisible = true;
         private bool pointsVisible = true;
         private bool meshRebuildPending;
+        private RandomDotMotionMode lastPreviewMotionMode;
 
         // Wird bei jedem Neubau aus der Dichte ausgerechnet, nicht eingestellt.
         private int dotCount;
@@ -226,7 +254,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
         public RandomDotMotionMode MotionMode => motionMode;
         public float SweepAmplitudeDegrees => simulatedYawAmplitudeDegrees;
-        public float SweepSpeedDegreesPerSecond => simulatedYawSpeedDegreesPerSecond;
+        public float SweepSpeedDegreesPerSecond => SessionRunning
+            ? simulatedYawSpeedDegreesPerSecond
+            : RandomDotSimulatedSweep.ObjectSpeed(previewSpeedReference, simulatedYawSpeedDegreesPerSecond,
+                previewImageCenterSpeed, instrumentMagnificationM, contentZoom);
         public bool IsVisible => isVisible;
 
         // Setzt der Experiment Manager, solange eine Sitzung läuft. Dann gibt es
@@ -250,6 +281,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
                 double elapsed = Time.realtimeSinceStartupAsDouble - motionStartSeconds;
                 float amplitude = simulatedYawAmplitudeDegrees;
+                float objectSpeed = SweepSpeedDegreesPerSecond;
                 if (loopSweepInPreview && !SessionRunning)
                 {
                     // Vorschau: Der Schwenk läuft so weit, wie neben dem sichtbaren Kreis
@@ -257,11 +289,11 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                     // er wieder von vorne an. Das % ist der Rest beim Teilen und setzt
                     // die Zeit nach jedem Durchlauf wieder auf null.
                     amplitude = Mathf.Max(amplitude, FreeWorldDegrees());
-                    elapsed %= 2d * amplitude / simulatedYawSpeedDegreesPerSecond;
+                    elapsed %= 2d * amplitude / objectSpeed;
                 }
 
                 return RandomDotSimulatedSweep.EvaluateOneWayDegrees(
-                    elapsed, amplitude, simulatedYawSpeedDegreesPerSecond, sweepDirection);
+                    elapsed, amplitude, objectSpeed, sweepDirection);
             }
         }
 
@@ -309,6 +341,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             isVisible = Application.isPlaying ? visibleAtStart : true;
             pointsVisible = true;
             motionStartSeconds = Time.realtimeSinceStartupAsDouble;
+            lastPreviewMotionMode = motionMode;
             if (observer != null)
             {
                 PlaceAroundObserver();
@@ -372,6 +405,11 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
             meshRebuildPending = false;
             SetupMeshAndMaterial(rebuildMesh: true);
+            // Beim Live-Wechsel auf Active die Punktwelt am jetzigen Kopf
+            // ausrichten und danach stehen lassen. Keine Trial-Uhr zurücksetzen.
+            if (!SessionRunning && lastPreviewMotionMode != motionMode)
+                PlaceAroundObserver();
+            lastPreviewMotionMode = motionMode;
             SendValuesToShader();
             ShowOrHideRenderer();
         }
@@ -581,6 +619,18 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             return Mathf.Clamp(count, MinimumDotCount, MaximumDotCount);
         }
 
+        /// <summary>Vorschauänderungen verwerfen und Mesh/Shader wieder mit den Originalwerten bauen.</summary>
+        public void RestorePreviewSettings(string settingsJson)
+        {
+            JsonUtility.FromJsonOverwrite(settingsJson, this);
+            ClampInspectorValues();
+            SetupMeshAndMaterial(rebuildMesh: true);
+            lastPreviewMotionMode = motionMode;
+            PlaceAroundObserver();
+            SendValuesToShader();
+            ShowOrHideRenderer();
+        }
+
         private void FollowHeadDuringSimulatedSweep()
         {
             // Wenn der Computer die Bewegung macht, soll die Person nicht einfach
@@ -779,6 +829,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             propertyBlock.SetFloat("_EyeMode", (float)eyePresentation);
             propertyBlock.SetFloat("_DotsEnabled", pointsVisible ? 1f : 0f);
             propertyBlock.SetFloat("_DotHalfSizeRad", 0.5f * dotSizeDegrees * Mathf.Deg2Rad);
+            // Nur eine unverzerrte Messlatte vor dem Kopf, nie Teil eines Trials.
+            propertyBlock.SetFloat("_ReferenceGridEnabled", showReferenceGrid && !SessionRunning ? 1f : 0f);
+            propertyBlock.SetFloat("_ReferenceGridSpacingUv",
+                Mathf.Tan(referenceGridSpacingDegrees * Mathf.Deg2Rad));
+            propertyBlock.SetFloat("_ReferenceGridWidthPixels", referenceGridWidthPixels);
+            propertyBlock.SetColor("_ReferenceGridColor", referenceGridColor);
             meshRenderer.SetPropertyBlock(propertyBlock);
             SendFrameValuesToShader();
         }
@@ -826,6 +882,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             worldCoverageDegrees = Mathf.Clamp(worldCoverageDegrees, 1f, MaximumCoverageDegrees);
             dotDensity = Mathf.Clamp(dotDensity, 0.01f, 1f);
             dotSizeDegrees = Mathf.Clamp(dotSizeDegrees, 0.02f, 2f);
+            referenceGridSpacingDegrees = Mathf.Clamp(referenceGridSpacingDegrees, 0.5f, 20f);
+            referenceGridWidthPixels = Mathf.Clamp(referenceGridWidthPixels, 0.5f, 4f);
+            previewImageCenterSpeed = Mathf.Clamp(previewImageCenterSpeed, 0.5f, 120f);
             lightDotFraction = Mathf.Clamp01(lightDotFraction);
             instrumentDistortionK = Mathf.Clamp(instrumentDistortionK, 0f, 1.4f);
             instrumentMagnificationM = Mathf.Clamp(instrumentMagnificationM,
