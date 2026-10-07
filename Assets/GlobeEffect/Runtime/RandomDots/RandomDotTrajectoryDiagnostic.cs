@@ -1,14 +1,15 @@
+using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Rendering;
 using UnityEngine.XR;
 using Keyboard = UnityEngine.InputSystem.Keyboard;
 
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
-    /// Technische Demonstration, kein Experiment. Neun bekannte Richtungen werden
-    /// mit dem ORIGINAL-Random-Dot-Shader gezeichnet. Die Spuren sind dieselben
-    /// Richtungen bei früheren Schwenkwinkeln, keine vorgegebenen horizontalen Bahnen.
+    /// Technische Demonstration, kein Experiment. Ein Raster aus bekannten
+    /// Richtungen (voreingestellt 3 x 3) wird mit dem ORIGINAL-Random-Dot-Shader
+    /// gezeichnet. Die Spuren sind dieselben Richtungen bei früheren
+    /// Schwenkwinkeln, keine vorgegebenen horizontalen Bahnen.
     /// </summary>
     [DefaultExecutionOrder(100)]
     public sealed class RandomDotTrajectoryDiagnostic : MonoBehaviour
@@ -28,7 +29,11 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public bool loop;
 
         [Header("Punkte und Referenzraster")]
-        [Tooltip("Abstand der drei Spalten/Zeilen in der unveränderten mittleren Blickstellung.")]
+        [Tooltip("Wie viele Spalten Punkte nebeneinander. Jede Spalte hat ihre eigene Farbe, von rot über grün bis blau.")]
+        [Range(1, 15)] public int markerColumns = 3;
+        [Tooltip("Wie viele Punkte übereinander in jeder Spalte. Nach oben werden sie heller.")]
+        [Range(1, 15)] public int markerRows = 3;
+        [Tooltip("Abstand der Spalten/Zeilen in der unveränderten mittleren Blickstellung. Punkte, die damit über 80 Grad hinaus liegen würden, fallen weg.")]
         [Range(2f, 25f)] public float markerSpacingDegrees = 10f;
         [Range(0.1f, 2f)] public float markerSizeDegrees = 0.45f;
         [Range(10, 160)] public int trailSamples = 80;
@@ -69,7 +74,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private float objectSpeed;
         private MaterialPropertyBlock values;
         private RandomDotDiagnosticFlowOverlay flowOverlay;
-        private (float k, float m, float speed, float duration, float spacing,
+        private (float k, float m, float speed, float duration, float spacing, int columns, int rows,
             RandomDotSweepAxis axis, RandomDotSweepDirection direction) motionSettings;
 
         private void OnEnable()
@@ -120,15 +125,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         private void OnValidate()
         {
-            distortionK = Mathf.Clamp(distortionK, 0f, 1.4f);
-            magnification = Mathf.Clamp(magnification, 1f, 20f);
-            durationSeconds = Mathf.Clamp(durationSeconds, 0.2f, 8f);
-            trailSamples = Mathf.Clamp(trailSamples, 10, 160);
+            // Die Grenzen der Regler hält Unity über [Range] selbst ein. Hier muss
+            // nur noch das Pfeilraster ungerade werden, damit ein Pfeil genau in
+            // der Mitte steht.
             arrowGridSize = RandomDotDiagnosticFlowOverlay.OddGridSize(arrowGridSize);
-            arrowSize = Mathf.Clamp(arrowSize, 0.3f, 2f);
-            arrowThickness = Mathf.Clamp(arrowThickness, 0.5f, 3f);
-            flowColorMinimum = Mathf.Clamp(flowColorMinimum, 0f, 0.99f);
-            flowColorMaximum = Mathf.Clamp(flowColorMaximum, 1.01f, 3f);
             dirty = true;
         }
 
@@ -165,7 +165,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private void Rebuild()
         {
             var nextMotion = (distortionK, magnification, imageCenterSpeed, durationSeconds,
-                markerSpacingDegrees, sweepAxis, sweepDirection);
+                markerSpacingDegrees, markerColumns, markerRows, sweepAxis, sweepDirection);
             bool restartMotion = nextMotion != motionSettings;
             motionSettings = nextMotion;
             ClearMarkers();
@@ -185,11 +185,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             field.ShowFixationOnly();
             markerMesh = CreateMarkerMesh(1f, 1f);
             trailMesh = CreateMarkerMesh(0.28f, 0.55f);
-            liveMarkers = CreateRenderer("Nine live markers", markerMesh);
-            liveMarkers.sortingOrder = 1;
+            liveMarkers = UnityTools.CreateMeshRenderer(field.transform, "Live markers", markerMesh,
+                background.sharedMaterial, 1);
             trails = new MeshRenderer[trailSamples + 1];
             for (int i = 0; i < trails.Length; i++)
-                trails[i] = CreateRenderer("Trail sample " + i, trailMesh);
+                trails[i] = UnityTools.CreateMeshRenderer(field.transform, "Trail sample " + i, trailMesh,
+                    background.sharedMaterial, 0);
             flowOverlay.gameObject.SetActive(true);
             flowOverlay.Configure(this);
             dirty = false;
@@ -197,75 +198,67 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             if (restartMotion) Restart();
         }
 
-        private MeshRenderer CreateRenderer(string label, Mesh mesh)
-        {
-            var child = new GameObject(label) { hideFlags = HideFlags.DontSave };
-            child.transform.SetParent(field.transform, false);
-            child.AddComponent<MeshFilter>().sharedMesh = mesh;
-            var renderer = child.AddComponent<MeshRenderer>();
-            renderer.sharedMaterial = background.sharedMaterial;
-            renderer.shadowCastingMode = ShadowCastingMode.Off;
-            renderer.receiveShadows = false;
-            return renderer;
-        }
-
         private Mesh CreateMarkerMesh(float size, float alpha)
         {
-            var vertices = new Vector3[36];
-            var uv = new Vector2[36];
-            var kinds = new Vector2[36];
-            var colors = new Color[36];
-            var indices = new int[54];
-            Color[] columnColors = { new Color(1f, 0.25f, 0.15f), Color.green,
-                new Color(0.2f, 0.55f, 1f) };
-            Vector2[] corners = { new Vector2(-1, -1), new Vector2(1, -1),
-                new Vector2(1, 1), new Vector2(-1, 1) };
-            for (int column = 0; column < 3; column++)
-            for (int row = 0; row < 3; row++)
+            // Erst alle Punkte sammeln, die sich sinnvoll zeichnen lassen. Jede
+            // Spalte bekommt eine eigene Farbe von rot über grün bis blau, nach
+            // oben werden die Punkte heller. Bei 3 x 3 ist das genau das alte Bild.
+            var points = new List<(Vector3 direction, Color color)>();
+            for (int column = 0; column < markerColumns; column++)
+            for (int row = 0; row < markerRows; row++)
             {
-                int point = column * 3 + row;
-                Vector3 direction = MarkerObjectDirection(column - 1, row - 1,
-                    markerSpacingDegrees, magnification, distortionK);
-                Color color = columnColors[column] * (0.65f + 0.175f * row);
+                // Das Raster liegt symmetrisch um die Mitte. Bei einer geraden
+                // Anzahl gibt es deshalb keine Spalte genau in der Mitte.
+                Vector3 direction = MarkerObjectDirection(column - 0.5f * (markerColumns - 1),
+                    row - 0.5f * (markerRows - 1), markerSpacingDegrees, magnification, distortionK);
+                if (direction == Vector3.zero) continue;
+                Color color = Color.HSVToRGB(Fraction(column, markerColumns) * 0.62f, 0.85f, 1f)
+                    * (0.65f + 0.35f * Fraction(row, markerRows));
                 color.a = alpha;
-                for (int corner = 0; corner < 4; corner++)
-                {
-                    int index = point * 4 + corner;
-                    vertices[index] = direction * field.FieldRadiusMeters;
-                    uv[index] = corners[corner];
-                    kinds[index] = new Vector2(size, 0f);
-                    colors[index] = color;
-                }
-                int start = point * 4;
-                int triangle = point * 6;
-                indices[triangle] = start;
-                indices[triangle + 1] = start + 2;
-                indices[triangle + 2] = start + 1;
-                indices[triangle + 3] = start;
-                indices[triangle + 4] = start + 3;
-                indices[triangle + 5] = start + 2;
+                points.Add((direction, color));
             }
+
+            // Jeder Punkt wird genauso gebaut wie die Zufallspunkte im Versuch.
+            var vertices = new Vector3[points.Count * 4];
+            var uv = new Vector2[points.Count * 4];
+            var sizes = new Vector2[points.Count * 4];
+            var colors = new Color32[points.Count * 4];
+            var indices = new int[points.Count * 6];
+            for (int i = 0; i < points.Count; i++)
+                RandomDotFieldStimulus.AddOneDot(i, points[i].direction * field.FieldRadiusMeters, size,
+                    RandomDotFieldStimulus.DotElement, points[i].color, vertices, uv, sizes, colors, indices);
             return new Mesh
             {
                 name = "Diagnostic direction markers", hideFlags = HideFlags.DontSave,
-                vertices = vertices, uv = uv, uv2 = kinds, colors = colors, triangles = indices,
+                vertices = vertices, uv = uv, uv2 = sizes, colors32 = colors, triangles = indices,
                 bounds = new Bounds(Vector3.zero, Vector3.one * field.FieldRadiusMeters * 4f)
             };
         }
 
+        // Wo im Raster man steht, von 0 (erste Spalte/Zeile) bis 1 (letzte).
+        private static float Fraction(int index, int count) => count > 1 ? index / (count - 1f) : 0.5f;
+
         /// <summary>
-        /// Nur die START-Anordnung zurückrechnen: drei senkrechte Spalten bei
+        /// Nur die START-Anordnung zurückrechnen: senkrechte Spalten bei
         /// Schwenkwinkel null. Alle späteren Positionen berechnet der Originalshader.
+        /// column und row zählen von der Mitte aus, in Rasterabständen.
+        /// Liegt ein Punkt so weit außen, dass sich die Formel nicht mehr
+        /// zurückrechnen lässt (über 80 Grad oder hinter dem Umkehrpunkt von k),
+        /// kommt Vector3.zero zurück und der Punkt wird weggelassen.
         /// </summary>
-        public static Vector3 MarkerObjectDirection(int column, int row, float spacing,
+        public static Vector3 MarkerObjectDirection(float column, float row, float spacing,
             float m, float k)
         {
+            if (Mathf.Abs(column * spacing) >= 80f || Mathf.Abs(row * spacing) >= 80f)
+                return Vector3.zero;
             var displayed = new Vector2(Mathf.Tan(column * spacing * Mathf.Deg2Rad),
                 Mathf.Tan(row * spacing * Mathf.Deg2Rad));
             float radius = displayed.magnitude;
             if (radius < 1e-6f) return Vector3.forward;
-            float angle = (float)MerlitzBinocularReferenceMath.ObjectAngleFromApparent(
-                Mathf.Atan(radius), m, k);
+            float apparent = Mathf.Atan(radius);
+            if (apparent >= 80f * Mathf.Deg2Rad || k * apparent >= 89f * Mathf.Deg2Rad)
+                return Vector3.zero;
+            float angle = (float)MerlitzBinocularReferenceMath.ObjectAngleFromApparent(apparent, m, k);
             Vector2 source = displayed * (Mathf.Tan(angle) / radius);
             return new Vector3(source.x, source.y, 1f).normalized;
         }
@@ -318,7 +311,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             GUI.Label(new Rect(20, 60, 580, 25),
                 $"k={distortionK:F2}, m={magnification:F1} | t={elapsed:F2}/{durationSeconds:F2} s");
             GUI.Label(new Rect(20, 85, 580, 25),
-                "Spalten: rot / grün / blau. Raster bleibt fest. Spuren zeigen frühere Positionen.");
+                $"{markerColumns} x {markerRows} Punkte, Spalten von rot bis blau. Raster bleibt fest. " +
+                "Spuren zeigen frühere Positionen.");
             string coordinateLabel = flowCoordinates == RandomDotDiagnosticCoordinates.LinearImage
                 ? "A: flacher Bildraum" : flowCoordinates == RandomDotDiagnosticCoordinates.SeparateAngles
                     ? "S: getrennte Winkelumrechnung" : "M: radiale Winkelumrechnung (l = 0)";

@@ -40,7 +40,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private const float MinimumRadiusMeters = 0.25f;
 
         // Was für ein Element ein Viereck im Mesh ist. Der Shader liest das aus uv2.
-        private const float DotElement = 0f;
+        internal const float DotElement = 0f;
         private const float FixationElement = 1f;
         private const float BackgroundElement = 2f;
 
@@ -710,7 +710,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             var triangles = new int[elementCount * 6];
             var random = new System.Random(randomSeed);
 
-            AddOneDot(0, Vector3.forward, 1f, BackgroundElement, fieldBackgroundColor,
+            AddOneDot(0, Vector3.forward * fieldRadiusMeters, 1f, BackgroundElement, fieldBackgroundColor,
                 vertices, uv, uv2, colors, triangles);
 
             float halfCoverage = 0.5f * worldCoverageDegrees * Mathf.Deg2Rad;
@@ -729,14 +729,14 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 // Wichtig ist nur die Richtung. Der Abstand kommt erst durch
                 // direction * fieldRadiusMeters dazu und ist reine Technik.
                 Color color = random.NextDouble() < lightDotFraction ? lightColor : darkColor;
-                AddOneDot(dotIndex + 1, direction, 1f, DotElement, color,
+                AddOneDot(dotIndex + 1, direction * fieldRadiusMeters, 1f, DotElement, color,
                     vertices, uv, uv2, colors, triangles);
             }
 
             // Das Kreuz kommt ganz zum Schluss dazu, genau geradeaus in der Mitte.
             if (showFixationTarget)
             {
-                AddOneDot(dotCount + 1, Vector3.forward, fixationSizeDegrees / dotSizeDegrees,
+                AddOneDot(dotCount + 1, Vector3.forward * fieldRadiusMeters, fixationSizeDegrees / dotSizeDegrees,
                     FixationElement, fixationColor, vertices, uv, uv2, colors, triangles);
             }
 
@@ -758,9 +758,11 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             };
         }
 
-        private void AddOneDot(
+        // Auch die Diagnose-Szene baut ihre farbigen Punkte hiermit. So sieht ein
+        // Punkt dort genau so aus wie im Versuch.
+        internal static void AddOneDot(
             int dotIndex,
-            Vector3 direction,
+            Vector3 center,
             float sizeMultiplier,
             float elementKind,
             Color color,
@@ -770,7 +772,6 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             Color32[] colors,
             int[] triangles)
         {
-            Vector3 center = direction * fieldRadiusMeters;
             int vertexIndex = dotIndex * 4;
 
             // Alle vier Ecken liegen erst mal genau übereinander im Mittelpunkt.

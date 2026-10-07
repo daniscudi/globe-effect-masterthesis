@@ -23,8 +23,12 @@ zusätzlich das tatsächliche Abspieltempo, nicht die räumliche Bahn.
 
 ## Was genau gezeichnet wird
 
-Neun Punkte: drei Spalten (rot, grün, blau), jeweils drei Höhen mit abgestufter
-Helligkeit. Die geordnete Anordnung bezieht sich auf die mittlere Blickstellung
+Ein Punktraster, voreingestellt 3 x 3: drei Spalten (rot, grün, blau), jeweils
+drei Höhen mit abgestufter Helligkeit. Mit **Marker Columns** und **Marker Rows**
+lassen sich bis zu 15 x 15 Punkte einstellen; die Farben laufen dann von rot über
+grün bis blau. Bei einer geraden Anzahl liegt das Raster symmetrisch um die Mitte,
+ohne Spalte bzw. Zeile genau in der Mitte. Punkte, die mit dem eingestellten
+Abstand weiter als 80° außen lägen, fallen weg. Die geordnete Anordnung bezieht sich auf die mittlere Blickstellung
 (Schwenkwinkel null). Der Schwenk beginnt seitlich davon. Das Raster bleibt kopffest.
 Die Punkte und Spuren werden weiterhin an der Kreisöffnung abgeschnitten.
 

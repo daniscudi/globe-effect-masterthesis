@@ -73,7 +73,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 SceneManager.MoveGameObjectToScene(overlayObject, scene);
                 var overlay = overlayObject.AddComponent<RandomDotDiagnosticFlowOverlay>();
                 overlay.Configure(settings);
-                Assert.That(overlayObject.GetComponent<MeshRenderer>().enabled, Is.False,
+                Assert.That(overlayObject.transform.Find("Speed heatmap").GetComponent<MeshRenderer>().enabled,
+                    Is.False,
                     "Die Heatmap ist ausgeschaltet; die Pfeile haben eine eigene Zeichenebene.");
                 int darkPixels = 0;
                 foreach (Color32 pixel in Render(camera, target, readback))

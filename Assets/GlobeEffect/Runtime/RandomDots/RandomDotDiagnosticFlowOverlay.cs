@@ -164,23 +164,13 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 triangles = new[] { 0, 2, 1, 0, 3, 2 },
                 bounds = new Bounds(Vector3.zero, Vector3.one * 10000f)
             };
-            gameObject.AddComponent<MeshFilter>().sharedMesh = mesh;
-            surface = gameObject.AddComponent<MeshRenderer>();
-            surface.sharedMaterial = material;
-            surface.sortingOrder = -2;
-            surface.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            surface.receiveShadows = false;
             arrowMesh = new Mesh { name = "Diagnostic Flow Arrows", hideFlags = HideFlags.DontSave };
             arrowMaterial = new Material(material) { hideFlags = HideFlags.DontSave };
             arrowMaterial.SetFloat("_Arrows", 1f);
-            var arrows = new GameObject("Sharp velocity arrows") { hideFlags = HideFlags.DontSave };
-            arrows.transform.SetParent(transform, false);
-            arrows.AddComponent<MeshFilter>().sharedMesh = arrowMesh;
-            arrowSurface = arrows.AddComponent<MeshRenderer>();
-            arrowSurface.sharedMaterial = arrowMaterial;
-            arrowSurface.sortingOrder = -1;
-            arrowSurface.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            arrowSurface.receiveShadows = false;
+            // Zwei eigene Ebenen: hinten die Farbfläche, davor die Pfeile.
+            surface = UnityTools.CreateMeshRenderer(transform, "Speed heatmap", mesh, material, -2);
+            arrowSurface = UnityTools.CreateMeshRenderer(transform, "Sharp velocity arrows", arrowMesh,
+                arrowMaterial, -1);
         }
 
         private void OnDestroy()
