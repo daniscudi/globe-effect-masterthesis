@@ -670,10 +670,8 @@ MonoBehaviour:
   - 10
   contentZoomValues:
   - 1
-  motionModes: 0100000000000000
-  counterbalanceMotionBlockOrderByParticipantId: 1
+  sessionMotionMode: 1
   repetitionsPerCondition: 25
-  repetitionsPerMiniBlock: 5
   motionDurationSeconds: 5
   sweepAmplitudeDegrees: 2
   sweepSpeedDegreesPerSecond: 1.2

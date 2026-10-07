@@ -181,13 +181,13 @@ namespace GlobeEffect.VRCheckerboard.Editor
             {
                 Fields(serializedObject, "participantId", "sessionLabel", "randomSeed", "dotSeedBase",
                     "fieldOfViewValues", "eyePresentations", "instrumentDistortionKValues",
-                    "instrumentMagnificationMValues", "contentZoomValues", "motionModes",
-                    "counterbalanceMotionBlockOrderByParticipantId", "repeatsPerCondition");
+                    "instrumentMagnificationMValues", "contentZoomValues", "sessionMotionMode", "repeatsPerCondition");
                 long conditions = (long)Count("fieldOfViewValues") * Count("eyePresentations")
                     * Count("instrumentDistortionKValues") * Count("instrumentMagnificationMValues")
-                    * Count("contentZoomValues") * Count("motionModes");
+                    * Count("contentZoomValues");
                 long trials = conditions * serializedObject.FindProperty("repeatsPerCondition").intValue;
-                EditorGUILayout.HelpBox($"Geplant: {trials} gültige Trials über alle Bewegungsblöcke.",
+                EditorGUILayout.HelpBox($"Geplant: {trials} gültige Trials für genau eine Bewegungsart. " +
+                    "Ein Block ohne Unterblock-Pausen. Die andere Variante startet als neue Sitzung.",
                     MessageType.Info);
             }
             if (Section("Simulierte Bewegung"))
@@ -218,13 +218,13 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
             if (Section("Training", false))
             {
-                Fields(serializedObject, "trainingKey", "practiceMotionMode", "trainSimulatedMotion",
+                Fields(serializedObject, "trainingKey", "trainSimulatedMotion",
                     "simulatedTrainingKValues", "simulatedTrainingRepeatsPerValue", "trainHeadMovement",
                     "requiredGoodTrainingSweeps", "sweepAmplitudeDegrees", "sweepSpeed",
                     "maximumProfileErrorDegrees", "maximumTrainingEndpointErrorDegrees", "turnaroundDegrees",
                     "requiredSweeps", "maxHeadTurnDegrees", "minMeanHeadSpeed", "maxPeakHeadSpeed");
-                EditorGUILayout.HelpBox("T übt die ausgewählte Practice Motion Mode ohne Messdateien. " +
-                    "In einer Sitzung wird das Training passend zum jeweiligen Bewegungsblock gewählt. " +
+                EditorGUILayout.HelpBox("T übt die ausgewählte Session Motion Mode ohne Messdateien. " +
+                    "In einer Sitzung wird das Training passend zur gewählten Bewegungsart gewählt. " +
                     "Das Kopftraining bleibt geführt, auch wenn die Haupttrials frei sind.", MessageType.Info);
             }
             FixationSettings();
@@ -232,7 +232,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             {
                 LinkedFields("keyboardController", "concaveKey", "convexKey", "swapResponseKeys",
                     "useVrControllerButtons", "vrControllerMapping", "logResponses");
-                Fields(serializedObject, "startSessionKey", "abortSessionKey");
+                Fields(serializedObject, "startSessionKey", "startOtherMotionSessionKey", "abortSessionKey");
             }
             if (Section("Punktfeld und Fixationskreuz", false))
                 LinkedFields("stimulus", "dotDensity", "dotSizeDegrees", "darkColor", "lightColor",
@@ -267,7 +267,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 LinkedFields("stimulus", "observer", "fieldRadiusMeters", "visibleAtStart", "materialOverride");
             }
             EndSettings("sessionState", "currentTrialNumber", "totalTrials", "validTrialsCompleted",
-                "presentationCount", "currentMotionBlock", "activeSessionFolder");
+                "presentationCount", "sessionMotionMode", "activeSessionFolder");
         }
     }
 }

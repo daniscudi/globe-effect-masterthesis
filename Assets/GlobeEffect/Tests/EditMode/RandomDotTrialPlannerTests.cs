@@ -22,6 +22,20 @@ namespace GlobeEffect.VRCheckerboard.Tests
             RandomDotMotionMode.HeadTracked
         };
 
+        [TestCase(RandomDotMotionMode.SimulatedYaw)]
+        [TestCase(RandomDotMotionMode.HeadTracked)]
+        public void SingleMotionSession_Has175TrialsInOneWholeBlock(RandomDotMotionMode mode)
+        {
+            var plan = RandomDotTrialPlanner.CreateSingleMotionPlan(new[] { 60f },
+                new[] { CheckerboardEyePresentation.BothEyes },
+                new[] { 0.2f, 0.4f, 0.6f, 0.8f, 1f, 1.2f, 1.4f },
+                new[] { 10f }, new[] { 1f }, mode, 25, 23, 100);
+            Assert.That(plan.Count, Is.EqualTo(175));
+            Assert.That(plan.All(t => t.MotionMode == mode && t.MotionBlockIndex == 1
+                && t.MiniBlockIndex == 1), Is.True);
+            Assert.That(plan.GroupBy(t => t.InstrumentDistortionK).All(group => group.Count() == 25), Is.True);
+        }
+
         [Test]
         public void SameSeed_ProducesSameOrderAndDotSeeds()
         {

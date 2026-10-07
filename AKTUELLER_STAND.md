@@ -17,7 +17,7 @@ Manager-Inspector direkt am Stimulus bearbeitbar. Random Dots: freie aktive
 Haupttrials sind über `Free Head Movement` auswählbar und standardmäßig aktiv;
 die bisherigen Sinus-/Tempo-/Wendeprüfungen greifen dann nicht. Geführtes
 Kopftraining bleibt erhalten. Zusätzlich gibt es ein eigenes Simulated-Training
-und `T` für ein eigenständiges Training der gewählten `Practice Motion Mode`.
+und `T` für ein eigenständiges Training der gewählten `Session Motion Mode`.
 Ein gerades, kopffestes Referenzraster ist nur in der Vorschau zuschaltbar und
 bleibt in Training/Messung aus. Punktwelt und Bewegungsreserve bleiben endlich.
 
@@ -26,8 +26,18 @@ gesichert und bei `P`, `F6`, Training-/Sitzungsstart oder Deaktivierung des
 Managers wiederhergestellt. Vorschauwerte beeinflussen die anschließende
 Messung nicht. Random-Dot-Unterblock-Einstellung und Unterblock-Pausen sind
 entfernt; alle Trials einer Bewegungsart laufen ohne weiteres `F5` durch.
-Pausen zwischen Bewegungsarten bleiben erhalten, die kompatible CSV-Spalte
-`mini_block_index` ist pro Bewegungsblock immer `1`.
+Seit 7. Oktober enthält jede Random-Dot-Sitzung nur eine Bewegungsart:
+`F5` startet die gewählte `Session Motion Mode`; `F7` die andere Variante als
+neue Sitzung mit eigenen Dateien. Keine gemeinsamen 350 Trials und keine
+Unterblock-Pausen. Sieben Stufen × 25 Wiederholungen = 175 gültige Trials,
+sofern alle anderen Bedingungslisten nur einen Wert enthalten.
+Die kompatiblen CSV-Spalten `motion_block_index` und `mini_block_index` bleiben `1`.
+
+Das bestehende MATLAB-psignifit-Skript erkennt Checkerboard (`visual_space_l`)
+und Random Dots (`instrument_distortion_k`) automatisch. Gemischte Bewegungsarten,
+m, Zoom, FOV oder Sollgeschwindigkeiten werden nicht gemeinsam gefittet.
+Mit einem optionalen `condition_filter` kann eine einzelne Bedingung gewählt
+werden. Die Skalen l/k werden nicht ineinander umgerechnet.
 
 Simulated-Vorschau: `Preview Speed Reference = Bildmitte` hält die gewünschte
 sichtbare Geschwindigkeit nahe der Bildmitte auch beim Verstellen von `m`

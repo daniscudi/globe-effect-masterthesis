@@ -221,7 +221,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(manager.ValidTrialsCompleted, Is.Zero);
             AssertNoSessionFiles(manager);
             config = new SerializedObject(manager);
-            config.FindProperty("practiceMotionMode").intValue = (int)RandomDotMotionMode.HeadTracked;
+            config.FindProperty("sessionMotionMode").intValue = (int)RandomDotMotionMode.HeadTracked;
             config.ApplyModifiedPropertiesWithoutUndo();
             Assert.That(manager.StartTraining(), Is.True);
             Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.HeadTrainingInstructions));
@@ -236,7 +236,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         {
             PrepareRandomDotScene();
             var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
-            config.FindProperty("motionModes").GetArrayElementAtIndex(0).intValue =
+            config.FindProperty("sessionMotionMode").intValue =
                 (int)RandomDotMotionMode.HeadTracked;
             SetFloats(config.FindProperty("instrumentMagnificationMValues"), 5f);
             config.FindProperty("headTrackedSeconds").floatValue = 0.2f;
@@ -292,7 +292,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         {
             PrepareRandomDotScene();
             var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
-            config.FindProperty("motionModes").GetArrayElementAtIndex(0).intValue =
+            config.FindProperty("sessionMotionMode").intValue =
                 (int)RandomDotMotionMode.HeadTracked;
             config.FindProperty("headTrackedSeconds").floatValue = 0.2f;
             config.FindProperty("freeHeadMovement").boolValue = false;
@@ -317,24 +317,22 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [UnityTest]
-        public IEnumerator RandomDots_RunSixRepeatsWithoutMiniBlockPauses_ButKeepMotionBlockPause()
+        public IEnumerator RandomDots_FinishOneMotionSession_ThenStartTheOtherSeparately()
         {
             PrepareRandomDotScene();
             var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
             SetFloats(config.FindProperty("instrumentMagnificationMValues"), 5f);
             config.FindProperty("repeatsPerCondition").intValue = 6;
-            config.FindProperty("counterbalanceMotionBlockOrderByParticipantId").boolValue = false;
-            SerializedProperty modes = config.FindProperty("motionModes");
-            modes.arraySize = 2;
-            modes.GetArrayElementAtIndex(0).intValue = (int)RandomDotMotionMode.SimulatedYaw;
-            modes.GetArrayElementAtIndex(1).intValue = (int)RandomDotMotionMode.HeadTracked;
+            config.FindProperty("sessionMotionMode").intValue = (int)RandomDotMotionMode.SimulatedYaw;
             config.ApplyModifiedPropertiesWithoutUndo();
             yield return new EnterPlayMode();
             yield return null;
             var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
             var controller = Object.FindAnyObjectByType<RandomDotKeyboardController>();
             Assert.That(manager.StartSession(), Is.True);
-            Assert.That(manager.TotalTrials, Is.EqualTo(12));
+            Assert.That(manager.TotalTrials, Is.EqualTo(6));
+            string simulatedFolder = new SerializedObject(manager).FindProperty("activeSessionFolder").stringValue;
+            Assert.That(manager.StartOtherMotionSession(), Is.False, "Keine Umschaltung während der Sitzung.");
             manager.ConfirmResponseInstructions();
             for (int trial = 0; trial < 6; trial++)
             {
@@ -343,10 +341,24 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 yield return WaitForState(manager, RandomDotSessionState.WaitingForResponse);
                 controller.SubmitResponse(Response.Convex);
             }
-            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.PausedBetweenMotionBlocks));
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.Completed));
+            Assert.That(manager.IsSessionActive, Is.False);
             Assert.That(manager.ValidTrialsCompleted, Is.EqualTo(6));
             foreach (Dictionary<string, string> row in ReadTrialRows(manager))
+            {
                 Assert.That(row["mini_block_index"], Is.EqualTo("1"));
+                Assert.That(row["motion_mode"], Is.EqualTo("SimulatedYaw"));
+            }
+            Assert.That(manager.StartOtherMotionSession(), Is.True);
+            Assert.That(manager.TotalTrials, Is.EqualTo(6));
+            Assert.That(new SerializedObject(manager).FindProperty("activeSessionFolder").stringValue,
+                Is.Not.EqualTo(simulatedFolder));
+            Assert.That(manager.ValidTrialsCompleted, Is.Zero);
+            manager.ConfirmResponseInstructions();
+            manager.ConfirmActiveMotionInstructions();
+            yield return WaitForState(manager, RandomDotSessionState.WaitingForResponse);
+            controller.SubmitResponse(Response.Convex);
+            Assert.That(ReadTrialRows(manager)[0]["motion_mode"], Is.EqualTo("HeadTracked"));
             manager.AbortSession();
             yield return new ExitPlayMode();
         }
@@ -637,9 +649,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         {
             OpenSceneForTest(RandomDotScene);
             var manager = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
-            SerializedProperty motionModes = manager.FindProperty("motionModes");
-            motionModes.arraySize = 1;
-            motionModes.GetArrayElementAtIndex(0).intValue = (int)RandomDotMotionMode.SimulatedYaw;
+            manager.FindProperty("sessionMotionMode").intValue = (int)RandomDotMotionMode.SimulatedYaw;
             SetFloats(manager.FindProperty("instrumentMagnificationMValues"), 1f, 5f, 20f);
             SetFloats(manager.FindProperty("instrumentDistortionKValues"), 0.5f);
             manager.FindProperty("simulatedSpeedReference").intValue =
@@ -657,6 +667,34 @@ namespace GlobeEffect.VRCheckerboard.Tests
             controller.FindProperty("vrControllerMapping").intValue =
                 (int)VrControllerMapping.TrackpadConvexTriggerConcave;
             controller.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        [UnityTest]
+        public IEnumerator TrajectoryDiagnostic_BuildsTheConfiguredMarkerGrid()
+        {
+            // 7 x 5 Punkte bei 10 Grad Abstand passen alle in die 80-Grad-Grenze.
+            OpenSceneForTest("Assets/GlobeEffect/Demo/RandomDotTrajectoryDiagnostic.unity");
+            var settings = new SerializedObject(Object.FindAnyObjectByType<RandomDotTrajectoryDiagnostic>());
+            settings.FindProperty("markerColumns").intValue = 7;
+            settings.FindProperty("markerRows").intValue = 5;
+            settings.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+
+            yield return null;
+            yield return null;
+            var diagnostic = Object.FindAnyObjectByType<RandomDotTrajectoryDiagnostic>();
+            MeshFilter live = null;
+            int trailCount = 0;
+            foreach (MeshFilter filter in diagnostic.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (filter.name == "Live markers") live = filter;
+                if (filter.name.StartsWith("Trail sample")) trailCount++;
+            }
+
+            Assert.That(live, Is.Not.Null, "Die Live-Punkte fehlen.");
+            Assert.That(live.sharedMesh.vertexCount, Is.EqualTo(7 * 5 * 4), "Vier Ecken pro Punkt.");
+            Assert.That(trailCount, Is.EqualTo(diagnostic.trailSamples + 1));
+            yield return new ExitPlayMode();
         }
 
         private static void OpenSceneForTest(string scenePath)

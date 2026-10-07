@@ -17,6 +17,25 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// </summary>
     public static class RandomDotTrialPlanner
     {
+        /// <summary>Aktueller Versuch: genau eine Bewegungsart, ein vollständig gemischter Block.</summary>
+        public static IReadOnlyList<RandomDotTrial> CreateSingleMotionPlan(
+            IReadOnlyList<float> angularDiametersDegrees,
+            IReadOnlyList<CheckerboardEyePresentation> eyePresentations,
+            IReadOnlyList<float> instrumentDistortionKValues,
+            IReadOnlyList<float> instrumentMagnificationMValues,
+            IReadOnlyList<float> contentZoomValues,
+            RandomDotMotionMode motionMode, int repetitions, int randomSeed, int dotSeedBase,
+            RandomDotSweepAxis simulatedSweepAxis = RandomDotSweepAxis.Horizontal)
+        {
+            if (!Enum.IsDefined(typeof(RandomDotMotionMode), motionMode))
+                throw new ArgumentOutOfRangeException(nameof(motionMode));
+            return CreateRandomizedPlan(angularDiametersDegrees, eyePresentations,
+                instrumentDistortionKValues, instrumentMagnificationMValues, contentZoomValues,
+                new[] { motionMode }, repetitions, repetitions, randomSeed, dotSeedBase, simulatedSweepAxis);
+        }
+
+        // Ältere Plan-API bleibt für vorhandene Tests und historische Blockpläne erhalten.
+        // Der Experiment Manager verwendet ausschließlich CreateSingleMotionPlan.
         public static IReadOnlyList<RandomDotTrial> CreateRandomizedPlan(
             IReadOnlyList<float> angularDiametersDegrees,
             IReadOnlyList<CheckerboardEyePresentation> eyePresentations,
