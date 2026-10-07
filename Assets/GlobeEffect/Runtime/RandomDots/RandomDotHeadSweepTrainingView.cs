@@ -73,11 +73,15 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         // responseLines sind die beiden Zeilen mit der Tastenbelegung. Der
         // Experiment Manager baut sie aus der eingestellten Zuordnung.
-        public void ShowWelcome(string startKey, string trainingKey, string previewKey, RandomDotMotionMode mode)
+        public void ShowWelcome(string startKey, string otherKey, string trainingKey, string previewKey,
+            RandomDotMotionMode mode, bool completed = false)
         {
             string practice = mode == RandomDotMotionMode.HeadTracked ? "ACTIVE HEAD MOVEMENT" : "SIMULATED PANNING";
-            Show(false, "RANDOM DOT EXPERIMENT",
-                startKey + " = START SESSION\n" + trainingKey + " = PRACTICE: " + practice + "\n" +
+            string other = mode == RandomDotMotionMode.HeadTracked ? "SIMULATED PANNING" : "ACTIVE HEAD MOVEMENT";
+            Show(false, completed ? "SESSION FINISHED AND SAVED" : "RANDOM DOT EXPERIMENT",
+                startKey + " = NEW SESSION: " + practice + "\n" +
+                otherKey + " = NEW SESSION: " + other + "\n" +
+                trainingKey + " = PRACTICE: " + practice + "\n" +
                 previewKey + " = PREVIEW (NO DATA)");
         }
 

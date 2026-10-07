@@ -192,12 +192,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 Row("Session", hasSession ? session.SessionState.ToString() : "Nicht gefunden");
                 Row("Trial",
                     hasSession ? FormatTrial(session.CurrentTrialNumber, session.TotalTrials) : Missing);
-                Row("Bewegungsblock", hasSession ? Number(session.CurrentMotionBlock) : Missing);
-                if (hasSession && session.SessionState == RandomDotSessionState.PausedBetweenMotionBlocks)
-                {
-                    EditorGUILayout.HelpBox("Pause – mit F5 fortsetzen.", MessageType.Info);
-                }
-                else if (hasSession && session.SessionState == RandomDotSessionState.ResponseInstructions)
+                Row("Bewegungsart", hasSession ? session.SessionMotionMode.ToString() : Missing);
+                if (hasSession && session.SessionState == RandomDotSessionState.ResponseInstructions)
                 {
                     EditorGUILayout.HelpBox(
                         "Die Person liest die Tastenbelegung – mit F5 starten.", MessageType.Info);

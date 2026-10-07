@@ -566,11 +566,9 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
 * `Maximum Training Endpoint Error Degrees`: tolerierter Fehler an den beiden
   Umkehrpunkten während des Trainings, voreingestellt auf `0,9°`.
 
-* `Motion Modes`: Basisreihenfolge der getrennten Bewegungsblöcke
-
-* `Counterbalance Motion Block Order By Participant Id`: kehrt diese Reihenfolge
-  automatisch für jede zweite fortlaufende Versuchsperson um (`pilot_001` Basis,
-  `pilot_002` umgekehrt)
+* `Session Motion Mode`: genau eine Bewegungsart pro Sitzung. `F5` startet diese
+  Auswahl, `F7` startet die andere Variante als neue Sitzung. Beide Tasten sind
+  einstellbar. `T` übt dieselbe Auswahl ohne Messdateien.
 
 * `Head Turn Safety Degrees`: unsichtbarer Sicherheitspuffer der
   Punktwelt im `HeadTracked`-Block; voreingestellt auf `15°` je Seite
@@ -596,10 +594,17 @@ Am `Random Dot Keyboard Controller` (am Objekt `Random Dot Field`) stehen die
 Antworttasten: die beiden Tasten der Tastatur, `Use Vr Controller Buttons` und
 `Vr Controller Mapping`.
 
-Die beiden Bewegungsarten werden nicht trialweise vermischt, sondern als
-getrennte Blöcke in der Reihenfolge der Liste ausgeführt. Nur zwischen den
-Bewegungsblöcken hält die Sitzung an; `F5` setzt sie fort. Innerhalb eines
-Bewegungsblocks wird mit dem Seed gemischt. Die Schwenkrichtung
+Eine Sitzung enthält nur Simulated Panning ODER aktive Kopfbewegung, jeweils
+als einen vollständigen gemischten Block ohne Unterblock-Pausen. Bei sieben
+k-Stufen, einem FOV, einem Augenmodus, einem m, Zoom 1 und 25 Wiederholungen
+sind das 175 gültige Trials pro Sitzung. Weitere eingestellte Bedingungen
+multiplizieren die Anzahl; ungültige Trials werden zusätzlich wiederholt.
+Danach endet die Sitzung und die Aufnahme wird gestoppt. `F7` startet die andere
+Variante mit eigenem Plan, passenden Anweisungen/Training und neuen Messdateien.
+Es gibt keine automatische Reihenfolge oder Zusammenführung zu 350 Trials;
+die Reihenfolge der zwei Sitzungen wird im Versuchsprotokoll festgelegt.
+Die kompatiblen CSV-Indizes `motion_block_index` und `mini_block_index` bleiben 1.
+Die Schwenkrichtung
 (beim Kopfschwenk die Richtung des ersten Schwenks) wechselt über die
 Wiederholungen jeder Bedingung, sodass links und rechts möglichst gleich oft vorkommen;
 durch das Mischen ist die Reihenfolge zufällig. Gleiche Wiederholungen verschiedener `k`-Stufen und beider
