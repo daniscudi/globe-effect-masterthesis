@@ -9,7 +9,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
     {
         public override void OnInspectorGUI()
         {
-            EditorGUILayout.HelpBox("Technische Diagnose, keine Messung. Neun farbige Punkte und ihre " +
+            EditorGUILayout.HelpBox("Technische Diagnose, keine Messung. Farbige Punkte (Raster unter Marker Columns/Rows) und ihre " +
                 "Spuren verwenden den Originalshader. k = 1: Tangensbedingung. " +
                 "Anordnung gilt bei Schwenkwinkel null; am Anfang steht das Feld seitlich versetzt. " +
                 "Instrument-/Bewegungsänderungen starten neu. Das Messlineal verändert keine Bahnen. " +

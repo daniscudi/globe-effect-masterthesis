@@ -100,7 +100,15 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 return;
             }
 
-            RefreshReferences(force: false);
+            // Unity ruft OnGUI zweimal hintereinander auf: erst zum Ausmessen
+            // (Layout), dann zum Zeichnen (Repaint). Beide Male müssen genau
+            // dieselben Zeilen kommen. Deshalb wird nur beim Ausmessen neu gesucht,
+            // sonst gibt es "Getting control ... position" Fehler.
+            if (Event.current.type == EventType.Layout)
+            {
+                RefreshReferences(force: false);
+            }
+
             // In einer Szene liegt normalerweise nur einer der beiden Tests.
             // Sind aus Versehen doch beide drin, wird das Checkerboard angezeigt.
             // Hauptsache, es ist eindeutig und flackert nicht hin und her.

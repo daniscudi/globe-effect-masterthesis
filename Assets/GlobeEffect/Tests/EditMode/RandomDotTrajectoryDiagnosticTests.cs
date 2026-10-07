@@ -80,6 +80,36 @@ namespace GlobeEffect.VRCheckerboard.Tests
             }
         }
 
+        [Test]
+        public void MarkerGrid_WithEvenCount_LiesSymmetricAroundTheCenter()
+        {
+            // Vier Spalten: die Mitte liegt zwischen der zweiten und dritten Spalte.
+            Vector3 left = RandomDotTrajectoryDiagnostic.MarkerObjectDirection(-0.5f, 0f, 10f, 10f, 1f);
+            Vector3 right = RandomDotTrajectoryDiagnostic.MarkerObjectDirection(0.5f, 0f, 10f, 10f, 1f);
+            Assert.That(left.x, Is.LessThan(0f));
+            Assert.That(right.x, Is.EqualTo(-left.x).Within(1e-6f));
+            Assert.That(right.y, Is.EqualTo(0f).Within(1e-6f));
+        }
+
+        [TestCase(8f, 0f, 10f)]
+        [TestCase(0f, 4f, 25f)]
+        [TestCase(4f, 0f, 20f)]
+        public void MarkerGrid_DropsPointsBeyondEightyDegrees(float column, float row, float spacing)
+        {
+            Assert.That(RandomDotTrajectoryDiagnostic.MarkerObjectDirection(column, row, spacing, 10f, 1f),
+                Is.EqualTo(Vector3.zero));
+        }
+
+        [Test]
+        public void MarkerGrid_DropsPointsBehindTheTurningPointOfK()
+        {
+            // k = 1,4 und 70 Grad: 1,4 * 70 Grad liegt hinter 90 Grad.
+            Assert.That(RandomDotTrajectoryDiagnostic.MarkerObjectDirection(7f, 0f, 10f, 10f, 1.4f),
+                Is.EqualTo(Vector3.zero));
+            Assert.That(RandomDotTrajectoryDiagnostic.MarkerObjectDirection(6f, 0f, 10f, 10f, 1f),
+                Is.Not.EqualTo(Vector3.zero));
+        }
+
         [TestCase(1d)]
         [TestCase(4d)]
         [TestCase(8d)]

@@ -31,6 +31,24 @@ namespace GlobeEffect.VRCheckerboard
             return new Material(shader) { name = materialName, hideFlags = HideFlags.HideAndDontSave };
         }
 
+        /// <summary>
+        /// Hängt ein neues Objekt mit Mesh und Material unter parent. Schatten
+        /// braucht hier nichts, und gespeichert wird das Objekt auch nicht.
+        /// </summary>
+        public static MeshRenderer CreateMeshRenderer(
+            Transform parent, string name, Mesh mesh, Material material, int sortingOrder)
+        {
+            var child = new GameObject(name) { hideFlags = HideFlags.DontSave };
+            child.transform.SetParent(parent, false);
+            child.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var renderer = child.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = material;
+            renderer.sortingOrder = sortingOrder;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            return renderer;
+        }
+
         public static void DeleteObject(Object objectToDelete)
         {
             if (objectToDelete == null)
