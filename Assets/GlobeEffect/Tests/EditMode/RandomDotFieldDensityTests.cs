@@ -97,6 +97,42 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [Test]
+        public void PreviewSpeed_NormalizesMagnificationWithoutChangingTheManagersRuntimeSpeed()
+        {
+            var fieldObject = new UnityEngine.GameObject("Preview speed test");
+            try
+            {
+                Field field = fieldObject.AddComponent<Field>();
+                var settings = new UnityEditor.SerializedObject(field);
+                settings.FindProperty("previewImageCenterSpeed").floatValue = 5f;
+                settings.ApplyModifiedPropertiesWithoutUndo();
+                foreach (float zoom in new[] { 1f, 2f })
+                foreach (float m in new[] { 1f, 10f, 20f })
+                {
+                    field.SetInstrumentMagnification(m);
+                    field.SetContentZoom(zoom);
+                    Assert.That(field.SweepSpeedDegreesPerSecond, Is.EqualTo(5f / (m * zoom)).Within(1e-5f));
+                }
+
+                field.SessionRunning = true;
+                field.SetSimulatedSweep(2f, 0.6f);
+                Assert.That(field.SweepSpeedDegreesPerSecond, Is.EqualTo(0.6f),
+                    "In Training/Messung muss allein die vom Manager berechnete Geschwindigkeit gelten.");
+                field.SessionRunning = false;
+                Assert.That(field.SweepSpeedDegreesPerSecond, Is.EqualTo(5f / 40f).Within(1e-5f));
+                settings.Update();
+                settings.FindProperty("previewSpeedReference").intValue =
+                    (int)GlobeEffect.VRCheckerboard.RandomDots.RandomDotSweepSpeedReference.ObjectAngle;
+                settings.ApplyModifiedPropertiesWithoutUndo();
+                Assert.That(field.SweepSpeedDegreesPerSecond, Is.EqualTo(0.6f));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(fieldObject);
+            }
+        }
+
+        [Test]
         public void CenterDensity_StaysTheSameAtEveryMagnification()
         {
             // Punkte pro Quadratgrad Außenwelt, geteilt durch die Flächenvergrößerung

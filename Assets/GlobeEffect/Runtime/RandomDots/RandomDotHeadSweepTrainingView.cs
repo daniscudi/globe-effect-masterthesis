@@ -73,6 +73,38 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         // responseLines sind die beiden Zeilen mit der Tastenbelegung. Der
         // Experiment Manager baut sie aus der eingestellten Zuordnung.
+        public void ShowWelcome(string startKey, string trainingKey, string previewKey, RandomDotMotionMode mode)
+        {
+            string practice = mode == RandomDotMotionMode.HeadTracked ? "ACTIVE HEAD MOVEMENT" : "SIMULATED PANNING";
+            Show(false, "RANDOM DOT EXPERIMENT",
+                startKey + " = START SESSION\n" + trainingKey + " = PRACTICE: " + practice + "\n" +
+                previewKey + " = PREVIEW (NO DATA)");
+        }
+
+        public void ShowSimulatedInstructions(string responseLines, string startKey)
+        {
+            Show(false, "SIMULATED PANNING PRACTICE\n\n" +
+                "Keep your head still and look at the cross.\n" +
+                "The computer moves the dots.\n" +
+                "After they disappear: did the field curve outward or inward?",
+                responseLines + "\n\n" + startKey + " = START PRACTICE");
+        }
+
+        public void ShowSimulatedResponse(int trial, int total, string responseLines)
+        {
+            Show(false, "PRACTICE " + trial + " / " + total + "\n\nOUTWARD OR INWARD?", responseLines);
+        }
+
+        public void ShowActiveMotionInstructions(bool free, string responseLines, string startKey)
+        {
+            string movement = free
+                ? "Move your head freely: left/right or up/down.\nNo target path or speed is required."
+                : "Use the left/right rhythm you practised.";
+            Show(false, "ACTIVE HEAD MOVEMENT\n\n" + movement + "\n" +
+                "Keep looking at the cross.\nAnswer after the dots disappear.",
+                responseLines + "\n\n" + startKey + " = START TRIALS");
+        }
+
         public void ShowResponseInstructions(string responseLines, string startKeyName)
         {
             Show(false,
@@ -82,7 +114,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 responseLines + "\n\n" + startKeyName + " = START");
         }
 
-        public void ShowInstructions(float amplitudeDegrees, string responseLines)
+        public void ShowInstructions(float amplitudeDegrees, string responseLines,
+            string startKey = "F5", string stopKey = "F6")
         {
             Show(false,
                 "HEAD MOVEMENT PRACTICE\n\n" +
@@ -91,7 +124,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 "Look at the central cross and turn only " +
                 amplitudeDegrees.ToString("F1") + " deg to each side.",
                 "After each trial answer with:\n" + responseLines + "\n\n" +
-                "F5 = START PRACTICE     F6 = STOP");
+                startKey + " = START PRACTICE     " + stopKey + " = STOP");
         }
 
         public void ShowPractice(int goodSweeps, int requiredSweeps, RandomDotSweepDirection direction)

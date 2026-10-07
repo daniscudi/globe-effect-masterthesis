@@ -198,6 +198,7 @@ namespace GlobeEffect.VRCheckerboard
         public float NoiseRefreshRateHz => noiseRefreshRateHz;
         public Color BackgroundColor => backgroundColor;
         public bool IsVisible => isVisible;
+        public bool FixationTargetEnabled => showFixationTarget;
 
         // Die Punktgröße, die gerade wirklich benutzt wird, in Grad in der
         // Bildmitte. Im Pixel-Modus ohne Kamera wird der Gradwert genommen.
@@ -457,6 +458,15 @@ namespace GlobeEffect.VRCheckerboard
             // geben und allen Zuhörern Bescheid sagen.
             ClampInspectorValues();
             SendValuesToShader();
+            ParametersChanged?.Invoke(CaptureSnapshot());
+        }
+
+        /// <summary>Stellt alle vor der Live-Vorschau gespeicherten Einstellungen wieder her.</summary>
+        public void RestorePreviewSettings(string settingsJson)
+        {
+            JsonUtility.FromJsonOverwrite(settingsJson, this);
+            ClampInspectorValues();
+            UpdateEverything();
             ParametersChanged?.Invoke(CaptureSnapshot());
         }
 

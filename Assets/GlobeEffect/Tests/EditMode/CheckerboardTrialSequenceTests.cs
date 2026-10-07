@@ -100,6 +100,26 @@ namespace GlobeEffect.VRCheckerboard.Tests
             return row[index];
         }
 
+        [Test]
+        public void Files_SettingsSnapshotIsSeparateFromTheUnchangedCsvFiles()
+        {
+            var files = new CheckerboardExperimentFiles(
+                outputRoot, "pilot_test", "settings_test", DateTime.UtcNow, randomSeed: 1);
+            files.WritePlan(new[] { CreateTrial() }, 10f, 0.6f, Sequence.NoiseResponseThenGray,
+                0.4f, 0f, "TRIGGER", "TRACKPAD CLICK", false,
+                VrControllerMapping.TrackpadConcaveTriggerConvex);
+            string planBefore = File.ReadAllText(files.PlanFile);
+            string trialsBefore = File.ReadAllText(files.TrialResultsFile);
+            const string settings = "{\"schemaVersion\":1,\"requireFixation\":true}";
+
+            files.WriteSessionSettings(settings);
+
+            Assert.That(File.ReadAllText(Path.Combine(files.SessionFolder,
+                files.BaseFileName + "_settings.json")), Is.EqualTo(settings));
+            Assert.That(File.ReadAllText(files.PlanFile), Is.EqualTo(planBefore));
+            Assert.That(File.ReadAllText(files.TrialResultsFile), Is.EqualTo(trialsBefore));
+        }
+
         private static CheckerboardTrial CreateTrial()
         {
             return new CheckerboardTrial(sequenceIndex: 1, conditionIndex: 1, repetition: 1, attemptNumber: 1,

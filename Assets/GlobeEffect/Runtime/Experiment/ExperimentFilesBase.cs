@@ -86,6 +86,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public string PlanFile { get; }
         public string TrialResultsFile { get; }
 
+        // Ergänzt die CSVs, ohne ihre Spalten zu verändern. Hier stehen auch die
+        // Darstellungs- und Blickparameter, die bisher nur in der Szene lagen.
+        public void WriteSessionSettings(string settingsJson)
+        {
+            File.WriteAllText(Path.Combine(SessionFolder, BaseFileName + "_settings.json"),
+                settingsJson, Utf8WithoutBom);
+        }
+
         public static string SanitizeIdentifier(string value, string fallback)
         {
             // Macht aus einer Eingabe einen Namen, der als Datei- oder Ordnername

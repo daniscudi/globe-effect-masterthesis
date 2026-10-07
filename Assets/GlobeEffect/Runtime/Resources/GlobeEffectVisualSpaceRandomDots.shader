@@ -15,6 +15,10 @@ Shader "GlobeEffect/Visual Space Random Dots"
         _EyeMode ("Eye Mode", Float) = 0
         _DotsEnabled ("Dots Enabled", Float) = 1
         _DotHalfSizeRad ("Dot Half Size [rad]", Float) = 0.00191986
+        _ReferenceGridEnabled ("Preview reference grid", Float) = 0
+        _ReferenceGridSpacingUv ("Reference grid spacing [u,v]", Float) = 0.087489
+        _ReferenceGridWidthPixels ("Reference grid width [pixels]", Float) = 1
+        _ReferenceGridColor ("Reference grid color", Color) = (0.15, 0.15, 0.15, 0.7)
         [HideInInspector] _SimulatedSweepRad ("Simulated Sweep [rad]", Float) = 0
         [HideInInspector] _SimulatedSweepAxis ("Simulated Sweep Axis", Float) = 0
         [HideInInspector] _ObserverWorldPosition ("Observer World Position", Vector) = (0, 0, 0, 1)
@@ -68,6 +72,10 @@ Shader "GlobeEffect/Visual Space Random Dots"
             float _EyeMode;
             float _DotsEnabled;
             float _DotHalfSizeRad;
+            float _ReferenceGridEnabled;
+            float _ReferenceGridSpacingUv;
+            float _ReferenceGridWidthPixels;
+            fixed4 _ReferenceGridColor;
             float _SimulatedSweepRad;
             float _SimulatedSweepAxis;
             float4 _ObserverWorldPosition;
@@ -310,8 +318,26 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 if (input.isApertureBackground > 0.5)
                 {
                     clip(apertureAlpha - 0.001);
+                    // Festes Karopapier in der Bildebene: weder k noch m oder der
+                    // Schwenk verändern diese Referenz. Die Punkte laufen darüber.
+                    float3 background = input.color.rgb;
+                    // Die Diagnose nutzt den Hintergrund ohne Zufallspunkte.
+                    // Das Referenzraster soll trotzdem sichtbar bleiben.
+                    if (_ReferenceGridEnabled > 0.5)
+                    {
+                        float2 cell = input.aperturePosition / max(_ReferenceGridSpacingUv, 1e-5);
+                        float2 distanceToLine = abs(frac(cell + 0.5) - 0.5);
+                        float2 pixelWidth = max(fwidth(cell), 1e-5);
+                        float2 distancePixels = distanceToLine / pixelWidth;
+                        float lineAlpha = 1.0 - smoothstep(
+                            max(0.0, 0.5 * _ReferenceGridWidthPixels - 0.5),
+                            0.5 * _ReferenceGridWidthPixels + 0.5,
+                            min(distancePixels.x, distancePixels.y));
+                        background = lerp(background, _ReferenceGridColor.rgb,
+                            lineAlpha * _ReferenceGridColor.a);
+                    }
                     return fixed4(
-                        input.color.rgb,
+                        background,
                         input.color.a * apertureAlpha);
                 }
 

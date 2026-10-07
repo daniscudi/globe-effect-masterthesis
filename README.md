@@ -6,6 +6,9 @@ Oomes et al. (2009). Daneben gibt es einen getrennten Random-Dot-Test für die
 Wahrnehmung während einer simulierten Schwenkbewegung.
 
 Eine kurze Bedienungs- und Arbeitsübersicht steht in `AKTUELLER_STAND.md`.
+Die aktuelle Pilot-Checkliste mit Inspector-Zuständigkeiten, vorgefundenen
+Szeneneinstellungen und offenen Protokollentscheidungen steht in
+[CHECKERBOARD_PILOT.md](CHECKERBOARD_PILOT.md).
 
 ## Was der Checkerboard-Test macht
 
@@ -46,8 +49,8 @@ eingestellt.
 ## Was der Random-Dot-Test macht
 
 Die Versuchsperson fixiert ein rotes Kreuz in der Mitte einer runden Öffnung.
-Schwarze und weiße Punkte bewegen sich dahinter automatisch von links nach
-rechts und wieder zurück. Die Öffnung und das Fixationskreuz bleiben dabei
+Schwarze und weiße Punkte bewegen sich dahinter im simulierten Trial einmal
+in eine Richtung. Die Öffnung und das Fixationskreuz bleiben dabei
 kopffest. Eine tatsächliche Kopfbewegung ist für die Hauptbedingung nicht nötig.
 
 Die aktuelle Instrumentenfassung setzt vor jedem Durchgang eine feste
@@ -333,7 +336,8 @@ Wenn die Fixation während der Darbietung zu lange verloren geht:
 
 1. Das Muster wird ausgeblendet.
 2. Die Präsentation wird als ungültig gespeichert und nicht ausgewertet.
-3. Dieselbe Bedingung wird ans Ende des aktuellen Unterblocks gehängt.
+3. Beim Checkerboard kommt dieselbe Bedingung ans Ende der Trial-Liste;
+   bei Random Dots ans Ende des aktuellen Bewegungsblocks.
 4. Die übrige zufällige Reihenfolge bleibt erhalten.
 
 Kurze Blickunterbrechungen und vollständig ungültige Blickdaten besitzen
@@ -448,9 +452,10 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
 
 * `Repeats Per Condition`: Wiederholungen jeder Kombination
 
-* `Repeats Per Block`: Wiederholungen jeder Bedingung pro Unterblock;
-  mit `25` insgesamt und `5` pro Unterblock entstehen fünf Abschnitte je
-  Bewegungsart
+* Keine Unterblock-Pausen mehr: Alle Trials einer Bewegungsart laufen in
+  gemischter Reihenfolge durch, ohne erneutes `F5` innerhalb dieses Blocks.
+  Die Pause zwischen Simulated und Active bleibt bestehen. Für die Kompatibilität
+  der Messdateien bleibt `mini_block_index` erhalten und steht pro Bewegungsblock auf `1`.
 
 * `Simulated Sweep Seconds`: wie lange die Punkte im simulierten Block zu
   sehen sind; voreingestellt `0,8 s`. In dieser Zeit schwenkt das Feld
@@ -461,14 +466,15 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
 
 * `Simulated Sweep Axis`: `Horizontal` (Standard, links/rechts) oder
   `Vertical` (oben/unten) für den simulierten Block. Der aktive
-  `HeadTracked`-Block und sein Training bleiben horizontal. Die Achse und
+  geführte `HeadTracked`-Block und sein Training bleiben horizontal. Freie aktive
+  Bewegung kann auch oben/unten oder schräg erfolgen. Die Achse und
   die Richtung werden in Plan, Ergebnissen und Trial-Markern gespeichert:
   beim simulierten Schwenk `Right`/`Left` bzw. `Up`/`Down`, beim
   Kopfschwenk die Seite des ersten Schwenks (`RightFirst`/`LeftFirst`). Die Auswahl erzeugt keine zusätzlichen Trials; für einen
   Vergleich beider Achsen sind getrennte Sitzungen nötig.
 
 * `Sweep Amplitude Degrees`: Zielschwenkweite des Kopfes je Seite im
-  `HeadTracked`-Block; für `10x` zunächst `2°`
+  geführten `HeadTracked`-Block und im Kopftraining; für `10x` zunächst `2°`
 
 * `Simulated Speed Reference`: worauf sich die Geschwindigkeit des simulierten
   Schwenks bezieht. `Bildmitte` (Voreinstellung): Die Punkte laufen in der
@@ -491,9 +497,18 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   Geschwindigkeit. Bei `10x` läuft er mit `1,2°/s` und `0,8 s` von `-0,48°`
   nach `+0,48°`, die Mitte der Bewegung liegt also genau geradeaus. Ob nach
   links oder rechts, wechselt von Trial zu Trial in zufälliger Reihenfolge;
-  beide Richtungen kommen pro Bedingung gleich oft vor.
+  beide Richtungen kommen bei gerader Wiederholungszahl gleich oft vor,
+  bei 25 Wiederholungen pro Bedingung 12- beziehungsweise 13-mal.
 
-* Vorschau: Solange keine Sitzung läuft, schwenkt das Feld im Play Mode immer
+* Vorschau: Im Play Mode schaltet `P` eine reine Live-Vorschau ein/aus;
+  `F6` beendet sie ebenfalls. Kein Training, keine Trials, keine Aufzeichnung.
+  Das gilt auch beim Checkerboard. Im Manager-Inspector unter
+  **Live-Vorschau ohne Messung** werden die verknüpften Stimuluswerte direkt
+  bearbeitet. Vor dem Öffnen wird ihre gesamte Konfiguration gesichert.
+  Beim Beenden mit `P`/`F6` oder direktem Start von Training/Sitzung werden alle
+  Vorschauänderungen verworfen, auch Punkt-/Gittergröße, Farben, Fixationskreuz
+  und Raster. Der Trial Plan bleibt davon unabhängig.
+  In der Random-Dot-Vorschau schwenkt das Feld optional immer
   weiter (`Loop Sweep In Preview` am `Random Dot Field`). Der Schwenk läuft
   dabei über die ganze Punktwelt und fängt am Ende wieder von vorne an; mit
   `40,6°` World Coverage und `1,2°/s` dauert ein Durchlauf etwa `26 s`. Die
@@ -501,7 +516,15 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   Geschwindigkeit, Richtung). Erst mit `F5` gelten die Werte des Experiment
   Managers, und jeder Schwenk läuft genau einmal.
 
-* Der Kopfschwenk im `HeadTracked`-Block ist sinusförmig. Mit `±2°`,
+* `Free Head Movement` ist standardmäßig an: In aktiven Haupttrials darf der
+  Kopf frei nach links/rechts, oben/unten oder schräg bewegt werden. Es gibt
+  keine Sollbahn, Wende-, Amplituden- oder Geschwindigkeitsprüfung und keine
+  Wiederholung wegen solcher Abweichungen. Blickkontrolle/Wiedervorlage bleibt
+  davon unabhängig. Die Punktwelt ist endlich: `Head Turn Safety Degrees`
+  beschreibt die Reserve um die Startblickrichtung, keine unbegrenzte 360°-Welt.
+
+* Wenn `Free Head Movement` aus ist, bleibt der geführte Links-Rechts-Schwenk
+  erhalten. Mit `±2°`,
   `1,2°/s` und `5 s` startet er in der Mitte, erreicht nach etwa `1,67 s` die
   erste Seite und nach `5 s` die andere Seite. An den Umkehrpunkten steht die
   Bewegung kurz.
@@ -509,13 +532,34 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
 * `Train Head Movement`: zeigt vor dem aktiven Block ein Kopfbewegungstraining
   mit blauem Sollmarker, gelbem Marker für den echten Kopf und kurzen Tönen
   an den Umkehrpunkten. `F5` startet das Training; `F6` bricht die Sitzung ab.
+  Das geführte Training bleibt auch bei freien Haupttrials erhalten.
+  Seine Dauer wird nötigenfalls bis zum zweiten Wendepunkt verlängert; eine
+  kurze freie Haupttrial-Dauer wird dadurch nicht verboten. Nach dem Training
+  erklären separate Instruktionen die tatsächlich gewählte Haupttrial-Regel.
+
+* `Train Simulated Motion`: eigenes Training vor dem simulierten Block. Kopf
+  stillhalten, Kreuz anschauen, kurze simulierte Bewegung sehen, dann antworten.
+  Die Werte stehen unter `Simulated Training K Values`; Wiederholungen unter
+  `Simulated Training Repeats Per Value`. Subjektive Formurteile erhalten keine
+  vorgegebene Richtig-/Falsch-Rückmeldung und zählen nicht als Mess-Trials.
+
+* `T` startet auch ohne Sitzung ein eigenständiges Training. Mit `Practice
+  Motion Mode` wird Simulated oder Active gewählt. `F5` bestätigt die
+  Trainingsinstruktionen, `F6` beendet das Training. Es entstehen keine
+  Sitzungsdateien. In einer Messung wählt der Manager das Training passend zum
+  jeweiligen Bewegungsblock; diese Übungen erhöhen die Haupttrial-Zähler nicht.
+
+* `Show Reference Grid` in der Live-Vorschau zeigt ein gerades, kopffestes
+  Karopapier-Raster. Es wird weder durch `k`, `m` oder Zoom verzerrt noch
+  mitgeschwenkt. Die Punkte bewegen sich darüber. Abstand, Linienbreite und
+  Farbe sind einstellbar. Das Raster bleibt während Training und Messung aus.
 
 * `Required Good Training Sweeps`: Anzahl unmittelbar aufeinanderfolgender
   gelungener Übungsschwenks, voreingestellt auf vier. Die Anfangsrichtung
   wechselt zwischen den Versuchen.
 
 * `Maximum Profile Error Degrees`: tolerierte mittlere Abweichung der
-  tatsächlichen Kopfbewegung vom Sinusprofil, im Training und in aktiven
+  tatsächlichen Kopfbewegung vom Sinusprofil, im Training und in geführten aktiven
   Haupttrials voreingestellt auf `0,9°`. Zusätzlich werden Auslenkung,
   Seitenwechsel und Geschwindigkeitsgrenzen geprüft.
 
@@ -531,9 +575,18 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
 * `Head Turn Safety Degrees`: unsichtbarer Sicherheitspuffer der
   Punktwelt im `HeadTracked`-Block; voreingestellt auf `15°` je Seite
 
-* `Validate Head Tracked Motion`: wiederholt aktive Durchgänge, wenn der
+* `Check Head Motion` (früher `Validate Head Tracked Motion`): wiederholt geführte aktive Durchgänge, wenn der
   Seitenwechsel fehlt oder Auslenkung beziehungsweise Geschwindigkeit außerhalb
   der eingestellten Grenzen liegen
+
+* Random-Dot-Ergebnisse enthalten zusätzlich `head_motion_constraint`:
+  `simulated`, `free` oder `guided`. Alle bisherigen CSV-Spalten bleiben an
+  ihrer Position. Bei freien Haupttrials stehen Sollamplitude, Sollgeschwindigkeit,
+  nominelle Bildmitten-Geschwindigkeit und Sinusfehler auf `NaN`, da es dort
+  keine Sollbahn gibt. Die bestehenden Sweep-Messwerte beschreiben weiterhin
+  Yaw (links/rechts), nicht die gesamte 3D-Bewegung. Soweit die Blickaufnahme
+  aktiv ist, enthält sie zusätzlich die Kopfpose. Plan-Achse und Plan-Richtung
+  sind bei `free` keine Bewegungsanweisung. Die Mapping-Version ist jetzt `v8`.
 
 * `Eye Presentations`: beide, nur linkes oder nur rechtes Auge
 
@@ -544,11 +597,11 @@ Antworttasten: die beiden Tasten der Tastatur, `Use Vr Controller Buttons` und
 `Vr Controller Mapping`.
 
 Die beiden Bewegungsarten werden nicht trialweise vermischt, sondern als
-getrennte Blöcke in der Reihenfolge der Liste ausgeführt. Nach jedem Unterblock
-und zwischen den Bewegungsblöcken hält die Sitzung an; `F5` setzt sie fort. Nur
-innerhalb eines Unterblocks wird mit dem Seed gemischt. Die Schwenkrichtung
+getrennte Blöcke in der Reihenfolge der Liste ausgeführt. Nur zwischen den
+Bewegungsblöcken hält die Sitzung an; `F5` setzt sie fort. Innerhalb eines
+Bewegungsblocks wird mit dem Seed gemischt. Die Schwenkrichtung
 (beim Kopfschwenk die Richtung des ersten Schwenks) wechselt über die
-Wiederholungen jeder Bedingung, sodass links und rechts gleich oft vorkommen;
+Wiederholungen jeder Bedingung, sodass links und rechts möglichst gleich oft vorkommen;
 durch das Mischen ist die Reihenfolge zufällig. Gleiche Wiederholungen verschiedener `k`-Stufen und beider
 Bewegungsarten verwenden vergleichbare Punkt-Seeds, damit die Punktverteilung
 nicht mit einer Bedingung verwechselt wird.
@@ -557,7 +610,8 @@ Vor dem ersten Head-Tracked-Trial eines Blocks erscheint die Anleitung im
 Headset. Nach `F5` folgt die Person dem blauen Marker mit langsamen, kleinen
 Kopfdrehungen und beobachtet den gelben Ist-Marker. Die Anzeige verlangt
 zwischen Übungsdurchgängen eine Rückkehr zur Mitte. Nach vier passenden
-Durchgängen startet der Block automatisch. Das Display und die Töne erscheinen
+Durchgängen erklärt eine weitere Instruktion die freie oder geführte Hauptbewegung;
+`F5` startet danach die Trials. Das Display und die Töne erscheinen
 im Hauptversuch nicht. Auch dort wird das tatsächliche Bewegungsprofil
 kontrolliert; stark abweichende Versuche werden später wiederholt.
 
@@ -591,6 +645,13 @@ jeden Trial so gewählt, dass die Punkte in der Bildmitte immer mit
 `Simulated Image Center Speed` laufen:
 
     Objektgeschwindigkeit = Bildmitte-Geschwindigkeit / (m * Content Zoom)
+
+Dieselbe Normierung gilt jetzt auch für die Live-Vorschau: Dort
+`Preview Speed Reference = Bildmitte` und `Preview Image Center Speed` einstellen.
+Beispiel ohne zusätzlichen Content Zoom: gewünschte `5°/s` bedeuten bei
+`m = 1, 10, 20` virtuelle Schwenkgeschwindigkeiten von `5, 0,5, 0,25°/s`.
+Die Vorschau-Einstellungen sind unabhängig von den Trainings-/Messwerten am
+Manager und werden beim Verlassen der Vorschau zurückgesetzt.
 
 Das Verhältnis zwischen Mitte und Rand bleibt dabei für jedes `k` unverändert.
 Die Dauer des Schwenks bleibt bei jedem `m` gleich; in der Außenwelt wird die

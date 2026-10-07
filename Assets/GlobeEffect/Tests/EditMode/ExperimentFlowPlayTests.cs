@@ -9,9 +9,11 @@ using GlobeEffect.VRCheckerboard.RandomDots;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEditor.SceneManagement;
+using UnityEditor.XR.Management;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using UnityEngine.XR.Management;
 using Object = UnityEngine.Object;
 using Response = GlobeEffect.VRCheckerboard.CheckerboardCurvatureResponse;
 using Sequence = GlobeEffect.VRCheckerboard.Experiment.CheckerboardTrialSequence;
@@ -41,6 +43,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         // Merkt sich über den Neustart der Skripte beim Wechsel in den Play Mode
         // hinweg, dass der Test die geöffnete Szene verändert hat.
         private const string SceneModifiedKey = "GlobeEffect.Tests.SceneModifiedByPlayTest";
+        private const string XrStartupKey = "GlobeEffect.Tests.XrStartupBeforePlayTest";
 
         private static string OutputRoot => Path.Combine(Path.GetTempPath(), "GlobeEffectPlayTests");
 
@@ -63,12 +66,298 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [UnityTest]
-        public IEnumerator RandomDots_KeepTheImageCenterSpeedAtMagnificationFiveAndTwenty()
+        public IEnumerator RandomDots_KeepTheImageCenterSpeedAtMagnificationOneFiveAndTwenty()
         {
             PrepareRandomDotScene();
             yield return new EnterPlayMode();
             yield return RunRandomDotSession();
             yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator Checkerboard_WithRequiredFixation_AbortsIfTheRecordingStops()
+        {
+            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            var settings = new SerializedObject(Object.FindAnyObjectByType<CheckerboardExperimentManager>());
+            settings.FindProperty("requireFixation").boolValue = true;
+            settings.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<CheckerboardExperimentManager>();
+            Assert.That(manager.StartSession(), Is.True);
+            Assert.That(manager.SessionState, Is.EqualTo(CheckerboardSessionState.WaitingForExperimentReady));
+            LogAssert.Expect(LogType.Error,
+                "Blickaufzeichnung wurde während der Messung beendet. Sitzung abgebrochen.");
+            Object.FindAnyObjectByType<EyeTrackingToolbox>().StopRecording();
+            yield return null;
+            Assert.That(manager.SessionState, Is.EqualTo(CheckerboardSessionState.Aborted));
+            Assert.That(manager.ValidTrialsCompleted, Is.EqualTo(0));
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator CheckerboardPreview_IsLiveAndDoesNotCreateASession()
+        {
+            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<CheckerboardExperimentManager>();
+            var stimulus = Object.FindAnyObjectByType<VrCheckerboardStimulus>();
+            string originalSettings = JsonUtility.ToJson(stimulus);
+            manager.TogglePreview();
+            Assert.That(manager.IsPreviewActive, Is.True);
+            Assert.That(manager.IsSessionActive, Is.False);
+            Assert.That(stimulus.CaptureSnapshot().checkerboardVisible, Is.True);
+            stimulus.SetVisualSpaceL(0.3f);
+            var previewSettings = new SerializedObject(stimulus);
+            previewSettings.FindProperty("gridSpacingDegrees").floatValue = 3f;
+            previewSettings.FindProperty("darkColor").colorValue = Color.blue;
+            previewSettings.FindProperty("showFixationTarget").boolValue = false;
+            previewSettings.ApplyModifiedPropertiesWithoutUndo();
+            Assert.That(stimulus.CaptureSnapshot().visualSpaceL, Is.EqualTo(0.3f));
+            Object.FindAnyObjectByType<CheckerboardKeyboardController>().SubmitResponse(Response.Convex);
+            AssertNoSessionFiles(manager);
+            manager.StopPreview();
+            Assert.That(manager.SessionState, Is.EqualTo(CheckerboardSessionState.Welcome));
+            Assert.That(manager.IsPreviewActive, Is.False);
+            Assert.That(JsonUtility.ToJson(stimulus), Is.EqualTo(originalSettings),
+                "Alle Vorschauwerte, auch gemeinsame Musterwerte, müssen wiederhergestellt werden.");
+            // Auch F5 direkt aus der Vorschau muss erst zurücksetzen, bevor
+            // Einstellungen geprüft und die Sitzungsdatei geschrieben werden.
+            manager.TogglePreview();
+            stimulus.SetAngularDiameter(110f);
+            stimulus.SetVisualSpaceL(0.2f);
+            previewSettings.Update();
+            previewSettings.FindProperty("gridSpacingDegrees").floatValue = 4f;
+            previewSettings.ApplyModifiedPropertiesWithoutUndo();
+            Assert.That(manager.StartSession(), Is.True);
+            Assert.That(JsonUtility.ToJson(stimulus), Is.EqualTo(originalSettings));
+            manager.TogglePreview();
+            Assert.That(manager.IsPreviewActive, Is.False, "Keine Vorschau während einer Messung.");
+            manager.AbortSession();
+            manager.TogglePreview();
+            stimulus.SetVisualSpaceL(0.3f);
+            Assert.That(manager.StartTraining(), Is.True);
+            Assert.That(JsonUtility.ToJson(stimulus), Is.EqualTo(originalSettings));
+            manager.StopTrainingAndReturnToWelcome();
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator RandomDotPreview_ChangesOpticsAndAllowsPitchWithoutStartingASession()
+        {
+            PrepareRandomDotScene();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
+            var stimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
+            string originalSettings = JsonUtility.ToJson(stimulus);
+            manager.TogglePreview();
+            Assert.That(manager.IsPreviewActive, Is.True);
+            Assert.That(manager.IsSessionActive, Is.False);
+            var settings = new SerializedObject(stimulus);
+            settings.FindProperty("motionMode").intValue = (int)RandomDotMotionMode.HeadTracked;
+            settings.FindProperty("instrumentDistortionK").floatValue = 0.3f;
+            settings.FindProperty("showReferenceGrid").boolValue = true;
+            settings.FindProperty("dotDensity").floatValue = 0.1f;
+            settings.FindProperty("dotSizeDegrees").floatValue = 0.5f;
+            settings.FindProperty("darkColor").colorValue = Color.blue;
+            settings.FindProperty("showFixationTarget").boolValue = false;
+            settings.ApplyModifiedPropertiesWithoutUndo();
+            yield return null;
+            Quaternion fieldOrientation = stimulus.transform.rotation;
+            stimulus.Observer.rotation = Quaternion.Euler(8f, 6f, 0f) * stimulus.Observer.rotation;
+            yield return null;
+            Assert.That(Quaternion.Angle(fieldOrientation, stimulus.transform.rotation), Is.LessThan(0.01f));
+            Assert.That(stimulus.InstrumentDistortionK, Is.EqualTo(0.3f));
+            var block = new MaterialPropertyBlock();
+            stimulus.GetComponent<MeshRenderer>().GetPropertyBlock(block);
+            Assert.That(block.GetFloat("_ReferenceGridEnabled"), Is.EqualTo(1f));
+            AssertNoSessionFiles(manager);
+            manager.StopPreview();
+            Assert.That(manager.IsPreviewActive, Is.False);
+            Assert.That(JsonUtility.ToJson(stimulus), Is.EqualTo(originalSettings));
+            manager.TogglePreview();
+            stimulus.SetInstrumentDistortionK(0.2f);
+            stimulus.SetInstrumentMagnification(12f);
+            settings.Update();
+            settings.FindProperty("dotDensity").floatValue = 0.05f;
+            settings.ApplyModifiedPropertiesWithoutUndo();
+            Assert.That(manager.StartSession(), Is.True);
+            Assert.That(JsonUtility.ToJson(stimulus), Is.EqualTo(originalSettings));
+            manager.AbortSession();
+            manager.TogglePreview();
+            stimulus.SetInstrumentMagnification(12f);
+            Assert.That(manager.StartTraining(), Is.True);
+            Assert.That(JsonUtility.ToJson(stimulus), Is.EqualTo(originalSettings));
+            manager.StopTrainingAndReturnToWelcome();
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator RandomDotStandaloneTraining_HasSeparateModesAndDoesNotSaveTrials()
+        {
+            PrepareRandomDotScene();
+            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
+            config.FindProperty("simulatedTrainingRepeatsPerValue").intValue = 1;
+            SetFloats(config.FindProperty("simulatedTrainingKValues"), 0.2f, 1.2f);
+            config.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
+            var controller = Object.FindAnyObjectByType<RandomDotKeyboardController>();
+            Assert.That(manager.StartTraining(), Is.True);
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.SimulatedTrainingInstructions));
+            Assert.That(manager.IsSessionActive, Is.False);
+            manager.ConfirmTrainingInstructions();
+            for (int trial = 0; trial < 2; trial++)
+            {
+                yield return WaitForState(manager, RandomDotSessionState.SimulatedTrainingResponse);
+                controller.SubmitResponse(Response.Convex);
+                controller.SubmitResponse(Response.Concave);
+                yield return null;
+            }
+            yield return WaitForState(manager, RandomDotSessionState.Idle);
+            Assert.That(manager.ValidTrialsCompleted, Is.Zero);
+            AssertNoSessionFiles(manager);
+            config = new SerializedObject(manager);
+            config.FindProperty("practiceMotionMode").intValue = (int)RandomDotMotionMode.HeadTracked;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            Assert.That(manager.StartTraining(), Is.True);
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.HeadTrainingInstructions));
+            manager.StopTrainingAndReturnToWelcome();
+            Assert.That(manager.IsTrainingActive, Is.False);
+            AssertNoSessionFiles(manager);
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator RandomDotFreeHeadTrial_AcceptsPitchAndYawWithoutASineOrSpeedRequirement()
+        {
+            PrepareRandomDotScene();
+            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
+            config.FindProperty("motionModes").GetArrayElementAtIndex(0).intValue =
+                (int)RandomDotMotionMode.HeadTracked;
+            SetFloats(config.FindProperty("instrumentMagnificationMValues"), 5f);
+            config.FindProperty("headTrackedSeconds").floatValue = 0.2f;
+            config.FindProperty("freeHeadMovement").boolValue = true;
+            config.FindProperty("checkHeadMotion").boolValue = true;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
+            var stimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
+            Assert.That(manager.StartSession(), Is.True, "Freie Trials brauchen keine Sinus-Mindestdauer.");
+            manager.ConfirmResponseInstructions();
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.ActiveMotionInstructions));
+            manager.ConfirmActiveMotionInstructions();
+            Quaternion startRotation = stimulus.Observer.rotation;
+            for (int frame = 0; frame < 4; frame++)
+            {
+                stimulus.Observer.rotation = startRotation * Quaternion.Euler(frame * 2f, frame * 2f, 0f);
+                yield return null;
+            }
+            yield return WaitForState(manager, RandomDotSessionState.WaitingForResponse);
+            Object.FindAnyObjectByType<RandomDotKeyboardController>().SubmitResponse(Response.Convex);
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.Completed));
+            List<Dictionary<string, string>> rows = ReadTrialRows(manager);
+            Assert.That(rows.Count, Is.EqualTo(1));
+            Assert.That(rows[0]["valid_for_analysis"], Is.EqualTo("1"));
+            Assert.That(rows[0]["head_motion_constraint"], Is.EqualTo("free"));
+            Assert.That(float.IsNaN(ParseFloat(rows[0]["profile_rmse_deg"])), Is.True);
+            Assert.That(float.IsNaN(ParseFloat(rows[0]["image_center_speed_deg_per_s"])), Is.True);
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator RandomDotSession_SelectsTheSimulatedTrainingForTheSimulatedBlock()
+        {
+            PrepareRandomDotScene();
+            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
+            config.FindProperty("trainSimulatedMotion").boolValue = true;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
+            Assert.That(manager.StartSession(), Is.True);
+            manager.ConfirmResponseInstructions();
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.SimulatedTrainingInstructions));
+            Assert.That(manager.ValidTrialsCompleted, Is.Zero);
+            manager.AbortSession();
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator RandomDotGuidedHeadTrial_KeepsTheOldDurationGuardAndHeadTraining()
+        {
+            PrepareRandomDotScene();
+            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
+            config.FindProperty("motionModes").GetArrayElementAtIndex(0).intValue =
+                (int)RandomDotMotionMode.HeadTracked;
+            config.FindProperty("headTrackedSeconds").floatValue = 0.2f;
+            config.FindProperty("freeHeadMovement").boolValue = false;
+            config.FindProperty("checkHeadMotion").boolValue = true;
+            config.FindProperty("trainHeadMovement").boolValue = true;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
+            LogAssert.Expect(LogType.Error, "Die HeadTracked-Dauer muss lang genug sein, damit der Sinus " +
+                "beide Umkehrpunkte erreicht (mindestens 3 * Amplitude / mittlere Geschwindigkeit).");
+            Assert.That(manager.StartSession(), Is.False);
+            AssertNoSessionFiles(manager);
+            config = new SerializedObject(manager);
+            config.FindProperty("headTrackedSeconds").floatValue = 5f;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            Assert.That(manager.StartSession(), Is.True);
+            manager.ConfirmResponseInstructions();
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.HeadTrainingInstructions));
+            manager.AbortSession();
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator RandomDots_RunSixRepeatsWithoutMiniBlockPauses_ButKeepMotionBlockPause()
+        {
+            PrepareRandomDotScene();
+            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
+            SetFloats(config.FindProperty("instrumentMagnificationMValues"), 5f);
+            config.FindProperty("repeatsPerCondition").intValue = 6;
+            config.FindProperty("counterbalanceMotionBlockOrderByParticipantId").boolValue = false;
+            SerializedProperty modes = config.FindProperty("motionModes");
+            modes.arraySize = 2;
+            modes.GetArrayElementAtIndex(0).intValue = (int)RandomDotMotionMode.SimulatedYaw;
+            modes.GetArrayElementAtIndex(1).intValue = (int)RandomDotMotionMode.HeadTracked;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
+            var controller = Object.FindAnyObjectByType<RandomDotKeyboardController>();
+            Assert.That(manager.StartSession(), Is.True);
+            Assert.That(manager.TotalTrials, Is.EqualTo(12));
+            manager.ConfirmResponseInstructions();
+            for (int trial = 0; trial < 6; trial++)
+            {
+                Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.PresentingMotion),
+                    "Innerhalb eines Bewegungsblocks darf kein zusätzliches F5 nötig sein.");
+                yield return WaitForState(manager, RandomDotSessionState.WaitingForResponse);
+                controller.SubmitResponse(Response.Convex);
+            }
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.PausedBetweenMotionBlocks));
+            Assert.That(manager.ValidTrialsCompleted, Is.EqualTo(6));
+            foreach (Dictionary<string, string> row in ReadTrialRows(manager))
+                Assert.That(row["mini_block_index"], Is.EqualTo("1"));
+            manager.AbortSession();
+            yield return new ExitPlayMode();
+        }
+
+        private static void AssertNoSessionFiles(Object manager)
+        {
+            Assert.That(new SerializedObject(manager).FindProperty("activeSessionFolder").stringValue,
+                Is.Empty);
+            Assert.That(!Directory.Exists(OutputRoot) || Directory.GetFiles(OutputRoot, "*",
+                SearchOption.AllDirectories).Length == 0, Is.True);
+            Assert.That(Object.FindAnyObjectByType<EyeTrackingToolbox>().IsRecording, Is.False);
         }
 
         [UnityTearDown]
@@ -83,6 +372,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
 
             if (SessionState.GetBool(SceneModifiedKey, false))
             {
+                XRGeneralSettings settings = XRGeneralSettingsPerBuildTarget
+                    .XRGeneralSettingsForBuildTarget(BuildTargetGroup.Standalone);
+                if (settings != null) settings.InitManagerOnStart = SessionState.GetBool(XrStartupKey, true);
+                SessionState.EraseBool(XrStartupKey);
                 SessionState.EraseBool(SceneModifiedKey);
                 EditorSceneManager.OpenScene(SceneManager.GetActiveScene().path);
             }
@@ -112,6 +405,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(manager.TrialSequence, Is.EqualTo(sequence));
             Assert.That(manager.StartSession(), Is.True, "Die Sitzung muss starten.");
             Assert.That(manager.SessionState, Is.EqualTo(CheckerboardSessionState.WaitingForExperimentReady));
+            AssertSettingsSaved(manager);
             Assert.That(prompt.text, Does.Contain("MAIN EXPERIMENT"));
             Assert.That(prompt.text, Does.Contain(responseLines));
             controller.SubmitResponse(Response.Convex);
@@ -186,6 +480,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(manager.StartSession(), Is.True, "Die Sitzung muss starten.");
             Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.ResponseInstructions),
                 "Vor dem ersten Durchgang steht die Tastenbelegung im Headset.");
+            AssertSettingsSaved(manager);
             string shownText = string.Empty;
             foreach (TextMesh text in stimulus.Observer.GetComponentsInChildren<TextMesh>())
             {
@@ -199,7 +494,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             manager.ConfirmResponseInstructions();
 
             var seenMagnifications = new List<float>();
-            for (int trial = 0; trial < 2; trial++)
+            for (int trial = 0; trial < 3; trial++)
             {
                 Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.PresentingMotion));
                 float m = stimulus.InstrumentMagnificationM;
@@ -226,10 +521,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
             }
 
             Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.Completed));
-            Assert.That(seenMagnifications, Is.EquivalentTo(new[] { 5f, 20f }));
+            Assert.That(seenMagnifications, Is.EquivalentTo(new[] { 1f, 5f, 20f }));
 
             List<Dictionary<string, string>> rows = ReadTrialRows(manager);
-            Assert.That(rows.Count, Is.EqualTo(2));
+            Assert.That(rows.Count, Is.EqualTo(3));
             foreach (Dictionary<string, string> row in rows)
             {
                 float m = ParseFloat(row["instrument_magnification_m"]);
@@ -331,6 +626,11 @@ namespace GlobeEffect.VRCheckerboard.Tests
             manager.FindProperty("repeatsPerCondition").intValue = 1;
             SetFloats(manager.FindProperty("visualSpaceLValues"), 0.5f, 1f);
             ApplySharedTestSettings(manager);
+            // Der gespeicherte Vorschauwert darf statisches Rauschen wählen.
+            // Dieser Test prüft ausdrücklich die flimmernde Variante mit 30 Hz.
+            var stimulus = new SerializedObject(Object.FindAnyObjectByType<VrCheckerboardStimulus>());
+            stimulus.FindProperty("noiseRefreshRateHz").floatValue = 30f;
+            stimulus.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static void PrepareRandomDotScene()
@@ -340,15 +640,16 @@ namespace GlobeEffect.VRCheckerboard.Tests
             SerializedProperty motionModes = manager.FindProperty("motionModes");
             motionModes.arraySize = 1;
             motionModes.GetArrayElementAtIndex(0).intValue = (int)RandomDotMotionMode.SimulatedYaw;
-            SetFloats(manager.FindProperty("instrumentMagnificationMValues"), 5f, 20f);
+            SetFloats(manager.FindProperty("instrumentMagnificationMValues"), 1f, 5f, 20f);
             SetFloats(manager.FindProperty("instrumentDistortionKValues"), 0.5f);
             manager.FindProperty("simulatedSpeedReference").intValue =
                 (int)RandomDotSweepSpeedReference.ImageCenter;
             manager.FindProperty("simulatedImageCenterSpeed").floatValue = ImageCenterSpeed;
             manager.FindProperty("simulatedSweepSeconds").floatValue = SimulatedSweepSeconds;
             manager.FindProperty("pauseSeconds").floatValue = 0f;
+            manager.FindProperty("trainSimulatedMotion").boolValue = false;
+            manager.FindProperty("trainHeadMovement").boolValue = false;
             manager.FindProperty("repeatsPerCondition").intValue = 1;
-            manager.FindProperty("repeatsPerBlock").intValue = 1;
             ApplySharedTestSettings(manager);
 
             var controller = new SerializedObject(Object.FindAnyObjectByType<RandomDotKeyboardController>());
@@ -373,6 +674,16 @@ namespace GlobeEffect.VRCheckerboard.Tests
 
             EditorSceneManager.OpenScene(scenePath);
             SessionState.SetBool(SceneModifiedKey, true);
+            // Ablaufprüfung ohne Hardware: keinen XR-Loader starten. Nur das
+            // geladene Objekt ändern, niemals das Asset speichern oder Loader
+            // umsortieren. TearDown stellt den ursprünglichen Wert wieder her.
+            XRGeneralSettings settings = XRGeneralSettingsPerBuildTarget
+                .XRGeneralSettingsForBuildTarget(BuildTargetGroup.Standalone);
+            if (settings != null)
+            {
+                SessionState.SetBool(XrStartupKey, settings.InitManagerOnStart);
+                settings.InitManagerOnStart = false;
+            }
         }
 
         private static void ApplySharedTestSettings(SerializedObject manager)
@@ -425,6 +736,19 @@ namespace GlobeEffect.VRCheckerboard.Tests
             }
 
             return rows;
+        }
+
+        private static void AssertSettingsSaved(Object manager)
+        {
+            string folder = new SerializedObject(manager).FindProperty("activeSessionFolder").stringValue;
+            string[] settings = Directory.GetFiles(folder, "*_settings.json");
+            Assert.That(settings.Length, Is.EqualTo(1));
+            string json = File.ReadAllText(settings[0]);
+            Assert.That(json, Does.Contain("\"experimentManagerAtStart\""));
+            Assert.That(json, Does.Contain("\"stimulusAtStart\""));
+            Assert.That(json, Does.Contain("\"activeEyeTracker\": \"Dummy\""));
+            Assert.That(json, Does.Not.Contain(": NaN"));
+            Assert.That(json, Does.Not.Contain(": Infinity"));
         }
 
         private static float ParseFloat(string value)
