@@ -8,8 +8,9 @@
 % Optional: set csv_path in the workspace before running this script.
 % Otherwise choose a trials.csv file. Never silently analyse an old pilot.
 % Older random-dot CSVs (one file with SimulatedYaw AND HeadTracked) are split
-% automatically: every motion mode / m / zoom / FOV / eye / speed condition is
-% fitted separately and gets its own XLSX and PNG.
+% automatically: each motion mode is fitted separately with its own XLSX/PNG.
+% Settings changed during a session (FOV, m, speed, edge softness, ...) are
+% pooled into one fit with a warning that lists the values.
 % Optional condition_filter struct selects one condition from a mixed CSV:
 % condition_filter = struct('motion_mode', 'SimulatedYaw', 'angular_diameter_deg', 60);
 clearvars -except csv_path psignifit_path condition_filter; close all; clc;
@@ -18,10 +19,16 @@ clearvars -except csv_path psignifit_path condition_filter; close all; clc;
 %% settings
 
 if ~exist('csv_path', 'var') || strlength(string(csv_path)) == 0
-    project_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
+    % Filter and start folder are passed separately: a combined path is an
+    % "invalid file filter" when the folder does not exist (or mfilename is
+    % empty, e.g. when only a section is run).
+    start_folder = fullfile(fileparts(fileparts(fileparts(mfilename('fullpath')))), 'measurements');
+    if ~isfolder(start_folder)
+        start_folder = pwd;
+    end
     [file_name, folder_name] = uigetfile( ...
-        fullfile(project_root, 'measurements', '*_trials.csv'), ...
-        'Choose the checkerboard or random-dot trials CSV');
+        {'*_trials.csv', 'Trials CSV (*_trials.csv)'; '*.csv', 'All CSV files (*.csv)'}, ...
+        'Choose the checkerboard or random-dot trials CSV', [start_folder, filesep]);
     if isequal(file_name, 0)
         disp('No file selected. Analysis cancelled.');
         return;
@@ -117,8 +124,8 @@ if isempty(T)
     error('No valid Concave/Convex trials were found.');
 end
 
-% A single fit must not mix people, sessions, eyes, FOVs, mappings or sequences.
-% Only the selected stimulus parameter may vary; seeds/directions may vary by trial.
+% Columns that describe the condition of a fit. Only the stimulus parameter
+% should vary; seeds/directions may vary by trial.
 condition_columns = {'participant_id', 'session_start_utc', 'eye_presentation', ...
     'angular_diameter_deg', 'mapping_version', 'trial_sequence', ...
     'grid_line_spacing_deg', 'aperture_edge_softness_deg', 'circular_aperture_enabled'};
@@ -127,18 +134,36 @@ if has_k
     condition_columns = [condition_columns, {'motion_mode', 'instrument_magnification_m', ...
         'content_zoom', 'sweep_axis', 'sweep_speed_deg_per_s', ...
         'image_center_speed_deg_per_s', 'head_motion_constraint', 'carrier_radius_m'}];
-    % Older random-dot sessions stored both motion modes (and possibly several
-    % m/zoom/FOV values) in one CSV. These columns are split into separate fits.
-    % Participant, session and mapping must still be identical.
-    split_columns = {'motion_mode', 'instrument_magnification_m', 'content_zoom', ...
-        'sweep_axis', 'angular_diameter_deg', 'eye_presentation', 'sweep_speed_deg_per_s', ...
-        'image_center_speed_deg_per_s', 'head_motion_constraint', 'carrier_radius_m'};
+    % Older random-dot sessions stored SimulatedYaw AND HeadTracked in one CSV.
+    % These are different tasks and are always fitted separately.
+    split_columns = {'motion_mode'};
 end
+[group_keys, group_id] = conditionGroups(T, split_columns);
+
+% Different people or sessions in one fit are always an error. Any other
+% setting changed during a session (FOV, m, speed, edge softness, ... e.g.
+% while testing a pilot) is pooled into one fit with a warning; the result
+% file lists the values and their trial counts.
+strict_columns = {'participant_id', 'session_start_utc'};
+pooled_columns = {};
 for column = condition_columns
     name = column{1};
-    if ismember(name, T.Properties.VariableNames) && ~ismember(name, split_columns)
+    if ~ismember(name, T.Properties.VariableNames) || ismember(name, split_columns)
+        continue;
+    end
+    if ismember(name, strict_columns)
         if numel(unique(conditionValues(T, name))) > 1
             error('Mixed condition in column %s. Select one condition before fitting.', name);
+        end
+        continue;
+    end
+    for g = 1:numel(group_keys)
+        rows = T(group_id == g, :);
+        if numel(unique(conditionValues(rows, name))) > 1
+            pooled_columns = union(pooled_columns, {name}, 'stable');
+            warning(['Mixed values in column %s (%s): %s. These trials are pooled ', ...
+                'into one fit. Use condition_filter to fit one value only.'], ...
+                name, group_keys(g), valueCounts(rows, name));
         end
     end
 end
@@ -158,7 +183,6 @@ if exist('psignifit', 'file') == 0
            'beginning of this script.']);
 end
 
-[group_keys, group_id] = conditionGroups(T, split_columns);
 fprintf('conditions found: %d\n', numel(group_keys));
 for g = 1:numel(group_keys)
     fprintf('  [%d] %s  (%d valid trials)\n', g, group_keys(g), sum(group_id == g));
@@ -170,6 +194,7 @@ task = struct('csv_path', csv_path, 'has_k', has_k, 'task_name', task_name, ...
     'reference_label', reference_label, 'pse_column', pse_column, ...
     'jnd_column', jnd_column, 'reference_column', reference_column);
 task.condition_columns = condition_columns;
+task.pooled_columns = pooled_columns;
 
 all_results = table();
 for g = 1:numel(group_keys)
@@ -314,8 +339,8 @@ function result_table = fitOneCondition(T, task)
         'eta', 'eta_ci95_low', 'eta_ci95_high'});
     % Keep the source and condition with the fitted value, not only the person's ID.
     result_table.source_csv = task.csv_path;
-    result_table.eye_presentation = string(T.eye_presentation(1));
-    result_table.angular_diameter_deg = T.angular_diameter_deg(1);
+    result_table.eye_presentation = resultValue(T, 'eye_presentation', task);
+    result_table.angular_diameter_deg = resultValue(T, 'angular_diameter_deg', task);
     result_table.sigmoid_name = string(sigmoid_name);
     result_table.n_stimulus_levels = numel(stimulus_values);
     result_table.task = string(task.task_name);
@@ -323,7 +348,7 @@ function result_table = fitOneCondition(T, task)
     for column = task.condition_columns
         name = column{1};
         if ismember(name, T.Properties.VariableNames) && ~ismember(name, result_table.Properties.VariableNames)
-            result_table.(name) = T.(name)(1);
+            result_table.(name) = resultValue(T, name, task);
         end
     end
 
@@ -337,7 +362,8 @@ function result_table = fitOneCondition(T, task)
             'head_motion_constraint', 'head'; 'eye_presentation', 'eye'};
         for index = 1:size(suffix_columns, 1)
             name = suffix_columns{index, 1};
-            if ismember(name, T.Properties.VariableNames)
+            % Pooled columns are listed in the XLSX, not in the file name.
+            if ismember(name, T.Properties.VariableNames) && ~ismember(name, task.pooled_columns)
                 value = string(T.(name)(1));
                 if ismissing(value)
                     value = "unspecified";
@@ -345,6 +371,13 @@ function result_table = fitOneCondition(T, task)
                 value = regexprep(char(value), '[^A-Za-z0-9_-]', '_');
                 condition_suffix = [condition_suffix, '_', suffix_columns{index, 2}, value]; %#ok<AGROW>
             end
+        end
+        % Windows paths are limited to 260 characters. Deep measurement folders
+        % plus a long suffix can exceed that; the XLSX still lists every value.
+        longest_path = fullfile(data_folder, [task.output_prefix, '_psychometric_psignifit_', ...
+            char(participant_id), condition_suffix, '.png']);
+        if strlength(longest_path) > 250
+            condition_suffix = ['_mode', regexprep(char(string(T.motion_mode(1))), '[^A-Za-z0-9_-]', '_')];
         end
     end
     result_file = fullfile(data_folder, [task.output_prefix, '_pse_result_psignifit', condition_suffix, '.xlsx']);
@@ -376,8 +409,9 @@ function result_table = fitOneCondition(T, task)
 
     plot_subtitle = participant_id;
     if task.has_k
-        plot_subtitle = sprintf('%s | %s | m = %g | FOV = %g deg', participant_id, ...
-            string(T.motion_mode(1)), T.instrument_magnification_m(1), T.angular_diameter_deg(1));
+        plot_subtitle = sprintf('%s | %s | m = %s | FOV = %s deg', participant_id, ...
+            string(T.motion_mode(1)), plotValue(T, 'instrument_magnification_m', task), ...
+            plotValue(T, 'angular_diameter_deg', task));
     end
     title({[task.task_name, ' psychometric function (psignifit)'], ...
            char(plot_subtitle)}, ...
@@ -416,6 +450,34 @@ function values = conditionValues(T, name)
     % Free head movement can leave a target speed unspecified in every row.
     % Treat repeated missing entries as one condition, not different values.
     values(ismissing(values)) = "<unspecified>";
+end
+
+function value = resultValue(T, name, task)
+    if ismember(name, task.pooled_columns)
+        % Pooled columns are always text ("60 (100); 70 (75)"), so the summary
+        % of several conditions can still be stacked into one table.
+        value = valueCounts(T, name);
+    elseif isnumeric(T.(name))
+        value = T.(name)(1);
+    else
+        value = string(T.(name)(1));
+    end
+end
+
+function text = plotValue(T, name, task)
+    if ismember(name, task.pooled_columns)
+        text = "mixed";
+    else
+        text = string(T.(name)(1));
+    end
+end
+
+function text = valueCounts(T, name)
+    % "0.5 (100); 1 (75)": every value with its number of valid trials.
+    values = conditionValues(T, name);
+    [unique_values, ~, index] = unique(values, 'stable');
+    counts = accumarray(index, 1);
+    text = join(unique_values + " (" + string(counts) + ")", "; ");
 end
 
 function [group_keys, group_id] = conditionGroups(T, split_columns)

@@ -31,11 +31,17 @@ einer eigenen CSV. Jede Datei ergibt einen Fit.
 
 Ältere Random-Dot-CSVs (bis 7. Oktober, z. B. 350 Trials mit `SimulatedYaw`
 und `HeadTracked` in einer Datei) werden automatisch aufgeteilt: Jede
-Bewegungsart bzw. jede Kombination aus m, Zoom, FOV, Augenmodus und
-Geschwindigkeit wird getrennt gefittet und bekommt eigene PNG/XLSX-Dateien.
+Bewegungsart wird getrennt gefittet und bekommt eigene PNG/XLSX-Dateien.
 Zusätzlich entsteht `random_dot_pse_summary_psignifit.xlsx` mit allen PSEs.
-Eine Bedingung ohne ausreichende Daten wird mit Warnung übersprungen.
-Verschiedene Personen, Sitzungen oder Mappings in einer Datei bleiben ein Fehler.
+Eine Bewegungsart ohne ausreichende Daten wird mit Warnung übersprungen.
+Verschiedene Personen oder Sitzungen in einer Datei bleiben ein Fehler.
+
+Wurde während einer Sitzung etwas umgestellt (FOV, m, Zoom, Geschwindigkeit,
+Edge Softness, Augenmodus, … – alles, was die CSV pro Trial speichert), wird
+trotzdem gemeinsam gefittet. Eine Warnung nennt je Spalte die Werte mit
+Trialzahl, die XLSX enthält z. B. `60 (80); 70 (95)`, der Plot zeigt `mixed`.
+Gemischte Spalten erscheinen nicht im Dateinamen. Nur einen Wert auswerten:
+`condition_filter = struct('angular_diameter_deg', 70);`
 
 Nur eine Bedingung einer gemischten CSV auswerten:
 
