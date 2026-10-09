@@ -22,6 +22,18 @@ namespace GlobeEffect.VRCheckerboard.Tests
             RandomDotMotionMode.HeadTracked
         };
 
+        [TestCase(0.2f, CheckerboardCurvatureResponse.Concave)]
+        [TestCase(0.3f, CheckerboardCurvatureResponse.Concave)]
+        [TestCase(0.7f, CheckerboardCurvatureResponse.None)]
+        [TestCase(1f, CheckerboardCurvatureResponse.None)]
+        [TestCase(1.1f, CheckerboardCurvatureResponse.Convex)]
+        [TestCase(1.2f, CheckerboardCurvatureResponse.Convex)]
+        public void TrainingFeedback_OnlyForClearExtremes(float k, CheckerboardCurvatureResponse expected)
+        {
+            // Zwischen den Grenzen gibt es keine "richtige" Antwort und keine Rückmeldung.
+            Assert.That(RandomDotExperimentManager.ExpectedTrainingResponse(k, 0.3f, 1.1f), Is.EqualTo(expected));
+        }
+
         [TestCase(RandomDotMotionMode.SimulatedYaw)]
         [TestCase(RandomDotMotionMode.HeadTracked)]
         public void SingleMotionSession_Has175TrialsInOneWholeBlock(RandomDotMotionMode mode)

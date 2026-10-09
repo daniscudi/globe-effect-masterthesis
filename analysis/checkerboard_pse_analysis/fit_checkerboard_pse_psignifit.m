@@ -38,9 +38,17 @@ end
 csv_path = string(csv_path);
 fprintf('input file: %s\n', csv_path);
 
-% Change this only if the psignifit folder is moved.
+% psignifit locations on the laptop and the lab PC; the first existing one is used.
+% Add a line here if psignifit is moved, or set psignifit_path before running.
 if ~exist('psignifit_path', 'var')
-    psignifit_path = "D:\TolgaDaniskan\Globe Effect\psignifit-master\psignifit-master";
+    psignifit_candidates = [ ...
+        "C:\Users\ZVSL-070\Downloads\psignifit-matlab\psignifit-master"   % laptop
+        "D:\TolgaDaniskan\Globe Effect\psignifit-master\psignifit-master" % lab PC
+        ];
+    psignifit_path = psignifit_candidates(find(isfolder(psignifit_candidates), 1));
+    if isempty(psignifit_path)
+        psignifit_path = psignifit_candidates(1);
+    end
 end
 if isfolder(psignifit_path)
     addpath(genpath(psignifit_path));

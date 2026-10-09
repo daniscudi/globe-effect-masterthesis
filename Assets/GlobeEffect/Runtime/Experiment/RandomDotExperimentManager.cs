@@ -219,6 +219,24 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [SerializeField, Min(1)]
         private int simulatedTrainingRepeatsPerValue = 2;
 
+        [SerializeField]
+        [Tooltip("Nach jeder Übungsantwort kurz anzeigen, ob sie zum Beispiel passte. Nur bei eindeutigen " +
+            "Extremwerten (Grenzen unten); für k dazwischen gibt es bewusst keine Rückmeldung, " +
+            "damit keine persönliche Grenze antrainiert wird. Gilt nicht in der Messung.")]
+        private bool simulatedTrainingFeedback = true;
+
+        [SerializeField, Range(0f, 2f)]
+        [Tooltip("Übungs-k bis zu diesem Wert gilt eindeutig als KONKAV.")]
+        private float feedbackConcaveMaxK = 0.3f;
+
+        [SerializeField, Range(0f, 2f)]
+        [Tooltip("Übungs-k ab diesem Wert gilt eindeutig als KONVEX.")]
+        private float feedbackConvexMinK = 1.1f;
+
+        [SerializeField, Range(0.2f, 5f)]
+        [Tooltip("Wie lange die Rückmeldung im Headset steht, in Sekunden.")]
+        private float feedbackSeconds = 1.5f;
+
         [FormerlySerializedAs("headTrackedTurnaroundThresholdDegrees")]
         [SerializeField, Range(0.5f, 30f)]
         [Tooltip("Diese Auslenkung muss auf beiden Seiten erreicht werden. Bei einer Zielamplitude von 2 Grad sind 1,5 Grad ein robuster Umkehrpunkt.")]
@@ -342,6 +360,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private string lookToKeepAfterPreview;
         private bool standaloneTraining;
         private bool trainingResponseReceived;
+        private CheckerboardCurvatureResponse trainingResponse;
         private int trainedSimulatedMotionBlock;
         private int instructedActiveMotionBlock;
         private Coroutine simulatedTrainingCoroutine;
@@ -904,7 +923,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulus.ShowFixationOnly();
             sessionState = State.SimulatedTrainingInstructions;
             headTrainingView.ShowSimulatedInstructions(BuildResponseLines(),
-                ResponseInputController.GetReadableKeyName(startSessionKey));
+                ResponseInputController.GetReadableKeyName(startSessionKey), simulatedTrainingFeedback);
         }
 
         private IEnumerator RunSimulatedTraining()
@@ -925,8 +944,27 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 stimulus.ShowFixationOnly();
                 sessionState = State.SimulatedTrainingResponse;
                 headTrainingView.ShowSimulatedResponse(index + 1, practice.Count, BuildResponseLines());
-                // Subjektives Formurteil: keine vorgegebene "richtige" PSE-Antwort.
                 while (!trainingResponseReceived) yield return null;
+
+                // Subjektives Formurteil: eine "richtige" Antwort gibt es nur bei
+                // eindeutigen Extremwerten. Dort sagt die Rückmeldung, was konvex
+                // und konkav heißt, ohne eine Grenze in der Mitte vorzugeben.
+                CheckerboardCurvatureResponse expected = simulatedTrainingFeedback
+                    ? ExpectedTrainingResponse(practice[index].InstrumentDistortionK,
+                        feedbackConcaveMaxK, feedbackConvexMinK)
+                    : CheckerboardCurvatureResponse.None;
+                if (expected != CheckerboardCurvatureResponse.None)
+                {
+                    LastTrainingAnswerCorrect = trainingResponse == expected;
+                    headTrainingView.ShowSimulatedFeedback(LastTrainingAnswerCorrect.Value,
+                        expected == CheckerboardCurvatureResponse.Convex
+                            ? "CONVEX (curves outward)" : "CONCAVE (curves inward)");
+                    yield return new WaitForSecondsRealtime(feedbackSeconds);
+                }
+                else
+                {
+                    LastTrainingAnswerCorrect = null;
+                }
             }
 
             if (!standaloneTraining && trialQueue.TryPeekNext(out RandomDotTrial next))
@@ -1300,6 +1338,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             if (sessionState == State.SimulatedTrainingResponse && response != CheckerboardCurvatureResponse.None)
             {
                 trainingResponseReceived = true;
+                trainingResponse = response;
                 // Sofort schließen: ein zweiter Tastendruck darf nicht das nächste Beispiel beantworten.
                 sessionState = State.SimulatedTrainingMotion;
                 return;
@@ -1669,6 +1708,21 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private bool IsFreeHeadTrial(RandomDotTrial trial) =>
             trial.MotionMode == RandomDotMotionMode.HeadTracked && freeHeadMovement;
 
+        /// <summary>Ergebnis der letzten Übungsrückmeldung; null = keine Rückmeldung (k nicht eindeutig).</summary>
+        public bool? LastTrainingAnswerCorrect { get; private set; }
+
+        /// <summary>
+        /// Welche Antwort im Training als eindeutig gilt: k bis concaveMaxK = konkav,
+        /// k ab convexMinK = konvex, dazwischen None (keine Rückmeldung).
+        /// </summary>
+        public static CheckerboardCurvatureResponse ExpectedTrainingResponse(
+            float k, float concaveMaxK, float convexMinK)
+        {
+            if (k <= concaveMaxK) return CheckerboardCurvatureResponse.Concave;
+            if (k >= convexMinK) return CheckerboardCurvatureResponse.Convex;
+            return CheckerboardCurvatureResponse.None;
+        }
+
         private bool IsOpenEndedTrial(RandomDotTrial trial) =>
             IsFreeHeadTrial(trial) && openEndedActiveTrials;
 
@@ -1852,6 +1906,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             repeatsPerCondition = Mathf.Max(1, repeatsPerCondition);
             simulatedTrainingRepeatsPerValue = Mathf.Max(1, simulatedTrainingRepeatsPerValue);
+            // Die Konkav-Grenze muss unter der Konvex-Grenze liegen.
+            feedbackConcaveMaxK = Mathf.Min(feedbackConcaveMaxK, feedbackConvexMinK - 0.01f);
             simulatedSweepSeconds = Mathf.Clamp(simulatedSweepSeconds, 0.1f, 5f);
             headTrackedSeconds = Mathf.Max(0.1f, headTrackedSeconds);
             sweepAmplitudeDegrees = Mathf.Clamp(sweepAmplitudeDegrees, 0.1f, 30f);
