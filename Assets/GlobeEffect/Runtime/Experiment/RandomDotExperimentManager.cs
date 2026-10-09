@@ -220,10 +220,34 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private int simulatedTrainingRepeatsPerValue = 2;
 
         [SerializeField]
+        [Tooltip("Vor den Übungstrials je ein beschriftetes Beispiel für KONVEX und KONKAV, wie beim " +
+            "Checkerboard: erst länger (Example Long Seconds), dann noch einmal so kurz wie in der " +
+            "Messung (Simulated Sweep Seconds). Danach Übung ohne Hinweise.")]
+        private bool showSimulatedExamples = true;
+
+        [SerializeField, Range(0f, 2f)]
+        [Tooltip("k des Beispiels für KONVEX.")]
+        private float exampleConvexK = 1.2f;
+
+        [SerializeField, Range(0f, 2f)]
+        [Tooltip("k des Beispiels für KONKAV.")]
+        private float exampleConcaveK = 0.2f;
+
+        [SerializeField, Range(0.5f, 10f)]
+        [Tooltip("Erste, längere Darbietung jedes Beispiels in Sekunden. Gleiche Geschwindigkeit wie " +
+            "in der Messung, nur länger, also ein weiterer Schwenk.")]
+        private float exampleLongSeconds = 2.5f;
+
+        [SerializeField, Range(0.2f, 10f)]
+        [Tooltip("Wie lange der Hinweistext vor jeder Beispiel-Darbietung im Headset steht, in Sekunden.")]
+        private float exampleTextSeconds = 3f;
+
+        [SerializeField]
         [Tooltip("Nach jeder Übungsantwort kurz anzeigen, ob sie zum Beispiel passte. Nur bei eindeutigen " +
             "Extremwerten (Grenzen unten); für k dazwischen gibt es bewusst keine Rückmeldung, " +
-            "damit keine persönliche Grenze antrainiert wird. Gilt nicht in der Messung.")]
-        private bool simulatedTrainingFeedback = true;
+            "damit keine persönliche Grenze antrainiert wird. Gilt nicht in der Messung. " +
+            "Standardmäßig aus: die beschrifteten Beispiele ersetzen sie.")]
+        private bool simulatedTrainingFeedback;
 
         [SerializeField, Range(0f, 2f)]
         [Tooltip("Übungs-k bis zu diesem Wert gilt eindeutig als KONKAV.")]
@@ -895,6 +919,59 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             BeginNextAttempt();
         }
 
+        /// <summary>Wie viele beschriftete Beispiele im laufenden Training schon gezeigt wurden.</summary>
+        public int TrainingExamplesShown { get; private set; }
+
+        private IEnumerator ShowSimulatedExamples()
+        {
+            // Wie beim Checkerboard: Zuerst je ein deutliches, beschriftetes Beispiel,
+            // damit klar ist, was "konvex" und "konkav" heißt. Danach Übung ohne
+            // Hinweise; eine Grenze in der Mitte wird so nicht vorgegeben.
+            TrainingExamplesShown = 0;
+            var examples = new[]
+            {
+                (category: CheckerboardCurvatureResponse.Convex, k: exampleConvexK),
+                (category: CheckerboardCurvatureResponse.Concave, k: exampleConcaveK)
+            };
+            for (int index = 0; index < examples.Length; index++)
+            {
+                RandomDotTrial example = RandomDotTrialPlanner.CreateRandomizedPlan(
+                    new[] { fieldOfViewValues[0] }, new[] { eyePresentations[0] }, new[] { examples[index].k },
+                    new[] { instrumentMagnificationMValues[0] }, new[] { contentZoomValues[0] },
+                    new[] { RandomDotMotionMode.SimulatedYaw }, 1, 1,
+                    unchecked(randomSeed + 50000 + index), dotSeedBase + 50000 + index, simulatedSweepAxis)[0];
+                string label = examples[index].category == CheckerboardCurvatureResponse.Convex
+                    ? "CONVEX (curves outward)" : "CONCAVE (curves inward)";
+
+                headTrainingView.ShowSimulatedExample(label,
+                    "Watch the dots. This example is shown longer.");
+                yield return new WaitForSecondsRealtime(exampleTextSeconds);
+                yield return PresentSimulatedExample(example, exampleLongSeconds);
+
+                headTrainingView.ShowSimulatedExample(label, string.Format(CultureInfo.InvariantCulture,
+                    "The same example again,\nas briefly as in the experiment ({0:0.0#} s).",
+                    simulatedSweepSeconds));
+                yield return new WaitForSecondsRealtime(exampleTextSeconds);
+                yield return PresentSimulatedExample(example, simulatedSweepSeconds);
+                TrainingExamplesShown++;
+            }
+
+            headTrainingView.ShowSimulatedPracticeStart(simulatedTrainingFeedback);
+            yield return new WaitForSecondsRealtime(exampleTextSeconds);
+        }
+
+        private IEnumerator PresentSimulatedExample(RandomDotTrial example, float seconds)
+        {
+            headTrainingView.Hide();
+            ConfigureStimulus(example, seconds);
+            stimulus.ShowFixationOnly();
+            yield return new WaitForSecondsRealtime(Mathf.Max(0.25f, pauseSeconds));
+            stimulus.RestartMotionPhase();
+            stimulus.Show();
+            yield return new WaitForSecondsRealtime(seconds);
+            stimulus.ShowFixationOnly();
+        }
+
         private IReadOnlyList<RandomDotTrial> BuildSimulatedTrainingPlan()
         {
             return RandomDotTrialPlanner.CreateRandomizedPlan(
@@ -923,12 +1000,18 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulus.ShowFixationOnly();
             sessionState = State.SimulatedTrainingInstructions;
             headTrainingView.ShowSimulatedInstructions(BuildResponseLines(),
-                ResponseInputController.GetReadableKeyName(startSessionKey), simulatedTrainingFeedback);
+                ResponseInputController.GetReadableKeyName(startSessionKey), simulatedTrainingFeedback,
+                showSimulatedExamples);
         }
 
         private IEnumerator RunSimulatedTraining()
         {
             sessionState = State.SimulatedTrainingMotion;
+            if (showSimulatedExamples)
+            {
+                yield return ShowSimulatedExamples();
+            }
+
             IReadOnlyList<RandomDotTrial> practice = BuildSimulatedTrainingPlan();
             for (int index = 0; index < practice.Count; index++)
             {
@@ -1224,7 +1307,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
         }
 
-        private void ConfigureStimulus(RandomDotTrial trial)
+        // simulatedSecondsOverride: nur für die längeren Trainingsbeispiele.
+        private void ConfigureStimulus(RandomDotTrial trial, float? simulatedSecondsOverride = null)
         {
             stimulus.Hide();
             stimulus.SetAngularDiameter(trial.AngularDiameterDegrees);
@@ -1234,11 +1318,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulus.SetEyePresentation(trial.EyePresentation);
             stimulus.SetMotionMode(trial.MotionMode);
             stimulus.SetSweepAxis(trial.SweepAxis);
-            stimulus.SetSimulatedSweep(SweepAmplitude(trial), SweepSpeed(trial));
+            stimulus.SetSimulatedSweep(SweepAmplitude(trial, simulatedSecondsOverride), SweepSpeed(trial));
             stimulus.SetSweepDirection(trial.SweepDirection);
             // Jeder Trial bekommt seine eigene Punktwelt: so groß wie nötig und so
             // dicht, dass es in der Bildmitte bei jedem m gleich aussieht.
-            stimulus.ConfigurePointField(trial.DotSeed, WorldCoverageFor(trial));
+            stimulus.ConfigurePointField(trial.DotSeed, WorldCoverageFor(trial, simulatedSecondsOverride));
             stimulus.PlaceAroundObserver();
         }
 
@@ -1734,23 +1818,23 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         // einmal von der einen Seite zur anderen, also die halbe Strecke zu jeder Seite.
         // Die Dauer bleibt bei jedem m gleich; bei "Bildmitte" wird deshalb die
         // Schwenkweite in der Außenwelt mit wachsendem m kleiner.
-        private float SweepAmplitude(RandomDotTrial trial) =>
+        private float SweepAmplitude(RandomDotTrial trial, float? simulatedSecondsOverride = null) =>
             trial.MotionMode == RandomDotMotionMode.HeadTracked
                 ? sweepAmplitudeDegrees
-                : 0.5f * SweepSpeed(trial) * simulatedSweepSeconds;
+                : 0.5f * SweepSpeed(trial) * (simulatedSecondsOverride ?? simulatedSweepSeconds);
 
         // Wie lange die Punkte im Trial zu sehen sind, in Sekunden.
         private float MotionSeconds(RandomDotTrial trial) =>
             trial.MotionMode == RandomDotMotionMode.HeadTracked ? headTrackedSeconds : simulatedSweepSeconds;
 
-        private float WorldCoverageFor(RandomDotTrial trial)
+        private float WorldCoverageFor(RandomDotTrial trial, float? simulatedSecondsOverride = null)
         {
             // Wie groß die Punktwelt für diesen Trial sein muss. Im HeadTracked-Block
             // kann der Kopf weiter drehen als der Sollschwenk. Dafür gibt es dort den
             // größeren Sicherheitsbereich.
             float reach = trial.MotionMode == RandomDotMotionMode.HeadTracked
                 ? Mathf.Max(sweepAmplitudeDegrees, headTurnSafetyDegrees)
-                : SweepAmplitude(trial);
+                : SweepAmplitude(trial, simulatedSecondsOverride);
             return RandomDotFieldStimulus.CoverageNeeded(trial.AngularDiameterDegrees, trial.ContentZoom,
                 trial.InstrumentMagnificationM, trial.InstrumentDistortionK, reach);
         }
