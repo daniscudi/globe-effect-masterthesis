@@ -202,6 +202,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "Blickkontrolle bleibt unabhängig aktiv. Das geführte Kopftraining bleibt erhalten.")]
         private bool freeHeadMovement = true;
 
+        [SerializeField]
+        [Tooltip("Nur mit Free Head Movement: Die Punkte bleiben sichtbar, bis die Person antwortet. " +
+            "Kein Zeitlimit, keine Richtung und kein Tempo vorgegeben; Head Tracked Seconds gilt dann nicht. " +
+            "Nach der Antwort kommt das graue Feld (Pause Seconds), dann der nächste Trial.")]
+        private bool openEndedActiveTrials = true;
+
         [Header("Simulated Panning Practice")]
         [SerializeField]
         [Tooltip("Vor einem simulierten Bewegungsblock eigene Übungstrials ohne Kopfbewegungs-Sinus.")]
@@ -761,7 +767,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulus.ShowFixationOnly();
             sessionState = State.ResponseInstructions;
             headTrainingView.ShowResponseInstructions(
-                BuildResponseLines(), ResponseInputController.GetReadableKeyName(startSessionKey));
+                BuildResponseLines(), ResponseInputController.GetReadableKeyName(startSessionKey),
+                OpenEndedSession);
             WriteMarker("ResponseInstructionsShown;task=random_dot_instrument");
         }
 
@@ -851,7 +858,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     stimulus.ShowFixationOnly();
                     sessionState = State.ActiveMotionInstructions;
                     headTrainingView.ShowActiveMotionInstructions(freeHeadMovement,
-                        BuildResponseLines(), ResponseInputController.GetReadableKeyName(startSessionKey));
+                        IsOpenEndedTrial(next), BuildResponseLines(), ResponseInputController.GetReadableKeyName(startSessionKey));
                     return;
                 }
             }
@@ -1225,17 +1232,22 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             WriteMarker(BuildTrialStartMarker(currentTrial));
             stimulus.Show();
-            motionCoroutine = StartCoroutine(EndMotionAfterDuration());
+            // Offene aktive Trials enden erst mit der Antwort, nicht nach einer Zeit.
+            bool openEnded = IsOpenEndedTrial(currentTrial);
+            if (!openEnded)
+                motionCoroutine = StartCoroutine(EndMotionAfterDuration());
 
             Debug.Log(string.Format(
                 CultureInfo.InvariantCulture,
                 "Random-Dot-Trial {0}/{1}, Präsentation {2}: k={3:F3}, m={4:F2}x, ContentZoom={5:F2}, " +
-                "{6}, Achse {7}, Richtung {8}, {9} Punkte, Versuch {10}. " +
-                "Fixationskreuz anschauen; Antwort folgt nach der Bewegung.",
+                "{6}, Achse {7}, Richtung {8}, {9} Punkte, Versuch {10}. {11}",
                 currentTrialNumber, totalTrials, presentationCount,
                 currentTrial.InstrumentDistortionK, currentTrial.InstrumentMagnificationM,
                 currentTrial.ContentZoom, currentTrial.MotionMode, currentTrial.SweepAxis,
-                currentTrial.DirectionLabel, stimulus.DotCount, currentTrial.AttemptNumber), this);
+                currentTrial.DirectionLabel, stimulus.DotCount, currentTrial.AttemptNumber,
+                openEnded
+                    ? "Frei umschauen, ohne Zeitlimit; die Antwort beendet den Trial."
+                    : "Fixationskreuz anschauen; Antwort folgt nach der Bewegung."), this);
         }
 
         private IEnumerator EndMotionAfterDuration()
@@ -1294,12 +1306,26 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
             // Drückt die Person schon während der Bewegung, zählt das nicht. Sie
             // soll sich erst die ganze Bewegung ansehen und dann entscheiden.
+            // Ausnahme: offene aktive Trials. Dort schaut die Person frei, so lange
+            // sie will, und die Antwort beendet die Darbietung.
             // Die erste Antwort beendet die Antwortphase sofort. Ein zweiter
             // Tastendruck landet deshalb in keinem Durchgang, auch nicht im nächsten.
-            if (sessionState != State.WaitingForResponse || currentTrial == null
+            bool answeredWhileVisible = sessionState == State.PresentingMotion
+                && currentTrial != null && IsOpenEndedTrial(currentTrial);
+            if ((sessionState != State.WaitingForResponse && !answeredWhileVisible) || currentTrial == null
                 || response == CheckerboardCurvatureResponse.None)
             {
                 return;
+            }
+
+            if (answeredWhileVisible)
+            {
+                stimulusEndUnitySeconds = Time.realtimeSinceStartupAsDouble;
+                WriteMarker(
+                    "StimulusEnded;task=random_dot_instrument;sequence={0};attempt={1};duration_s={2:F4};" +
+                    "ended_by=response",
+                    currentTrial.SequenceIndex, currentTrial.AttemptNumber,
+                    stimulusEndUnitySeconds - trialStartUnitySeconds);
             }
 
             RandomDotTrialResult result = CaptureCurrentResult(response, validForAnalysis: true, "valid");
@@ -1593,7 +1619,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 trial.AttemptNumber, trial.EyePresentation, trial.AngularDiameterDegrees,
                 stimulus.ApertureEdgeSoftnessDegrees, trial.InstrumentDistortionK,
                 trial.InstrumentMagnificationM, trial.ContentZoom, trial.MotionMode,
-                IsFreeHeadTrial(trial) ? "Free" : trial.DirectionLabel, MotionSeconds(trial),
+                IsFreeHeadTrial(trial) ? "Free" : trial.DirectionLabel,
+                IsOpenEndedTrial(trial) ? float.NaN : MotionSeconds(trial),
                 IsFreeHeadTrial(trial) ? float.NaN : SweepAmplitude(trial),
                 IsFreeHeadTrial(trial) ? float.NaN : SweepSpeed(trial),
                 trial.DotSeed, trial.SweepAxis, stimulus.DotCount,
@@ -1641,6 +1668,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private bool IsFreeHeadTrial(RandomDotTrial trial) =>
             trial.MotionMode == RandomDotMotionMode.HeadTracked && freeHeadMovement;
+
+        private bool IsOpenEndedTrial(RandomDotTrial trial) =>
+            IsFreeHeadTrial(trial) && openEndedActiveTrials;
+
+        private bool OpenEndedSession =>
+            sessionMotionMode == RandomDotMotionMode.HeadTracked && freeHeadMovement && openEndedActiveTrials;
 
         // Wie weit das Feld im Trial zu jeder Seite der Mitte schwenkt, in Grad. Der
         // simulierte Schwenk läuft in der eingestellten Zeit mit fester Geschwindigkeit

@@ -241,6 +241,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             SetFloats(config.FindProperty("instrumentMagnificationMValues"), 5f);
             config.FindProperty("headTrackedSeconds").floatValue = 0.2f;
             config.FindProperty("freeHeadMovement").boolValue = true;
+            config.FindProperty("openEndedActiveTrials").boolValue = false;
             config.FindProperty("checkHeadMotion").boolValue = true;
             config.ApplyModifiedPropertiesWithoutUndo();
             yield return new EnterPlayMode();
@@ -266,6 +267,53 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(rows[0]["head_motion_constraint"], Is.EqualTo("free"));
             Assert.That(float.IsNaN(ParseFloat(rows[0]["profile_rmse_deg"])), Is.True);
             Assert.That(float.IsNaN(ParseFloat(rows[0]["image_center_speed_deg_per_s"])), Is.True);
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator RandomDotOpenEndedActiveTrial_StaysVisibleUntilTheAnswer()
+        {
+            PrepareRandomDotScene();
+            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
+            config.FindProperty("sessionMotionMode").intValue = (int)RandomDotMotionMode.HeadTracked;
+            SetFloats(config.FindProperty("instrumentMagnificationMValues"), 5f);
+            config.FindProperty("repeatsPerCondition").intValue = 2;
+            config.FindProperty("headTrackedSeconds").floatValue = 0.1f;
+            config.FindProperty("freeHeadMovement").boolValue = true;
+            config.FindProperty("openEndedActiveTrials").boolValue = true;
+            config.FindProperty("trainHeadMovement").boolValue = false;
+            config.FindProperty("pauseSeconds").floatValue = 0.2f;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
+            var controller = Object.FindAnyObjectByType<RandomDotKeyboardController>();
+            Assert.That(manager.StartSession(), Is.True);
+            manager.ConfirmResponseInstructions();
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.ActiveMotionInstructions),
+                "Ohne Kopftraining direkt zur Anleitung für die aktiven Trials.");
+            manager.ConfirmActiveMotionInstructions();
+
+            // Deutlich länger als Head Tracked Seconds: kein Zeitlimit.
+            double waitUntil = Time.realtimeSinceStartupAsDouble + 0.4d;
+            while (Time.realtimeSinceStartupAsDouble < waitUntil) yield return null;
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.PresentingMotion));
+
+            controller.SubmitResponse(Response.Convex);
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.InterTrial),
+                "Nach der Antwort kommt das graue Feld, dann der nächste Trial.");
+            Assert.That(manager.ValidTrialsCompleted, Is.EqualTo(1));
+            yield return WaitForState(manager, RandomDotSessionState.PresentingMotion);
+            controller.SubmitResponse(Response.Concave);
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.Completed));
+
+            List<Dictionary<string, string>> rows = ReadTrialRows(manager);
+            Assert.That(rows.Count, Is.EqualTo(2));
+            Assert.That(rows[0]["valid_for_analysis"], Is.EqualTo("1"));
+            Assert.That(rows[0]["response"], Is.EqualTo("Convex"));
+            Assert.That(ParseFloat(rows[0]["stimulus_duration_s"]), Is.GreaterThanOrEqualTo(0.35f));
+            Assert.That(ParseFloat(rows[0]["response_time_s"]), Is.EqualTo(0f).Within(0.001f));
+            Assert.That(rows[1]["response"], Is.EqualTo("Concave"));
             yield return new ExitPlayMode();
         }
 
@@ -356,7 +404,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(manager.ValidTrialsCompleted, Is.Zero);
             manager.ConfirmResponseInstructions();
             manager.ConfirmActiveMotionInstructions();
-            yield return WaitForState(manager, RandomDotSessionState.WaitingForResponse);
+            // Aktive Trials sind standardmäßig offen: Antwort während die Punkte sichtbar sind.
+            yield return WaitForState(manager, RandomDotSessionState.PresentingMotion);
             controller.SubmitResponse(Response.Convex);
             Assert.That(ReadTrialRows(manager)[0]["motion_mode"], Is.EqualTo("HeadTracked"));
             manager.AbortSession();
