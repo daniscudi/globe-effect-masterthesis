@@ -286,6 +286,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [Tooltip("Reine Live-Vorschau ohne Sitzung, Training oder Datenaufzeichnung ein/aus.")]
         private Key previewKey = Key.P;
 
+        // Stand vor dem ersten "Vorschau-Werte übernehmen". Leer heißt: es wurde
+        // nichts übernommen. "Originalwerte wiederherstellen" holt ihn zurück.
+        [SerializeField, HideInInspector]
+        private string valuesBeforePreviewTakeover = string.Empty;
+
         [Header("Runtime Status (Read Only)")]
         [SerializeField]
         private RandomDotSessionState sessionState = RandomDotSessionState.Idle;
@@ -328,6 +333,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private bool eventsSubscribed;
         private bool previewActive;
         private string settingsBeforePreview;
+        private string lookToKeepAfterPreview;
         private bool standaloneTraining;
         private bool trainingResponseReceived;
         private int trainedSimulatedMotionBlock;
@@ -344,6 +350,16 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public bool RequireFixation => requireFixation;
         public bool FreeHeadMovement => freeHeadMovement;
         public bool IsPreviewActive => previewActive;
+        public RandomDotFieldStimulus Stimulus => stimulus;
+
+        // Für die Editor-Übergabe aus dem Play Mode in die Szene.
+        public string ValuesBeforePreviewTakeover
+        {
+            get => valuesBeforePreviewTakeover;
+            set => valuesBeforePreviewTakeover = value ?? string.Empty;
+        }
+
+        public bool HasValuesBeforePreviewTakeover => !string.IsNullOrEmpty(valuesBeforePreviewTakeover);
         public bool IsTrainingActive => sessionState is State.HeadTrainingInstructions
             or State.HeadTrainingMotion or State.HeadTrainingFeedback
             or State.SimulatedTrainingInstructions or State.SimulatedTrainingMotion
@@ -515,7 +531,67 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             previewActive = false;
             if (stimulus != null && !string.IsNullOrEmpty(settingsBeforePreview))
                 stimulus.RestorePreviewSettings(settingsBeforePreview);
+            // Ein übernommenes Punktbild bleibt nach der Vorschau erhalten.
+            if (stimulus != null && lookToKeepAfterPreview != null)
+                stimulus.RestorePreviewSettings(lookToKeepAfterPreview);
             settingsBeforePreview = null;
+            lookToKeepAfterPreview = null;
+        }
+
+        /// <summary>
+        /// Übernimmt FOV, m, Zoom, Auge, Bewegungsart, Achse und Geschwindigkeit der
+        /// Vorschau in den Versuchsplan und behält das Punktbild (Dichte, Punktgröße,
+        /// Edge Softness, Farben). Die k-Liste bleibt unverändert. Beim ersten Mal
+        /// wird der bisherige Stand als Original gesichert.
+        /// </summary>
+        public bool TakeOverPreviewValues()
+        {
+            if (IsSessionActive || IsTrainingActive) return false;
+            ResolveReferences();
+            if (stimulus == null) return false;
+            if (!HasValuesBeforePreviewTakeover)
+                valuesBeforePreviewTakeover = CaptureExperimentValues();
+            RandomDotPreviewTakeover.CopyPreviewIntoPlan(stimulus, this);
+            if (previewActive)
+                lookToKeepAfterPreview = RandomDotPreviewTakeover.CaptureLook(JsonUtility.ToJson(stimulus));
+            return true;
+        }
+
+        /// <summary>Stand vor dem ersten Übernehmen zurückholen. Beliebig oft möglich.</summary>
+        public bool RestoreValuesBeforePreviewTakeover()
+        {
+            if (IsSessionActive || IsTrainingActive || !HasValuesBeforePreviewTakeover) return false;
+            ResolveReferences();
+            ApplyExperimentValues(valuesBeforePreviewTakeover);
+            valuesBeforePreviewTakeover = string.Empty;
+            return true;
+        }
+
+        /// <summary>Aktueller Versuchsplan plus Punktbild, so wie sie nach der Vorschau gelten.</summary>
+        public string CaptureExperimentValues()
+        {
+            ResolveReferences();
+            string look = lookToKeepAfterPreview
+                ?? (previewActive ? settingsBeforePreview : null)
+                ?? (stimulus != null ? JsonUtility.ToJson(stimulus) : "{}");
+            return RandomDotPreviewTakeover.Capture(this, look);
+        }
+
+        public void ApplyExperimentValues(string valuesJson)
+        {
+            RandomDotPreviewTakeover.ApplyPlan(valuesJson, this);
+            ResolveReferences();
+            if (stimulus == null) return;
+            string look = RandomDotPreviewTakeover.LookOf(valuesJson);
+            if (Application.isPlaying)
+            {
+                stimulus.RestorePreviewSettings(look);
+                if (previewActive) lookToKeepAfterPreview = look;
+            }
+            else
+            {
+                JsonUtility.FromJsonOverwrite(look, stimulus);
+            }
         }
 
         /// <summary>Eigenständiges Training mit T, noch ohne Messdateien.</summary>
