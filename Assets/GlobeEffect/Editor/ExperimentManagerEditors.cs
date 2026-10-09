@@ -236,7 +236,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
             if (Section("Punktfeld und Fixationskreuz", false))
                 LinkedFields("stimulus", "dotDensity", "dotSizeDegrees", "darkColor", "lightColor",
-                    "fieldBackgroundColor", "lightDotFraction", "edgeSoftnessDegrees", "showFixationTarget",
+                    "fieldBackgroundColor", "backgroundColor", "lightDotFraction", "edgeSoftnessDegrees", "showFixationTarget",
                     "fixationSizeDegrees", "fixationColor");
             if (Section("Live-Vorschau ohne Messung"))
             {
@@ -246,7 +246,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "Das gerade Raster ist nur eine feste Referenz und bleibt in Training und Messung aus.",
                     MessageType.Info);
                 LinkedFields("stimulus", "fieldOfViewDegrees", "edgeSoftnessDegrees", "dotDensity",
-                    "dotSizeDegrees", "instrumentDistortionK",
+                    "dotSizeDegrees", "darkColor", "lightColor", "backgroundColor", "fieldBackgroundColor",
+                    "instrumentDistortionK",
                     "instrumentMagnificationM", "contentZoom", "eyePresentation", "motionMode", "sweepAxis",
                     "simulatedYawAmplitudeDegrees", "previewSpeedReference", "previewImageCenterSpeed",
                     "simulatedYawSpeedDegreesPerSecond", "sweepDirection",
