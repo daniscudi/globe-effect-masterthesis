@@ -696,7 +696,7 @@ MonoBehaviour:
   requiredGoodTrainingSweeps: 4
   maximumProfileErrorDegrees: 0.9
   maximumTrainingEndpointErrorDegrees: 0.9
-  headTurnSafetyDegrees: 15
+  headTurnSafetyDegrees: 30
   checkHeadMotion: 1
   freeHeadMovement: 1
   trainSimulatedMotion: 0
