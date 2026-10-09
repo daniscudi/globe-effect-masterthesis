@@ -91,6 +91,63 @@ namespace GlobeEffect.VRCheckerboard.Editor
         }
 
         protected int Count(string name) => serializedObject.FindProperty(name).arraySize;
+
+        /// <summary>
+        /// Tabelle "Wert | Wiederholungen" für k bzw. l. Beide Listen bleiben gleich lang;
+        /// neue Zeilen bekommen Repeats Per Condition. Gibt die Summe der Wiederholungen zurück.
+        /// </summary>
+        protected long LevelTable(string valuesName, string repeatsName, string label)
+        {
+            SerializedProperty values = serializedObject.FindProperty(valuesName);
+            SerializedProperty repeats = serializedObject.FindProperty(repeatsName);
+            int fallback = serializedObject.FindProperty("repeatsPerCondition").intValue;
+            while (repeats.arraySize < values.arraySize)
+            {
+                repeats.arraySize++;
+                repeats.GetArrayElementAtIndex(repeats.arraySize - 1).intValue = fallback;
+            }
+            repeats.arraySize = values.arraySize;
+
+            EditorGUILayout.LabelField($"{label}-Werte und Wiederholungen", EditorStyles.boldLabel);
+            long sum = 0;
+            int removeIndex = -1;
+            for (int index = 0; index < values.arraySize; index++)
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField(label, GUILayout.Width(14));
+                    SerializedProperty value = values.GetArrayElementAtIndex(index);
+                    value.floatValue = EditorGUILayout.FloatField(value.floatValue, GUILayout.MinWidth(50));
+                    EditorGUILayout.LabelField("×", GUILayout.Width(12));
+                    SerializedProperty count = repeats.GetArrayElementAtIndex(index);
+                    count.intValue = Mathf.Max(1, EditorGUILayout.IntField(count.intValue, GUILayout.MinWidth(40)));
+                    sum += count.intValue;
+                    if (GUILayout.Button("–", GUILayout.Width(22))) removeIndex = index;
+                }
+            }
+            if (removeIndex >= 0)
+            {
+                values.DeleteArrayElementAtIndex(removeIndex);
+                repeats.DeleteArrayElementAtIndex(removeIndex);
+            }
+            if (GUILayout.Button($"+ {label}-Wert"))
+            {
+                values.arraySize++;
+                repeats.arraySize = values.arraySize;
+                repeats.GetArrayElementAtIndex(repeats.arraySize - 1).intValue = fallback;
+            }
+            return sum;
+        }
+
+        protected string BlockText(long trials)
+        {
+            int blocks = serializedObject.FindProperty("blocksPerSession").intValue;
+            if (blocks <= 1) return ", ohne Pausen";
+            var pauses = new System.Collections.Generic.List<string>();
+            for (int pause = 1; pause < blocks; pause++)
+                pauses.Add(Mathf.RoundToInt(trials * pause / (float)blocks).ToString());
+            return $", {blocks} Blöcke (Pausen nach {string.Join(", ", pauses)} gültigen Trials, weiter mit F5)";
+        }
     }
 
     [CustomEditor(typeof(CheckerboardExperimentManager))]
@@ -107,11 +164,11 @@ namespace GlobeEffect.VRCheckerboard.Editor
             if (Section("Sitzung und Versuchsplan"))
             {
                 Fields(serializedObject, "participantId", "sessionLabel", "randomSeed", "fieldOfViewValues",
-                    "eyePresentations", "visualSpaceLValues", "repeatsPerCondition");
-                long conditions = (long)Count("fieldOfViewValues") * Count("eyePresentations")
-                    * Count("visualSpaceLValues");
-                long trials = conditions * serializedObject.FindProperty("repeatsPerCondition").intValue;
-                EditorGUILayout.HelpBox($"{conditions} Bedingungen × Wiederholungen = {trials} gültige Trials. " +
+                    "eyePresentations", "repeatsPerCondition");
+                long repetitions = LevelTable("visualSpaceLValues", "repeatsPerLValue", "l");
+                long trials = (long)Count("fieldOfViewValues") * Count("eyePresentations") * repetitions;
+                Fields(serializedObject, "blocksPerSession");
+                EditorGUILayout.HelpBox($"Geplant: {trials} gültige Trials{BlockText(trials)}. " +
                     "Ungültige Darbietungen kommen zusätzlich dazu.", MessageType.Info);
             }
             if (Section("Ablauf und Zeiten"))
@@ -183,15 +240,14 @@ namespace GlobeEffect.VRCheckerboard.Editor
             if (Section("Sitzung und Versuchsplan"))
             {
                 Fields(serializedObject, "participantId", "sessionLabel", "randomSeed", "dotSeedBase",
-                    "fieldOfViewValues", "eyePresentations", "instrumentDistortionKValues",
-                    "instrumentMagnificationMValues", "contentZoomValues", "sessionMotionMode", "repeatsPerCondition");
-                long conditions = (long)Count("fieldOfViewValues") * Count("eyePresentations")
-                    * Count("instrumentDistortionKValues") * Count("instrumentMagnificationMValues")
-                    * Count("contentZoomValues");
-                long trials = conditions * serializedObject.FindProperty("repeatsPerCondition").intValue;
-                EditorGUILayout.HelpBox($"Geplant: {trials} gültige Trials für genau eine Bewegungsart. " +
-                    "Ein Block ohne Unterblock-Pausen. Die andere Variante startet als neue Sitzung.",
-                    MessageType.Info);
+                    "fieldOfViewValues", "eyePresentations", "instrumentMagnificationMValues",
+                    "contentZoomValues", "sessionMotionMode", "repeatsPerCondition");
+                long repetitions = LevelTable("instrumentDistortionKValues", "repeatsPerKValue", "k");
+                long trials = (long)Count("fieldOfViewValues") * Count("eyePresentations")
+                    * Count("instrumentMagnificationMValues") * Count("contentZoomValues") * repetitions;
+                Fields(serializedObject, "blocksPerSession");
+                EditorGUILayout.HelpBox($"Geplant: {trials} gültige Trials für genau eine Bewegungsart" +
+                    $"{BlockText(trials)}. Die andere Variante startet als neue Sitzung.", MessageType.Info);
             }
             if (Section("Simulierte Bewegung"))
             {

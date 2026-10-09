@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using GlobeEffect.VRCheckerboard.Experiment;
 using GlobeEffect.VRCheckerboard.EyeTracking;
 using GlobeEffect.VRCheckerboard.RandomDots;
@@ -435,6 +436,82 @@ namespace GlobeEffect.VRCheckerboard.Tests
             yield return new ExitPlayMode();
         }
 
+        [UnityTest]
+        public IEnumerator RandomDots_PauseAfterEachQuarterUntilTheExperimenterContinues()
+        {
+            PrepareRandomDotScene();
+            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
+            SetFloats(config.FindProperty("instrumentMagnificationMValues"), 5f);
+            SetFloats(config.FindProperty("instrumentDistortionKValues"), 0.5f, 1f);
+            SetInts(config.FindProperty("repeatsPerKValue"), 3, 1);
+            config.FindProperty("blocksPerSession").intValue = 4;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
+            var controller = Object.FindAnyObjectByType<RandomDotKeyboardController>();
+            Assert.That(manager.StartSession(), Is.True);
+            Assert.That(manager.TotalTrials, Is.EqualTo(4), "k = 0,5 dreimal, k = 1 einmal.");
+            manager.ConfirmResponseInstructions();
+            for (int trial = 1; trial <= 4; trial++)
+            {
+                yield return WaitForState(manager, RandomDotSessionState.WaitingForResponse);
+                controller.SubmitResponse(Response.Convex);
+                if (trial < 4)
+                {
+                    // Nach jedem Viertel (1, 2, 3 von 4 gültigen Trials) wartet die Sitzung.
+                    Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.PausedBetweenMiniBlocks));
+                    Assert.That(manager.PausesTaken, Is.EqualTo(trial));
+                    controller.SubmitResponse(Response.Convex);
+                    Assert.That(manager.ValidTrialsCompleted, Is.EqualTo(trial), "Antworten in der Pause zählen nicht.");
+                    manager.ContinueAfterBlockPause();
+                }
+            }
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.Completed), "Am Ende keine Pause.");
+            List<Dictionary<string, string>> rows = ReadTrialRows(manager);
+            Assert.That(rows.Count(row => row["instrument_distortion_k"] == "0.5"), Is.EqualTo(3));
+            Assert.That(rows.Count(row => row["instrument_distortion_k"] == "1"), Is.EqualTo(1));
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator Checkerboard_PausesAtHalfTimeUntilTheExperimenterContinues()
+        {
+            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            var config = new SerializedObject(Object.FindAnyObjectByType<CheckerboardExperimentManager>());
+            SetInts(config.FindProperty("repeatsPerLValue"), 1, 1);
+            config.FindProperty("blocksPerSession").intValue = 2;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<CheckerboardExperimentManager>();
+            var stimulus = Object.FindAnyObjectByType<VrCheckerboardStimulus>();
+            var controller = Object.FindAnyObjectByType<CheckerboardKeyboardController>();
+            Assert.That(manager.StartSession(), Is.True);
+            manager.ConfirmExperimentReady();
+            yield return WaitForState(manager, CheckerboardSessionState.WaitingForResponse);
+            controller.SubmitResponse(Response.Convex);
+            Assert.That(manager.SessionState, Is.EqualTo(CheckerboardSessionState.BlockPause));
+            Assert.That(manager.IsSessionActive, Is.True);
+            var block = new MaterialPropertyBlock();
+            stimulus.GetComponent<MeshRenderer>().GetPropertyBlock(block);
+            Assert.That(block.GetFloat("_FixationEnabled"), Is.EqualTo(1f), "Das rote Kreuz bleibt in der Pause.");
+            TextMesh prompt = stimulus.GetComponentInChildren<TextMesh>(includeInactive: true);
+            Assert.That(prompt.text, Does.Contain("SHORT BREAK"));
+            manager.ContinueAfterBlockPause();
+            yield return WaitForState(manager, CheckerboardSessionState.WaitingForResponse);
+            controller.SubmitResponse(Response.Concave);
+            Assert.That(manager.SessionState, Is.EqualTo(CheckerboardSessionState.Completed));
+            yield return new ExitPlayMode();
+        }
+
+        private static void SetInts(SerializedProperty list, params int[] values)
+        {
+            list.arraySize = values.Length;
+            for (int index = 0; index < values.Length; index++)
+                list.GetArrayElementAtIndex(index).intValue = values[index];
+        }
+
         private static void AssertNoSessionFiles(Object manager)
         {
             Assert.That(new SerializedObject(manager).FindProperty("activeSessionFolder").stringValue,
@@ -803,6 +880,14 @@ namespace GlobeEffect.VRCheckerboard.Tests
             manager.FindProperty("requireFixation").boolValue = false;
             manager.FindProperty("autoStartOnPlay").boolValue = false;
             manager.FindProperty("outputRoot").stringValue = OutputRoot;
+            // Die Ablauftests rechnen mit Repeats Per Condition und ohne Pausen.
+            // Wiederholungen pro Wert und Viertelpausen haben eigene Tests.
+            foreach (string perValue in new[] { "repeatsPerKValue", "repeatsPerLValue" })
+            {
+                SerializedProperty list = manager.FindProperty(perValue);
+                if (list != null) list.arraySize = 0;
+            }
+            manager.FindProperty("blocksPerSession").intValue = 1;
             manager.ApplyModifiedPropertiesWithoutUndo();
 
             // Der Dummy wird hier ausdrücklich gewählt. So hängt der Test nicht

@@ -15,7 +15,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     public sealed class RandomDotTrajectoryDiagnostic : MonoBehaviour
     {
         [Header("Instrument – live einstellbar; Änderungen starten neu")]
-        [Range(0f, 1.4f)] public float distortionK = 1f;
+        [Range(0f, 2f)] public float distortionK = 1f;
         [Range(1f, 20f)] public float magnification = 10f;
         [Range(20f, 100f)] public float fieldOfViewDegrees = 60f;
         [Range(0f, 10f)] public float edgeSoftnessDegrees = 1f;

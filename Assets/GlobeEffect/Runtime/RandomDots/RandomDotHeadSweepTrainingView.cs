@@ -102,6 +102,13 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             Show(false, "PRACTICE " + trial + " / " + total + "\n\nOUTWARD OR INWARD?", responseLines);
         }
 
+        public void ShowBlockPause(int finishedBlock, int blockCount)
+        {
+            // Überschrift über, Fußzeile unter dem Kreuz: das rote Kreuz bleibt frei sichtbar.
+            Show(false, "SHORT BREAK\n\nBlock " + finishedBlock + " of " + blockCount + " done.",
+                "Rest a moment if you like.\nThe experimenter will continue.");
+        }
+
         public void ShowSimulatedExample(string categoryLabel, string note)
         {
             Show(false, "EXAMPLE: " + categoryLabel + "\n\n" + note, string.Empty);

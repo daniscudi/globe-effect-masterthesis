@@ -419,6 +419,15 @@ namespace GlobeEffect.VRCheckerboard
             ShowParts(checkerboard: false, noise: false, fixation: false, prompt: true);
         }
 
+        // Pausenhinweis: Text wie bei ShowResponsePrompt, aber das Fixationskreuz
+        // bleibt sichtbar (der Text lässt die Mitte frei).
+        public void ShowPausePrompt(string promptText)
+        {
+            SetupTextObject();
+            textMesh.text = promptText ?? string.Empty;
+            ShowParts(checkerboard: false, noise: false, fixation: true, prompt: true);
+        }
+
         public void Hide()
         {
             isVisible = false;

@@ -28,7 +28,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         WaitingForResponse,
         Completed,
         Aborted,
-        PreStimulus
+        PreStimulus,
+        BlockPause // Pause zwischen Viertelblöcken; der Versuchsleiter setzt mit F5 fort.
     }
 
     /// <summary>
@@ -141,8 +142,18 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         [FormerlySerializedAs("repetitionsPerCondition")]
         [SerializeField, Min(1)]
-        [Tooltip("Wie oft jede Kombination gezeigt wird. Mehr Wiederholungen heißt sicherere Ergebnisse, aber auch eine längere Sitzung.")]
+        [Tooltip("Wie oft jede Kombination gezeigt wird. Mehr Wiederholungen heißt sicherere Ergebnisse, aber auch eine längere Sitzung. Gilt für jedes l ohne eigenen Eintrag in Repeats Per L Value.")]
         private int repeatsPerCondition = 3;
+
+        [SerializeField]
+        [Tooltip("Wiederholungen pro l, in derselben Reihenfolge wie die l-Liste (z. B. Randwerte 8 oder 16, Mitte 25). " +
+            "Leer oder zu kurz: für die fehlenden l gilt Repeats Per Condition.")]
+        private List<int> repeatsPerLValue = new();
+
+        [SerializeField, Range(1, 10)]
+        [Tooltip("In wie viele Blöcke eine Sitzung geteilt wird. 4 = Viertelblöcke: nach 25, 50 und 75 % der " +
+            "gültigen Trials eine Pause mit rotem Kreuz, die der Versuchsleiter mit F5 beendet. 1 = keine Pausen.")]
+        private int blocksPerSession = 4;
 
         [Header("Fixation And Repeats")]
         [SerializeField]
@@ -297,6 +308,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private readonly LookAwayTimer lookAway = new();
         private IReadOnlyList<CheckerboardTrial> trialPlan;
         private CheckerboardTrialQueue trialQueue;
+        private int pausesTaken;
         private CheckerboardTrial currentTrial;
         private CheckerboardExperimentFiles experimentFiles;
         private DateTime trialStartUtc;
@@ -343,7 +355,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 or State.PreStimulus
                 or State.WaitingForFixation
                 or State.RunningTrial
-                or State.WaitingForResponse;
+                or State.WaitingForResponse
+                or State.BlockPause;
 
         public bool IsTrainingActive =>
             sessionState is State.TrainingInstructions
@@ -404,6 +417,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 if (previewActive && keyboard[abortSessionKey].wasPressedThisFrame)
                 {
                     StopPreview();
+                    return;
+                }
+
+                if (sessionState == State.BlockPause && keyboard[startSessionKey].wasPressedThisFrame)
+                {
+                    ContinueAfterBlockPause();
                     return;
                 }
 
@@ -821,7 +840,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             try
             {
                 trialPlan = CheckerboardTrialPlanner.CreateRandomizedPlan(
-                    fieldOfViewValues, eyePresentations, visualSpaceLValues, repeatsPerCondition, randomSeed);
+                    fieldOfViewValues, eyePresentations, visualSpaceLValues, repeatsPerCondition, randomSeed,
+                    repeatsPerLValue);
                 trialQueue = new CheckerboardTrialQueue(trialPlan);
 
                 DateTime sessionStartUtc = DateTime.UtcNow;
@@ -851,6 +871,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             totalTrials = trialPlan.Count;
             validTrialsCompleted = 0;
             presentationCount = 0;
+            pausesTaken = 0;
             sessionState = State.WaitingForExperimentReady;
 
             Debug.Log($"Checkerboard-Sitzung vorbereitet: {totalTrials} gültige Trials geplant, " +
@@ -1235,8 +1256,53 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // Antwortphase.
             StopAndClear(ref presentationCoroutine);
             currentTrial = null;
+            if (TryStartBlockPause())
+            {
+                return;
+            }
+
             sessionState = State.InterTrial;
             BeginNextAttempt();
+        }
+
+        private bool TryStartBlockPause()
+        {
+            // Viertelblöcke: Nach 25, 50 und 75 % der geplanten gültigen Trials eine
+            // Pause. Wiederholte ungültige Trials zählen nicht mit. Das rote Kreuz
+            // bleibt stehen. Am Ende der Sitzung kommt keine Pause mehr.
+            int nextPause = pausesTaken + 1;
+            if (blocksPerSession <= 1 || nextPause >= blocksPerSession
+                || trialQueue == null || trialQueue.Count == 0) return false;
+            int boundary = Mathf.RoundToInt(totalTrials * nextPause / (float)blocksPerSession);
+            if (validTrialsCompleted < boundary) return false;
+
+            pausesTaken = nextPause;
+            sessionState = State.BlockPause;
+            stimulus.ShowPausePrompt(BuildBlockPausePrompt());
+            WriteMarker("BlockPauseStarted;block={0};of={1};valid_trials={2}",
+                pausesTaken, blocksPerSession, validTrialsCompleted);
+            Debug.Log($"Pause nach Block {pausesTaken} von {blocksPerSession} ({validTrialsCompleted} gültige " +
+                $"Trials). Weiter mit {ResponseInputController.GetReadableKeyName(startSessionKey)}.", this);
+            return true;
+        }
+
+        /// <summary>Versuchsleiter beendet die Viertelblock-Pause (F5).</summary>
+        public void ContinueAfterBlockPause()
+        {
+            if (sessionState != State.BlockPause) return;
+            WriteMarker("BlockPauseEnded;block={0}", pausesTaken);
+            sessionState = State.InterTrial;
+            BeginNextAttempt();
+        }
+
+        public int PausesTaken => pausesTaken;
+
+        private string BuildBlockPausePrompt()
+        {
+            // Der Text steht mittig. Die leeren Zeilen in der Mitte lassen das
+            // rote Kreuz frei: Überschrift darüber, Hinweis darunter.
+            return "SHORT BREAK\nBlock " + pausesTaken + " of " + blocksPerSession + " done.\n\n\n\n\n" +
+                "Rest a moment if you like.\nThe experimenter will continue.";
         }
 
         private void CompleteSession()

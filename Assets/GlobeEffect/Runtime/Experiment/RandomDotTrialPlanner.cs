@@ -25,13 +25,24 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             IReadOnlyList<float> instrumentMagnificationMValues,
             IReadOnlyList<float> contentZoomValues,
             RandomDotMotionMode motionMode, int repetitions, int randomSeed, int dotSeedBase,
-            RandomDotSweepAxis simulatedSweepAxis = RandomDotSweepAxis.Horizontal)
+            RandomDotSweepAxis simulatedSweepAxis = RandomDotSweepAxis.Horizontal,
+            IReadOnlyList<int> repetitionsPerK = null)
         {
             if (!Enum.IsDefined(typeof(RandomDotMotionMode), motionMode))
                 throw new ArgumentOutOfRangeException(nameof(motionMode));
+            // Ein einziger gemischter Block: so groß wie die meisten Wiederholungen.
+            int mostRepetitions = repetitions;
+            if (instrumentDistortionKValues != null)
+            {
+                mostRepetitions = 0;
+                for (int index = 0; index < instrumentDistortionKValues.Count; index++)
+                    mostRepetitions = Math.Max(mostRepetitions,
+                        PlannerTools.RepetitionsFor(repetitionsPerK, index, repetitions));
+            }
             return CreateRandomizedPlan(angularDiametersDegrees, eyePresentations,
                 instrumentDistortionKValues, instrumentMagnificationMValues, contentZoomValues,
-                new[] { motionMode }, repetitions, repetitions, randomSeed, dotSeedBase, simulatedSweepAxis);
+                new[] { motionMode }, mostRepetitions, mostRepetitions, randomSeed, dotSeedBase,
+                simulatedSweepAxis, repetitionsPerK, repetitions);
         }
 
         // Ältere Plan-API bleibt für vorhandene Tests und historische Blockpläne erhalten.
@@ -47,7 +58,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             int repetitionsPerMiniBlock,
             int randomSeed,
             int dotSeedBase,
-            RandomDotSweepAxis simulatedSweepAxis = RandomDotSweepAxis.Horizontal)
+            RandomDotSweepAxis simulatedSweepAxis = RandomDotSweepAxis.Horizontal,
+            IReadOnlyList<int> repetitionsPerK = null,
+            int? defaultRepetitionsPerK = null)
         {
             // Erst prüfen, ob die Werte stimmen. Lieber hier abbrechen, als mitten
             // in der Messung zu merken, dass etwas nicht passt.
@@ -82,8 +95,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                         {
                             foreach (float magnificationM in instrumentMagnificationMValues)
                             {
-                                foreach (float distortionK in instrumentDistortionKValues)
+                                for (int kIndex = 0; kIndex < instrumentDistortionKValues.Count; kIndex++)
                                 {
+                                    float distortionK = instrumentDistortionKValues[kIndex];
                                     conditionIndex++;
                                     conditions.Add(new Condition
                                     {
@@ -101,6 +115,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                                         DistortionK = distortionK,
                                         MagnificationM = magnificationM,
                                         ContentZoom = contentZoom,
+                                        // Eigene Wiederholungszahl pro k (z. B. Randwerte 8-mal).
+                                        Repetitions = PlannerTools.RepetitionsFor(repetitionsPerK, kIndex,
+                                            defaultRepetitionsPerK ?? repetitions),
                                     });
                                 }
                             }
@@ -115,7 +132,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     var miniBlockTrials = new List<RandomDotTrial>();
                     foreach (Condition condition in conditions)
                     {
-                        for (int repetition = first; repetition <= last; repetition++)
+                        for (int repetition = first; repetition <= Math.Min(last, condition.Repetitions); repetition++)
                         {
                             miniBlockTrials.Add(
                                 condition.CreateTrial(repetition, miniBlockIndex, dotSeedBase));
@@ -187,12 +204,25 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             // Erst jedes k für sich prüfen, dann jedes k zusammen mit jedem FOV.
             // Einzeln kann beides in Ordnung sein und zusammen trotzdem nicht gehen.
+            // k gehört zur Instrumentenformel (Merlitz) und darf bis 2 gehen; das l
+            // des Checkerboards bleibt davon getrennt. Zusammen mit dem FOV muss
+            // k · FOV/2 unter 90° bleiben, sonst kippt der Tangens um.
             foreach (float value in instrumentDistortionKValues)
             {
-                VisualSpaceRadialMapping.ValidateVisualSpaceL(value);
+                if (value < MerlitzBinocularReferenceMath.MinimumDistortionK
+                    || value > MerlitzBinocularReferenceMath.MaximumDistortionK)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(instrumentDistortionKValues),
+                        $"k = {value} liegt außerhalb von 0 bis {MerlitzBinocularReferenceMath.MaximumDistortionK}.");
+                }
+
                 foreach (float angularDiameter in angularDiametersDegrees)
                 {
-                    VisualSpaceRadialMapping.ValidateParameters(angularDiameter, value);
+                    if (value * 0.5f * angularDiameter >= 90f)
+                    {
+                        throw new ArgumentOutOfRangeException(nameof(instrumentDistortionKValues),
+                            $"k = {value} geht bei FOV {angularDiameter}° nicht: k · FOV/2 muss unter 90° bleiben.");
+                    }
                 }
             }
 
@@ -234,6 +264,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             public float DistortionK;
             public float MagnificationM;
             public float ContentZoom;
+            public int Repetitions;
 
             public RandomDotTrial CreateTrial(int repetition, int miniBlockIndex, int dotSeedBase)
             {

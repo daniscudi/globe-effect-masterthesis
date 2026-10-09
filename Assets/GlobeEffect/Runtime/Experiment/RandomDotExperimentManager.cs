@@ -22,7 +22,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         WaitingForFixation,
         PresentingMotion,
         WaitingForResponse,
-        PausedBetweenMiniBlocks, // Alter serialisierter Status; im aktuellen Ablauf nicht mehr verwendet.
+        PausedBetweenMiniBlocks, // Pause zwischen Viertelblöcken; der Versuchsleiter setzt mit F5 fort.
         PausedBetweenMotionBlocks, // Alter Status; neue Sitzungen enthalten nur eine Bewegungsart.
         Completed,
         Aborted,
@@ -132,8 +132,18 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         [FormerlySerializedAs("repetitionsPerCondition")]
         [SerializeField, Min(1)]
-        [Tooltip("Wie oft jede Kombination gezeigt wird. Mehr Wiederholungen heißt sicherere Ergebnisse, aber auch eine längere Sitzung.")]
+        [Tooltip("Wie oft jede Kombination gezeigt wird. Mehr Wiederholungen heißt sicherere Ergebnisse, aber auch eine längere Sitzung. Gilt für jedes k ohne eigenen Eintrag in Repeats Per K Value.")]
         private int repeatsPerCondition = 3;
+
+        [SerializeField]
+        [Tooltip("Wiederholungen pro k, in derselben Reihenfolge wie die k-Liste (z. B. Randwerte 8, Mitte 25). " +
+            "Leer oder zu kurz: für die fehlenden k gilt Repeats Per Condition.")]
+        private List<int> repeatsPerKValue = new();
+
+        [SerializeField, Range(1, 10)]
+        [Tooltip("In wie viele Blöcke eine Sitzung geteilt wird. 4 = Viertelblöcke: nach 25, 50 und 75 % der " +
+            "gültigen Trials eine Pause mit rotem Kreuz, die der Versuchsleiter mit F5 beendet. 1 = keine Pausen.")]
+        private int blocksPerSession = 4;
 
         [Header("Simulated Sweep")]
         [SerializeField]
@@ -390,6 +400,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private readonly FrameTimingTracker frameTiming = new();
         private int frameTimingStartFrame;
         private int trialsWithSlowFrames;
+        private int pausesTaken;
         private int trainedSimulatedMotionBlock;
         private int instructedActiveMotionBlock;
         private Coroutine simulatedTrainingCoroutine;
@@ -500,6 +511,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 if (sessionState == State.ResponseInstructions)
                 {
                     ConfirmResponseInstructions();
+                }
+                else if (sessionState == State.PausedBetweenMiniBlocks)
+                {
+                    ContinueAfterBlockPause();
                 }
                 else if (sessionState is State.HeadTrainingInstructions or State.SimulatedTrainingInstructions)
                 {
@@ -757,7 +772,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 trialPlan = RandomDotTrialPlanner.CreateSingleMotionPlan(
                     fieldOfViewValues, eyePresentations, instrumentDistortionKValues,
                     instrumentMagnificationMValues, contentZoomValues, sessionMotionMode,
-                    repeatsPerCondition, randomSeed, dotSeedBase, simulatedSweepAxis);
+                    repeatsPerCondition, randomSeed, dotSeedBase, simulatedSweepAxis, repeatsPerKValue);
                 CheckPointWorlds(trialPlan);
                 trialQueue = new RandomDotTrialQueue(trialPlan);
 
@@ -787,6 +802,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             validTrialsCompleted = 0;
             presentationCount = 0;
             trialsWithSlowFrames = 0;
+            pausesTaken = 0;
             currentMotionBlock = 0;
             currentMiniBlock = 0;
             trainedHeadMotionBlock = 0;
@@ -1630,6 +1646,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return;
             }
 
+            if (TryStartBlockPause())
+            {
+                return;
+            }
+
             sessionState = State.InterTrial;
             if (pauseSeconds <= 0f)
             {
@@ -1640,6 +1661,43 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 interTrialCoroutine = StartCoroutine(BeginNextAttemptAfterDelay());
             }
         }
+
+        private bool TryStartBlockPause()
+        {
+            // Viertelblöcke: Nach 25, 50 und 75 % der geplanten gültigen Trials eine
+            // Pause. Wiederholte ungültige Trials zählen nicht mit. Das rote Kreuz und
+            // die graue Fläche bleiben stehen; Text steht darüber und darunter.
+            int nextPause = pausesTaken + 1;
+            if (blocksPerSession <= 1 || nextPause >= blocksPerSession) return false;
+            int boundary = Mathf.RoundToInt(totalTrials * nextPause / (float)blocksPerSession);
+            if (validTrialsCompleted < boundary) return false;
+
+            pausesTaken = nextPause;
+            sessionState = State.PausedBetweenMiniBlocks;
+            stimulus.ShowFixationOnly();
+            if (stimulus.Observer != null)
+            {
+                headTrainingView ??= new RandomDotHeadSweepTrainingView(stimulus.Observer);
+                headTrainingView.ShowBlockPause(pausesTaken, blocksPerSession);
+            }
+            WriteMarker("BlockPauseStarted;task=random_dot_instrument;block={0};of={1};valid_trials={2}",
+                pausesTaken, blocksPerSession, validTrialsCompleted);
+            Debug.Log($"Pause nach Block {pausesTaken} von {blocksPerSession} ({validTrialsCompleted} gültige " +
+                $"Trials). Weiter mit {ResponseInputController.GetReadableKeyName(startSessionKey)}.", this);
+            return true;
+        }
+
+        /// <summary>Versuchsleiter beendet die Viertelblock-Pause (F5).</summary>
+        public void ContinueAfterBlockPause()
+        {
+            if (sessionState != State.PausedBetweenMiniBlocks) return;
+            headTrainingView?.Hide();
+            WriteMarker("BlockPauseEnded;task=random_dot_instrument;block={0}", pausesTaken);
+            sessionState = State.InterTrial;
+            BeginNextAttempt();
+        }
+
+        public int PausesTaken => pausesTaken;
 
         private IEnumerator BeginNextAttemptAfterDelay()
         {

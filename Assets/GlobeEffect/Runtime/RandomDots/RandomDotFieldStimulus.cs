@@ -132,7 +132,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [Header("Merlitz Instrument Optics")]
         [FormerlySerializedAs("merlitzK")]
         [FormerlySerializedAs("visualSpaceL")]
-        [SerializeField, Range(0f, 1.4f)]
+        [SerializeField, Range(0f, 2f)]
         [Tooltip("Verzeichnung k des simulierten Instruments. k = 1 ist die Tangentenbedingung, k = 0,5 der Helmholtz-/Kreispunkt. Werte über 1 setzen die Familie in die tonnenförmige Richtung fort.")]
         private float instrumentDistortionK = 0.5f;
 
@@ -853,6 +853,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 Mathf.Tan(referenceGridSpacingDegrees * Mathf.Deg2Rad));
             propertyBlock.SetFloat("_ReferenceGridWidthPixels", referenceGridWidthPixels);
             propertyBlock.SetColor("_ReferenceGridColor", referenceGridColor);
+            // Gleicher Weg wie die Kamera-Löschfarbe außen (Gleitkomma, gleiche
+            // Farbraum-Umrechnung), damit gleiche Farben innen und außen exakt gleich sind.
+            propertyBlock.SetColor("_FieldBackgroundColor", fieldBackgroundColor);
             meshRenderer.SetPropertyBlock(propertyBlock);
             SendFrameValuesToShader();
         }
@@ -922,7 +925,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             referenceGridWidthPixels = Mathf.Clamp(referenceGridWidthPixels, 0.5f, 4f);
             previewImageCenterSpeed = Mathf.Clamp(previewImageCenterSpeed, 0.5f, 120f);
             lightDotFraction = Mathf.Clamp01(lightDotFraction);
-            instrumentDistortionK = Mathf.Clamp(instrumentDistortionK, 0f, 1.4f);
+            instrumentDistortionK = Mathf.Clamp(instrumentDistortionK, 0f, 2f);
             instrumentMagnificationM = Mathf.Clamp(instrumentMagnificationM,
                 MinimumInstrumentMagnification, MaximumInstrumentMagnification);
             contentZoom = Mathf.Clamp(contentZoom, MinimumContentZoom, MaximumContentZoom);

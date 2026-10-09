@@ -799,14 +799,31 @@ MonoBehaviour:
   - 60
   eyePresentations: 00000000
   visualSpaceLValues:
-  - 1.2
-  - 1
-  - 0.9
-  - 0.8
-  - 0.7
-  - 0.6
   - 0.2
+  - 0.3
+  - 0.4
+  - 0.5
+  - 0.6
+  - 0.7
+  - 0.8
+  - 0.9
+  - 1
+  - 1.1
+  - 1.2
   repeatsPerCondition: 15
+  repeatsPerLValue:
+  - 16
+  - 25
+  - 25
+  - 25
+  - 25
+  - 25
+  - 25
+  - 25
+  - 25
+  - 25
+  - 8
+  blocksPerSession: 4
   requireFixation: 0
   maxLookAwaySeconds: 0.15
   maxNoDataSeconds: 0.2
