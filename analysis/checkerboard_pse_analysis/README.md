@@ -25,7 +25,19 @@ Sitzungen, FOVs, Augenmodi, Bewegungsarten, Vergrößerungen oder Sollgeschwindi
 werden nicht ungeprüft zusammen ausgewertet. Wiederholte ungültige Versuche zählen
 nicht; doppelte gültige `sequence_index` werden abgewiesen.
 
-Für ältere CSVs mit mehreren Bedingungen zuerst eine Bedingung wählen:
+Neue Random-Dot-CSVs (ab 7. Oktober) enthalten nur eine Bewegungsart pro
+Sitzung: `F5` speichert z. B. Simulated Panning, `F7` aktive Kopfbewegung in
+einer eigenen CSV. Jede Datei ergibt einen Fit.
+
+Ältere Random-Dot-CSVs (bis 7. Oktober, z. B. 350 Trials mit `SimulatedYaw`
+und `HeadTracked` in einer Datei) werden automatisch aufgeteilt: Jede
+Bewegungsart bzw. jede Kombination aus m, Zoom, FOV, Augenmodus und
+Geschwindigkeit wird getrennt gefittet und bekommt eigene PNG/XLSX-Dateien.
+Zusätzlich entsteht `random_dot_pse_summary_psignifit.xlsx` mit allen PSEs.
+Eine Bedingung ohne ausreichende Daten wird mit Warnung übersprungen.
+Verschiedene Personen, Sitzungen oder Mappings in einer Datei bleiben ein Fehler.
+
+Nur eine Bedingung einer gemischten CSV auswerten:
 
 ```matlab
 condition_filter = struct('motion_mode', 'SimulatedYaw', ...
