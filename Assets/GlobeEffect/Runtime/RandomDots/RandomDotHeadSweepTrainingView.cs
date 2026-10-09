@@ -99,8 +99,19 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             Show(false, "PRACTICE " + trial + " / " + total + "\n\nOUTWARD OR INWARD?", responseLines);
         }
 
-        public void ShowActiveMotionInstructions(bool free, string responseLines, string startKey)
+        public void ShowActiveMotionInstructions(bool free, bool openEnded, string responseLines, string startKey)
         {
+            if (free && openEnded)
+            {
+                // Offene aktive Trials: kein Zeitlimit, die Antwort beendet den Trial.
+                Show(false, "ACTIVE HEAD MOVEMENT\n\n" +
+                    "Look around freely and move your head in any direction,\n" +
+                    "as long as you like.\n" +
+                    "Answer whenever you are ready. Then the next trial starts.",
+                    responseLines + "\n\n" + startKey + " = START TRIALS");
+                return;
+            }
+
             string movement = free
                 ? "Move your head freely: left/right or up/down.\nNo target path or speed is required."
                 : "Use the left/right rhythm you practised.";
@@ -109,12 +120,13 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 responseLines + "\n\n" + startKey + " = START TRIALS");
         }
 
-        public void ShowResponseInstructions(string responseLines, string startKeyName)
+        public void ShowResponseInstructions(string responseLines, string startKeyName, bool openEnded = false)
         {
             Show(false,
                 "RANDOM DOT EXPERIMENT\n\n" +
-                "Keep looking at the cross.\n" +
-                "Answer after the dots have disappeared.",
+                (openEnded
+                    ? "Look around freely, as long as you like.\nAnswer whenever you are ready."
+                    : "Keep looking at the cross.\nAnswer after the dots have disappeared."),
                 responseLines + "\n\n" + startKeyName + " = START");
         }
 

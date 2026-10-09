@@ -692,14 +692,14 @@ MonoBehaviour:
   sweepSpeed: 1.2
   headTrackedSeconds: 5
   sweepAmplitudeDegrees: 2
-  trainHeadMovement: 1
+  trainHeadMovement: 0
   requiredGoodTrainingSweeps: 4
   maximumProfileErrorDegrees: 0.9
   maximumTrainingEndpointErrorDegrees: 0.9
   headTurnSafetyDegrees: 15
   checkHeadMotion: 1
   freeHeadMovement: 1
-  trainSimulatedMotion: 1
+  trainSimulatedMotion: 0
   simulatedTrainingKValues:
   - 0.2
   - 1.2

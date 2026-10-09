@@ -203,9 +203,18 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
             if (Section("Aktive Kopfbewegung"))
             {
-                Fields(serializedObject, "freeHeadMovement", "headTrackedSeconds", "headTurnSafetyDegrees");
+                Fields(serializedObject, "freeHeadMovement");
                 bool free = serializedObject.FindProperty("freeHeadMovement").boolValue;
-                EditorGUILayout.HelpBox(free
+                bool openEnded = free && serializedObject.FindProperty("openEndedActiveTrials").boolValue;
+                if (free) Fields(serializedObject, "openEndedActiveTrials");
+                if (!openEnded) Fields(serializedObject, "headTrackedSeconds");
+                Fields(serializedObject, "headTurnSafetyDegrees");
+                if (openEnded)
+                    EditorGUILayout.HelpBox("OFFEN: Die Punkte bleiben sichtbar, bis die Person antwortet. " +
+                        "Frei umschauen, beliebig lange und in jede Richtung. Danach graues Feld " +
+                        "(Pause Seconds) und der nächste Trial. Die Punktwelt reicht nur Head Turn " +
+                        "Safety Degrees weit um die Startblickrichtung.", MessageType.Info);
+                else EditorGUILayout.HelpBox(free
                     ? "FREI: beliebige Richtung, kein Solltempo, keine Sinus-/Wendeprüfung. " +
                         "Blickkontrolle bleibt aktiv. Der Punktvorrat ist endlich: " +
                         "Head Turn Safety Degrees legt die verfügbare Reserve um die Startblickrichtung fest."
