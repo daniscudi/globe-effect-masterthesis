@@ -40,7 +40,7 @@ fprintf('input file: %s\n', csv_path);
 
 % Change this only if the psignifit folder is moved.
 if ~exist('psignifit_path', 'var')
-    psignifit_path = "C:\Users\ZVSL-070\Downloads\psignifit-matlab\psignifit-master";
+    psignifit_path = "D:\TolgaDaniskan\Globe Effect\psignifit-master\psignifit-master";
 end
 if isfolder(psignifit_path)
     addpath(genpath(psignifit_path));
