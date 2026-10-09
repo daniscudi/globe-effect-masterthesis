@@ -385,6 +385,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private bool standaloneTraining;
         private bool trainingResponseReceived;
         private CheckerboardCurvatureResponse trainingResponse;
+        private readonly FrameTimingTracker frameTiming = new();
+        private int frameTimingStartFrame;
+        private int trialsWithSlowFrames;
         private int trainedSimulatedMotionBlock;
         private int instructedActiveMotionBlock;
         private Coroutine simulatedTrainingCoroutine;
@@ -454,6 +457,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // Hier werden die Tasten vom Versuchsleiter abgefragt: starten und
             // abbrechen. Läuft gerade die Bewegung, wird nebenher in jedem Frame
             // geprüft, ob der Blick noch auf dem Kreuz liegt.
+            // Bildzeiten nur während der Darbietung zählen, ab dem Frame nach dem Start.
+            if (sessionState == State.PresentingMotion && Time.frameCount > frameTimingStartFrame)
+                frameTiming.Add(Time.unscaledDeltaTime);
+
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null && !IsSessionActive && !IsTrainingActive
                 && keyboard[previewKey].wasPressedThisFrame)
@@ -775,6 +782,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             totalTrials = trialPlan.Count;
             validTrialsCompleted = 0;
             presentationCount = 0;
+            trialsWithSlowFrames = 0;
             currentMotionBlock = 0;
             currentMiniBlock = 0;
             trainedHeadMotionBlock = 0;
@@ -1350,6 +1358,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             stimulusEndUnitySeconds = 0d;
+            frameTiming.Reset(FrameTimingTracker.CurrentExpectedFrameMilliseconds());
+            frameTimingStartFrame = Time.frameCount;
             sessionState = State.PresentingMotion;
 
             WriteMarker(BuildTrialStartMarker(currentTrial));
@@ -1572,7 +1582,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 gaze.SteadySeconds, gaze.ValidSampleFraction,
                 lookAway.LongestLookAwaySeconds, lookAway.LongestNoDataSeconds,
                 stimulus.DotCount, stimulus.WorldCoverageDiameterDegrees, stimulus.FieldRadiusMeters,
-                status, IsFreeHeadTrial(currentTrial));
+                status, IsFreeHeadTrial(currentTrial), frameTiming);
         }
 
             // Die Fehlerwerte zur Sollbahn gibt es nur bei geführten HeadTracked-Trials.
@@ -1591,6 +1601,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             try
             {
                 experimentFiles.AppendResult(result, totalTrials);
+                if (result.FrameTiming.SlowFrames > 0) trialsWithSlowFrames++;
                 return true;
             }
             catch (Exception exception)
@@ -1637,8 +1648,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // Zum Schluss: Marker in die Aufnahme schreiben und die
             // Eye-Tracking-Aufzeichnung beenden.
             currentTrialNumber = totalTrials;
-            WriteMarker("SessionCompleted;task=random_dot_instrument;valid_trials={0};presentations={1}",
-                validTrialsCompleted, presentationCount);
+            WriteMarker("SessionCompleted;task=random_dot_instrument;valid_trials={0};presentations={1};" +
+                "presentations_with_slow_frames={2}", validTrialsCompleted, presentationCount, trialsWithSlowFrames);
+            if (trialsWithSlowFrames > 0)
+                Debug.LogWarning($"{trialsWithSlowFrames} von {presentationCount} Darbietungen hatten ausgefallene " +
+                    "Frames (Spalte slow_frames in der CSV). Die Bewegung kann dort geruckelt haben.", this);
             EndSession(State.Completed);
             if (stimulus.Observer != null)
             {

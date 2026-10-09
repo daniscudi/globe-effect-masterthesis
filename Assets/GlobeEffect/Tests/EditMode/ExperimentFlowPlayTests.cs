@@ -328,6 +328,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(ParseFloat(rows[0]["stimulus_duration_s"]), Is.GreaterThanOrEqualTo(0.35f));
             Assert.That(ParseFloat(rows[0]["response_time_s"]), Is.EqualTo(0f).Within(0.001f));
             Assert.That(rows[1]["response"], Is.EqualTo("Concave"));
+            // Bildzeiten der Darbietung stehen pro Trial in der CSV.
+            Assert.That(int.Parse(rows[0]["frames_presented"]), Is.GreaterThan(1));
+            Assert.That(int.Parse(rows[0]["slow_frames"]), Is.GreaterThanOrEqualTo(0));
+            Assert.That(ParseFloat(rows[0]["max_frame_ms"]), Is.GreaterThan(0f));
             yield return new ExitPlayMode();
         }
 
