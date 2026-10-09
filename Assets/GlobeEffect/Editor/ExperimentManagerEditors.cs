@@ -1,4 +1,7 @@
+using System.Globalization;
+using System.Text;
 using GlobeEffect.VRCheckerboard.Experiment;
+using GlobeEffect.VRCheckerboard.RandomDots;
 using UnityEditor;
 using UnityEngine;
 
@@ -209,6 +212,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 if (free) Fields(serializedObject, "openEndedActiveTrials");
                 if (!openEnded) Fields(serializedObject, "headTrackedSeconds");
                 Fields(serializedObject, "headTurnSafetyDegrees");
+                HeadTurnReachInfo();
                 if (openEnded)
                     EditorGUILayout.HelpBox("OFFEN: Die Punkte bleiben sichtbar, bis die Person antwortet. " +
                         "Frei umschauen, beliebig lange und in jede Richtung. Danach graues Feld " +
@@ -255,7 +259,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 Fields(serializedObject, "previewKey");
                 EditorGUILayout.HelpBox("Im Play Mode P drücken; erneut P oder F6 beendet. " +
                     "Hier live k, m, FOV und Bewegungsart ändern. Die Vorschau ist nicht der Trial Plan. " +
-                    "Das gerade Raster ist nur eine feste Referenz und bleibt in Training und Messung aus.",
+                    "Das gerade Raster ist nur eine feste Referenz und bleibt in Training und Messung aus. " +
+                    "Punktwelt: Bei Motion Mode HeadTracked gilt wie in der Sitzung Head Turn Safety Degrees " +
+                    "(World Coverage wird dann überschrieben), bei SimulatedYaw World Coverage.",
                     MessageType.Info);
                 LinkedFields("stimulus", "fieldOfViewDegrees", "edgeSoftnessDegrees", "dotDensity",
                     "dotSizeDegrees", "darkColor", "lightColor", "backgroundColor", "fieldBackgroundColor",
@@ -284,6 +290,52 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
             EndSettings("sessionState", "currentTrialNumber", "totalTrials", "validTrialsCompleted",
                 "presentationCount", "sessionMotionMode", "activeSessionFolder");
+        }
+
+        private void HeadTurnReachInfo()
+        {
+            // Wie weit der Kopf drehen kann und wie viele Punkte das kostet, je m.
+            // Gerechnet wie vor dem Sitzungsstart: ungünstigstes FOV, Zoom und k.
+            var stimulus = serializedObject.FindProperty("stimulus").objectReferenceValue as RandomDotFieldStimulus;
+            if (stimulus == null) return;
+            float reach = Mathf.Max(serializedObject.FindProperty("sweepAmplitudeDegrees").floatValue,
+                serializedObject.FindProperty("headTurnSafetyDegrees").floatValue);
+            SerializedProperty fovs = serializedObject.FindProperty("fieldOfViewValues");
+            SerializedProperty ms = serializedObject.FindProperty("instrumentMagnificationMValues");
+            SerializedProperty zooms = serializedObject.FindProperty("contentZoomValues");
+            SerializedProperty ks = serializedObject.FindProperty("instrumentDistortionKValues");
+            var culture = CultureInfo.GetCultureInfo("de-DE");
+            var text = new StringBuilder($"Punkte bis ±{reach:0.#}° Kopfdrehung ab Trialbeginn, in jede Richtung.");
+            bool tooMuch = false;
+            for (int mi = 0; mi < ms.arraySize; mi++)
+            {
+                float m = ms.GetArrayElementAtIndex(mi).floatValue;
+                int mostDots = 0;
+                bool impossible = false;
+                for (int fi = 0; fi < fovs.arraySize; fi++)
+                for (int zi = 0; zi < zooms.arraySize; zi++)
+                for (int ki = 0; ki < ks.arraySize; ki++)
+                {
+                    float zoom = zooms.GetArrayElementAtIndex(zi).floatValue;
+                    float coverage = RandomDotFieldStimulus.CoverageNeeded(fovs.GetArrayElementAtIndex(fi).floatValue,
+                        zoom, m, ks.GetArrayElementAtIndex(ki).floatValue, reach);
+                    if (float.IsInfinity(coverage) || coverage > RandomDotFieldStimulus.MaximumCoverageDegrees)
+                    {
+                        impossible = true;
+                        continue;
+                    }
+                    mostDots = Mathf.Max(mostDots,
+                        RandomDotFieldStimulus.DotCountFor(stimulus.DotDensity, m, zoom, coverage));
+                }
+                bool overLimit = mostDots > RandomDotFieldStimulus.MaximumDotCount;
+                tooMuch |= impossible || overLimit;
+                text.Append($"\nm = {m.ToString("0.##", culture)}: bis ca. {mostDots.ToString("N0", culture)} Punkte");
+                if (overLimit)
+                    text.Append($" – über {RandomDotFieldStimulus.MaximumDotCount.ToString("N0", culture)}, Sitzung startet nicht");
+                if (impossible)
+                    text.Append(" – Punktwelt größer als 170°, Sitzung startet nicht");
+            }
+            EditorGUILayout.HelpBox(text.ToString(), tooMuch ? MessageType.Warning : MessageType.Info);
         }
 
         private void PreviewTakeoverButtons(RandomDotExperimentManager manager)

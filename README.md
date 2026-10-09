@@ -584,8 +584,12 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   Auswahl, `F7` startet die andere Variante als neue Sitzung. Beide Tasten sind
   einstellbar. `T` übt dieselbe Auswahl ohne Messdateien.
 
-* `Head Turn Safety Degrees`: unsichtbarer Sicherheitspuffer der
-  Punktwelt im `HeadTracked`-Block; voreingestellt auf `15°` je Seite
+* `Head Turn Safety Degrees`: so weit darf der Kopf im `HeadTracked`-Block von
+  der Blickrichtung zu Trialbeginn weg drehen (in jede Richtung), ohne dass am
+  Rand eine leere Fläche erscheint; voreingestellt auf `30°`. Der Inspector zeigt
+  darunter für jedes m, wie viele Punkte das braucht (Grenze 500.000). Gilt auch
+  in der Vorschau, wenn dort `Motion Mode = HeadTracked` gewählt ist; `World
+  Coverage` am Random Dot Field gilt nur für die Simulated-Vorschau.
 
 * `Check Head Motion` (früher `Validate Head Tracked Motion`): wiederholt geführte aktive Durchgänge, wenn der
   Seitenwechsel fehlt oder Auslenkung beziehungsweise Geschwindigkeit außerhalb

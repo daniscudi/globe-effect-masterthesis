@@ -49,16 +49,16 @@ namespace GlobeEffect.VRCheckerboard.Tests
         public void MagnificationTwenty_FitsIntoThePointLimitWithTheSceneSettings()
         {
             // Szenenwerte: 70 Grad FOV, Dichte 0,19, kein Zusatzzoom. Im HeadTracked-
-            // Block kommen 15 Grad Sicherheitsbereich dazu, im simulierten Block nur
+            // Block kommen 30 Grad Sicherheitsbereich dazu, im simulierten Block nur
             // die Schwenkweite. Geprüft werden alle k-Werte der Szene.
             Assert.That(Field.MaximumInstrumentMagnification, Is.EqualTo(20f));
             foreach (float k in new[] { 1.2f, 1f, 0.9f, 0.8f, 0.7f, 0.6f, 0.2f })
             {
-                float headTracked = Field.CoverageNeeded(70f, 1f, 20f, k, 15f);
+                float headTracked = Field.CoverageNeeded(70f, 1f, 20f, k, 30f);
                 float simulated = Field.CoverageNeeded(70f, 1f, 20f, k, 0.24f);
                 Assert.That(headTracked, Is.LessThan(Field.MaximumCoverageDegrees));
                 Assert.That(Field.DotCountFor(0.19f, 20f, 1f, headTracked),
-                    Is.InRange(70000, Field.MaximumDotCount));
+                    Is.InRange(200000, Field.MaximumDotCount));
                 Assert.That(Field.DotCountFor(0.19f, 20f, 1f, simulated), Is.InRange(2000, 3000));
             }
         }

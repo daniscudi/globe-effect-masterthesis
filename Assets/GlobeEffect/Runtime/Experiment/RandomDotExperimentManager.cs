@@ -188,8 +188,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         [FormerlySerializedAs("headTrackedCoverageYawDegrees")]
         [SerializeField, Range(3f, 60f)]
-        [Tooltip("Bis zu dieser Kopfrotation je Seite enthält die Punktwelt einen Sicherheitsbereich. Der gültige Zielschwenk bleibt deutlich kleiner.")]
-        private float headTurnSafetyDegrees = 15f;
+        [Tooltip("So weit darf der Kopf im HeadTracked-Block von der Blickrichtung zu Trialbeginn weg " +
+            "drehen (in jede Richtung), ohne dass am Rand eine leere Fläche erscheint. Größere Werte " +
+            "brauchen deutlich mehr Punkte. Gilt auch für die Vorschau mit Motion Mode HeadTracked.")]
+        private float headTurnSafetyDegrees = 30f;
 
         [FormerlySerializedAs("validateHeadTrackedMotion")]
         [SerializeField]
@@ -457,6 +459,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // Hier werden die Tasten vom Versuchsleiter abgefragt: starten und
             // abbrechen. Läuft gerade die Bewegung, wird nebenher in jedem Frame
             // geprüft, ob der Blick noch auf dem Kreuz liegt.
+            if (previewActive) KeepPreviewPointWorldLikeSession();
+
             // Bildzeiten nur während der Darbietung zählen, ab dem Frame nach dem Start.
             if (sessionState == State.PresentingMotion && Time.frameCount > frameTimingStartFrame)
                 frameTiming.Add(Time.unscaledDeltaTime);
@@ -1819,6 +1823,22 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             if (k <= concaveMaxK) return CheckerboardCurvatureResponse.Concave;
             if (k >= convexMinK) return CheckerboardCurvatureResponse.Convex;
             return CheckerboardCurvatureResponse.None;
+        }
+
+        /// <summary>So weit darf der Kopf im HeadTracked-Block drehen, bevor die Punktwelt endet.</summary>
+        public float HeadTrackedReachDegrees => Mathf.Max(sweepAmplitudeDegrees, headTurnSafetyDegrees);
+
+        private void KeepPreviewPointWorldLikeSession()
+        {
+            // In der Vorschau mit aktiver Kopfbewegung dieselbe Reichweite wie in der
+            // Sitzung (Head Turn Safety Degrees), nicht World Coverage. Wird bei jeder
+            // Änderung von FOV, m, k oder Zoom nachgeführt. Simulated behält World Coverage.
+            if (stimulus == null || stimulus.MotionMode != RandomDotMotionMode.HeadTracked) return;
+            float coverage = Mathf.Min(RandomDotFieldStimulus.MaximumCoverageDegrees,
+                RandomDotFieldStimulus.CoverageNeeded(stimulus.FieldOfViewDegrees, stimulus.ContentZoom,
+                    stimulus.InstrumentMagnificationM, stimulus.InstrumentDistortionK, HeadTrackedReachDegrees));
+            if (Mathf.Abs(coverage - stimulus.WorldCoverageDiameterDegrees) > 0.05f)
+                stimulus.SetWorldCoverage(coverage);
         }
 
         private bool IsOpenEndedTrial(RandomDotTrial trial) =>

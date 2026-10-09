@@ -247,6 +247,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         // Diese Werte kann man von außen nur lesen. Geändert werden sie im
         // Inspector oder über die Set-Methoden weiter unten.
+        public float FieldOfViewDegrees => fieldOfViewDegrees;
         public float ApertureEdgeSoftnessDegrees => edgeSoftnessDegrees;
         public float FieldRadiusMeters => fieldRadiusMeters;
         public float WorldCoverageDiameterDegrees => worldCoverageDegrees;
@@ -490,6 +491,17 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             sweepAxis = value;
             RestartMotionPhase();
             SendFrameValuesToShader();
+        }
+
+        /// <summary>
+        /// Nur die Größe der Punktwelt ändern (Vorschau). Der Neuaufbau läuft wie bei
+        /// einer Inspector-Änderung im nächsten LateUpdate, inklusive Shaderwerten.
+        /// </summary>
+        public void SetWorldCoverage(float newCoverageDegrees)
+        {
+            worldCoverageDegrees = newCoverageDegrees;
+            ClampInspectorValues();
+            meshRebuildPending = true;
         }
 
         public void ConfigurePointField(int newRandomSeed, float newCoverageDegrees)
