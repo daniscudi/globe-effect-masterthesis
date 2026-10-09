@@ -117,8 +117,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private Color lightColor = Color.white;
 
         [SerializeField]
-        [Tooltip("Neutrales Grau innerhalb der kreisförmigen Fernglasöffnung. Außerhalb bleibt der Kamerahintergrund schwarz.")]
+        [Tooltip("Farbe innerhalb der kreisförmigen Fernglasöffnung, unabhängig vom Außenhintergrund.")]
         private Color fieldBackgroundColor = Color.gray;
+
+        [SerializeField]
+        [Tooltip("Farbe außerhalb der kreisförmigen Öffnung. Edge Softness blendet das Punktfeld zu dieser Farbe aus.")]
+        private Color backgroundColor = Color.black;
 
         [SerializeField, Range(0f, 1f)]
         [Tooltip("Wie viele Punkte hell sind. 0,5 heißt halb schwarz und halb weiß.")]
@@ -842,6 +846,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         private void SendFrameValuesToShader()
         {
+            PaintCameraBackground();
             // Diese Werte ändern sich in jedem Frame: wo die Bewegung gerade steht
             // und wo der Kopf ist.
             if (meshRenderer == null)
@@ -861,6 +866,23 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             }
 
             meshRenderer.SetPropertyBlock(propertyBlock);
+        }
+
+        private void PaintCameraBackground()
+        {
+            // Wie beim Checkerboard: nur im Play Mode ändern, damit der
+            // gespeicherte Kamerahintergrund in der Szene unverändert bleibt.
+            if (!Application.isPlaying || observer == null)
+            {
+                return;
+            }
+
+            Camera headCamera = observer.GetComponent<Camera>();
+            if (headCamera != null)
+            {
+                headCamera.clearFlags = CameraClearFlags.SolidColor;
+                headCamera.backgroundColor = backgroundColor;
+            }
         }
 
         private void ShowOrHideRenderer()
