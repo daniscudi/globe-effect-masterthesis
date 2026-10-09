@@ -516,6 +516,20 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   Geschwindigkeit, Richtung). Erst mit `F5` gelten die Werte des Experiment
   Managers, und jeder Schwenk läuft genau einmal.
 
+* Random Dots, Vorschau übernehmen: Im Manager-Inspector unter
+  **Live-Vorschau ohne Messung** übernimmt **Vorschau-Werte ins Experiment
+  übernehmen** FOV, m, Zoom, Auge, Bewegungsart (`Session Motion Mode`),
+  Schwenkachse und Geschwindigkeit (Bezug + Wert) in den Versuchsplan. Listen
+  werden durch den einen Vorschau-Wert ersetzt. Das Punktbild (Dichte,
+  Punktgröße, Edge Softness, Farben) bleibt danach erhalten. Die k-Liste wird
+  nicht verändert. Im Play Mode geht das nur bei laufender Vorschau (`P`); es
+  gilt sofort für `F5`/`F7` und wird nach dem Stoppen des Play Mode in die Szene
+  geschrieben (Konsole meldet es, dann Szene mit Strg+S speichern).
+  Beim ersten Übernehmen wird der bisherige Stand gesichert;
+  **Originalwerte wiederherstellen** holt ihn zurück (auch nach mehrmaligem
+  Übernehmen). Auf dem Lab-PC vor `git pull` die Originalwerte wiederherstellen
+  oder die Szenenänderung verwerfen, sonst gibt es einen Konflikt in der Szene.
+
 * `Free Head Movement` ist standardmäßig an: In aktiven Haupttrials darf der
   Kopf frei nach links/rechts, oben/unten oder schräg bewegt werden. Es gibt
   keine Sollbahn, Wende-, Amplituden- oder Geschwindigkeitsprüfung und keine

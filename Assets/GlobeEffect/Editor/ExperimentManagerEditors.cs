@@ -254,12 +254,15 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "loopSweepInPreview", "worldCoverageDegrees", "showReferenceGrid",
                     "referenceGridSpacingDegrees", "referenceGridWidthPixels", "referenceGridColor");
                 EditorGUILayout.HelpBox("Beim Beenden der Vorschau oder Start von Training/Messung werden " +
-                    "alle Stimuluswerte auf den Stand vor der Vorschau zurückgesetzt.", MessageType.Info);
+                    "alle Stimuluswerte auf den Stand vor der Vorschau zurückgesetzt – außer nach " +
+                    "„Vorschau-Werte ins Experiment übernehmen“.", MessageType.Info);
+                var manager = (RandomDotExperimentManager)target;
                 if (Application.isPlaying && GUILayout.Button("Vorschau ein / aus"))
                 {
                     serializedObject.ApplyModifiedProperties();
-                    ((RandomDotExperimentManager)target).TogglePreview();
+                    manager.TogglePreview();
                 }
+                PreviewTakeoverButtons(manager);
             }
             if (Section("Verweise und erweiterte Einstellungen", false))
             {
@@ -269,6 +272,40 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
             EndSettings("sessionState", "currentTrialNumber", "totalTrials", "validTrialsCompleted",
                 "presentationCount", "sessionMotionMode", "activeSessionFolder");
+        }
+
+        private void PreviewTakeoverButtons(RandomDotExperimentManager manager)
+        {
+            EditorGUILayout.Space(4);
+            EditorGUILayout.HelpBox("Übernehmen schreibt FOV, m, Zoom, Auge, Bewegungsart, Achse und " +
+                "Geschwindigkeit der Vorschau in „Sitzung und Versuchsplan“ bzw. „Simulierte Bewegung“ " +
+                "(Listen werden durch den einen Vorschau-Wert ersetzt) und behält das Punktbild " +
+                "(Dichte, Punktgröße, Edge Softness, Farben). Die k-Liste bleibt unverändert. " +
+                "Im Play Mode nur bei laufender Vorschau; nach dem Stoppen wird es in die Szene " +
+                "übernommen – dann Szene speichern.", MessageType.Info);
+            // Im Play Mode ohne Vorschau trägt der Stimulus Werte des letzten Trials.
+            bool canTakeOver = !Application.isPlaying || manager.IsPreviewActive;
+            using (new EditorGUI.DisabledScope(!canTakeOver))
+            {
+                if (GUILayout.Button("Vorschau-Werte ins Experiment übernehmen"))
+                {
+                    serializedObject.ApplyModifiedProperties();
+                    RandomDotPreviewTakeoverEditor.TakeOver(manager);
+                    serializedObject.Update();
+                }
+            }
+            using (new EditorGUI.DisabledScope(!manager.HasValuesBeforePreviewTakeover))
+            {
+                if (GUILayout.Button("Originalwerte wiederherstellen"))
+                {
+                    serializedObject.ApplyModifiedProperties();
+                    RandomDotPreviewTakeoverEditor.Restore(manager);
+                    serializedObject.Update();
+                }
+            }
+            if (manager.HasValuesBeforePreviewTakeover)
+                EditorGUILayout.HelpBox("Versuchsplan enthält übernommene Vorschau-Werte. " +
+                    "Originalwerte sind gesichert.", MessageType.Warning);
         }
     }
 }
