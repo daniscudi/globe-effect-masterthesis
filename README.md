@@ -731,10 +731,23 @@ Aufbau dauert auf dem Entwicklungsrechner etwa `35 ms` und passiert einmal pro
 Trial, während nur das Kreuz zu sehen ist.
 
 Beim Start einer Sitzung wird für alle Trials nachgerechnet, ob die Punktwelt
-unter `170°` und unter `100.000` Punkten bleibt; sonst startet die Sitzung nicht
-und die Konsole nennt die Ursache. Punktzahl und Größe der Punktwelt stehen für
-jeden Trial in `dot_count` und `world_coverage_diameter_deg`, die Dichte im
-Marker `SessionStart`.
+unter `170°` und unter `500.000` Punkten bleibt; sonst startet die Sitzung nicht
+und die Konsole nennt die Ursache. Die Grenze ist keine technische Grenze; sie
+verhindert, dass die Punktzahl still abgeschnitten und die Dichte damit zwischen
+Bedingungen ungleich wird. Mehr Punkte verlängern den Aufbau pro Trial (grob
+linear; aus den `35 ms` bei 78.000 Punkten geschätzt etwa `0,2 s` bei 500.000,
+nicht gemessen). Punktzahl und Größe der Punktwelt
+stehen für jeden Trial in `dot_count` und `world_coverage_diameter_deg`, die
+Dichte im Marker `SessionStart`.
+
+Ob der Rechner mitkommt, steht ebenfalls pro Trial in der CSV:
+`frames_presented` (Bilder während der Darbietung), `slow_frames` (Bilder, die
+länger als das 1,5-Fache der Bildwiederholzeit brauchten, bei 90 Hz also über
+16,7 ms), `max_frame_ms` und `expected_frame_ms` (Bildwiederholzeit von Headset
+bzw. Monitor). In VR werden ausgefallene Bilder hochgerechnet; die Bewegung kann
+dann ruckeln, ohne dass es am Monitor auffällt. Trials mit `slow_frames > 0`
+sollte man sich deshalb ansehen. Am Sitzungsende meldet die Konsole, wie viele
+Darbietungen betroffen waren.
 
 ## Eye Tracking und Messdateien
 

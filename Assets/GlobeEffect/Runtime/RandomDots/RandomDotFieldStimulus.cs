@@ -46,11 +46,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         // Wie wenige und wie viele Punkte erlaubt sind. Die beiden Zahlen stehen
         // absichtlich nur hier, damit der Regler im Inspector und die Prüfungen
-        // weiter unten nie auseinanderlaufen. Die Obergrenze reicht für m = 20 im
-        // HeadTracked-Block (rund 78.000 Punkte bei 70 Grad FOV, Dichte 0,19 und
-        // 15 Grad Sicherheitsbereich).
+        // weiter unten nie auseinanderlaufen. Die Obergrenze ist keine technische
+        // Grenze (das Mesh nutzt 32-Bit-Indizes); sie verhindert, dass die Anzahl
+        // still abgeschnitten wird. Der Manager prüft vor jeder Sitzung dagegen.
+        // Ob der Rechner mitkommt, steht pro Trial in der CSV (slow_frames).
         public const int MinimumDotCount = 100;
-        public const int MaximumDotCount = 100000;
+        public const int MaximumDotCount = 500000;
 
         // Wie klein und wie groß der Zoom sein darf. Die beiden Zahlen stehen
         // nur hier, damit der Regler im Inspector, die Set-Methode und die

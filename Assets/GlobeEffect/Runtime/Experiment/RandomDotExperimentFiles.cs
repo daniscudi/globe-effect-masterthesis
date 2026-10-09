@@ -45,6 +45,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public float CarrierRadiusMeters { get; }
         public string Status { get; }
         public bool FreeHeadMovement { get; }
+        public FrameTimingTracker FrameTiming { get; }
         public string MotionConstraint => Trial.MotionMode == RandomDotMotionMode.SimulatedYaw
             ? "simulated" : FreeHeadMovement ? "free" : "guided";
 
@@ -86,7 +87,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             float worldCoverageDiameterDegrees,
             float carrierRadiusMeters,
             string status,
-            bool freeHeadMovement = false)
+            bool freeHeadMovement = false,
+            FrameTimingTracker frameTiming = null)
         {
             Trial = trial ?? throw new ArgumentNullException(nameof(trial));
             PresentationIndex = presentationIndex;
@@ -120,6 +122,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             CarrierRadiusMeters = carrierRadiusMeters;
             Status = status ?? string.Empty;
             FreeHeadMovement = freeHeadMovement;
+            // Kopie: der Manager setzt seinen Zähler für den nächsten Trial zurück.
+            FrameTiming = new FrameTimingTracker();
+            if (frameTiming != null) FrameTiming.CopyFrom(frameTiming);
         }
     }
 
@@ -152,7 +157,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "world_coverage_diameter_deg,carrier_radius_m,response,valid_for_analysis," +
             "fixation_sample_valid,fixation_inside_tolerance,fixation_angle_deg," +
             "continuous_fixation_s,fixation_valid_sample_fraction,longest_off_target_s," +
-            "longest_invalid_gaze_s,status,image_center_speed_deg_per_s,head_motion_constraint";
+            "longest_invalid_gaze_s,status,image_center_speed_deg_per_s,head_motion_constraint," +
+            "frames_presented,slow_frames,max_frame_ms,expected_frame_ms";
 
         public RandomDotExperimentFiles(
             string outputRoot,
@@ -217,7 +223,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 // wie schnell die Punkte dabei in der Bildmitte liefen.
                 .Add(RandomDotSimulatedSweep.ImageCenterSpeed(result.SweepSpeedDegreesPerSecond,
                     trial.InstrumentMagnificationM, trial.ContentZoom))
-                .Add(result.MotionConstraint));
+                .Add(result.MotionConstraint)
+                // Ausgefallene Frames während der Darbietung (siehe FrameTimingTracker).
+                .Add(result.FrameTiming.Frames).Add(result.FrameTiming.SlowFrames)
+                .Add(result.FrameTiming.MaxFrameMilliseconds)
+                .Add(result.FrameTiming.ExpectedFrameMilliseconds));
         }
     }
 }
