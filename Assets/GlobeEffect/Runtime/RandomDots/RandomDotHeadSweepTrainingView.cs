@@ -85,18 +85,25 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 previewKey + " = PREVIEW (NO DATA)");
         }
 
-        public void ShowSimulatedInstructions(string responseLines, string startKey)
+        public void ShowSimulatedInstructions(string responseLines, string startKey, bool feedback = false)
         {
             Show(false, "SIMULATED PANNING PRACTICE\n\n" +
                 "Keep your head still and look at the cross.\n" +
                 "The computer moves the dots.\n" +
-                "After they disappear: did the field curve outward or inward?",
+                "After they disappear: did the field curve outward or inward?" +
+                (feedback ? "\nFor clear examples you will see the expected answer." : string.Empty),
                 responseLines + "\n\n" + startKey + " = START PRACTICE");
         }
 
         public void ShowSimulatedResponse(int trial, int total, string responseLines)
         {
             Show(false, "PRACTICE " + trial + " / " + total + "\n\nOUTWARD OR INWARD?", responseLines);
+        }
+
+        public void ShowSimulatedFeedback(bool correct, string expectedLabel)
+        {
+            Show(false, (correct ? "CORRECT" : "NOT QUITE") + "\n\nThis example was clearly\n" + expectedLabel + ".",
+                string.Empty);
         }
 
         public void ShowActiveMotionInstructions(bool free, bool openEnded, string responseLines, string startKey)

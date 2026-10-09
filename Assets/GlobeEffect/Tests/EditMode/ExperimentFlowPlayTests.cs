@@ -201,6 +201,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
             var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
             config.FindProperty("simulatedTrainingRepeatsPerValue").intValue = 1;
             SetFloats(config.FindProperty("simulatedTrainingKValues"), 0.2f, 1.2f);
+            config.FindProperty("simulatedTrainingFeedback").boolValue = true;
+            config.FindProperty("feedbackSeconds").floatValue = 0.2f;
             config.ApplyModifiedPropertiesWithoutUndo();
             yield return new EnterPlayMode();
             yield return null;
@@ -210,13 +212,20 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.SimulatedTrainingInstructions));
             Assert.That(manager.IsSessionActive, Is.False);
             manager.ConfirmTrainingInstructions();
+            // Immer "konvex": bei k = 0,2 falsch, bei k = 1,2 richtig, Reihenfolge gemischt.
+            var feedback = new List<bool>();
             for (int trial = 0; trial < 2; trial++)
             {
                 yield return WaitForState(manager, RandomDotSessionState.SimulatedTrainingResponse);
                 controller.SubmitResponse(Response.Convex);
                 controller.SubmitResponse(Response.Concave);
                 yield return null;
+                yield return null;
+                Assert.That(manager.LastTrainingAnswerCorrect.HasValue, Is.True,
+                    "Bei eindeutigen Extremwerten kommt eine Rückmeldung.");
+                feedback.Add(manager.LastTrainingAnswerCorrect.Value);
             }
+            Assert.That(feedback, Is.EquivalentTo(new[] { true, false }));
             yield return WaitForState(manager, RandomDotSessionState.Idle);
             Assert.That(manager.ValidTrialsCompleted, Is.Zero);
             AssertNoSessionFiles(manager);
