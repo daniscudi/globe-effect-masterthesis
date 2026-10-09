@@ -228,6 +228,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
             if (Section("Training", false))
             {
                 Fields(serializedObject, "trainingKey", "trainSimulatedMotion",
+                    "showSimulatedExamples", "exampleConvexK", "exampleConcaveK", "exampleLongSeconds",
+                    "exampleTextSeconds",
                     "simulatedTrainingKValues", "simulatedTrainingRepeatsPerValue", "simulatedTrainingFeedback",
                     "feedbackConcaveMaxK", "feedbackConvexMinK", "feedbackSeconds", "trainHeadMovement",
                     "requiredGoodTrainingSweeps", "sweepAmplitudeDegrees", "sweepSpeed",
