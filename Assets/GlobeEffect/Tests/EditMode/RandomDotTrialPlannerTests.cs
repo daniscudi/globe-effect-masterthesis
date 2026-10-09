@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using GlobeEffect.VRCheckerboard.Experiment;
@@ -21,6 +22,43 @@ namespace GlobeEffect.VRCheckerboard.Tests
             RandomDotMotionMode.SimulatedYaw,
             RandomDotMotionMode.HeadTracked
         };
+
+        [Test]
+        public void PilotDesign_HasFewerTrialsAtTheEdgesAnd257InTotal()
+        {
+            // k 0 und 0,2 je 8-mal, 0,6 bis 1,4 je 25-mal, 1,8 und 2,0 je 8-mal.
+            float[] k = { 0f, 0.2f, 0.6f, 0.7f, 0.8f, 0.9f, 1f, 1.1f, 1.2f, 1.3f, 1.4f, 1.8f, 2f };
+            int[] repeats = { 8, 8, 25, 25, 25, 25, 25, 25, 25, 25, 25, 8, 8 };
+            IReadOnlyList<RandomDotTrial> plan = RandomDotTrialPlanner.CreateSingleMotionPlan(
+                new[] { 70f }, new[] { CheckerboardEyePresentation.BothEyes }, k, new[] { 10f }, new[] { 1f },
+                RandomDotMotionMode.SimulatedYaw, 25, 1234, 99, repetitionsPerK: repeats);
+
+            Assert.That(plan.Count, Is.EqualTo(257));
+            for (int index = 0; index < k.Length; index++)
+            {
+                RandomDotTrial[] trialsForK = plan.Where(t => t.InstrumentDistortionK == k[index]).ToArray();
+                Assert.That(trialsForK.Length, Is.EqualTo(repeats[index]), $"k = {k[index]}");
+                int right = trialsForK.Count(t => t.SweepDirection == RandomDotSweepDirection.RightFirst);
+                Assert.That(Math.Abs(2 * right - trialsForK.Length), Is.LessThanOrEqualTo(1),
+                    $"Links/rechts ausgeglichen bei k = {k[index]}");
+            }
+        }
+
+        [Test]
+        public void K_GoesUpToTwoAsLongAsTheTangentDoesNotFlip()
+        {
+            var eyes = new[] { CheckerboardEyePresentation.BothEyes };
+            Assert.DoesNotThrow(() => RandomDotTrialPlanner.CreateSingleMotionPlan(
+                new[] { 70f }, eyes, new[] { 2f }, new[] { 10f }, new[] { 1f },
+                RandomDotMotionMode.SimulatedYaw, 1, 1, 1));
+            // FOV 90: 2 · 45° = 90°, dort kippt der Tangens.
+            Assert.Throws<ArgumentOutOfRangeException>(() => RandomDotTrialPlanner.CreateSingleMotionPlan(
+                new[] { 90f }, eyes, new[] { 2f }, new[] { 10f }, new[] { 1f },
+                RandomDotMotionMode.SimulatedYaw, 1, 1, 1));
+            Assert.Throws<ArgumentOutOfRangeException>(() => RandomDotTrialPlanner.CreateSingleMotionPlan(
+                new[] { 70f }, eyes, new[] { 2.1f }, new[] { 10f }, new[] { 1f },
+                RandomDotMotionMode.SimulatedYaw, 1, 1, 1));
+        }
 
         [TestCase(0.2f, CheckerboardCurvatureResponse.Concave)]
         [TestCase(0.3f, CheckerboardCurvatureResponse.Concave)]

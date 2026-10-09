@@ -178,6 +178,71 @@ namespace GlobeEffect.VRCheckerboard.Tests
             }
         }
 
+        [Test]
+        public void SameColorInsideAndOutside_LeavesNoVisibleCircle(
+            [Values(RenderTextureFormat.ARGB32, RenderTextureFormat.ARGBHalf)] RenderTextureFormat format,
+            [Values(0.5f, 0.46226418f, 0.3f, 0.7f)] float gray)
+        {
+            // Früher kam die Kreisfläche als 8-Bit-Vertexfarbe (0,5 -> 128), die
+            // Kamera-Löschfarbe außen aber als Gleitkomma (0,5 -> 127). Bei Edge
+            // Softness 0 und gleicher Farbe war der Kreis deshalb leicht sichtbar.
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
+                Assert.Ignore("Der Farbtest braucht eine Grafikkarte.");
+
+            Scene scene = EditorSceneManager.NewPreviewScene();
+            var target = new RenderTexture(128, 128, 24, format);
+            var readback = new Texture2D(128, 128,
+                format == RenderTextureFormat.ARGBHalf ? TextureFormat.RGBAFloat : TextureFormat.RGBA32, false);
+            RenderTexture previousTarget = RenderTexture.active;
+            try
+            {
+                var color = new Color(gray, gray, gray, 1f);
+                var cameraObject = new GameObject("Color Test Camera");
+                SceneManager.MoveGameObjectToScene(cameraObject, scene);
+                var camera = cameraObject.AddComponent<Camera>();
+                camera.enabled = false;
+                camera.scene = scene;
+                camera.fieldOfView = 90f;
+                camera.aspect = 1f;
+                camera.clearFlags = CameraClearFlags.SolidColor;
+                camera.backgroundColor = color;
+                camera.targetTexture = target;
+                camera.stereoTargetEye = StereoTargetEyeMask.None;
+
+                var field = new GameObject("Color Test Field");
+                SceneManager.MoveGameObjectToScene(field, scene);
+                var stimulus = field.AddComponent<RandomDotFieldStimulus>();
+                stimulus.Observer = camera.transform;
+                stimulus.SetAngularDiameter(70f);
+                var settings = new SerializedObject(stimulus);
+                settings.FindProperty("darkColor").colorValue = Color.clear;
+                settings.FindProperty("lightColor").colorValue = Color.clear;
+                settings.FindProperty("showFixationTarget").boolValue = false;
+                settings.FindProperty("edgeSoftnessDegrees").floatValue = 0f;
+                settings.FindProperty("fieldBackgroundColor").colorValue = color;
+                settings.ApplyModifiedPropertiesWithoutUndo();
+                stimulus.ConfigurePointField(42, 40f);
+                stimulus.Show();
+
+                camera.Render();
+                RenderTexture.active = target;
+                readback.ReadPixels(new Rect(0, 0, 128, 128), 0, 0);
+                readback.Apply();
+                Color inside = readback.GetPixel(64, 64);
+                Color outside = readback.GetPixel(2, 2);
+                Assert.That(inside.r, Is.EqualTo(outside.r).Within(1e-4f),
+                    $"Innen {inside.r * 255f:F2}, außen {outside.r * 255f:F2} (von 255).");
+            }
+            finally
+            {
+                RenderTexture.active = previousTarget;
+                EditorSceneManager.ClosePreviewScene(scene);
+                target.Release();
+                Object.DestroyImmediate(target);
+                Object.DestroyImmediate(readback);
+            }
+        }
+
         private static Color32[] Render(Camera camera, RenderTexture target, Texture2D readback)
         {
             camera.Render();

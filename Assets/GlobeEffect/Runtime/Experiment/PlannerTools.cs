@@ -35,5 +35,22 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 throw new ArgumentException("Mindestens ein Wert ist erforderlich.", name);
             }
         }
+
+        /// <summary>
+        /// Wie oft der Reizwert an Position index gezeigt wird. Steht für ihn eine
+        /// eigene Zahl in perValue, gilt diese (z. B. Randwerte 8-mal, Mitte 25-mal),
+        /// sonst die gemeinsame Zahl fallback.
+        /// </summary>
+        public static int RepetitionsFor(IReadOnlyList<int> perValue, int index, int fallback)
+        {
+            int repetitions = perValue != null && index < perValue.Count ? perValue[index] : fallback;
+            if (repetitions < 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(perValue),
+                    $"Jeder Reizwert braucht mindestens 1 Wiederholung (Position {index + 1}).");
+            }
+
+            return repetitions;
+        }
     }
 }

@@ -20,26 +20,34 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             IReadOnlyList<CheckerboardEyePresentation> eyePresentations,
             IReadOnlyList<float> visualSpaceLValues,
             int repetitions,
-            int randomSeed)
+            int randomSeed,
+            IReadOnlyList<int> repetitionsPerL = null)
         {
             // Erst einmal prüfen, ob die Werte überhaupt stimmen. Lieber hier
             // abbrechen, als mitten in der Messung zu merken, dass etwas fehlt.
             ValidateValues(
                 angularDiametersDegrees, eyePresentations, visualSpaceLValues, repetitions);
+            for (int index = 0; index < visualSpaceLValues.Count; index++)
+            {
+                PlannerTools.RepetitionsFor(repetitionsPerL, index, repetitions);
+            }
 
             var trials = new List<CheckerboardTrial>();
             int conditionIndex = 0;
 
             // Die ineinander liegenden Schleifen gehen jede Kombination einmal
-            // durch: jedes FOV mit jedem Augenmodus mit jedem l.
+            // durch: jedes FOV mit jedem Augenmodus mit jedem l. Jedes l kann eine
+            // eigene Wiederholungszahl haben (z. B. Randwerte seltener als die Mitte).
             foreach (float angularDiameter in angularDiametersDegrees)
             {
                 foreach (CheckerboardEyePresentation eye in eyePresentations)
                 {
-                    foreach (float visualSpaceL in visualSpaceLValues)
+                    for (int lIndex = 0; lIndex < visualSpaceLValues.Count; lIndex++)
                     {
+                        float visualSpaceL = visualSpaceLValues[lIndex];
+                        int repetitionsForL = PlannerTools.RepetitionsFor(repetitionsPerL, lIndex, repetitions);
                         conditionIndex++;
-                        for (int repetition = 1; repetition <= repetitions; repetition++)
+                        for (int repetition = 1; repetition <= repetitionsForL; repetition++)
                         {
                             trials.Add(new CheckerboardTrial(sequenceIndex: 0, conditionIndex,
                                 repetition, attemptNumber: 1, angularDiameter, eye, visualSpaceL));

@@ -218,6 +218,27 @@ Am `Checkerboard Stimulus` und am `Random Dot Field` gibt es den Wert
 Die Angabe erfolgt in Winkelgrad und nicht in Pixeln. Dadurch bleibt die
 Randbreite auch bei anderer Auflösung oder auf der XR-4 vergleichbar. 
 
+Genau (Random-Dot-Shader): θ ist der dargestellte Sehwinkel eines Bildpunkts
+zur Bildmitte des jeweiligen Auges, also nach der Instrumentenabbildung mit m
+und k. θ_A = FOV/2 ist der Blendenradius, s = `Edge Softness Degrees`. Die
+Deckkraft ist
+
+```text
+α(θ) = 1 − smoothstep(θ_A − s, θ_A, θ),   smoothstep(e0, e1, x) = t²(3 − 2t),
+t = clamp((x − e0) / (e1 − e0), 0, 1)
+```
+
+Bis `θ_A − s` ist alles voll sichtbar, zwischen `θ_A − s` und `θ_A` wird mit
+S-förmigem Verlauf zur Außenfarbe (`Background Color`, Kamera-Löschfarbe)
+übergeblendet, ab `θ_A` ist nur noch die Außenfarbe zu sehen. Beispiel FOV 70°,
+s = 10°: Übergang im Ring von 25° bis 35° Exzentrizität. Punkte und Kreisfläche
+(`Field Background Color`) werden mit demselben α gemischt; die Mischung ist
+linear in den gamma-kodierten Farbwerten (Projekt im Gamma-Farbraum), nicht in
+der Leuchtdichte. Bei s = 0 gibt es eine harte Kante bei θ_A. Die Kreisfläche
+wird als Gleitkommafarbe an den Shader übergeben, damit gleiche Farben innen
+und außen exakt gleich gerundet werden (früher 8-Bit-Vertexfarbe: 0,5 ergab
+innen 128, außen 127, der Kreis war minimal sichtbar).
+
 Am `Checkerboard Stimulus` kann `Use Circular Aperture` für eine technische
 Kontrolle ausgeschaltet werden. Dann sieht man das vollständige quadratische
 Gitter. Für den eigentlichen Versuch bleibt der Haken eingeschaltet. Der
@@ -450,12 +471,24 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
 * `Content Zoom Values`: optionaler Nach-Zoom; für die Instrumentensimulation
   normalerweise `1`
 
-* `Repeats Per Condition`: Wiederholungen jeder Kombination
+* k-Werte und Wiederholungen (Inspector-Tabelle „k-Werte und Wiederholungen“,
+  Felder `Instrument Distortion K Values` und `Repeats Per K Value`): jedes k hat
+  eine eigene Wiederholungszahl. Pilotdesign: k 0 und 0,2 je 8-mal, 0,6 bis 1,4
+  in 0,1-Schritten je 25-mal, 1,8 und 2,0 je 8-mal, zusammen 257 Trials pro
+  Bewegungsart. k darf 0 bis 2 sein, solange k · FOV/2 unter 90° bleibt (bei
+  FOV 70 also bis 2; bei FOV 90 startet k = 2 nicht). Checkerboard analog mit
+  `Repeats Per L Value`: l 0,2 16-mal, 0,3 bis 1,1 je 25-mal, 1,2 8-mal = 249.
 
-* Keine Unterblock-Pausen mehr: Alle Trials einer Bewegungsart laufen in
-  gemischter Reihenfolge durch, ohne erneutes `F5` innerhalb dieses Blocks.
-  Die Pause zwischen Simulated und Active bleibt bestehen. Für die Kompatibilität
-  der Messdateien bleibt `mini_block_index` erhalten und steht pro Bewegungsblock auf `1`.
+* `Repeats Per Condition`: gilt für jedes k bzw. l ohne eigenen Eintrag und für
+  neu hinzugefügte Zeilen.
+
+* `Blocks Per Session` (beide Tests, voreingestellt 4): Viertelblöcke. Nach 25,
+  50 und 75 % der geplanten gültigen Trials (bei 257 nach 64, 128, 193; bei 249
+  nach 62, 124, 187) erscheint „SHORT BREAK“; rotes Kreuz und graue Fläche
+  bleiben sichtbar, Antworten zählen nicht. Weiter erst, wenn der Versuchsleiter
+  `F5` drückt. Wiederholte ungültige Trials zählen nicht mit; am Ende keine
+  Pause. Marker `BlockPauseStarted`/`BlockPauseEnded`. `1` = keine Pausen.
+  `mini_block_index` in der CSV bleibt aus Kompatibilitätsgründen `1`.
 
 * `Simulated Sweep Seconds`: wie lange die Punkte im simulierten Block zu
   sehen sind; voreingestellt `0,8 s`. In dieser Zeit schwenkt das Feld
@@ -613,9 +646,10 @@ Antworttasten: die beiden Tasten der Tastatur, `Use Vr Controller Buttons` und
 `Vr Controller Mapping`.
 
 Eine Sitzung enthält nur Simulated Panning ODER aktive Kopfbewegung, jeweils
-als einen vollständigen gemischten Block ohne Unterblock-Pausen. Bei sieben
-k-Stufen, einem FOV, einem Augenmodus, einem m, Zoom 1 und 25 Wiederholungen
-sind das 175 gültige Trials pro Sitzung. Weitere eingestellte Bedingungen
+als ein vollständig gemischter Plan mit Viertelpausen (`Blocks Per Session`).
+Mit dem Pilotdesign (13 k-Stufen, Randwerte 8-mal, Mitte 25-mal), einem FOV,
+einem Augenmodus, einem m und Zoom 1 sind das 257 gültige Trials pro
+Sitzung. Weitere eingestellte Bedingungen
 multiplizieren die Anzahl; ungültige Trials werden zusätzlich wiederholt.
 Danach endet die Sitzung und die Aufnahme wird gestoppt. `F7` startet die andere
 Variante mit eigenem Plan, passenden Anweisungen/Training und neuen Messdateien.

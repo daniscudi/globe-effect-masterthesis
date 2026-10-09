@@ -9,7 +9,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
     {
         _ApertureHalfAngleRad ("Aperture Half Angle [rad]", Float) = 0.785398
         _ApertureEdgeSoftnessRad ("Aperture Edge Softness [rad]", Float) = 0.0174533
-        _InstrumentDistortionK ("Instrument distortion k", Range(0, 1.4)) = 0.5
+        _InstrumentDistortionK ("Instrument distortion k", Range(0, 2)) = 0.5
         _InstrumentMagnificationM ("Instrument magnification m", Range(1, 20)) = 10
         _ContentZoom ("Content Zoom", Float) = 1
         _EyeMode ("Eye Mode", Float) = 0
@@ -19,6 +19,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
         _ReferenceGridSpacingUv ("Reference grid spacing [u,v]", Float) = 0.087489
         _ReferenceGridWidthPixels ("Reference grid width [pixels]", Float) = 1
         _ReferenceGridColor ("Reference grid color", Color) = (0.15, 0.15, 0.15, 0.7)
+        _FieldBackgroundColor ("Field background color", Color) = (0.5, 0.5, 0.5, 1)
         [HideInInspector] _SimulatedSweepRad ("Simulated Sweep [rad]", Float) = 0
         [HideInInspector] _SimulatedSweepAxis ("Simulated Sweep Axis", Float) = 0
         [HideInInspector] _ObserverWorldPosition ("Observer World Position", Vector) = (0, 0, 0, 1)
@@ -76,6 +77,11 @@ Shader "GlobeEffect/Visual Space Random Dots"
             float _ReferenceGridSpacingUv;
             float _ReferenceGridWidthPixels;
             fixed4 _ReferenceGridColor;
+            // Farbe der Kreisfläche. Bewusst als Gleitkommawert und nicht als
+            // 8-Bit-Vertexfarbe: Sonst wird sie vorab gerundet (0,5 -> 128/255),
+            // die Kamera-Löschfarbe außen aber erst von der Grafikkarte (0,5 -> 127).
+            // Bei gleicher Farbe innen und außen wäre der Kreis dann trotzdem sichtbar.
+            float4 _FieldBackgroundColor;
             float _SimulatedSweepRad;
             float _SimulatedSweepAxis;
             float4 _ObserverWorldPosition;
@@ -320,7 +326,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
                     clip(apertureAlpha - 0.001);
                     // Festes Karopapier in der Bildebene: weder k noch m oder der
                     // Schwenk verändern diese Referenz. Die Punkte laufen darüber.
-                    float3 background = input.color.rgb;
+                    float3 background = _FieldBackgroundColor.rgb;
                     // Die Diagnose nutzt den Hintergrund ohne Zufallspunkte.
                     // Das Referenzraster soll trotzdem sichtbar bleiben.
                     if (_ReferenceGridEnabled > 0.5)
@@ -336,9 +342,9 @@ Shader "GlobeEffect/Visual Space Random Dots"
                         background = lerp(background, _ReferenceGridColor.rgb,
                             lineAlpha * _ReferenceGridColor.a);
                     }
-                    return fixed4(
+                    return float4(
                         background,
-                        input.color.a * apertureAlpha);
+                        _FieldBackgroundColor.a * apertureAlpha);
                 }
 
                 if (input.isFixationTarget > 0.5)

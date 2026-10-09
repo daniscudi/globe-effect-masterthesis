@@ -26,7 +26,7 @@ namespace GlobeEffect.VRCheckerboard
     {
         private const double AlmostZero = 1e-7;
         public const double MinimumDistortionK = 0.0;
-        public const double MaximumDistortionK = 1.4;
+        public const double MaximumDistortionK = 2.0;
 
         /// <summary>
         /// Der Weg vorwärts: Ein Punkt liegt in Wirklichkeit beim Winkel A.
@@ -125,7 +125,7 @@ namespace GlobeEffect.VRCheckerboard
             if (k < MinimumDistortionK || k > MaximumDistortionK)
             {
                 throw new ArgumentOutOfRangeException(nameof(k),
-                    "k muss zwischen 0 und 1,4 liegen. Der Bereich über 1 "
+                    "k muss zwischen 0 und 2 liegen. Der Bereich über 1 "
                     + "setzt die Abbildungsfamilie in die tonnenförmige Richtung fort.");
             }
         }
