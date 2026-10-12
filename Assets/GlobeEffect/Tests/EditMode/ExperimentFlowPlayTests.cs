@@ -505,6 +505,101 @@ namespace GlobeEffect.VRCheckerboard.Tests
             yield return new ExitPlayMode();
         }
 
+        [UnityTest]
+        public IEnumerator RandomDotVelocityGate_ShowsDotsOnlyDuringASteadyHeadSweep()
+        {
+            // EnterPlayMode muss direkt in der Testmethode stehen, nicht verschachtelt.
+            PrepareVelocityGatedScene();
+            yield return new EnterPlayMode();
+            yield return null;
+            RandomDotExperimentManager manager = StartVelocityGatedSession();
+            var stimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
+            float target = manager.VelocityGateTargetSpeedPreview;
+
+            // Kopf still: Die Punkte dürfen nicht erscheinen.
+            double waitUntil = Time.realtimeSinceStartupAsDouble + 0.4d;
+            while (Time.realtimeSinceStartupAsDouble < waitUntil) yield return null;
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.WaitingForHeadMotion));
+
+            // Gleichmäßiger Schwenk im Zieltempo: Punkte erscheinen, nach 0,8 s Antwort.
+            // Keine Lambdas in diesen Tests: Sie überleben den Domain Reload beim
+            // Wechsel in den Play Mode nicht (eingefangene Variablen werden null).
+            yield return SweepHead(stimulus, target, manager, RandomDotSessionState.PresentingMotion);
+            yield return SweepHead(stimulus, target, manager, RandomDotSessionState.WaitingForResponse);
+            Object.FindAnyObjectByType<RandomDotKeyboardController>().SubmitResponse(Response.Convex);
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.Completed));
+
+            Dictionary<string, string> row = ReadTrialRows(manager)[0];
+            Assert.That(row["status"], Is.EqualTo("valid"));
+            Assert.That(ParseFloat(row["velocity_gate_target_deg_per_s"]), Is.EqualTo(target).Within(0.001f));
+            Assert.That(ParseFloat(row["head_speed_mean_deg_per_s"]), Is.EqualTo(target).Within(0.3f * target));
+            Assert.That(ParseFloat(row["head_motion_wait_s"]), Is.GreaterThanOrEqualTo(0.15f));
+            Assert.That(ParseFloat(row["stimulus_duration_s"]), Is.EqualTo(SimulatedSweepSeconds).Within(0.1f));
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator RandomDotVelocityGate_StoppingDuringTheDotsMakesTheTrialInvalid()
+        {
+            // EnterPlayMode muss direkt in der Testmethode stehen, nicht verschachtelt.
+            PrepareVelocityGatedScene();
+            yield return new EnterPlayMode();
+            yield return null;
+            RandomDotExperimentManager manager = StartVelocityGatedSession();
+            var stimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
+
+            // Schwenken, bis die Punkte da sind, dann anhalten.
+            yield return SweepHead(stimulus, manager.VelocityGateTargetSpeedPreview, manager,
+                RandomDotSessionState.PresentingMotion);
+            yield return WaitForState(manager, RandomDotSessionState.WaitingForHeadMotion);
+
+            Assert.That(ReadTrialRows(manager)[0]["status"], Is.EqualTo("invalid:head_speed_out_of_range"));
+            Assert.That(manager.ValidTrialsCompleted, Is.Zero, "Der Trial wird später wiederholt.");
+            manager.AbortSession();
+            yield return new ExitPlayMode();
+        }
+
+        private static void PrepareVelocityGatedScene()
+        {
+            PrepareRandomDotScene();
+            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
+            config.FindProperty("sessionMotionMode").intValue = (int)RandomDotMotionMode.HeadTracked;
+            SetFloats(config.FindProperty("instrumentMagnificationMValues"), 5f);
+            config.FindProperty("freeHeadMovement").boolValue = true;
+            config.FindProperty("useVelocityGate").boolValue = true;
+            config.FindProperty("velocityTolerance").floatValue = 0.5f;
+            config.FindProperty("velocityHoldSeconds").floatValue = 0.15f;
+            config.FindProperty("velocityGraceSeconds").floatValue = 0.1f;
+            config.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static RandomDotExperimentManager StartVelocityGatedSession()
+        {
+            var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
+            Assert.That(manager.StartSession(), Is.True);
+            manager.ConfirmResponseInstructions();
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.ActiveMotionInstructions));
+            manager.ConfirmActiveMotionInstructions();
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.WaitingForHeadMotion));
+            return manager;
+        }
+
+        private static IEnumerator SweepHead(RandomDotFieldStimulus stimulus, float degreesPerSecond,
+            RandomDotExperimentManager manager, RandomDotSessionState until)
+        {
+            // Dreht die Kopfkamera gleichmäßig nach rechts, bis der Zustand erreicht ist.
+            Quaternion start = stimulus.Observer.rotation;
+            double startTime = Time.realtimeSinceStartupAsDouble;
+            double deadline = startTime + 5d;
+            while (manager.SessionState != until && Time.realtimeSinceStartupAsDouble < deadline)
+            {
+                float elapsed = (float)(Time.realtimeSinceStartupAsDouble - startTime);
+                stimulus.Observer.rotation = start * Quaternion.Euler(0f, degreesPerSecond * elapsed, 0f);
+                yield return null;
+            }
+            Assert.That(manager.SessionState, Is.EqualTo(until));
+        }
+
         private static void SetInts(SerializedProperty list, params int[] values)
         {
             list.arraySize = values.Length;
@@ -888,6 +983,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 if (list != null) list.arraySize = 0;
             }
             manager.FindProperty("blocksPerSession").intValue = 1;
+            // Die älteren aktiven Ablauftests prüfen "offen" bzw. "mit Zeitlimit".
+            // Die Geschwindigkeitserkennung hat eigene Tests.
+            SerializedProperty velocityGate = manager.FindProperty("useVelocityGate");
+            if (velocityGate != null) velocityGate.boolValue = false;
             manager.ApplyModifiedPropertiesWithoutUndo();
 
             // Der Dummy wird hier ausdrücklich gewählt. So hängt der Test nicht

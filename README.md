@@ -570,6 +570,23 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   davon unabhängig. Die Punktwelt ist endlich: `Head Turn Safety Degrees`
   beschreibt die Reserve um die Startblickrichtung, keine unbegrenzte 360°-Welt.
 
+* Geschwindigkeitserkennung (`Use Velocity Gate`, Standard an, nur mit `Free Head
+  Movement`, Vorrang vor `Open Ended Active Trials`): Im aktiven Trial sind zuerst
+  nur graue Fläche und Kreuz zu sehen. `RandomDotHeadVelocityGate` misst jeden
+  Frame die Kopfdrehung (`Velocity Gate Axis`: horizontal = Yaw, optional vertikal
+  = Pitch), geglättet mit Vorzeichen (`Velocity Smoothing Seconds`), damit Zittern
+  sich aufhebt. Zieltempo = Objektwinkel-Tempo des simulierten Schwenks
+  (Bildmitte-Tempo / (m · Zoom), bei 12 °/s und m = 10 also 1,2 °/s), erlaubt
+  ± `Velocity Tolerance`. Liegt das Tempo `Velocity Hold Seconds` am Stück im
+  Bereich, erscheinen die Punkte für `Simulated Sweep Seconds` (wie Simulated),
+  danach Antwort. Verlässt es den Bereich während der Darbietung länger als
+  `Velocity Grace Seconds`, ist der Trial ungültig
+  (`invalid:head_speed_out_of_range`) und wird später wiederholt. CSV-Spalten:
+  `velocity_gate_target_deg_per_s`, `head_speed_onset/mean/min/max_deg_per_s`,
+  `head_motion_wait_s` (bei Simulated NaN); Marker `WaitingForHeadMotion`.
+  Das Zieltempo liegt nah am natürlichen Kopfzittern; im Pilot anhand der
+  CSV-Werte Toleranz und Haltezeit einstellen.
+
 * Wenn `Free Head Movement` aus ist, bleibt der geführte Links-Rechts-Schwenk
   erhalten. Mit `±2°`,
   `1,2°/s` und `5 s` startet er in der Mitte, erreicht nach etwa `1,67 s` die

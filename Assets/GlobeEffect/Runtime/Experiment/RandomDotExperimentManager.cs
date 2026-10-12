@@ -30,7 +30,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         SimulatedTrainingInstructions,
         SimulatedTrainingMotion,
         SimulatedTrainingResponse,
-        ActiveMotionInstructions
+        ActiveMotionInstructions,
+        WaitingForHeadMotion // activer trial: Kreuz sichtbar, wartet auf das richtige Kopftempo
     }
 
     /// <summary>
@@ -220,6 +221,34 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "Nach der Antwort kommt das graue Feld (Pause Seconds), dann der nächste Trial.")]
         private bool openEndedActiveTrials = true;
 
+        [Header("Active Velocity Gate")]
+        [SerializeField]
+        [Tooltip("Aktive Trials - Punkte erst zeigen, wenn der Kopf gleichmäßig im richtigen Tempo " + 
+            "schwenkt, dann für Simulated Sweep Seconds (zB 0,8s) wie bei Simulated. " +
+            "Hat Vorrang vor Open Ended Active Trials.")]
+        private bool useVelocityGate = true;
+
+        [SerializeField]
+        [Tooltip("Welche Kopfdrehung zählt. Horizontal = links oder rechts wie der simulierte Schwenk.")]
+        private HeadVelocityAxis velocityGateAxis = HeadVelocityAxis.Horizontal;
+
+        [SerializeField, Range(0.05f, 1f)]
+        [Tooltip("Erlaubte Abweichung vom Zieltempo als Anteil. 0,5 = Zieltempo plus/minus 50%.")]
+        private float velocityTolerance = 0.5f;
+
+        [SerializeField, Range(0f, 1f)]
+        [Tooltip("So lange muss das Tempo am Stück im Bereich liegen, bevor die Punkte erscheinen, in Sekunden.")]
+        private float velocityHoldSeconds = 0.15f;
+
+        [SerializeField, Range(0f, 0.5f)]
+        [Tooltip("So lange darf das Tempo während der Darbietung am Stück außerhalb liegen, " +
+            "bevor der Trial ungültig wird und später wiederholt wird, in Sekunden.")]
+        private float velocityGraceSeconds = 0.1f;
+
+        [SerializeField, Range(0.02f, 0.5f)]
+        [Tooltip("Glättung der gemessenen Kopfgeschwindigkeit (Zeitkonstante in Sekunden).")]
+        private float velocitySmoothingSeconds = 0.1f;
+
         [Header("Simulated Panning Practice")]
         [SerializeField]
         [Tooltip("Vor einem simulierten Bewegungsblock eigene Übungstrials ohne Kopfbewegungs-Sinus.")]
@@ -398,6 +427,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private bool trainingResponseReceived;
         private CheckerboardCurvatureResponse trainingResponse;
         private readonly FrameTimingTracker frameTiming = new();
+        private readonly RandomDotHeadVelocityGate velocityGate = new();
         private int frameTimingStartFrame;
         private int trialsWithSlowFrames;
         private int pausesTaken;
@@ -532,10 +562,16 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return;
             }
 
+            if (currentTrial != null && IsVelocityGatedTrial(currentTrial)
+                && (sessionState is State.WaitingForHeadMotion or State.PresentingMotion))
+            {
+                UpdateVelocityGate();
+            }
+
             if (sessionState == State.WaitingForFixation
                 && fixationMonitor != null && fixationMonitor.IsReadyForPresentation(maxSampleAgeSeconds))
             {
-                PresentCurrentTrial();
+                PresentOrWaitForHeadMotion();
                 return;
             }
 
@@ -929,7 +965,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     stimulus.ShowFixationOnly();
                     sessionState = State.ActiveMotionInstructions;
                     headTrainingView.ShowActiveMotionInstructions(freeHeadMovement,
-                        IsOpenEndedTrial(next), BuildResponseLines(), ResponseInputController.GetReadableKeyName(startSessionKey));
+                        IsOpenEndedTrial(next), BuildResponseLines(), ResponseInputController.GetReadableKeyName(startSessionKey),
+                        IsVelocityGatedTrial(next), velocityGateAxis);
                     return;
                 }
             }
@@ -1331,7 +1368,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
             else
             {
-                PresentCurrentTrial();
+                PresentOrWaitForHeadMotion();
             }
         }
 
@@ -1352,6 +1389,53 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // dicht, dass es in der Bildmitte bei jedem m gleich aussieht.
             stimulus.ConfigurePointField(trial.DotSeed, WorldCoverageFor(trial, simulatedSecondsOverride));
             stimulus.PlaceAroundObserver();
+        }
+
+        // Aktive Trials mit Geschwindigkeitserkennung warten zuerst auf die richtige
+        // Kopfbewegung. Alle anderen Trials starten wie bisher sofort.
+        private void PresentOrWaitForHeadMotion()
+        {
+            if (IsVelocityGatedTrial(currentTrial))
+            {
+                BeginWaitingForHeadMotion();
+            }
+            else
+            {
+                PresentCurrentTrial();
+            }
+        }
+
+        private void BeginWaitingForHeadMotion()
+        {
+            // Graue Fläche und Kreuz, noch keine Punkte. Die Messung beginnt neu.
+            velocityGate.Reset();
+            stimulus.ShowFixationOnly();
+            sessionState = State.WaitingForHeadMotion;
+            WriteMarker("WaitingForHeadMotion;task=random_dot_instrument;sequence={0};attempt={1};" +
+                "target_speed_deg_s={2:F3}", currentTrial.SequenceIndex, currentTrial.AttemptNumber,
+                VelocityGateTargetSpeed(currentTrial));
+        }
+
+        private void UpdateVelocityGate()
+        {
+            // Jeden Frame: Kopftempo messen und mit dem erlaubten Bereich vergleichen.
+            float target = VelocityGateTargetSpeed(currentTrial);
+            velocityGate.AddSample(stimulus.Observer.forward, Time.unscaledDeltaTime, velocityGateAxis,
+                velocitySmoothingSeconds, target * (1f - velocityTolerance), target * (1f + velocityTolerance));
+
+            if (sessionState == State.WaitingForHeadMotion
+                && velocityGate.SecondsInRange >= velocityHoldSeconds)
+            {
+                // Lange genug gleichmäßig im richtigen Tempo: jetzt die Punkte zeigen.
+                velocityGate.BeginPresentation();
+                PresentCurrentTrial();
+            }
+            else if (sessionState == State.PresentingMotion
+                && velocityGate.SecondsOutOfRange > velocityGraceSeconds)
+            {
+                // Während der Darbietung zu schnell, zu langsam oder angehalten.
+                InvalidateCurrentTrial("head_speed_out_of_range");
+            }
         }
 
         private void PresentCurrentTrial()
@@ -1471,9 +1555,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return;
             }
 
+            // Bei einer Antwort während der Punkte ist noch kein Darbietungsende gesetzt.
+            // CaptureCurrentResult nimmt dann den Antwortzeitpunkt als Ende, also genau
+            // denselben Moment (Antwortzeit 0). Der Marker kommt erst danach, damit das
+            // Schreiben in die Aufnahme die Zeiten nicht auseinanderzieht.
+            RandomDotTrialResult result = CaptureCurrentResult(response, validForAnalysis: true, "valid");
             if (answeredWhileVisible)
             {
-                stimulusEndUnitySeconds = Time.realtimeSinceStartupAsDouble;
+                stimulusEndUnitySeconds = result.StimulusEndUnitySeconds;
                 WriteMarker(
                     "StimulusEnded;task=random_dot_instrument;sequence={0};attempt={1};duration_s={2:F4};" +
                     "ended_by=response",
@@ -1481,7 +1570,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     stimulusEndUnitySeconds - trialStartUnitySeconds);
             }
 
-            RandomDotTrialResult result = CaptureCurrentResult(response, validForAnalysis: true, "valid");
             if (!TryAppendResult(result))
             {
                 return;
@@ -1602,7 +1690,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 gaze.SteadySeconds, gaze.ValidSampleFraction,
                 lookAway.LongestLookAwaySeconds, lookAway.LongestNoDataSeconds,
                 stimulus.DotCount, stimulus.WorldCoverageDiameterDegrees, stimulus.FieldRadiusMeters,
-                status, IsFreeHeadTrial(currentTrial), frameTiming);
+                status, IsFreeHeadTrial(currentTrial), frameTiming,
+                headVelocity: IsVelocityGatedTrial(currentTrial)
+                    ? velocityGate.Summarize(VelocityGateTargetSpeed(currentTrial))
+                    : HeadVelocitySummary.None);
         }
 
             // Die Fehlerwerte zur Sollbahn gibt es nur bei geführten HeadTracked-Trials.
@@ -1899,11 +1990,29 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 stimulus.SetWorldCoverage(coverage);
         }
 
+        //Aktiver Trial mit Geschwindigkeitserkennung (Vorrang vor "offen")
+        private bool IsVelocityGatedTrial(RandomDotTrial trial) =>
+            IsFreeHeadTrial(trial) && useVelocityGate;
+
+        // Zieltempo der Kopfdrehung in Grad pro Sekunde: genau so schnell, wie das
+        // Intrument im simulierten Schwenk über die Außenwelt dreht. Dann laufen
+        // die Punkte im Bild bei Simulated und Active gleich schnell.
+        private float VelocityGateTargetSpeed(RandomDotTrial trial) =>
+            RandomDotSimulatedSweep.ObjectSpeed(simulatedSpeedReference, sweepSpeed,
+                simulatedImageCenterSpeed, trial.InstrumentMagnificationM, trial.ContentZoom);
+        
         private bool IsOpenEndedTrial(RandomDotTrial trial) =>
-            IsFreeHeadTrial(trial) && openEndedActiveTrials;
+            IsFreeHeadTrial(trial) && openEndedActiveTrials && !useVelocityGate;
 
         private bool OpenEndedSession =>
-            sessionMotionMode == RandomDotMotionMode.HeadTracked && freeHeadMovement && openEndedActiveTrials;
+            sessionMotionMode == RandomDotMotionMode.HeadTracked && freeHeadMovement && openEndedActiveTrials
+            && !useVelocityGate;
+
+        /// <summary>Zieltempo der Kopfdrehung für das erste m und den ersten Zoom (Anzeige im Inspector).</summary>
+        public float VelocityGateTargetSpeedPreview => RandomDotSimulatedSweep.ObjectSpeed(
+            simulatedSpeedReference, sweepSpeed, simulatedImageCenterSpeed,
+            instrumentMagnificationMValues.Count > 0 ? instrumentMagnificationMValues[0] : 1f,
+            contentZoomValues.Count > 0 ? contentZoomValues[0] : 1f);
 
         // Wie weit das Feld im Trial zu jeder Seite der Mitte schwenkt, in Grad. Der
         // simulierte Schwenk läuft in der eingestellten Zeit mit fester Geschwindigkeit
@@ -1917,7 +2026,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         // Wie lange die Punkte im Trial zu sehen sind, in Sekunden.
         private float MotionSeconds(RandomDotTrial trial) =>
-            trial.MotionMode == RandomDotMotionMode.HeadTracked ? headTrackedSeconds : simulatedSweepSeconds;
+            IsVelocityGatedTrial(trial) ? simulatedSweepSeconds
+            : trial.MotionMode == RandomDotMotionMode.HeadTracked ? headTrackedSeconds : simulatedSweepSeconds;
 
         private float WorldCoverageFor(RandomDotTrial trial, float? simulatedSecondsOverride = null)
         {

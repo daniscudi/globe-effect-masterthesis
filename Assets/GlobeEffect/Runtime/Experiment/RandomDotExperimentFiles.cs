@@ -46,6 +46,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public string Status { get; }
         public bool FreeHeadMovement { get; }
         public FrameTimingTracker FrameTiming { get; }
+        public HeadVelocitySummary HeadVelocity { get; }
         public string MotionConstraint => Trial.MotionMode == RandomDotMotionMode.SimulatedYaw
             ? "simulated" : FreeHeadMovement ? "free" : "guided";
 
@@ -88,7 +89,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             float carrierRadiusMeters,
             string status,
             bool freeHeadMovement = false,
-            FrameTimingTracker frameTiming = null)
+            FrameTimingTracker frameTiming = null,
+            HeadVelocitySummary? headVelocity = null)
         {
             Trial = trial ?? throw new ArgumentNullException(nameof(trial));
             PresentationIndex = presentationIndex;
@@ -125,6 +127,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // Kopie: der Manager setzt seinen Zähler für den nächsten Trial zurück.
             FrameTiming = new FrameTimingTracker();
             if (frameTiming != null) FrameTiming.CopyFrom(frameTiming);
+            HeadVelocity = headVelocity ?? HeadVelocitySummary.None;
         }
     }
 
@@ -158,7 +161,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "fixation_sample_valid,fixation_inside_tolerance,fixation_angle_deg," +
             "continuous_fixation_s,fixation_valid_sample_fraction,longest_off_target_s," +
             "longest_invalid_gaze_s,status,image_center_speed_deg_per_s,head_motion_constraint," +
-            "frames_presented,slow_frames,max_frame_ms,expected_frame_ms";
+            "frames_presented,slow_frames,max_frame_ms,expected_frame_ms," +
+            "velocity_gate_target_deg_per_s,head_speed_onset_deg_per_s,head_speed_mean_deg_per_s," +
+            "head_speed_min_deg_per_s,head_speed_max_deg_per_s,head_motion_wait_s";
 
         public RandomDotExperimentFiles(
             string outputRoot,
@@ -227,7 +232,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 // Ausgefallene Frames während der Darbietung (siehe FrameTimingTracker).
                 .Add(result.FrameTiming.Frames).Add(result.FrameTiming.SlowFrames)
                 .Add(result.FrameTiming.MaxFrameMilliseconds)
-                .Add(result.FrameTiming.ExpectedFrameMilliseconds));
+                .Add(result.FrameTiming.ExpectedFrameMilliseconds)
+                .Add(result.HeadVelocity.TargetSpeed).Add(result.HeadVelocity.OnsetSpeed)
+                .Add(result.HeadVelocity.MeanSpeed).Add(result.HeadVelocity.MinSpeed)
+                .Add(result.HeadVelocity.MaxSpeed).Add(result.HeadVelocity.WaitSeconds));
         }
     }
 }

@@ -128,8 +128,22 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 string.Empty);
         }
 
-        public void ShowActiveMotionInstructions(bool free, bool openEnded, string responseLines, string startKey)
+        public void ShowActiveMotionInstructions(bool free, bool openEnded, string responseLines, string startKey,
+            bool velocityGated = false, HeadVelocityAxis axis = HeadVelocityAxis.Horizontal)
         {
+            if (free && velocityGated)
+            {
+                // Geschwindigkeitserkennung: Punkte erscheinen erst bei ruhigem, gleichmäßigem Schwenk.
+                string direction = axis == HeadVelocityAxis.Horizontal ? "left or right" : "up or down";
+                Show(false, "ACTIVE HEAD MOVEMENT\n\n" +
+                    "Keep looking at the cross and turn your head\n" +
+                    "slowly and steadily " + direction + ".\n" +
+                    "The dots appear while you move.\n" +
+                    "Answer after they disappear.",
+                    responseLines + "\n\n" + startKey + " = START TRIALS");
+                return;
+            }
+
             if (free && openEnded)
             {
                 // Offene aktive Trials: kein Zeitlimit, die Antwort beendet den Trial.

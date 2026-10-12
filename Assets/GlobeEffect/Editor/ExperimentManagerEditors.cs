@@ -264,22 +264,27 @@ namespace GlobeEffect.VRCheckerboard.Editor
             {
                 Fields(serializedObject, "freeHeadMovement");
                 bool free = serializedObject.FindProperty("freeHeadMovement").boolValue;
-                bool openEnded = free && serializedObject.FindProperty("openEndedActiveTrials").boolValue;
-                if (free) Fields(serializedObject, "openEndedActiveTrials");
-                if (!openEnded) Fields(serializedObject, "headTrackedSeconds");
+                bool gated = free && serializedObject.FindProperty("useVelocityGate").boolValue;
+                bool openEnded = free && !gated && serializedObject.FindProperty("openEndedActiveTrials").boolValue;
+                if (free) Fields(serializedObject, "useVelocityGate");
+                if (gated) VelocityGateSettings();
+                if (free && !gated) Fields(serializedObject, "openEndedActiveTrials");
+                if (!openEnded && !gated) Fields(serializedObject, "headTrackedSeconds");
                 Fields(serializedObject, "headTurnSafetyDegrees");
                 HeadTurnReachInfo();
-                if (openEnded)
-                    EditorGUILayout.HelpBox("OFFEN: Die Punkte bleiben sichtbar, bis die Person antwortet. " +
-                        "Frei umschauen, beliebig lange und in jede Richtung. Danach graues Feld " +
-                        "(Pause Seconds) und der nächste Trial. Die Punktwelt reicht nur Head Turn " +
-                        "Safety Degrees weit um die Startblickrichtung.", MessageType.Info);
-                else EditorGUILayout.HelpBox(free
-                    ? "FREI: beliebige Richtung, kein Solltempo, keine Sinus-/Wendeprüfung. " +
-                        "Blickkontrolle bleibt aktiv. Der Punktvorrat ist endlich: " +
-                        "Head Turn Safety Degrees legt die verfügbare Reserve um die Startblickrichtung fest."
-                    : "GEFÜHRT: bisherige Links-Rechts-Sinusbahn. Bei aktiver Prüfung werden " +
-                        "abweichende Haupttrials wiederholt.", MessageType.Info);
+                // Bei Geschwindigkeitserkennung steht die Erklärung schon bei deren Einstellungen.
+                if (!gated)
+                    EditorGUILayout.HelpBox(openEnded
+                        ? "OFFEN: Die Punkte bleiben sichtbar, bis die Person antwortet. " +
+                            "Frei umschauen, beliebig lange und in jede Richtung. Danach graues Feld " +
+                            "(Pause Seconds) und der nächste Trial. Die Punktwelt reicht nur Head Turn " +
+                            "Safety Degrees weit um die Startblickrichtung."
+                        : free
+                            ? "FREI: beliebige Richtung, kein Solltempo, keine Sinus-/Wendeprüfung. " +
+                                "Blickkontrolle bleibt aktiv. Der Punktvorrat ist endlich: " +
+                                "Head Turn Safety Degrees legt die verfügbare Reserve um die Startblickrichtung fest."
+                            : "GEFÜHRT: bisherige Links-Rechts-Sinusbahn. Bei aktiver Prüfung werden " +
+                                "abweichende Haupttrials wiederholt.", MessageType.Info);
                 if (!free)
                     Fields(serializedObject, "checkHeadMotion", "sweepAmplitudeDegrees", "sweepSpeed",
                         "maximumProfileErrorDegrees", "turnaroundDegrees", "requiredSweeps",
@@ -346,6 +351,28 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
             EndSettings("sessionState", "currentTrialNumber", "totalTrials", "validTrialsCompleted",
                 "presentationCount", "sessionMotionMode", "activeSessionFolder");
+        }
+
+        private void VelocityGateSettings()
+        {
+            Fields(serializedObject, "velocityGateAxis", "velocityTolerance", "velocityHoldSeconds",
+                "velocityGraceSeconds", "velocitySmoothingSeconds");
+            // Zieltempo wie bei Simulated (gleiche Rechnung wie im Manager), für das erste m.
+            var manager = (RandomDotExperimentManager)target;
+            float targetSpeed = manager.VelocityGateTargetSpeedPreview;
+            float tolerance = serializedObject.FindProperty("velocityTolerance").floatValue;
+            float seconds = serializedObject.FindProperty("simulatedSweepSeconds").floatValue;
+            EditorGUILayout.HelpBox(
+                "GESCHWINDIGKEITSERKENNUNG: Kreuz und graue Fläche, bis der Kopf gleichmäßig im " +
+                $"richtigen Tempo schwenkt. Zieltempo {targetSpeed:0.##} °/s Kopfdrehung (wie Simulated, " +
+                $"erstes m), erlaubt {targetSpeed * (1f - tolerance):0.##} bis {targetSpeed * (1f + tolerance):0.##} °/s. " +
+                $"Nach Hold Seconds im Bereich erscheinen die Punkte für {seconds:0.##} s (Simulated Sweep " +
+                "Seconds), danach Antwort. Verlässt das Tempo den Bereich länger als Grace Seconds, wird der " +
+                "Trial ungültig und später wiederholt (status head_speed_out_of_range). Gemessene Werte " +
+                "stehen pro Trial in der CSV (head_speed_*).", MessageType.Info);
+            if (targetSpeed < 1.5f)
+                EditorGUILayout.HelpBox("Das Zieltempo ist sehr langsam und liegt nah am natürlichen Kopfzittern. " +
+                    "Im Pilot die CSV-Spalten head_speed_* prüfen und Tolerance/Hold anpassen.", MessageType.Warning);
         }
 
         private void HeadTurnReachInfo()
