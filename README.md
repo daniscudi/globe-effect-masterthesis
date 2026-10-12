@@ -668,6 +668,13 @@ Kurz gesagt:
 * Falls die Originalimplementierung von Oomes noch verfügbar wird, kann ihre
   α-Skala nachträglich mit der hier verwendeten l-Familie verglichen werden.
 
+## Separate natürliche Szene
+
+`Assets/GlobeEffect/Demo/NaturalScenePreview.unity` zeigt das CC0-Panorama
+**Suburban Field 01** mit live einstellbarer Instrumentenabbildung und
+simuliertem oder freiem Schwenken. Kein Experiment, keine Datenerfassung.
+Bedienung und Grenzen: [NATURAL_SCENE_PREVIEW.md](NATURAL_SCENE_PREVIEW.md).
+
 ## Literaturgrundlage
 
 * Oomes, A. H. J., Koenderink, J. J., van Doorn, A. J. und de Ridder, H.
