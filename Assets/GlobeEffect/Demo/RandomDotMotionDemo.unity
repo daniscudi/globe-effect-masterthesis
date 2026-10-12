@@ -154,11 +154,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.RandomDots.RandomDotHeadSweepMonitor
   observer: {fileID: 684958492}
   stimulus: {fileID: 206131110}
-  yawThresholdDegrees: 1.5
+  turnaroundDegrees: 1.5
   requiredHalfSweeps: 1
   currentYawDegrees: 0
   completedHalfSweeps: 0
-  maximumAbsoluteYawDegrees: 0
+  maxHeadTurnDegrees: 0
+  meanHeadSpeed: 0
+  peakHeadSpeed: 0
 --- !u!114 &206131109
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -175,6 +177,8 @@ MonoBehaviour:
   convexKey: 62
   swapResponseKeys: 0
   logResponses: 0
+  useVrControllerButtons: 1
+  vrControllerMapping: 0
 --- !u!114 &206131110
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -188,28 +192,37 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.RandomDots.RandomDotFieldStimulus
   observer: {fileID: 684958492}
-  angularDiameterDegrees: 70
-  apertureEdgeSoftnessDegrees: 1
+  fieldOfViewDegrees: 70
+  edgeSoftnessDegrees: 10
   fieldRadiusMeters: 5
-  worldCoverageDiameterDegrees: 40.6
-  dotCount: 24500
-  dotAngularDiameterDegrees: 0.35
+  worldCoverageDegrees: 40.6
+  dotDensity: 0.2
+  dotSizeDegrees: 0.35
   randomSeed: 20260828
-  darkColor: {r: 0, g: 0, b: 0, a: 1}
+  darkColor: {r: 0.009433985, g: 0.009389485, b: 0.009389485, a: 1}
   lightColor: {r: 1, g: 1, b: 1, a: 1}
   fieldBackgroundColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  backgroundColor: {r: 0.46226418, g: 0.46226418, b: 0.46226418, a: 1}
   lightDotFraction: 0.5
   instrumentDistortionK: 0.5
   instrumentMagnificationM: 10
   contentZoom: 1
   eyePresentation: 0
   showFixationTarget: 1
-  fixationTargetSizeDegrees: 0.5
+  fixationSizeDegrees: 0.5
   fixationColor: {r: 1, g: 0, b: 0, a: 1}
   motionMode: 1
+  sweepAxis: 0
   simulatedYawAmplitudeDegrees: 2
+  previewSpeedReference: 1
+  previewImageCenterSpeed: 12
   simulatedYawSpeedDegreesPerSecond: 1.2
   sweepDirection: 1
+  loopSweepInPreview: 1
+  showReferenceGrid: 0
+  referenceGridSpacingDegrees: 5
+  referenceGridWidthPixels: 1
+  referenceGridColor: {r: 0.15, g: 0.15, b: 0.15, a: 0.7}
   visibleAtStart: 1
   materialOverride: {fileID: 0}
 --- !u!23 &206131111
@@ -649,58 +662,93 @@ MonoBehaviour:
   sweepMonitor: {fileID: 206131108}
   eyeTrackingToolbox: {fileID: 1215582095}
   fixationMonitor: {fileID: 1215582094}
-  participantId: pilot_001
+  participantId: Testing_01
   sessionLabel: random_dot_instrument_pilot
   randomSeed: 20260901
   dotSeedBase: 24680
   outputRoot: 
   autoStartOnPlay: 0
-  angularDiametersDegrees:
+  fieldOfViewValues:
   - 70
   eyePresentations: 00000000
   instrumentDistortionKValues:
-  - 1.2
-  - 1
-  - 0.9
-  - 0.8
-  - 0.7
-  - 0.6
+  - 0
   - 0.2
+  - 0.6
+  - 0.7
+  - 0.8
+  - 0.9
+  - 1
+  - 1.1
+  - 1.2
+  - 1.3
+  - 1.4
+  - 1.8
+  - 2
   instrumentMagnificationMValues:
   - 10
   contentZoomValues:
   - 1
-  motionModes: 0100000000000000
-  counterbalanceMotionBlockOrderByParticipantId: 1
-  repetitionsPerCondition: 25
-  repetitionsPerMiniBlock: 5
-  motionDurationSeconds: 5
+  sessionMotionMode: 1
+  repeatsPerCondition: 25
+  repeatsPerKValue:
+  - 8
+  - 8
+  - 25
+  - 25
+  - 25
+  - 25
+  - 25
+  - 25
+  - 25
+  - 25
+  - 25
+  - 8
+  - 8
+  blocksPerSession: 4
+  simulatedSweepAxis: 0
+  simulatedSweepSeconds: 0.8
+  simulatedSpeedReference: 1
+  simulatedImageCenterSpeed: 20
+  sweepSpeed: 1.2
+  headTrackedSeconds: 5
   sweepAmplitudeDegrees: 2
-  sweepSpeedDegreesPerSecond: 1.2
-  trainHeadMovement: 1
+  trainHeadMovement: 0
   requiredGoodTrainingSweeps: 4
   maximumProfileErrorDegrees: 0.9
   maximumTrainingEndpointErrorDegrees: 0.9
-  headTrackedCoverageYawDegrees: 15
-  validateHeadTrackedMotion: 1
-  headTrackedTurnaroundThresholdDegrees: 1.5
-  requiredHeadSweepAlternations: 1
-  maximumValidHeadYawDegrees: 4
-  minimumMeanHeadSpeedDegreesPerSecond: 0.5
-  maximumPeakHeadSpeedDegreesPerSecond: 2.5
-  requireFixation: 1
-  maximumOffTargetSeconds: 0.15
-  maximumInvalidGazeSeconds: 0.2
-  maximumGazeSampleAgeSeconds: 0.1
-  maximumAttemptsPerTrial: 0
-  interTrialSeconds: 0.25
+  headTurnSafetyDegrees: 30
+  checkHeadMotion: 1
+  freeHeadMovement: 1
+  trainSimulatedMotion: 0
+  simulatedTrainingKValues:
+  - 0.2
+  - 1.2
+  simulatedTrainingRepeatsPerValue: 2
+  turnaroundDegrees: 1.5
+  requiredSweeps: 1
+  maxHeadTurnDegrees: 4
+  minMeanHeadSpeed: 0.5
+  maxPeakHeadSpeed: 2.5
+  requireFixation: 0
+  maxLookAwaySeconds: 0.15
+  maxNoDataSeconds: 0.2
+  maxSampleAgeSeconds: 0.1
+  maxRepeatsPerTrial: 0
+  pauseSeconds: 0.25
   startSessionKey: 98
+  startOtherMotionSessionKey: 100
   abortSessionKey: 99
+  trainingKey: 34
+  previewKey: 30
+  valuesBeforePreviewTakeover: '{"plan":"{\"fieldOfViewValues\":[70.0],\"eyePresentations\":[0],\"instrumentMagnificationMValues\":[10.0],\"contentZoomValues\":[1.0],\"sessionMotionMode\":1,\"simulatedSweepAxis\":0,\"simulatedSpeedReference\":1,\"simulatedImageCenterSpeed\":12.0,\"sweepSpeed\":1.2000000476837159}","look":"{\"edgeSoftnessDegrees\":1.0,\"dotDensity\":0.1899999976158142,\"dotSizeDegrees\":0.3499999940395355,\"darkColor\":{\"r\":0.0,\"g\":0.0,\"b\":0.0,\"a\":1.0},\"lightColor\":{\"r\":1.0,\"g\":1.0,\"b\":1.0,\"a\":1.0},\"fieldBackgroundColor\":{\"r\":0.5,\"g\":0.5,\"b\":0.5,\"a\":1.0},\"backgroundColor\":{\"r\":0.0,\"g\":0.0,\"b\":0.0,\"a\":1.0},\"lightDotFraction\":0.5}"}'
   sessionState: 0
   currentTrialNumber: 0
   totalTrials: 0
   validTrialsCompleted: 0
   presentationCount: 0
+  currentMotionBlock: 0
+  currentMiniBlock: 0
   activeSessionFolder: 
 --- !u!4 &1006624962
 Transform:
@@ -750,7 +798,7 @@ MonoBehaviour:
   eyeTrackingToolbox: {fileID: 1215582095}
   stimulus: {fileID: 206131110}
   toleranceDegrees: 3
-  requiredContinuousSeconds: 0.3
+  requiredSteadySeconds: 0.3
   currentSampleValid: 0
   isInsideTolerance: 0
   currentAngleDegrees: NaN
@@ -769,7 +817,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5e7f22e3d2364d1b8d66ab9d026af84b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.EyeTracking.EyeTrackingToolbox
-  provider: 1
+  provider: 0
   mainCameraTransform: {fileID: 684958492}
   persistAcrossScenes: 1
   calibrationMode: 0

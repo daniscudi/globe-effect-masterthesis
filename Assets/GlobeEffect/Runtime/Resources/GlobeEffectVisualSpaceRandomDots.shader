@@ -9,12 +9,17 @@ Shader "GlobeEffect/Visual Space Random Dots"
     {
         _ApertureHalfAngleRad ("Aperture Half Angle [rad]", Float) = 0.785398
         _ApertureEdgeSoftnessRad ("Aperture Edge Softness [rad]", Float) = 0.0174533
-        _InstrumentDistortionK ("Instrument distortion k", Range(0, 1.4)) = 0.5
+        _InstrumentDistortionK ("Instrument distortion k", Range(0, 2)) = 0.5
         _InstrumentMagnificationM ("Instrument magnification m", Range(1, 20)) = 10
         _ContentZoom ("Content Zoom", Float) = 1
         _EyeMode ("Eye Mode", Float) = 0
         _DotsEnabled ("Dots Enabled", Float) = 1
         _DotHalfSizeRad ("Dot Half Size [rad]", Float) = 0.00191986
+        _ReferenceGridEnabled ("Preview reference grid", Float) = 0
+        _ReferenceGridSpacingUv ("Reference grid spacing [u,v]", Float) = 0.087489
+        _ReferenceGridWidthPixels ("Reference grid width [pixels]", Float) = 1
+        _ReferenceGridColor ("Reference grid color", Color) = (0.15, 0.15, 0.15, 0.7)
+        _FieldBackgroundColor ("Field background color", Color) = (0.5, 0.5, 0.5, 1)
         [HideInInspector] _SimulatedSweepRad ("Simulated Sweep [rad]", Float) = 0
         [HideInInspector] _SimulatedSweepAxis ("Simulated Sweep Axis", Float) = 0
         [HideInInspector] _ObserverWorldPosition ("Observer World Position", Vector) = (0, 0, 0, 1)
@@ -52,7 +57,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
             {
                 float4 position : SV_POSITION;
                 float2 dotUv : TEXCOORD0;
-                float displayedAngle : TEXCOORD1;
+                float2 aperturePosition : TEXCOORD1;
                 float validProjection : TEXCOORD2;
                 float isFixationTarget : TEXCOORD3;
                 float isApertureBackground : TEXCOORD4;
@@ -68,6 +73,15 @@ Shader "GlobeEffect/Visual Space Random Dots"
             float _EyeMode;
             float _DotsEnabled;
             float _DotHalfSizeRad;
+            float _ReferenceGridEnabled;
+            float _ReferenceGridSpacingUv;
+            float _ReferenceGridWidthPixels;
+            fixed4 _ReferenceGridColor;
+            // Farbe der Kreisfläche. Bewusst als Gleitkommawert und nicht als
+            // 8-Bit-Vertexfarbe: Sonst wird sie vorab gerundet (0,5 -> 128/255),
+            // die Kamera-Löschfarbe außen aber erst von der Grafikkarte (0,5 -> 127).
+            // Bei gleicher Farbe innen und außen wäre der Kreis dann trotzdem sichtbar.
+            float4 _FieldBackgroundColor;
             float _SimulatedSweepRad;
             float _SimulatedSweepAxis;
             float4 _ObserverWorldPosition;
@@ -167,10 +181,10 @@ Shader "GlobeEffect/Visual Space Random Dots"
                         UNITY_MATRIX_P,
                         float4(backgroundViewPosition, 1.0));
                     output.dotUv = input.uv;
-                    // Der genaue Winkel wird im Fragment aus den interpolierten
-                    // UV-Koordinaten berechnet. An allen vier Ecken wäre er sonst
-                    // gleich und könnte keinen Kreis ergeben.
-                    output.displayedAngle = 0.0;
+                    // Wo diese Ecke im Bild liegt, gemessen von der Bildmitte. Der
+                    // Fragment-Shader rechnet daraus für jedes Pixel den Winkel aus
+                    // und schneidet so den Kreis.
+                    output.aperturePosition = input.uv * tangentAtBoundary;
                     output.validProjection = 1.0;
                     output.isFixationTarget = 0.0;
                     output.isApertureBackground = 1.0;
@@ -248,14 +262,34 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 // Danach wird die feste Winkelgröße des sternähnlichen Markers
                 // ergänzt; k und m verändern damit seine Bahn, nicht seine Größe.
                 float angularHalfSize = _DotHalfSizeRad * input.sizeData.x;
-                viewPosition.xy += input.uv * forwardDistance *
-                    tan(angularHalfSize);
+                float tanHalfSize = tan(angularHalfSize);
+
+                // Das Viereck wird rundherum anderthalb Bildpixel größer gezeichnet
+                // als der Punkt selbst. Der Punkt bleibt dabei gleich groß. Der Platz
+                // ist für den weichen Rand da: Ohne ihn würde der Rand oben, unten,
+                // links und rechts an der Kante des Vierecks abgeschnitten, und
+                // kleine Punkte sähen eckig aus. pixelTan ist die Breite eines
+                // Bildpixels, im selben Maß wie tanHalfSize.
+                float pixelTan = 2.0 /
+                    (abs(UNITY_MATRIX_P[1][1]) * _ScreenParams.y);
+                float quadScale = isFixation > 0.5
+                    ? 1.0
+                    : 1.0 + 1.5 * pixelTan / max(tanHalfSize, 1e-6);
+                viewPosition.xy += input.uv * quadScale * forwardDistance *
+                    tanHalfSize;
 
                 output.position = mul(
                     UNITY_MATRIX_P,
                     float4(viewPosition, 1.0));
-                output.dotUv = input.uv;
-                output.displayedAngle = displayedAngle;
+                // Der Punktrand liegt weiter bei 1. Die Ecken des größeren Vierecks
+                // liegen entsprechend weiter draußen.
+                output.dotUv = input.uv * quadScale;
+                // Auch hier wandert die Stelle im Bild mit, und zwar für jede Ecke
+                // des Punktes einzeln. So schneidet der Kreisrand einen Punkt genau
+                // dort ab, wo er über den Rand ragt. Früher zählte nur der
+                // Mittelpunkt, und Punkte am Rand standen über den Kreis hinaus.
+                output.aperturePosition = viewPosition.xy /
+                    max(forwardDistance, 1e-4);
                 output.validProjection = validFront *
                     validInstrumentDomain * validAngle;
                 output.isFixationTarget = isFixation;
@@ -283,17 +317,34 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 clip(visibleForEye - 0.5);
                 clip(input.validProjection - 0.5);
 
-                float apertureAngle = input.isApertureBackground > 0.5
-                    ? atan(length(input.dotUv) *
-                        tan(_ApertureHalfAngleRad))
-                    : input.displayedAngle;
+                // Winkel dieses Pixels zur Bildmitte. Daraus ergibt sich, ob es
+                // innerhalb der runden Öffnung liegt.
+                float apertureAngle = atan(length(input.aperturePosition));
                 float apertureAlpha = ResolveApertureAlpha(apertureAngle);
                 if (input.isApertureBackground > 0.5)
                 {
                     clip(apertureAlpha - 0.001);
-                    return fixed4(
-                        input.color.rgb,
-                        input.color.a * apertureAlpha);
+                    // Festes Karopapier in der Bildebene: weder k noch m oder der
+                    // Schwenk verändern diese Referenz. Die Punkte laufen darüber.
+                    float3 background = _FieldBackgroundColor.rgb;
+                    // Die Diagnose nutzt den Hintergrund ohne Zufallspunkte.
+                    // Das Referenzraster soll trotzdem sichtbar bleiben.
+                    if (_ReferenceGridEnabled > 0.5)
+                    {
+                        float2 cell = input.aperturePosition / max(_ReferenceGridSpacingUv, 1e-5);
+                        float2 distanceToLine = abs(frac(cell + 0.5) - 0.5);
+                        float2 pixelWidth = max(fwidth(cell), 1e-5);
+                        float2 distancePixels = distanceToLine / pixelWidth;
+                        float lineAlpha = 1.0 - smoothstep(
+                            max(0.0, 0.5 * _ReferenceGridWidthPixels - 0.5),
+                            0.5 * _ReferenceGridWidthPixels + 0.5,
+                            min(distancePixels.x, distancePixels.y));
+                        background = lerp(background, _ReferenceGridColor.rgb,
+                            lineAlpha * _ReferenceGridColor.a);
+                    }
+                    return float4(
+                        background,
+                        _FieldBackgroundColor.a * apertureAlpha);
                 }
 
                 if (input.isFixationTarget > 0.5)

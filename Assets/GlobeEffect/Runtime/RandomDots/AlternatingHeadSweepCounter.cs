@@ -43,17 +43,13 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             // gedreht wurde. Sie werden später mit dem Ergebnis gespeichert.
             MinimumYawDegrees = Math.Min(MinimumYawDegrees, yawDegrees);
             MaximumYawDegrees = Math.Max(MaximumYawDegrees, yawDegrees);
-            MaximumAbsoluteYawDegrees = Math.Max(
-                MaximumAbsoluteYawDegrees,
-                Math.Abs(yawDegrees));
+            MaximumAbsoluteYawDegrees = Math.Max(MaximumAbsoluteYawDegrees, Math.Abs(yawDegrees));
 
             // Wo ist der Kopf gerade?
             // 1 heißt rechter Rand erreicht, -1 linker Rand, 0 irgendwo dazwischen.
-            int currentExtreme = yawDegrees >= ThresholdDegrees
-                ? 1
-                : yawDegrees <= -ThresholdDegrees
-                    ? -1
-                    : 0;
+            int currentExtreme = yawDegrees >= ThresholdDegrees ? 1
+                : yawDegrees <= -ThresholdDegrees ? -1
+                : 0;
 
             // Mittendrin oder immer noch auf derselben Seite: nichts passiert.
             if (currentExtreme == 0 || currentExtreme == lastExtreme)

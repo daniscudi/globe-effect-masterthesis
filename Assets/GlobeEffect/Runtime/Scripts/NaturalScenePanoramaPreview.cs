@@ -157,7 +157,7 @@ namespace GlobeEffect.VRCheckerboard
             float fov = Mathf.Min(Mathf.Clamp(fieldOfViewDegrees, 5, 120),
                 (float)NaturalScenePanoramaMath.MaximumFieldOfViewDegrees(k, zoom) - 0.01f);
             CurrentSweepDegrees = motionMode == RandomDotMotionMode.SimulatedYaw
-                ? RandomDotSimulatedSweep.EvaluateSweepDegrees(elapsed,
+                ? RandomDotSimulatedSweep.EvaluateBackAndForthDegrees(elapsed,
                     imageSweepAmplitudeDegrees / (m * zoom),
                     imageCenterSpeed / (m * zoom), sweepDirection) : 0;
             Quaternion basis = motionMode == RandomDotMotionMode.SimulatedYaw

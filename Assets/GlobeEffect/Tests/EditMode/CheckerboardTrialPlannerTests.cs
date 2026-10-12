@@ -1,9 +1,40 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using GlobeEffect.VRCheckerboard.Experiment;
 using NUnit.Framework;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
+    public sealed class CheckerboardPerLevelRepetitionTests
+    {
+        [Test]
+        public void PilotDesign_HasFewerTrialsAtTheEdgesAnd249InTotal()
+        {
+            // l 0,2 16-mal, 0,3 bis 1,1 je 25-mal, 1,2 8-mal.
+            float[] l = { 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1f, 1.1f, 1.2f };
+            int[] repeats = { 16, 25, 25, 25, 25, 25, 25, 25, 25, 25, 8 };
+            IReadOnlyList<CheckerboardTrial> plan = CheckerboardTrialPlanner.CreateRandomizedPlan(
+                new[] { 70f }, new[] { CheckerboardEyePresentation.BothEyes }, l, 25, 1234, repeats);
+
+            Assert.That(plan.Count, Is.EqualTo(249));
+            for (int index = 0; index < l.Length; index++)
+            {
+                int count = 0;
+                foreach (CheckerboardTrial trial in plan)
+                    if (trial.VisualSpaceL == l[index]) count++;
+                Assert.That(count, Is.EqualTo(repeats[index]), $"l = {l[index]}");
+            }
+        }
+
+        [Test]
+        public void MissingRepetitions_FallBackToRepeatsPerCondition()
+        {
+            IReadOnlyList<CheckerboardTrial> plan = CheckerboardTrialPlanner.CreateRandomizedPlan(
+                new[] { 70f }, new[] { CheckerboardEyePresentation.BothEyes }, new[] { 0.5f, 1f }, 3, 1,
+                new[] { 5 });
+            Assert.That(plan.Count, Is.EqualTo(5 + 3));
+        }
+    }
+
     /// <summary>
     /// Testet den Planer für den Checkerboard-Versuch.
     ///
@@ -22,14 +53,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(second.Count, Is.EqualTo(first.Count));
             for (int index = 0; index < first.Count; index++)
             {
-                Assert.That(second[index].ConditionIndex,
-                    Is.EqualTo(first[index].ConditionIndex));
-                Assert.That(second[index].Repetition,
-                    Is.EqualTo(first[index].Repetition));
-                Assert.That(second[index].VisualSpaceL,
-                    Is.EqualTo(first[index].VisualSpaceL));
-                Assert.That(second[index].EyePresentation,
-                    Is.EqualTo(first[index].EyePresentation));
+                Assert.That(second[index].ConditionIndex, Is.EqualTo(first[index].ConditionIndex));
+                Assert.That(second[index].Repetition, Is.EqualTo(first[index].Repetition));
+                Assert.That(second[index].VisualSpaceL, Is.EqualTo(first[index].VisualSpaceL));
+                Assert.That(second[index].EyePresentation, Is.EqualTo(first[index].EyePresentation));
             }
         }
 
@@ -64,11 +91,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         {
             Assert.Throws<System.ArgumentOutOfRangeException>(() =>
                 CheckerboardTrialPlanner.CreateRandomizedPlan(
-                    new[] { 90f },
-                    new[] { CheckerboardEyePresentation.BothEyes },
-                    new[] { 1.5f },
-                    1,
-                    1));
+                    new[] { 90f }, new[] { CheckerboardEyePresentation.BothEyes }, new[] { 1.5f }, 1, 1));
         }
 
         [TestCase("pilot 01", "pilot_01")]
@@ -76,23 +99,18 @@ namespace GlobeEffect.VRCheckerboard.Tests
         [TestCase("", "fallback")]
         public void SessionIdentifier_IsMadeFileSafe(string input, string expected)
         {
-            Assert.That(
-                CheckerboardExperimentFiles.SanitizeIdentifier(input, "fallback"),
-                Is.EqualTo(expected));
+            Assert.That(ExperimentFilesBase.SanitizeIdentifier(input, "fallback"), Is.EqualTo(expected));
         }
 
         private static IReadOnlyList<CheckerboardTrial> CreatePlan(int seed)
         {
+            var eyes = new[]
+            {
+                CheckerboardEyePresentation.BothEyes,
+                CheckerboardEyePresentation.LeftEyeOnly
+            };
             return CheckerboardTrialPlanner.CreateRandomizedPlan(
-                new[] { 70f, 90f },
-                new[]
-                {
-                    CheckerboardEyePresentation.BothEyes,
-                    CheckerboardEyePresentation.LeftEyeOnly
-                },
-                new[] { 0.5f, 1f },
-                2,
-                seed);
+                new[] { 70f, 90f }, eyes, new[] { 0.5f, 1f }, 2, seed);
         }
     }
 }

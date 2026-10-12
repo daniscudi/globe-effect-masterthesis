@@ -7,6 +7,8 @@ using GlobeEffect.VRCheckerboard.RandomDots;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
+// Kurzname, damit nicht überall RandomDotSessionState ausgeschrieben werden muss.
+using State = GlobeEffect.VRCheckerboard.Experiment.RandomDotSessionState;
 
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
@@ -20,18 +22,27 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         WaitingForFixation,
         PresentingMotion,
         WaitingForResponse,
-        PausedBetweenMiniBlocks,
-        PausedBetweenMotionBlocks,
+        PausedBetweenMiniBlocks, // Pause zwischen Viertelblöcken; der Versuchsleiter setzt mit F5 fort.
+        PausedBetweenMotionBlocks, // Alter Status; neue Sitzungen enthalten nur eine Bewegungsart.
         Completed,
-        Aborted
+        Aborted,
+        ResponseInstructions,
+        SimulatedTrainingInstructions,
+        SimulatedTrainingMotion,
+        SimulatedTrainingResponse,
+        ActiveMotionInstructions
     }
 
     /// <summary>
     /// Steuert den ganzen Random-Dot-Versuch.
     ///
     /// So läuft ein Durchgang ab: Die Person schaut auf das Kreuz. Liegt der Blick
-    /// ruhig genug, laufen die Punkte für eine feste Zeit nach links und rechts.
-    /// Erst wenn die Bewegung vorbei ist, antwortet die Person konkav oder konvex.
+    /// ruhig genug, kommen die Punkte. Im SimulatedYaw-Block schwenken sie kurz in
+    /// eine Richtung, im HeadTracked-Block dreht die Person den Kopf selbst.
+    /// Freie Bewegung ist der Standard; die geführte Sinusbahn bleibt optional.
+    /// Erst wenn die Bewegung vorbei ist, antwortet die Person konkav oder konvex,
+    /// mit den Pfeiltasten oder mit Trigger und Trackpad-Klick am VR-Controller.
+    /// Welche Taste was bedeutet, liest sie vor dem ersten Durchgang im Headset.
     ///
     /// Welche Instrumentenwerte k und m gezeigt werden, steht vorher fest. Schaut
     /// die Person zwischendurch zu lange weg, zählt der Durchgang nicht und kommt
@@ -86,8 +97,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         [SerializeField]
         private bool autoStartOnPlay;
-        [Header("Trial Plan")]
 
+        [Header("Trial Plan")]
         [FormerlySerializedAs("angularDiametersDegrees")]
         [SerializeField]
         [Tooltip("Wie groß der runde Ausschnitt sein soll, in Grad. Es können auch mehrere Werte drinstehen, dann wird jeder davon gezeigt.")]
@@ -104,16 +115,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [FormerlySerializedAs("stimulusKValues")]
         [FormerlySerializedAs("visualSpaceLValues")]
         [Tooltip("Alle Instrumentenverzeichnungen k. k = 1 ist geometrisch gerade, k = 0,5 der Helmholtz-/Kreispunkt. Der subjektiv neutrale k-Wert schätzt das l der Person.")]
-        private List<float> instrumentDistortionKValues = new()
-        {
-            1.2f,
-            1f,
-            0.8f,
-            0.6f,
-            0.5f,
-            0.4f,
-            0.2f
-        };
+        private List<float> instrumentDistortionKValues = new() { 1.2f, 1f, 0.8f, 0.6f, 0.5f, 0.4f, 0.2f };
 
         [SerializeField]
         [Tooltip("Fernglasvergrößerungen m. Ein einzelner Wert hält m fest; mehrere Werte machen m zu einem Versuchsparameter. 10 entspricht einem typischen 10x-Fernglas.")]
@@ -125,46 +127,58 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private List<float> contentZoomValues = new() { 1f };
 
         [SerializeField]
-        [Tooltip("Basisreihenfolge der getrennten Bewegungsblöcke. SimulatedYaw heißt, der Computer macht die Bewegung; bei HeadTracked dreht die Person den Kopf selbst.")]
-        private List<RandomDotMotionMode> motionModes = new()
-        {
-            RandomDotMotionMode.SimulatedYaw,
-            RandomDotMotionMode.HeadTracked
-        };
-
-        [SerializeField]
-        [Tooltip("Kehrt die Blockreihenfolge für jede zweite Versuchsperson anhand der Kennung um. pilot_001 erhält die Basisreihenfolge, pilot_002 die umgekehrte Reihenfolge.")]
-        private bool counterbalanceMotionBlockOrderByParticipantId = true;
+        [Tooltip("Eine Bewegungsart pro Sitzung. F5 startet diese Auswahl; F7 startet die andere als neue Sitzung.")]
+        private RandomDotMotionMode sessionMotionMode = RandomDotMotionMode.SimulatedYaw;
 
         [FormerlySerializedAs("repetitionsPerCondition")]
         [SerializeField, Min(1)]
-        [Tooltip("Wie oft jede Kombination gezeigt wird. Mehr Wiederholungen heißt sicherere Ergebnisse, aber auch eine längere Sitzung.")]
+        [Tooltip("Wie oft jede Kombination gezeigt wird. Mehr Wiederholungen heißt sicherere Ergebnisse, aber auch eine längere Sitzung. Gilt für jedes k ohne eigenen Eintrag in Repeats Per K Value.")]
         private int repeatsPerCondition = 3;
 
-        [FormerlySerializedAs("repetitionsPerMiniBlock")]
-        [SerializeField, Min(1)]
-        [Tooltip("Nach so vielen Wiederholungen jeder Bedingung folgt eine kurze Unterblock-Pause. Bei 25 Wiederholungen ergeben 5 Wiederholungen pro Unterblock fünf Abschnitte mit je 35 Trials.")]
-        private int repeatsPerBlock = 5;
-        [Header("Simulated Sweep")]
-
         [SerializeField]
-        [Tooltip("Achse des simulierten Schwenks: Horizontal = links/rechts, Vertical = oben/unten. Der aktive HeadTracked-Block bleibt links/rechts.")]
+        [Tooltip("Wiederholungen pro k, in derselben Reihenfolge wie die k-Liste (z. B. Randwerte 8, Mitte 25). " +
+            "Leer oder zu kurz: für die fehlenden k gilt Repeats Per Condition.")]
+        private List<int> repeatsPerKValue = new();
+
+        [SerializeField, Range(1, 10)]
+        [Tooltip("In wie viele Blöcke eine Sitzung geteilt wird. 4 = Viertelblöcke: nach 25, 50 und 75 % der " +
+            "gültigen Trials eine Pause mit rotem Kreuz, die der Versuchsleiter mit F5 beendet. 1 = keine Pausen.")]
+        private int blocksPerSession = 4;
+
+        [Header("Simulated Sweep")]
+        [SerializeField]
+        [Tooltip("Achse des simulierten Schwenks: Horizontal = links/rechts, Vertical = oben/unten. " +
+            "Freie aktive Kopfbewegung ist nicht an diese Achse gebunden.")]
         private RandomDotSweepAxis simulatedSweepAxis = RandomDotSweepAxis.Horizontal;
 
-        [FormerlySerializedAs("motionDurationSeconds")]
-        [SerializeField, Min(0.1f)]
-        [Tooltip("Wie lange die Punkte zu sehen sind und sich bewegen, in Sekunden.")]
-        private float motionSeconds = 5f;
+        [SerializeField, Range(0.1f, 5f)]
+        [Tooltip("Wie lange die Punkte im SimulatedYaw-Block zu sehen sind, in Sekunden. In dieser Zeit schwenkt das Feld einmal in eine Richtung, ohne umzukehren. Ob nach links oder rechts, wechselt von Trial zu Trial in zufälliger Reihenfolge, und beide Richtungen kommen gleich oft dran.")]
+        private float simulatedSweepSeconds = 0.8f;
 
-        [SerializeField, Range(0.1f, 30f)]
-        [Tooltip("Wie weit die Bewegung zu jeder Seite geht, in Grad. Dieser Wert gilt, sobald die Sitzung startet, und überschreibt den Vorschauwert am Random Dot Field.")]
-        private float sweepAmplitudeDegrees = 2f;
+        [SerializeField]
+        [Tooltip("Worauf sich die Geschwindigkeit des simulierten Schwenks bezieht. Bildmitte: Die Punkte laufen in der Bildmitte bei jedem m gleich schnell durch das Bild (Simulated Image Center Speed). Objektwinkel: bisherige Definition, das Instrument schwenkt bei jedem m mit Sweep Speed, und das Bild läuft in der Mitte m-mal so schnell. Die durch k erzeugten Unterschiede zwischen Mitte und Rand bleiben in beiden Fällen erhalten. Der HeadTracked-Block ist davon nicht betroffen.")]
+        private RandomDotSweepSpeedReference simulatedSpeedReference = RandomDotSweepSpeedReference.ImageCenter;
+
+        [SerializeField, Range(0.5f, 120f)]
+        [Tooltip("Sichtbare Winkelgeschwindigkeit der Punkte in der Bildmitte, in Grad pro Sekunde. Gilt nur bei der Einstellung Bildmitte. 12 entspricht dem bisherigen Stand mit m = 10 und 1,2 Grad pro Sekunde.")]
+        private float simulatedImageCenterSpeed = 12f;
 
         [FormerlySerializedAs("sweepSpeedDegreesPerSecond")]
         [SerializeField, Range(0.1f, 60f)]
-        [Tooltip("Mittlere absolute Geschwindigkeit des Sinusschwenks in Grad pro Sekunde. An den Umkehrpunkten wird er langsamer. Überschreibt den Vorschauwert am Random Dot Field.")]
+        [Tooltip("Wie schnell über die Außenwelt geschwenkt wird, in Grad Objektwinkel pro Sekunde. Im HeadTracked-Block ist es die mittlere Geschwindigkeit der Kopfbewegung, die an den Umkehrpunkten langsamer wird. Im SimulatedYaw-Block gilt der Wert nur bei der Einstellung Objektwinkel; dann bleibt die Geschwindigkeit die ganze Zeit gleich. Überschreibt den Vorschauwert am Random Dot Field.")]
         private float sweepSpeed = 1.2f;
+
         [Header("Active Head Tracked Sweep")]
+        [FormerlySerializedAs("motionSeconds")]
+        [FormerlySerializedAs("motionDurationSeconds")]
+        [SerializeField, Min(0.1f)]
+        [Tooltip("Wie lange die Punkte im HeadTracked-Block zu sehen sind, in Sekunden. " +
+            "Die Bewegung kann frei oder optional geführt sein.")]
+        private float headTrackedSeconds = 5f;
+
+        [SerializeField, Range(0.1f, 30f)]
+        [Tooltip("Wie weit die Person den Kopf im HeadTracked-Block zu jeder Seite drehen soll, in Grad.")]
+        private float sweepAmplitudeDegrees = 2f;
 
         [SerializeField]
         [Tooltip("Vor dem aktiven Bewegungsblock die Kopfbewegung mit Soll- und Ist-Marker üben.")]
@@ -184,13 +198,80 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         [FormerlySerializedAs("headTrackedCoverageYawDegrees")]
         [SerializeField, Range(3f, 60f)]
-        [Tooltip("Bis zu dieser Kopfrotation je Seite enthält die Punktwelt einen Sicherheitsbereich. Der gültige Zielschwenk bleibt deutlich kleiner.")]
-        private float headTurnSafetyDegrees = 15f;
+        [Tooltip("So weit darf der Kopf im HeadTracked-Block von der Blickrichtung zu Trialbeginn weg " +
+            "drehen (in jede Richtung), ohne dass am Rand eine leere Fläche erscheint. Größere Werte " +
+            "brauchen deutlich mehr Punkte. Gilt auch für die Vorschau mit Motion Mode HeadTracked.")]
+        private float headTurnSafetyDegrees = 30f;
 
         [FormerlySerializedAs("validateHeadTrackedMotion")]
         [SerializeField]
         [Tooltip("Ungenügende, zu schnelle oder zu große aktive Kopfbewegungen werden gespeichert und später wiederholt.")]
         private bool checkHeadMotion = true;
+
+        [SerializeField]
+        [Tooltip("Aktive Haupttrials sind frei: links/rechts, oben/unten und ohne Solltempo. " +
+            "Keine Wiederholung wegen Sinusbahn, Wendepunkten oder Geschwindigkeit. " +
+            "Blickkontrolle bleibt unabhängig aktiv. Das geführte Kopftraining bleibt erhalten.")]
+        private bool freeHeadMovement = true;
+
+        [SerializeField]
+        [Tooltip("Nur mit Free Head Movement: Die Punkte bleiben sichtbar, bis die Person antwortet. " +
+            "Kein Zeitlimit, keine Richtung und kein Tempo vorgegeben; Head Tracked Seconds gilt dann nicht. " +
+            "Nach der Antwort kommt das graue Feld (Pause Seconds), dann der nächste Trial.")]
+        private bool openEndedActiveTrials = true;
+
+        [Header("Simulated Panning Practice")]
+        [SerializeField]
+        [Tooltip("Vor einem simulierten Bewegungsblock eigene Übungstrials ohne Kopfbewegungs-Sinus.")]
+        private bool trainSimulatedMotion = true;
+
+        [SerializeField]
+        private List<float> simulatedTrainingKValues = new() { 0.2f, 1.2f };
+
+        [SerializeField, Min(1)]
+        private int simulatedTrainingRepeatsPerValue = 2;
+
+        [SerializeField]
+        [Tooltip("Vor den Übungstrials je ein beschriftetes Beispiel für KONVEX und KONKAV, wie beim " +
+            "Checkerboard: erst länger (Example Long Seconds), dann noch einmal so kurz wie in der " +
+            "Messung (Simulated Sweep Seconds). Danach Übung ohne Hinweise.")]
+        private bool showSimulatedExamples = true;
+
+        [SerializeField, Range(0f, 2f)]
+        [Tooltip("k des Beispiels für KONVEX.")]
+        private float exampleConvexK = 1.2f;
+
+        [SerializeField, Range(0f, 2f)]
+        [Tooltip("k des Beispiels für KONKAV.")]
+        private float exampleConcaveK = 0.2f;
+
+        [SerializeField, Range(0.5f, 10f)]
+        [Tooltip("Erste, längere Darbietung jedes Beispiels in Sekunden. Gleiche Geschwindigkeit wie " +
+            "in der Messung, nur länger, also ein weiterer Schwenk.")]
+        private float exampleLongSeconds = 2.5f;
+
+        [SerializeField, Range(0.2f, 10f)]
+        [Tooltip("Wie lange der Hinweistext vor jeder Beispiel-Darbietung im Headset steht, in Sekunden.")]
+        private float exampleTextSeconds = 3f;
+
+        [SerializeField]
+        [Tooltip("Nach jeder Übungsantwort kurz anzeigen, ob sie zum Beispiel passte. Nur bei eindeutigen " +
+            "Extremwerten (Grenzen unten); für k dazwischen gibt es bewusst keine Rückmeldung, " +
+            "damit keine persönliche Grenze antrainiert wird. Gilt nicht in der Messung. " +
+            "Standardmäßig aus: die beschrifteten Beispiele ersetzen sie.")]
+        private bool simulatedTrainingFeedback;
+
+        [SerializeField, Range(0f, 2f)]
+        [Tooltip("Übungs-k bis zu diesem Wert gilt eindeutig als KONKAV.")]
+        private float feedbackConcaveMaxK = 0.3f;
+
+        [SerializeField, Range(0f, 2f)]
+        [Tooltip("Übungs-k ab diesem Wert gilt eindeutig als KONVEX.")]
+        private float feedbackConvexMinK = 1.1f;
+
+        [SerializeField, Range(0.2f, 5f)]
+        [Tooltip("Wie lange die Rückmeldung im Headset steht, in Sekunden.")]
+        private float feedbackSeconds = 1.5f;
 
         [FormerlySerializedAs("headTrackedTurnaroundThresholdDegrees")]
         [SerializeField, Range(0.5f, 30f)]
@@ -241,8 +322,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [SerializeField, Min(0)]
         [Tooltip("Wie oft derselbe Durchgang höchstens wiederholt werden darf. 0 heißt: so lange, bis es klappt.")]
         private int maxRepeatsPerTrial;
-        [Header("Timing")]
 
+        [Header("Timing")]
         [FormerlySerializedAs("interTrialSeconds")]
         [SerializeField, Min(0f)]
         private float pauseSeconds = 0.25f;
@@ -252,7 +333,23 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private Key startSessionKey = Key.F5;
 
         [SerializeField]
+        [Tooltip("Startet im Ruhezustand die jeweils andere Bewegungsart als separate Sitzung.")]
+        private Key startOtherMotionSessionKey = Key.F7;
+
+        [SerializeField]
         private Key abortSessionKey = Key.F6;
+
+        [SerializeField]
+        private Key trainingKey = Key.T;
+
+        [SerializeField]
+        [Tooltip("Reine Live-Vorschau ohne Sitzung, Training oder Datenaufzeichnung ein/aus.")]
+        private Key previewKey = Key.P;
+
+        // Stand vor dem ersten "Vorschau-Werte übernehmen". Leer heißt: es wurde
+        // nichts übernommen. "Originalwerte wiederherstellen" holt ihn zurück.
+        [SerializeField, HideInInspector]
+        private string valuesBeforePreviewTakeover = string.Empty;
 
         [Header("Runtime Status (Read Only)")]
         [SerializeField]
@@ -279,6 +376,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [SerializeField]
         private string activeSessionFolder = string.Empty;
 
+        private readonly LookAwayTimer lookAway = new();
         private IReadOnlyList<RandomDotTrial> trialPlan;
         private RandomDotTrialQueue trialQueue;
         private RandomDotTrial currentTrial;
@@ -286,10 +384,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private DateTime trialStartUtc;
         private double trialStartUnitySeconds;
         private double stimulusEndUnitySeconds;
-        private float currentOffTargetSeconds;
-        private float currentInvalidGazeSeconds;
-        private float longestOffTargetSeconds;
-        private float longestInvalidGazeSeconds;
         private Coroutine interTrialCoroutine;
         private Coroutine motionCoroutine;
         private Coroutine headTrainingCoroutine;
@@ -297,36 +391,55 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private int trainedHeadMotionBlock;
         private Vector3 trainingCenterForward;
         private bool eventsSubscribed;
-
-        public event Action<RandomDotTrial> TrialStarted;
-        public event Action<RandomDotTrialResult> TrialEnded;
-        public event Action<RandomDotSessionState> SessionFinished;
+        private bool previewActive;
+        private string settingsBeforePreview;
+        private string lookToKeepAfterPreview;
+        private bool standaloneTraining;
+        private bool trainingResponseReceived;
+        private CheckerboardCurvatureResponse trainingResponse;
+        private readonly FrameTimingTracker frameTiming = new();
+        private int frameTimingStartFrame;
+        private int trialsWithSlowFrames;
+        private int pausesTaken;
+        private int trainedSimulatedMotionBlock;
+        private int instructedActiveMotionBlock;
+        private Coroutine simulatedTrainingCoroutine;
 
         public RandomDotSessionState SessionState => sessionState;
-        public RandomDotTrial CurrentTrial => currentTrial;
+        public RandomDotMotionMode SessionMotionMode => sessionMotionMode;
         public int CurrentTrialNumber => currentTrialNumber;
         public int TotalTrials => totalTrials;
         public int ValidTrialsCompleted => validTrialsCompleted;
-        public int PresentationCount => presentationCount;
         public int CurrentMotionBlock => currentMotionBlock;
         public int CurrentMiniBlock => currentMiniBlock;
-        public int PendingTrialCount => trialQueue?.Count ?? 0;
-        public float CurrentOffTargetSeconds => currentOffTargetSeconds;
-        public float CurrentInvalidGazeSeconds => currentInvalidGazeSeconds;
-        public string ActiveSessionFolder => activeSessionFolder;
         public bool RequireFixation => requireFixation;
-        public bool ResponseKeysSwapped =>
-            keyboardController != null && keyboardController.SwapResponseKeys;
-        public bool IsSessionActive =>
-            sessionState == RandomDotSessionState.HeadTrainingInstructions ||
-            sessionState == RandomDotSessionState.HeadTrainingMotion ||
-            sessionState == RandomDotSessionState.HeadTrainingFeedback ||
-            sessionState == RandomDotSessionState.InterTrial ||
-            sessionState == RandomDotSessionState.WaitingForFixation ||
-            sessionState == RandomDotSessionState.PresentingMotion ||
-            sessionState == RandomDotSessionState.WaitingForResponse ||
-            sessionState == RandomDotSessionState.PausedBetweenMiniBlocks ||
-            sessionState == RandomDotSessionState.PausedBetweenMotionBlocks;
+        public bool FreeHeadMovement => freeHeadMovement;
+        public bool IsPreviewActive => previewActive;
+        public RandomDotFieldStimulus Stimulus => stimulus;
+
+        // Für die Editor-Übergabe aus dem Play Mode in die Szene.
+        public string ValuesBeforePreviewTakeover
+        {
+            get => valuesBeforePreviewTakeover;
+            set => valuesBeforePreviewTakeover = value ?? string.Empty;
+        }
+
+        public bool HasValuesBeforePreviewTakeover => !string.IsNullOrEmpty(valuesBeforePreviewTakeover);
+        public bool IsTrainingActive => sessionState is State.HeadTrainingInstructions
+            or State.HeadTrainingMotion or State.HeadTrainingFeedback
+            or State.SimulatedTrainingInstructions or State.SimulatedTrainingMotion
+            or State.SimulatedTrainingResponse;
+        public string ControllerSummary => keyboardController != null ? keyboardController.ControllerSummary : "–";
+        public string KeyboardSummary => keyboardController != null ? keyboardController.KeyboardSummary : "–";
+
+        // Aktiv ist alles außer: noch nicht gestartet, fertig oder abgebrochen.
+        public bool IsSessionActive => !standaloneTraining
+            && sessionState is not (State.Idle or State.Completed or State.Aborted);
+
+        // Der Haupttrial kann frei/kurz sein. Das unveränderte Sinustraining
+        // braucht unabhängig davon genug Zeit für beide Wendepunkte.
+        private float HeadTrainingSeconds =>
+            Mathf.Max(headTrackedSeconds, 3f * sweepAmplitudeDegrees / sweepSpeed);
 
         private void Awake()
         {
@@ -346,6 +459,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             {
                 StartSession();
             }
+            else
+            {
+                ShowWelcomeScreen();
+            }
         }
 
         private void Update()
@@ -353,46 +470,76 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // Hier werden die Tasten vom Versuchsleiter abgefragt: starten und
             // abbrechen. Läuft gerade die Bewegung, wird nebenher in jedem Frame
             // geprüft, ob der Blick noch auf dem Kreuz liegt.
+            if (previewActive) KeepPreviewPointWorldLikeSession();
+
+            // Bildzeiten nur während der Darbietung zählen, ab dem Frame nach dem Start.
+            if (sessionState == State.PresentingMotion && Time.frameCount > frameTimingStartFrame)
+                frameTiming.Add(Time.unscaledDeltaTime);
+
             Keyboard keyboard = Keyboard.current;
-            if (keyboard != null)
+            if (keyboard != null && !IsSessionActive && !IsTrainingActive
+                && keyboard[previewKey].wasPressedThisFrame)
             {
-                if (keyboard[startSessionKey].wasPressedThisFrame)
-                {
-                    if (sessionState == RandomDotSessionState.HeadTrainingInstructions)
-                    {
-                        headTrainingCoroutine = StartCoroutine(RunHeadMovementTraining());
-                    }
-                    else if (sessionState ==
-                            RandomDotSessionState.PausedBetweenMiniBlocks ||
-                        sessionState ==
-                            RandomDotSessionState.PausedBetweenMotionBlocks)
-                    {
-                        ResumePausedSession();
-                    }
-                    else if (!IsSessionActive)
-                    {
-                        StartSession();
-                    }
-
-                    return;
-                }
-
-                if (IsSessionActive && keyboard[abortSessionKey].wasPressedThisFrame)
-                {
-                    AbortSession("ManualAbort");
-                    return;
-                }
+                TogglePreview();
+                return;
             }
 
-            if (sessionState == RandomDotSessionState.WaitingForFixation &&
-                fixationMonitor != null && fixationMonitor.RequirementMet)
+            if (keyboard != null && keyboard[abortSessionKey].wasPressedThisFrame)
+            {
+                if (previewActive) StopPreview();
+                else if (standaloneTraining) StopTrainingAndReturnToWelcome();
+                else if (IsSessionActive) AbortSession("ManualAbort");
+                return;
+            }
+
+            if (keyboard != null && !IsSessionActive && !IsTrainingActive
+                && keyboard[trainingKey].wasPressedThisFrame)
+            {
+                StartTraining();
+                return;
+            }
+
+            if (keyboard != null && !IsSessionActive && !IsTrainingActive
+                && keyboard[startOtherMotionSessionKey].wasPressedThisFrame)
+            {
+                StartOtherMotionSession();
+                return;
+            }
+
+            if (keyboard != null && keyboard[startSessionKey].wasPressedThisFrame)
+            {
+                if (sessionState == State.ResponseInstructions)
+                {
+                    ConfirmResponseInstructions();
+                }
+                else if (sessionState == State.PausedBetweenMiniBlocks)
+                {
+                    ContinueAfterBlockPause();
+                }
+                else if (sessionState is State.HeadTrainingInstructions or State.SimulatedTrainingInstructions)
+                {
+                    ConfirmTrainingInstructions();
+                }
+                else if (sessionState == State.ActiveMotionInstructions)
+                {
+                    ConfirmActiveMotionInstructions();
+                }
+                else if (!IsSessionActive && !IsTrainingActive)
+                {
+                    StartSession();
+                }
+
+                return;
+            }
+
+            if (sessionState == State.WaitingForFixation
+                && fixationMonitor != null && fixationMonitor.IsReadyForPresentation(maxSampleAgeSeconds))
             {
                 PresentCurrentTrial();
                 return;
             }
 
-            if (sessionState == RandomDotSessionState.PresentingMotion &&
-                requireFixation)
+            if (sessionState == State.PresentingMotion && requireFixation)
             {
                 MonitorFixationDuringMotion();
             }
@@ -400,6 +547,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void OnDisable()
         {
+            RestorePreviewSettings();
+            if (standaloneTraining) StopTrainingAndReturnToWelcome();
             UnsubscribeEvents();
             if (Application.isPlaying && IsSessionActive)
             {
@@ -409,23 +558,158 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             DisposeTrainingView();
         }
 
-        public void Configure(
-            RandomDotFieldStimulus randomDotStimulus,
-            RandomDotKeyboardController randomDotKeyboard,
-            RandomDotHeadSweepMonitor headSweepMonitor,
-            EyeTrackingToolbox toolbox,
-            RandomDotFixationMonitor randomDotFixationMonitor)
+        public void ShowWelcomeScreen()
         {
-            UnsubscribeEvents();
-            stimulus = randomDotStimulus;
-            keyboardController = randomDotKeyboard;
-            sweepMonitor = headSweepMonitor;
-            eyeTrackingToolbox = toolbox;
-            fixationMonitor = randomDotFixationMonitor;
-            if (isActiveAndEnabled)
+            RestorePreviewSettings();
+            standaloneTraining = false;
+            sessionState = State.Idle;
+            ResolveReferences();
+            if (stimulus == null || stimulus.Observer == null) return;
+            headTrainingView ??= new RandomDotHeadSweepTrainingView(stimulus.Observer);
+            stimulus.SessionRunning = false;
+            stimulus.ShowFixationOnly();
+            headTrainingView.ShowWelcome(
+                ResponseInputController.GetReadableKeyName(startSessionKey),
+                ResponseInputController.GetReadableKeyName(startOtherMotionSessionKey),
+                ResponseInputController.GetReadableKeyName(trainingKey),
+                ResponseInputController.GetReadableKeyName(previewKey), sessionMotionMode);
+        }
+
+        /// <summary>Nur Punkte anschauen und live einstellen. Keine Dateien oder Blickaufnahme.</summary>
+        public void TogglePreview()
+        {
+            if (IsSessionActive || IsTrainingActive) return;
+            if (previewActive)
             {
-                SubscribeEvents();
+                StopPreview();
+                return;
             }
+
+            ResolveReferences();
+            if (stimulus == null) return;
+            settingsBeforePreview = JsonUtility.ToJson(stimulus);
+            headTrainingView?.Hide();
+            previewActive = true;
+            stimulus.SessionRunning = false;
+            stimulus.PlaceAroundObserver();
+            stimulus.Show();
+        }
+
+        public void StopPreview()
+        {
+            if (previewActive) ShowWelcomeScreen();
+        }
+
+        private void RestorePreviewSettings()
+        {
+            if (!previewActive) return;
+            previewActive = false;
+            if (stimulus != null && !string.IsNullOrEmpty(settingsBeforePreview))
+                stimulus.RestorePreviewSettings(settingsBeforePreview);
+            // Ein übernommenes Punktbild bleibt nach der Vorschau erhalten.
+            if (stimulus != null && lookToKeepAfterPreview != null)
+                stimulus.RestorePreviewSettings(lookToKeepAfterPreview);
+            settingsBeforePreview = null;
+            lookToKeepAfterPreview = null;
+        }
+
+        /// <summary>
+        /// Übernimmt FOV, m, Zoom, Auge, Bewegungsart, Achse und Geschwindigkeit der
+        /// Vorschau in den Versuchsplan und behält das Punktbild (Dichte, Punktgröße,
+        /// Edge Softness, Farben). Die k-Liste bleibt unverändert. Beim ersten Mal
+        /// wird der bisherige Stand als Original gesichert.
+        /// </summary>
+        public bool TakeOverPreviewValues()
+        {
+            if (IsSessionActive || IsTrainingActive) return false;
+            ResolveReferences();
+            if (stimulus == null) return false;
+            if (!HasValuesBeforePreviewTakeover)
+                valuesBeforePreviewTakeover = CaptureExperimentValues();
+            RandomDotPreviewTakeover.CopyPreviewIntoPlan(stimulus, this);
+            if (previewActive)
+                lookToKeepAfterPreview = RandomDotPreviewTakeover.CaptureLook(JsonUtility.ToJson(stimulus));
+            return true;
+        }
+
+        /// <summary>Stand vor dem ersten Übernehmen zurückholen. Beliebig oft möglich.</summary>
+        public bool RestoreValuesBeforePreviewTakeover()
+        {
+            if (IsSessionActive || IsTrainingActive || !HasValuesBeforePreviewTakeover) return false;
+            ResolveReferences();
+            ApplyExperimentValues(valuesBeforePreviewTakeover);
+            valuesBeforePreviewTakeover = string.Empty;
+            return true;
+        }
+
+        /// <summary>Aktueller Versuchsplan plus Punktbild, so wie sie nach der Vorschau gelten.</summary>
+        public string CaptureExperimentValues()
+        {
+            ResolveReferences();
+            string look = lookToKeepAfterPreview
+                ?? (previewActive ? settingsBeforePreview : null)
+                ?? (stimulus != null ? JsonUtility.ToJson(stimulus) : "{}");
+            return RandomDotPreviewTakeover.Capture(this, look);
+        }
+
+        public void ApplyExperimentValues(string valuesJson)
+        {
+            RandomDotPreviewTakeover.ApplyPlan(valuesJson, this);
+            ResolveReferences();
+            if (stimulus == null) return;
+            string look = RandomDotPreviewTakeover.LookOf(valuesJson);
+            if (Application.isPlaying)
+            {
+                stimulus.RestorePreviewSettings(look);
+                if (previewActive) lookToKeepAfterPreview = look;
+            }
+            else
+            {
+                JsonUtility.FromJsonOverwrite(look, stimulus);
+            }
+        }
+
+        /// <summary>Eigenständiges Training mit T, noch ohne Messdateien.</summary>
+        public bool StartTraining()
+        {
+            if (IsSessionActive || IsTrainingActive) return false;
+            StopPreview();
+            ResolveReferences();
+            if (stimulus == null || stimulus.Observer == null
+                || keyboardController == null || sweepMonitor == null) return false;
+            standaloneTraining = true;
+            stimulus.SessionRunning = true;
+            if (sessionMotionMode == RandomDotMotionMode.HeadTracked)
+                ShowHeadTrainingInstructions(null);
+            else
+                ShowSimulatedTrainingInstructions();
+            return IsTrainingActive;
+        }
+
+        public void StopTrainingAndReturnToWelcome()
+        {
+            if (!standaloneTraining) return;
+            StopPendingCoroutines();
+            sweepMonitor.StopProfileTracking();
+            headTrainingView?.Hide();
+            ShowWelcomeScreen();
+        }
+
+        public void ConfirmTrainingInstructions()
+        {
+            if (sessionState == State.HeadTrainingInstructions)
+                headTrainingCoroutine = StartCoroutine(RunHeadMovementTraining());
+            else if (sessionState == State.SimulatedTrainingInstructions)
+                simulatedTrainingCoroutine = StartCoroutine(RunSimulatedTraining());
+        }
+
+        /// <summary>Andere Variante bewusst als neue Sitzung starten, niemals eine laufende Sitzung ändern.</summary>
+        public bool StartOtherMotionSession()
+        {
+            if (IsSessionActive || IsTrainingActive) return false;
+            sessionMotionMode = sessionMotionMode == RandomDotMotionMode.SimulatedYaw
+                ? RandomDotMotionMode.HeadTracked : RandomDotMotionMode.SimulatedYaw;
+            return StartSession();
         }
 
         public bool StartSession()
@@ -434,103 +718,162 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // Einstellungen prüfen -> alle Durchgänge bauen und mischen ->
             // die Messdateien anlegen -> Eye Tracking starten ->
             // den ersten Durchgang zeigen.
-            if (IsSessionActive)
+            if (IsSessionActive || IsTrainingActive)
             {
                 Debug.LogWarning("Eine Random-Dot-Sitzung läuft bereits.", this);
                 return false;
             }
+
+            StopPreview();
 
             ResolveReferences();
             SubscribeEvents();
             if (stimulus == null || keyboardController == null || sweepMonitor == null)
             {
                 Debug.LogError(
-                    "Random-Dot-Stimulus, Tastatursteuerung und Sweep-Monitor müssen zugewiesen sein.",
-                    this);
+                    "Random-Dot-Stimulus, Tastatursteuerung und Sweep-Monitor müssen zugewiesen sein.", this);
                 return false;
             }
+
+            // Ab hier sind stimulus, keyboardController und sweepMonitor sicher da.
+            // Der Rest vom Skript muss das deshalb nicht jedes Mal neu prüfen.
 
             if (requireFixation && fixationMonitor == null)
             {
                 Debug.LogError(
-                    "Fixationskontrolle ist aktiv, aber der Random-Dot Fixation Monitor fehlt.",
-                    this);
+                    "Fixationskontrolle ist aktiv, aber der Random-Dot Fixation Monitor fehlt.", this);
                 return false;
             }
 
-            if (motionSeconds + 0.001f <
-                3f * sweepAmplitudeDegrees / sweepSpeed)
+            // Hat die Auswahl "Auto" keinen echten Eye Tracker gefunden, darf eine
+            // Messung nicht unbemerkt mit dem Dummy (Maus-Blick) laufen.
+            if (EyeTrackerProviderResolver.TryGetSessionBlockReason(
+                eyeTrackingToolbox, requireFixation, out string eyeTrackerBlockReason))
+            {
+                Debug.LogError(eyeTrackerBlockReason, this);
+                return false;
+            }
+
+            // Im HeadTracked-Block kommt der zweite Umkehrpunkt erst nach
+            // 3 * Amplitude / Geschwindigkeit.
+            if (sessionMotionMode == RandomDotMotionMode.HeadTracked
+                && !freeHeadMovement && checkHeadMotion
+                && headTrackedSeconds + 0.001f < 3f * sweepAmplitudeDegrees / sweepSpeed)
             {
                 Debug.LogError(
-                    "Die Bewegungsdauer muss lang genug sein, damit der Sinus " +
-                    "beide Umkehrpunkte erreicht (mindestens 3 * Amplitude / " +
-                    "mittlere Geschwindigkeit).",
-                    this);
+                    "Die HeadTracked-Dauer muss lang genug sein, damit der Sinus " +
+                    "beide Umkehrpunkte erreicht " +
+                    "(mindestens 3 * Amplitude / mittlere Geschwindigkeit).", this);
                 return false;
             }
 
             try
             {
-                IReadOnlyList<RandomDotMotionMode> orderedMotionModes =
-                    BuildMotionBlockOrder();
-                trialPlan = RandomDotTrialPlanner.CreateRandomizedPlan(
-                    fieldOfViewValues,
-                    eyePresentations,
-                    instrumentDistortionKValues,
-                    instrumentMagnificationMValues,
-                    contentZoomValues,
-                    orderedMotionModes,
-                    repeatsPerCondition,
-                    repeatsPerBlock,
-                    randomSeed,
-                    dotSeedBase,
-                    simulatedSweepAxis);
-                EnsureWorldCoverageSupportsPlan(trialPlan);
+                trialPlan = RandomDotTrialPlanner.CreateSingleMotionPlan(
+                    fieldOfViewValues, eyePresentations, instrumentDistortionKValues,
+                    instrumentMagnificationMValues, contentZoomValues, sessionMotionMode,
+                    repeatsPerCondition, randomSeed, dotSeedBase, simulatedSweepAxis, repeatsPerKValue);
+                CheckPointWorlds(trialPlan);
                 trialQueue = new RandomDotTrialQueue(trialPlan);
 
                 DateTime sessionStartUtc = DateTime.UtcNow;
-                string resolvedRoot = ExperimentOutputPath.Resolve(outputRoot);
-                experimentFiles = RandomDotExperimentFiles.Create(
-                    resolvedRoot,
-                    participantId,
-                    sessionLabel,
-                    sessionStartUtc,
-                    randomSeed);
+                experimentFiles = new RandomDotExperimentFiles(
+                    ExperimentOutputPath.Resolve(outputRoot), participantId, sessionLabel,
+                    sessionStartUtc, randomSeed);
                 experimentFiles.WritePlan(trialPlan);
                 activeSessionFolder = experimentFiles.SessionFolder;
                 StartEyeTracking(sessionStartUtc);
+                experimentFiles.WriteSessionSettings(ExperimentSessionSettings.Capture(
+                    this, stimulus, fixationMonitor, keyboardController, eyeTrackingToolbox));
             }
             catch (Exception exception)
             {
-                sessionState = RandomDotSessionState.Aborted;
+                EndSession(State.Aborted);
                 Debug.LogError(
-                    "Random-Dot-Sitzung konnte nicht gestartet werden: " +
-                    exception.Message,
-                    this);
+                    "Random-Dot-Sitzung konnte nicht gestartet werden: " + exception.Message, this);
                 return false;
             }
 
             StopPendingCoroutines();
+            headTrainingView?.Hide();
             currentTrial = null;
             currentTrialNumber = 0;
             totalTrials = trialPlan.Count;
             validTrialsCompleted = 0;
             presentationCount = 0;
+            trialsWithSlowFrames = 0;
+            pausesTaken = 0;
             currentMotionBlock = 0;
             currentMiniBlock = 0;
             trainedHeadMotionBlock = 0;
-            sessionState = RandomDotSessionState.InterTrial;
+            trainedSimulatedMotionBlock = 0;
+            instructedActiveMotionBlock = 0;
+            sessionState = State.InterTrial;
+            // Ab jetzt keine Vorschau-Dauerschleife mehr: Jeder Schwenk läuft einmal.
+            stimulus.SessionRunning = true;
 
-            Debug.Log(
-                $"Random-Dot-Sitzung gestartet: {totalTrials} gültige Trials geplant.\n" +
-                activeSessionFolder,
-                this);
-            BeginTrainingOrNextAttempt();
+            Debug.Log($"Random-Dot-Sitzung gestartet: {totalTrials} gültige Trials geplant.\n" +
+                activeSessionFolder, this);
+            ShowResponseInstructions();
             return true;
+        }
+
+        private void ShowResponseInstructions()
+        {
+            // Vor dem ersten Durchgang liest die Person im Headset, welche Taste
+            // welche Antwort gibt. Der Text richtet sich nach der Zuordnung, die
+            // am Random Dot Keyboard Controller eingestellt ist. Mit Auto Start
+            // (nur zum schnellen Ausprobieren) wird die Anzeige übersprungen.
+            Debug.Log("Random-Dot-Antworten: Controller " + ControllerSummary +
+                "; Tastatur " + KeyboardSummary + ".", this);
+            Transform observer = stimulus.Observer;
+            if (autoStartOnPlay || observer == null)
+            {
+                BeginTrainingOrNextAttempt();
+                return;
+            }
+
+            headTrainingView ??= new RandomDotHeadSweepTrainingView(observer);
+            stimulus.PlaceAroundObserver();
+            stimulus.ShowFixationOnly();
+            sessionState = State.ResponseInstructions;
+            headTrainingView.ShowResponseInstructions(
+                BuildResponseLines(), ResponseInputController.GetReadableKeyName(startSessionKey),
+                OpenEndedSession);
+            WriteMarker("ResponseInstructionsShown;task=random_dot_instrument");
+        }
+
+        /// <summary>
+        /// Beendet die Anzeige der Tastenbelegung. Danach beginnt der erste
+        /// Durchgang oder, im HeadTracked-Block, das Kopfbewegungstraining.
+        /// </summary>
+        public void ConfirmResponseInstructions()
+        {
+            if (sessionState != State.ResponseInstructions)
+            {
+                return;
+            }
+
+            headTrainingView.Hide();
+            WriteMarker("ResponseInstructionsConfirmed;task=random_dot_instrument");
+            sessionState = State.InterTrial;
+            BeginTrainingOrNextAttempt();
+        }
+
+        // Die beiden Zeilen mit der Tastenbelegung für die Anzeigen im Headset.
+        private string BuildResponseLines()
+        {
+            return keyboardController.BuildResponseLines(
+                "CONVEX (curves outward)", "CONCAVE (curves inward)");
         }
 
         public void AbortSession(string reason = "ManualAbort")
         {
+            if (standaloneTraining)
+            {
+                StopTrainingAndReturnToWelcome();
+                return;
+            }
             // Stoppt Bewegung und Aufnahme sauber. Beim Abbrechen geht nichts
             // verloren, alles bisher Gemessene bleibt im Sitzungsordner liegen.
             if (!IsSessionActive)
@@ -540,10 +883,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             StopPendingCoroutines();
             headTrainingView?.Hide();
-            sweepMonitor?.StopProfileTracking();
-            if ((sessionState == RandomDotSessionState.PresentingMotion ||
-                 sessionState == RandomDotSessionState.WaitingForResponse) &&
-                currentTrial != null && experimentFiles != null)
+            sweepMonitor.StopProfileTracking();
+            if ((sessionState is State.PresentingMotion or State.WaitingForResponse)
+                && currentTrial != null && experimentFiles != null)
             {
                 if (stimulusEndUnitySeconds <= trialStartUnitySeconds)
                 {
@@ -551,37 +893,206 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 }
 
                 TryAppendResult(CaptureCurrentResult(
-                    CheckerboardCurvatureResponse.None,
-                    validForAnalysis: false,
-                    "aborted:" + (reason ?? string.Empty)));
+                    CheckerboardCurvatureResponse.None, validForAnalysis: false, "aborted:" + reason));
             }
 
             WriteMarker("SessionAborted;task=random_dot_instrument;reason=" +
-                CheckerboardExperimentFiles.SanitizeIdentifier(reason, "unspecified"));
-            stimulus?.Hide();
-            StopEyeTrackingRecording();
-            currentTrial = null;
-            sessionState = RandomDotSessionState.Aborted;
-            SessionFinished?.Invoke(sessionState);
+                ExperimentFilesBase.SanitizeIdentifier(reason, "unspecified"));
+            EndSession(State.Aborted);
         }
 
         private void BeginTrainingOrNextAttempt()
         {
-            if (trainHeadMovement && trialQueue != null &&
-                trialQueue.TryPeekNext(out RandomDotTrial next) &&
-                next.MotionMode == RandomDotMotionMode.HeadTracked &&
-                trainedHeadMotionBlock != next.MotionBlockIndex)
+            // Jeder Bewegungsblock bekommt sein eigenes Training. Die kurze
+            // simulierte Darbietung hat keine Kopfbewegungs-Sollbahn.
+            if (trialQueue != null && trialQueue.TryPeekNext(out RandomDotTrial next))
             {
-                ShowHeadTrainingInstructions(next);
-                return;
+                if (trainHeadMovement && next.MotionMode == RandomDotMotionMode.HeadTracked
+                    && trainedHeadMotionBlock != next.MotionBlockIndex)
+                {
+                    ShowHeadTrainingInstructions(next);
+                    return;
+                }
+
+                if (trainSimulatedMotion && !autoStartOnPlay
+                    && next.MotionMode == RandomDotMotionMode.SimulatedYaw
+                    && trainedSimulatedMotionBlock != next.MotionBlockIndex)
+                {
+                    ShowSimulatedTrainingInstructions();
+                    return;
+                }
+
+                if (!autoStartOnPlay && next.MotionMode == RandomDotMotionMode.HeadTracked
+                    && instructedActiveMotionBlock != next.MotionBlockIndex && stimulus.Observer != null)
+                {
+                    headTrainingView ??= new RandomDotHeadSweepTrainingView(stimulus.Observer);
+                    stimulus.ShowFixationOnly();
+                    sessionState = State.ActiveMotionInstructions;
+                    headTrainingView.ShowActiveMotionInstructions(freeHeadMovement,
+                        IsOpenEndedTrial(next), BuildResponseLines(), ResponseInputController.GetReadableKeyName(startSessionKey));
+                    return;
+                }
             }
 
             BeginNextAttempt();
         }
 
+        public void ConfirmActiveMotionInstructions()
+        {
+            if (sessionState != State.ActiveMotionInstructions) return;
+            if (trialQueue.TryPeekNext(out RandomDotTrial next))
+                instructedActiveMotionBlock = next.MotionBlockIndex;
+            headTrainingView.Hide();
+            sessionState = State.InterTrial;
+            BeginNextAttempt();
+        }
+
+        /// <summary>Wie viele beschriftete Beispiele im laufenden Training schon gezeigt wurden.</summary>
+        public int TrainingExamplesShown { get; private set; }
+
+        private IEnumerator ShowSimulatedExamples()
+        {
+            // Wie beim Checkerboard: Zuerst je ein deutliches, beschriftetes Beispiel,
+            // damit klar ist, was "konvex" und "konkav" heißt. Danach Übung ohne
+            // Hinweise; eine Grenze in der Mitte wird so nicht vorgegeben.
+            TrainingExamplesShown = 0;
+            var examples = new[]
+            {
+                (category: CheckerboardCurvatureResponse.Convex, k: exampleConvexK),
+                (category: CheckerboardCurvatureResponse.Concave, k: exampleConcaveK)
+            };
+            for (int index = 0; index < examples.Length; index++)
+            {
+                RandomDotTrial example = RandomDotTrialPlanner.CreateRandomizedPlan(
+                    new[] { fieldOfViewValues[0] }, new[] { eyePresentations[0] }, new[] { examples[index].k },
+                    new[] { instrumentMagnificationMValues[0] }, new[] { contentZoomValues[0] },
+                    new[] { RandomDotMotionMode.SimulatedYaw }, 1, 1,
+                    unchecked(randomSeed + 50000 + index), dotSeedBase + 50000 + index, simulatedSweepAxis)[0];
+                string label = examples[index].category == CheckerboardCurvatureResponse.Convex
+                    ? "CONVEX (curves outward)" : "CONCAVE (curves inward)";
+
+                headTrainingView.ShowSimulatedExample(label,
+                    "Watch the dots. This example is shown longer.");
+                yield return new WaitForSecondsRealtime(exampleTextSeconds);
+                yield return PresentSimulatedExample(example, exampleLongSeconds);
+
+                headTrainingView.ShowSimulatedExample(label, string.Format(CultureInfo.InvariantCulture,
+                    "The same example again,\nas briefly as in the experiment ({0:0.0#} s).",
+                    simulatedSweepSeconds));
+                yield return new WaitForSecondsRealtime(exampleTextSeconds);
+                yield return PresentSimulatedExample(example, simulatedSweepSeconds);
+                TrainingExamplesShown++;
+            }
+
+            headTrainingView.ShowSimulatedPracticeStart(simulatedTrainingFeedback);
+            yield return new WaitForSecondsRealtime(exampleTextSeconds);
+        }
+
+        private IEnumerator PresentSimulatedExample(RandomDotTrial example, float seconds)
+        {
+            headTrainingView.Hide();
+            ConfigureStimulus(example, seconds);
+            stimulus.ShowFixationOnly();
+            yield return new WaitForSecondsRealtime(Mathf.Max(0.25f, pauseSeconds));
+            stimulus.RestartMotionPhase();
+            stimulus.Show();
+            yield return new WaitForSecondsRealtime(seconds);
+            stimulus.ShowFixationOnly();
+        }
+
+        private IReadOnlyList<RandomDotTrial> BuildSimulatedTrainingPlan()
+        {
+            return RandomDotTrialPlanner.CreateRandomizedPlan(
+                new[] { fieldOfViewValues[0] }, new[] { eyePresentations[0] }, simulatedTrainingKValues,
+                new[] { instrumentMagnificationMValues[0] }, new[] { contentZoomValues[0] },
+                new[] { RandomDotMotionMode.SimulatedYaw }, simulatedTrainingRepeatsPerValue,
+                simulatedTrainingRepeatsPerValue, randomSeed, dotSeedBase, simulatedSweepAxis);
+        }
+
+        private void ShowSimulatedTrainingInstructions()
+        {
+            try
+            {
+                CheckPointWorlds(BuildSimulatedTrainingPlan());
+                if (stimulus.Observer == null) throw new InvalidOperationException("Training braucht einen Observer.");
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("Simulated-Panning-Training: " + exception.Message, this);
+                if (standaloneTraining) ShowWelcomeScreen();
+                else AbortSession("InvalidTrainingSettings");
+                return;
+            }
+
+            headTrainingView ??= new RandomDotHeadSweepTrainingView(stimulus.Observer);
+            stimulus.ShowFixationOnly();
+            sessionState = State.SimulatedTrainingInstructions;
+            headTrainingView.ShowSimulatedInstructions(BuildResponseLines(),
+                ResponseInputController.GetReadableKeyName(startSessionKey), simulatedTrainingFeedback,
+                showSimulatedExamples);
+        }
+
+        private IEnumerator RunSimulatedTraining()
+        {
+            sessionState = State.SimulatedTrainingMotion;
+            if (showSimulatedExamples)
+            {
+                yield return ShowSimulatedExamples();
+            }
+
+            IReadOnlyList<RandomDotTrial> practice = BuildSimulatedTrainingPlan();
+            for (int index = 0; index < practice.Count; index++)
+            {
+                headTrainingView.Hide();
+                ConfigureStimulus(practice[index]);
+                stimulus.ShowFixationOnly();
+                yield return new WaitForSecondsRealtime(Mathf.Max(0.25f, pauseSeconds));
+                stimulus.RestartMotionPhase();
+                trainingResponseReceived = false;
+                sessionState = State.SimulatedTrainingMotion;
+                stimulus.Show();
+                yield return new WaitForSecondsRealtime(simulatedSweepSeconds);
+                stimulus.ShowFixationOnly();
+                sessionState = State.SimulatedTrainingResponse;
+                headTrainingView.ShowSimulatedResponse(index + 1, practice.Count, BuildResponseLines());
+                while (!trainingResponseReceived) yield return null;
+
+                // Subjektives Formurteil: eine "richtige" Antwort gibt es nur bei
+                // eindeutigen Extremwerten. Dort sagt die Rückmeldung, was konvex
+                // und konkav heißt, ohne eine Grenze in der Mitte vorzugeben.
+                CheckerboardCurvatureResponse expected = simulatedTrainingFeedback
+                    ? ExpectedTrainingResponse(practice[index].InstrumentDistortionK,
+                        feedbackConcaveMaxK, feedbackConvexMinK)
+                    : CheckerboardCurvatureResponse.None;
+                if (expected != CheckerboardCurvatureResponse.None)
+                {
+                    LastTrainingAnswerCorrect = trainingResponse == expected;
+                    headTrainingView.ShowSimulatedFeedback(LastTrainingAnswerCorrect.Value,
+                        expected == CheckerboardCurvatureResponse.Convex
+                            ? "CONVEX (curves outward)" : "CONCAVE (curves inward)");
+                    yield return new WaitForSecondsRealtime(feedbackSeconds);
+                }
+                else
+                {
+                    LastTrainingAnswerCorrect = null;
+                }
+            }
+
+            if (!standaloneTraining && trialQueue.TryPeekNext(out RandomDotTrial next))
+                trainedSimulatedMotionBlock = next.MotionBlockIndex;
+            headTrainingView.Hide();
+            simulatedTrainingCoroutine = null;
+            if (standaloneTraining) ShowWelcomeScreen();
+            else
+            {
+                sessionState = State.InterTrial;
+                BeginNextAttempt();
+            }
+        }
+
         private void ShowHeadTrainingInstructions(RandomDotTrial next)
         {
-            Transform observer = stimulus != null ? stimulus.Observer : null;
+            Transform observer = stimulus.Observer;
             if (observer == null)
             {
                 Debug.LogError("Das Kopfbewegungstraining braucht die XR-Kamera als Observer.", this);
@@ -593,25 +1104,25 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulus.SetMotionMode(RandomDotMotionMode.HeadTracked);
             stimulus.PlaceAroundObserver();
             stimulus.ShowFixationOnly();
-            trainingCenterForward = HorizontalForward(observer.forward);
-            sessionState = RandomDotSessionState.HeadTrainingInstructions;
-            headTrainingView.ShowInstructions(sweepAmplitudeDegrees);
-            WriteMarker(string.Format(
-                CultureInfo.InvariantCulture,
-                "HeadTrainingInstructions;task=random_dot_instrument;motion_block={0};amplitude_deg={1:F3};mean_speed_deg_s={2:F3}",
-                next.MotionBlockIndex,
-                sweepAmplitudeDegrees,
-                sweepSpeed));
+            trainingCenterForward = RandomDotHeadSweepMonitor.RemoveUpDownTilt(observer.forward);
+            sessionState = State.HeadTrainingInstructions;
+            headTrainingView.ShowInstructions(sweepAmplitudeDegrees, BuildResponseLines(),
+                ResponseInputController.GetReadableKeyName(startSessionKey),
+                ResponseInputController.GetReadableKeyName(abortSessionKey));
+            WriteMarker(
+                "HeadTrainingInstructions;task=random_dot_instrument;motion_block={0};" +
+                "amplitude_deg={1:F3};mean_speed_deg_s={2:F3}",
+                next?.MotionBlockIndex ?? 0, sweepAmplitudeDegrees, sweepSpeed);
         }
 
         private IEnumerator RunHeadMovementTraining()
         {
             int goodSweeps = 0;
             int attempt = 0;
-            RandomDotSweepDirection firstDirection =
-                trialQueue.TryPeekNext(out RandomDotTrial next)
-                    ? next.SweepDirection
-                    : RandomDotSweepDirection.RightFirst;
+            RandomDotSweepDirection firstDirection = trialQueue != null
+                && trialQueue.TryPeekNext(out RandomDotTrial next)
+                ? next.SweepDirection
+                : RandomDotSweepDirection.RightFirst;
             Transform observer = stimulus.Observer;
             float firstTurnSeconds = sweepAmplitudeDegrees / sweepSpeed;
             float oppositeTurnSeconds = 3f * firstTurnSeconds;
@@ -620,63 +1131,48 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             {
                 // Zwischen den Übungsdurchgängen zur ursprünglichen Mitte
                 // zurückkehren. Sonst verschiebt sich der Nullpunkt schrittweise.
-                sessionState = RandomDotSessionState.HeadTrainingFeedback;
-                while (Mathf.Abs(HeadYawFromTrainingCenter(observer)) > 0.5f)
-                {
-                    headTrainingView.ShowCentering(
-                        HeadYawFromTrainingCenter(observer),
-                        sweepAmplitudeDegrees);
-                    yield return null;
-                }
-
+                sessionState = State.HeadTrainingFeedback;
+                yield return WaitUntilHeadCentered(observer);
                 yield return new WaitForSecondsRealtime(0.35f);
-                if (Mathf.Abs(HeadYawFromTrainingCenter(observer)) > 0.5f)
+                if (IsHeadOffCenter(observer))
                 {
                     continue;
                 }
 
-                RandomDotSweepDirection direction = (attempt & 1) == 0
-                    ? firstDirection
-                    : firstDirection == RandomDotSweepDirection.RightFirst
-                        ? RandomDotSweepDirection.LeftFirst
-                        : RandomDotSweepDirection.RightFirst;
+                // Abwechselnd geht es zuerst in die eine und dann in die andere Richtung.
+                RandomDotSweepDirection direction =
+                    attempt % 2 == 0 ? firstDirection : Opposite(firstDirection);
                 attempt++;
                 sweepMonitor.ConfigureCriterion(turnaroundDegrees, requiredSweeps);
-                sweepMonitor.ResetForTrial();
-                sweepMonitor.StartProfileTracking(
-                    sweepAmplitudeDegrees, sweepSpeed, direction);
-                sessionState = RandomDotSessionState.HeadTrainingMotion;
-                headTrainingView.ShowPractice(
-                    goodSweeps, requiredGoodTrainingSweeps, direction);
+                sweepMonitor.StartProfileTracking(sweepAmplitudeDegrees, sweepSpeed, direction);
+                sessionState = State.HeadTrainingMotion;
+                headTrainingView.ShowPractice(goodSweeps, requiredGoodTrainingSweeps, direction);
 
+                // An jeder Wende kommt ein Ton. firstSide ist die Seite der ersten Wende
+                // (+ rechts, - links), die zweite Wende liegt auf der anderen Seite.
+                float firstSide = direction == RandomDotSweepDirection.RightFirst
+                    ? sweepAmplitudeDegrees
+                    : -sweepAmplitudeDegrees;
                 double startSeconds = Time.realtimeSinceStartupAsDouble;
                 bool firstCuePlayed = false;
                 bool oppositeCuePlayed = false;
-                while (Time.realtimeSinceStartupAsDouble - startSeconds < motionSeconds)
+                while (Time.realtimeSinceStartupAsDouble - startSeconds < HeadTrainingSeconds)
                 {
                     double elapsed = Time.realtimeSinceStartupAsDouble - startSeconds;
-                    float targetYaw = RandomDotSimulatedSweep.EvaluateYawDegrees(
+                    float targetYaw = RandomDotSimulatedSweep.EvaluateBackAndForthDegrees(
                         elapsed, sweepAmplitudeDegrees, sweepSpeed, direction);
                     headTrainingView.UpdateMarkers(
-                        targetYaw,
-                        sweepMonitor.CurrentYawDegrees,
-                        sweepAmplitudeDegrees);
+                        targetYaw, sweepMonitor.CurrentYawDegrees, sweepAmplitudeDegrees);
 
                     if (!firstCuePlayed && elapsed >= firstTurnSeconds)
                     {
-                        headTrainingView.PlayTurnCue(direction ==
-                            RandomDotSweepDirection.RightFirst
-                                ? sweepAmplitudeDegrees
-                                : -sweepAmplitudeDegrees);
+                        headTrainingView.PlayTurnCue(firstSide);
                         firstCuePlayed = true;
                     }
 
                     if (!oppositeCuePlayed && elapsed >= oppositeTurnSeconds)
                     {
-                        headTrainingView.PlayTurnCue(direction ==
-                            RandomDotSweepDirection.RightFirst
-                                ? -sweepAmplitudeDegrees
-                                : sweepAmplitudeDegrees);
+                        headTrainingView.PlayTurnCue(-firstSide);
                         oppositeCuePlayed = true;
                     }
 
@@ -686,105 +1182,122 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 sweepMonitor.StopProfileTracking();
                 if (!oppositeCuePlayed)
                 {
-                    headTrainingView.PlayTurnCue(direction ==
-                        RandomDotSweepDirection.RightFirst
-                            ? -sweepAmplitudeDegrees
-                            : sweepAmplitudeDegrees);
+                    headTrainingView.PlayTurnCue(-firstSide);
                 }
 
-                string problem = GetTrainingMotionProblem();
+                string problem = FindHeadMotionProblem(checkTurnPoints: true);
+                string hint = problem == null ? null : TrainingHint(problem);
                 goodSweeps = problem == null ? goodSweeps + 1 : 0;
-                WriteMarker(string.Format(
-                    CultureInfo.InvariantCulture,
-                    "HeadTrainingAttempt;task=random_dot_instrument;attempt={0};direction={1};accepted={2};consecutive_good={3};reason={4};profile_rmse_deg={5:F3};first_turn_error_deg={6:F3};second_turn_error_deg={7:F3};mean_speed_deg_s={8:F3};peak_speed_deg_s={9:F3}",
-                    attempt,
-                    direction,
-                    problem == null ? 1 : 0,
-                    goodSweeps,
-                    problem ?? "none",
-                    sweepMonitor.ProfileErrorDegrees,
-                    sweepMonitor.FirstExtremeErrorDegrees,
-                    sweepMonitor.SecondExtremeErrorDegrees,
-                    sweepMonitor.MeanAbsoluteYawSpeedDegreesPerSecond,
-                    sweepMonitor.PeakAbsoluteYawSpeedDegreesPerSecond));
-                sessionState = RandomDotSessionState.HeadTrainingFeedback;
+                WriteMarker(
+                    "HeadTrainingAttempt;task=random_dot_instrument;attempt={0};direction={1};accepted={2};" +
+                    "consecutive_good={3};reason={4};profile_rmse_deg={5:F3};first_turn_error_deg={6:F3};" +
+                    "second_turn_error_deg={7:F3};mean_speed_deg_s={8:F3};peak_speed_deg_s={9:F3}",
+                    attempt, direction, problem == null ? 1 : 0, goodSweeps, hint ?? "none",
+                    sweepMonitor.ProfileErrorDegrees, sweepMonitor.FirstExtremeErrorDegrees,
+                    sweepMonitor.SecondExtremeErrorDegrees, sweepMonitor.MeanAbsoluteYawSpeedDegreesPerSecond,
+                    sweepMonitor.PeakAbsoluteYawSpeedDegreesPerSecond);
+                sessionState = State.HeadTrainingFeedback;
                 headTrainingView.ShowFeedback(
-                    problem == null ? "GOOD - FOLLOW THAT RHYTHM" : problem,
-                    goodSweeps,
-                    requiredGoodTrainingSweeps);
+                    hint ?? "GOOD - FOLLOW THAT RHYTHM", goodSweeps, requiredGoodTrainingSweeps);
                 yield return new WaitForSecondsRealtime(1f);
             }
 
-            while (Mathf.Abs(HeadYawFromTrainingCenter(observer)) > 0.5f)
-            {
-                headTrainingView.ShowCentering(
-                    HeadYawFromTrainingCenter(observer),
-                    sweepAmplitudeDegrees);
-                yield return null;
-            }
+            yield return WaitUntilHeadCentered(observer);
 
-            trainedHeadMotionBlock = next.MotionBlockIndex;
+            trainedHeadMotionBlock = !standaloneTraining && trialQueue.TryPeekNext(out RandomDotTrial completedNext)
+                ? completedNext.MotionBlockIndex : 0;
             headTrainingView.ShowCompleted();
-            WriteMarker(string.Format(
-                CultureInfo.InvariantCulture,
-                "HeadTrainingCompleted;task=random_dot_instrument;motion_block={0};attempts={1}",
-                trainedHeadMotionBlock,
-                attempt));
+            WriteMarker("HeadTrainingCompleted;task=random_dot_instrument;motion_block={0};attempts={1}",
+                trainedHeadMotionBlock, attempt);
             yield return new WaitForSecondsRealtime(1f);
             headTrainingView.Hide();
             headTrainingCoroutine = null;
-            sessionState = RandomDotSessionState.InterTrial;
-            BeginNextAttempt();
+            if (standaloneTraining)
+            {
+                ShowWelcomeScreen();
+                yield break;
+            }
+            sessionState = State.InterTrial;
+            BeginTrainingOrNextAttempt();
         }
 
-        private string GetTrainingMotionProblem()
+        // Zeigt "zurück zur Mitte", bis der Kopf wieder geradeaus schaut.
+        private IEnumerator WaitUntilHeadCentered(Transform observer)
         {
+            while (IsHeadOffCenter(observer))
+            {
+                headTrainingView.ShowCentering(HeadYawFromTrainingCenter(observer), sweepAmplitudeDegrees);
+                yield return null;
+            }
+        }
+
+        // Mehr als ein halbes Grad neben der Mitte zählt als "nicht in der Mitte".
+        private bool IsHeadOffCenter(Transform observer)
+        {
+            return Mathf.Abs(HeadYawFromTrainingCenter(observer)) > 0.5f;
+        }
+
+        private float HeadYawFromTrainingCenter(Transform observer)
+        {
+            return RandomDotHeadSweepMonitor.YawFromStart(trainingCenterForward, observer);
+        }
+
+        private static RandomDotSweepDirection Opposite(RandomDotSweepDirection direction)
+        {
+            return direction == RandomDotSweepDirection.RightFirst
+                ? RandomDotSweepDirection.LeftFirst
+                : RandomDotSweepDirection.RightFirst;
+        }
+
+        private string FindHeadMotionProblem(bool checkTurnPoints)
+        {
+            // Die Regeln für eine geführte Kopfbewegung gelten im Training und
+            // in geführten Haupttrials. Freie Haupttrials rufen diese Prüfung nicht auf.
+            // Nur im Training wird zusätzlich geprüft,
+            // ob die beiden Umkehrpunkte gut getroffen wurden.
+            // Gibt den ersten Fehler als kurzen Text zurück, oder null, wenn alles passt.
             if (sweepMonitor.MaximumAbsoluteYawDegrees > maxHeadTurnDegrees)
             {
-                return "TOO FAR - TURN LESS";
+                return "head_yaw_too_large";
             }
 
             if (sweepMonitor.CompletedHalfSweeps < requiredSweeps)
             {
-                return "REACH BOTH SIDES";
+                return "head_sweep_incomplete";
             }
 
             if (sweepMonitor.MeanAbsoluteYawSpeedDegreesPerSecond < minMeanHeadSpeed)
             {
-                return "TOO SLOW - FOLLOW BLUE";
+                return "head_sweep_too_slow";
             }
 
             if (sweepMonitor.PeakAbsoluteYawSpeedDegreesPerSecond > maxPeakHeadSpeed)
             {
-                return "TOO FAST - MOVE SMOOTHLY";
+                return "head_sweep_too_fast";
             }
 
-            if (sweepMonitor.ProfileErrorDegrees > maximumProfileErrorDegrees ||
-                sweepMonitor.FirstExtremeErrorDegrees >
-                    maximumTrainingEndpointErrorDegrees ||
-                sweepMonitor.SecondExtremeErrorDegrees >
-                    maximumTrainingEndpointErrorDegrees)
+            bool turnPointsMissed = checkTurnPoints
+                && (sweepMonitor.FirstExtremeErrorDegrees > maximumTrainingEndpointErrorDegrees
+                    || sweepMonitor.SecondExtremeErrorDegrees > maximumTrainingEndpointErrorDegrees);
+            if (sweepMonitor.ProfileErrorDegrees > maximumProfileErrorDegrees || turnPointsMissed)
             {
-                return "FOLLOW BLUE MORE CLOSELY";
+                return "head_sweep_profile_mismatch";
             }
 
             return null;
         }
 
-        private float HeadYawFromTrainingCenter(Transform observer)
+        // Der Hinweis, den die Person im Training zu einem Fehler im Headset liest.
+        private static string TrainingHint(string problem)
         {
-            return Vector3.SignedAngle(
-                trainingCenterForward,
-                HorizontalForward(observer.forward),
-                Vector3.up);
-        }
-
-        private static Vector3 HorizontalForward(Vector3 direction)
-        {
-            direction.y = 0f;
-            return direction.sqrMagnitude > 1e-8f
-                ? direction.normalized
-                : Vector3.forward;
+            return problem switch
+            {
+                "head_yaw_too_large" => "TOO FAR - TURN LESS",
+                "head_sweep_incomplete" => "REACH BOTH SIDES",
+                "head_sweep_too_slow" => "TOO SLOW - FOLLOW BLUE",
+                "head_sweep_too_fast" => "TOO FAST - MOVE SMOOTHLY",
+                _ => "FOLLOW BLUE MORE CLOSELY"
+            };
         }
 
         private void BeginNextAttempt()
@@ -802,48 +1315,43 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             currentTrialNumber = validTrialsCompleted + 1;
             currentMotionBlock = currentTrial.MotionBlockIndex;
             currentMiniBlock = currentTrial.MiniBlockIndex;
-            stimulus.Hide();
-            stimulus.SetAngularDiameter(currentTrial.AngularDiameterDegrees);
-            stimulus.SetInstrumentDistortionK(
-                currentTrial.InstrumentDistortionK);
-            stimulus.SetInstrumentMagnification(
-                currentTrial.InstrumentMagnificationM);
-            stimulus.SetContentZoom(currentTrial.ContentZoom);
-            stimulus.SetEyePresentation(currentTrial.EyePresentation);
-            stimulus.SetMotionMode(currentTrial.MotionMode);
-            stimulus.SetSweepAxis(currentTrial.SweepAxis);
-            stimulus.SetSimulatedSweep(
-                sweepAmplitudeDegrees,
-                sweepSpeed);
-            stimulus.SetSweepDirection(currentTrial.SweepDirection);
-            stimulus.ConfigurePointField(
-                stimulus.DotCount,
-                currentTrial.DotSeed,
-                stimulus.WorldCoverageDiameterDegrees);
-            stimulus.PlaceAroundObserver();
+            ConfigureStimulus(currentTrial);
 
-            sweepMonitor.ConfigureCriterion(
-                turnaroundDegrees,
-                requiredSweeps);
-            sweepMonitor.ResetForTrial();
-            fixationMonitor?.ResetFixationWindow();
-            ResetFixationCounters();
+            // ConfigureCriterion setzt den Sweep Monitor auch gleich auf null zurück.
+            sweepMonitor.ConfigureCriterion(turnaroundDegrees, requiredSweeps);
+            ResetFixationChecks();
             stimulusEndUnitySeconds = 0d;
 
             if (requireFixation)
             {
-                sessionState = RandomDotSessionState.WaitingForFixation;
+                sessionState = State.WaitingForFixation;
                 stimulus.ShowFixationOnly();
-                WriteMarker(string.Format(
-                    CultureInfo.InvariantCulture,
-                    "FixationAcquisitionStart;task=random_dot_instrument;sequence={0};attempt={1}",
-                    currentTrial.SequenceIndex,
-                    currentTrial.AttemptNumber));
+                WriteMarker("FixationAcquisitionStart;task=random_dot_instrument;sequence={0};attempt={1}",
+                    currentTrial.SequenceIndex, currentTrial.AttemptNumber);
             }
             else
             {
                 PresentCurrentTrial();
             }
+        }
+
+        // simulatedSecondsOverride: nur für die längeren Trainingsbeispiele.
+        private void ConfigureStimulus(RandomDotTrial trial, float? simulatedSecondsOverride = null)
+        {
+            stimulus.Hide();
+            stimulus.SetAngularDiameter(trial.AngularDiameterDegrees);
+            stimulus.SetInstrumentDistortionK(trial.InstrumentDistortionK);
+            stimulus.SetInstrumentMagnification(trial.InstrumentMagnificationM);
+            stimulus.SetContentZoom(trial.ContentZoom);
+            stimulus.SetEyePresentation(trial.EyePresentation);
+            stimulus.SetMotionMode(trial.MotionMode);
+            stimulus.SetSweepAxis(trial.SweepAxis);
+            stimulus.SetSimulatedSweep(SweepAmplitude(trial, simulatedSecondsOverride), SweepSpeed(trial));
+            stimulus.SetSweepDirection(trial.SweepDirection);
+            // Jeder Trial bekommt seine eigene Punktwelt: so groß wie nötig und so
+            // dicht, dass es in der Bildmitte bei jedem m gleich aussieht.
+            stimulus.ConfigurePointField(trial.DotSeed, WorldCoverageFor(trial, simulatedSecondsOverride));
+            stimulus.PlaceAroundObserver();
         }
 
         private void PresentCurrentTrial()
@@ -855,53 +1363,50 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return;
             }
 
-            fixationMonitor?.ResetFixationWindow();
-            ResetFixationCounters();
+            ResetFixationChecks();
             // Die aktive Punktwelt wird erst jetzt am aktuellen Kopf ausgerichtet.
             // Zwischen Fixationsbeginn und Trialstart kann sich der Kopf bewegen.
             stimulus.PlaceAroundObserver();
-            sweepMonitor?.ResetForTrial();
+            sweepMonitor.ResetForTrial();
             stimulus.RestartMotionPhase();
             trialStartUtc = DateTime.UtcNow;
             trialStartUnitySeconds = Time.realtimeSinceStartupAsDouble;
-            if (currentTrial.MotionMode == RandomDotMotionMode.HeadTracked)
+            if (currentTrial.MotionMode == RandomDotMotionMode.HeadTracked && !freeHeadMovement)
             {
-                sweepMonitor?.StartProfileTracking(
-                    sweepAmplitudeDegrees,
-                    sweepSpeed,
-                    currentTrial.SweepDirection);
+                sweepMonitor.StartProfileTracking(
+                    sweepAmplitudeDegrees, sweepSpeed, currentTrial.SweepDirection);
             }
+
             stimulusEndUnitySeconds = 0d;
-            sessionState = RandomDotSessionState.PresentingMotion;
+            frameTiming.Reset(FrameTimingTracker.CurrentExpectedFrameMilliseconds());
+            frameTimingStartFrame = Time.frameCount;
+            sessionState = State.PresentingMotion;
 
             WriteMarker(BuildTrialStartMarker(currentTrial));
             stimulus.Show();
-            TrialStarted?.Invoke(currentTrial);
-            motionCoroutine = StartCoroutine(EndMotionAfterDuration());
+            // Offene aktive Trials enden erst mit der Antwort, nicht nach einer Zeit.
+            bool openEnded = IsOpenEndedTrial(currentTrial);
+            if (!openEnded)
+                motionCoroutine = StartCoroutine(EndMotionAfterDuration());
 
             Debug.Log(string.Format(
                 CultureInfo.InvariantCulture,
                 "Random-Dot-Trial {0}/{1}, Präsentation {2}: k={3:F3}, m={4:F2}x, ContentZoom={5:F2}, " +
-                "{6}, Achse {7}, zuerst {8}, Versuch {9}. Fixationskreuz anschauen; Antwort folgt nach der Bewegung.",
-                currentTrialNumber,
-                totalTrials,
-                presentationCount,
-                currentTrial.InstrumentDistortionK,
-                currentTrial.InstrumentMagnificationM,
-                currentTrial.ContentZoom,
-                currentTrial.MotionMode,
-                currentTrial.SweepAxis,
-                RandomDotSimulatedSweep.DirectionLabel(
-                    currentTrial.SweepAxis, currentTrial.SweepDirection),
-                currentTrial.AttemptNumber),
-                this);
+                "{6}, Achse {7}, Richtung {8}, {9} Punkte, Versuch {10}. {11}",
+                currentTrialNumber, totalTrials, presentationCount,
+                currentTrial.InstrumentDistortionK, currentTrial.InstrumentMagnificationM,
+                currentTrial.ContentZoom, currentTrial.MotionMode, currentTrial.SweepAxis,
+                currentTrial.DirectionLabel, stimulus.DotCount, currentTrial.AttemptNumber,
+                openEnded
+                    ? "Frei umschauen, ohne Zeitlimit; die Antwort beendet den Trial."
+                    : "Fixationskreuz anschauen; Antwort folgt nach der Bewegung."), this);
         }
 
         private IEnumerator EndMotionAfterDuration()
         {
             // Eine Coroutine wartet, ohne dass dabei alles andere stehen bleibt.
             // Unity zeichnet weiter und das Eye Tracking misst weiter.
-            yield return new WaitForSecondsRealtime(motionSeconds);
+            yield return new WaitForSecondsRealtime(MotionSeconds(currentTrial));
             motionCoroutine = null;
             EndMotionPresentation();
         }
@@ -909,14 +1414,17 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private void EndMotionPresentation()
         {
             // Die Bewegung ist vorbei. Ab jetzt wird nur noch auf die Antwort gewartet.
-            if (sessionState != RandomDotSessionState.PresentingMotion ||
-                currentTrial == null)
+            if (sessionState != State.PresentingMotion || currentTrial == null)
             {
                 return;
             }
 
-            sweepMonitor?.StopProfileTracking();
-            string motionProblem = GetHeadTrackedMotionProblem();
+            // Die Kopfbewegung wird nur im HeadTracked-Block geprüft.
+            sweepMonitor.StopProfileTracking();
+            bool headTracked = currentTrial.MotionMode == RandomDotMotionMode.HeadTracked;
+            string motionProblem =
+                checkHeadMotion && headTracked && !freeHeadMovement
+                    ? FindHeadMotionProblem(checkTurnPoints: false) : null;
             if (motionProblem != null)
             {
                 InvalidateCurrentTrial(motionProblem);
@@ -928,55 +1436,62 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // bleiben stehen, damit der Wechsel zur Antwortphase keinen globalen
             // Helligkeitssprung im Headset erzeugt.
             stimulus.ShowFixationOnly();
-            sessionState = RandomDotSessionState.WaitingForResponse;
-            WriteMarker(string.Format(
-                CultureInfo.InvariantCulture,
-                "StimulusEnded;task=random_dot_instrument;sequence={0};attempt={1};duration_s={2:F4};profile_rmse_deg={3:F4};first_turn_error_deg={4:F4};second_turn_error_deg={5:F4}",
-                currentTrial.SequenceIndex,
-                currentTrial.AttemptNumber,
+            sessionState = State.WaitingForResponse;
+            WriteMarker(
+                "StimulusEnded;task=random_dot_instrument;sequence={0};attempt={1};duration_s={2:F4};" +
+                "profile_rmse_deg={3:F4};first_turn_error_deg={4:F4};second_turn_error_deg={5:F4}",
+                currentTrial.SequenceIndex, currentTrial.AttemptNumber,
                 stimulusEndUnitySeconds - trialStartUnitySeconds,
-                currentTrial.MotionMode == RandomDotMotionMode.HeadTracked
-                    ? sweepMonitor.ProfileErrorDegrees : float.NaN,
-                currentTrial.MotionMode == RandomDotMotionMode.HeadTracked
-                    ? sweepMonitor.FirstExtremeErrorDegrees : float.NaN,
-                currentTrial.MotionMode == RandomDotMotionMode.HeadTracked
-                    ? sweepMonitor.SecondExtremeErrorDegrees : float.NaN));
-
-            string responseHint = ResponseKeysSwapped
-                ? "Links = konvex, rechts = konkav."
-                : "Links = konkav, rechts = konvex.";
-            Debug.Log("Random-Dot-Antwort: " + responseHint, this);
+                HeadTrackedOnly(sweepMonitor.ProfileErrorDegrees),
+                HeadTrackedOnly(sweepMonitor.FirstExtremeErrorDegrees),
+                HeadTrackedOnly(sweepMonitor.SecondExtremeErrorDegrees));
         }
 
         private void HandleResponseSubmitted(CheckerboardCurvatureResponse response)
         {
+            if (sessionState == State.SimulatedTrainingResponse && response != CheckerboardCurvatureResponse.None)
+            {
+                trainingResponseReceived = true;
+                trainingResponse = response;
+                // Sofort schließen: ein zweiter Tastendruck darf nicht das nächste Beispiel beantworten.
+                sessionState = State.SimulatedTrainingMotion;
+                return;
+            }
             // Drückt die Person schon während der Bewegung, zählt das nicht. Sie
             // soll sich erst die ganze Bewegung ansehen und dann entscheiden.
-            if (sessionState != RandomDotSessionState.WaitingForResponse ||
-                currentTrial == null ||
-                response == CheckerboardCurvatureResponse.None)
+            // Ausnahme: offene aktive Trials. Dort schaut die Person frei, so lange
+            // sie will, und die Antwort beendet die Darbietung.
+            // Die erste Antwort beendet die Antwortphase sofort. Ein zweiter
+            // Tastendruck landet deshalb in keinem Durchgang, auch nicht im nächsten.
+            bool answeredWhileVisible = sessionState == State.PresentingMotion
+                && currentTrial != null && IsOpenEndedTrial(currentTrial);
+            if ((sessionState != State.WaitingForResponse && !answeredWhileVisible) || currentTrial == null
+                || response == CheckerboardCurvatureResponse.None)
             {
                 return;
             }
 
-            RandomDotTrialResult result = CaptureCurrentResult(
-                response,
-                validForAnalysis: true,
-                "valid");
+            if (answeredWhileVisible)
+            {
+                stimulusEndUnitySeconds = Time.realtimeSinceStartupAsDouble;
+                WriteMarker(
+                    "StimulusEnded;task=random_dot_instrument;sequence={0};attempt={1};duration_s={2:F4};" +
+                    "ended_by=response",
+                    currentTrial.SequenceIndex, currentTrial.AttemptNumber,
+                    stimulusEndUnitySeconds - trialStartUnitySeconds);
+            }
+
+            RandomDotTrialResult result = CaptureCurrentResult(response, validForAnalysis: true, "valid");
             if (!TryAppendResult(result))
             {
                 return;
             }
 
             validTrialsCompleted++;
-            WriteMarker(string.Format(
-                CultureInfo.InvariantCulture,
-                "TrialResponse;task=random_dot_instrument;sequence={0};attempt={1};response={2};response_s={3:F4};valid=1",
-                currentTrial.SequenceIndex,
-                currentTrial.AttemptNumber,
-                response,
-                result.ResponseTimeSeconds));
-            TrialEnded?.Invoke(result);
+            WriteMarker(
+                "TrialResponse;task=random_dot_instrument;sequence={0};attempt={1};" +
+                "response={2};response_s={3:F4};valid=1",
+                currentTrial.SequenceIndex, currentTrial.AttemptNumber, response, result.ResponseTimeSeconds);
             FinishAttemptAndScheduleNext();
         }
 
@@ -994,40 +1509,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return;
             }
 
-            float delta = Time.unscaledDeltaTime;
-            bool sampleRecent = fixationMonitor.HasRecentSample(
-                maxSampleAgeSeconds);
-
-            if (!sampleRecent || !fixationMonitor.CurrentSampleValid)
+            bool sampleUsable =
+                fixationMonitor.HasRecentSample(maxSampleAgeSeconds) && fixationMonitor.CurrentSampleValid;
+            lookAway.Add(Time.unscaledDeltaTime, sampleUsable, fixationMonitor.IsInsideTolerance);
+            string problem = lookAway.FindProblem(maxLookAwaySeconds, maxNoDataSeconds);
+            if (problem != null)
             {
-                currentInvalidGazeSeconds += delta;
-                currentOffTargetSeconds = 0f;
-            }
-            else if (!fixationMonitor.IsInsideTolerance)
-            {
-                currentOffTargetSeconds += delta;
-                currentInvalidGazeSeconds = 0f;
-            }
-            else
-            {
-                currentOffTargetSeconds = 0f;
-                currentInvalidGazeSeconds = 0f;
-            }
-
-            longestOffTargetSeconds = Mathf.Max(
-                longestOffTargetSeconds,
-                currentOffTargetSeconds);
-            longestInvalidGazeSeconds = Mathf.Max(
-                longestInvalidGazeSeconds,
-                currentInvalidGazeSeconds);
-
-            if (currentOffTargetSeconds > maxLookAwaySeconds)
-            {
-                InvalidateCurrentTrial("off_target");
-            }
-            else if (currentInvalidGazeSeconds > maxNoDataSeconds)
-            {
-                InvalidateCurrentTrial("invalid_gaze_data");
+                InvalidateCurrentTrial(problem);
             }
         }
 
@@ -1036,161 +1524,93 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // Bewegung stoppen, den misslungenen Versuch trotzdem speichern und
             // denselben Durchgang mit höherer Versuchsnummer ganz hinten wieder
             // in die Warteschlange hängen.
-            if (sessionState != RandomDotSessionState.PresentingMotion ||
-                currentTrial == null)
+            if (sessionState != State.PresentingMotion || currentTrial == null)
             {
                 return;
             }
 
-            StopMotionCoroutine();
-            sweepMonitor?.StopProfileTracking();
+            StopAndClear(ref motionCoroutine);
+            sweepMonitor.StopProfileTracking();
             stimulusEndUnitySeconds = Time.realtimeSinceStartupAsDouble;
             RandomDotTrial invalidTrial = currentTrial;
             RandomDotTrialResult result = CaptureCurrentResult(
-                CheckerboardCurvatureResponse.None,
-                validForAnalysis: false,
-                "invalid:" + reason);
+                CheckerboardCurvatureResponse.None, validForAnalysis: false, "invalid:" + reason);
             if (!TryAppendResult(result))
             {
                 return;
             }
 
-            WriteMarker(string.Format(
-                CultureInfo.InvariantCulture,
-                "TrialInvalid;task=random_dot_instrument;sequence={0};attempt={1};reason={2};off_target_s={3:F4};invalid_gaze_s={4:F4};mean_yaw_speed_deg_s={5:F4};peak_yaw_speed_deg_s={6:F4};max_abs_yaw_deg={7:F4}",
-                invalidTrial.SequenceIndex,
-                invalidTrial.AttemptNumber,
-                reason,
-                longestOffTargetSeconds,
-                longestInvalidGazeSeconds,
-                sweepMonitor?.MeanAbsoluteYawSpeedDegreesPerSecond ?? 0f,
-                sweepMonitor?.PeakAbsoluteYawSpeedDegreesPerSecond ?? 0f,
-                sweepMonitor?.MaximumAbsoluteYawDegrees ?? 0f));
-            TrialEnded?.Invoke(result);
+            WriteMarker(
+                "TrialInvalid;task=random_dot_instrument;sequence={0};attempt={1};reason={2};" +
+                "off_target_s={3:F4};invalid_gaze_s={4:F4};mean_yaw_speed_deg_s={5:F4};" +
+                "peak_yaw_speed_deg_s={6:F4};max_abs_yaw_deg={7:F4}",
+                invalidTrial.SequenceIndex, invalidTrial.AttemptNumber, reason,
+                lookAway.LongestLookAwaySeconds, lookAway.LongestNoDataSeconds,
+                sweepMonitor.MeanAbsoluteYawSpeedDegreesPerSecond,
+                sweepMonitor.PeakAbsoluteYawSpeedDegreesPerSecond,
+                sweepMonitor.MaximumAbsoluteYawDegrees);
 
-            bool limitReached = maxRepeatsPerTrial > 0 &&
-                invalidTrial.AttemptNumber >= maxRepeatsPerTrial;
-            if (limitReached)
+            if (maxRepeatsPerTrial > 0 && invalidTrial.AttemptNumber >= maxRepeatsPerTrial)
             {
-                stimulus.Hide();
-                WriteMarker("SessionAborted;task=random_dot_instrument;reason=maximum_repeat_attempts_reached");
-                StopEyeTrackingRecording();
-                currentTrial = null;
-                sessionState = RandomDotSessionState.Aborted;
-                SessionFinished?.Invoke(sessionState);
+                WriteMarker(
+                    "SessionAborted;task=random_dot_instrument;reason=maximum_repeat_attempts_reached");
+                EndSession(State.Aborted);
                 Debug.LogError(
-                    "Die maximale Zahl an Wiederholungen wurde erreicht. Die Sitzung wurde beendet.",
-                    this);
+                    "Die maximale Zahl an Wiederholungen wurde erreicht. Die Sitzung wurde beendet.", this);
                 return;
             }
 
             RandomDotTrial repeat = trialQueue.AppendRepeatedAttempt(invalidTrial);
-            WriteMarker(string.Format(
-                CultureInfo.InvariantCulture,
-                "TrialRepeatQueued;task=random_dot_instrument;sequence={0};next_attempt={1};queue_position={2}",
-                repeat.SequenceIndex,
-                repeat.AttemptNumber,
-                trialQueue.Count));
+            WriteMarker(
+                "TrialRepeatQueued;task=random_dot_instrument;sequence={0};" +
+                "next_attempt={1};queue_position={2}",
+                repeat.SequenceIndex, repeat.AttemptNumber, trialQueue.Count);
             FinishAttemptAndScheduleNext();
         }
 
         private RandomDotTrialResult CaptureCurrentResult(
-            CheckerboardCurvatureResponse response,
-            bool validForAnalysis,
-            string status)
+            CheckerboardCurvatureResponse response, bool validForAnalysis, string status)
         {
             // Hier wird alles zu diesem Durchgang in ein Objekt gepackt: die
             // Bedingung, die Antwort, die Bewegung, die Zeiten und die Blickwerte.
             // Dieses Objekt geht danach an die Dateiklasse, die daraus eine
             // CSV-Zeile macht.
             double responseTime = Time.realtimeSinceStartupAsDouble;
-            double resolvedStimulusEnd = stimulusEndUnitySeconds > trialStartUnitySeconds
+            double stimulusEnd = stimulusEndUnitySeconds > trialStartUnitySeconds
                 ? stimulusEndUnitySeconds
                 : responseTime;
+            FixationSnapshot gaze =
+                fixationMonitor != null ? fixationMonitor.TakeSnapshot() : FixationSnapshot.None;
 
             return new RandomDotTrialResult(
-                currentTrial,
-                presentationCount,
-                trialStartUtc,
-                trialStartUnitySeconds,
-                resolvedStimulusEnd,
-                responseTime,
-                response,
-                validForAnalysis,
-                sweepMonitor?.CompletedHalfSweeps ?? 0,
-                sweepMonitor?.MinimumYawDegrees ?? 0f,
-                sweepMonitor?.MaximumYawDegrees ?? 0f,
-                sweepMonitor?.MaximumAbsoluteYawDegrees ?? 0f,
-                sweepMonitor?.MeanAbsoluteYawSpeedDegreesPerSecond ?? 0f,
-                sweepMonitor?.PeakAbsoluteYawSpeedDegreesPerSecond ?? 0f,
-                currentTrial.MotionMode == RandomDotMotionMode.HeadTracked
-                    ? sweepMonitor?.ProfileErrorDegrees ?? float.NaN
-                    : float.NaN,
-                currentTrial.MotionMode == RandomDotMotionMode.HeadTracked
-                    ? sweepMonitor?.FirstExtremeErrorDegrees ?? float.NaN
-                    : float.NaN,
-                currentTrial.MotionMode == RandomDotMotionMode.HeadTracked
-                    ? sweepMonitor?.SecondExtremeErrorDegrees ?? float.NaN
-                    : float.NaN,
-                stimulus.SweepAmplitudeDegrees,
-                stimulus.SweepSpeedDegreesPerSecond,
+                currentTrial, presentationCount, trialStartUtc,
+                trialStartUnitySeconds, stimulusEnd, responseTime,
+                response, validForAnalysis,
+                sweepMonitor.CompletedHalfSweeps,
+                sweepMonitor.MinimumYawDegrees,
+                sweepMonitor.MaximumYawDegrees,
+                sweepMonitor.MaximumAbsoluteYawDegrees,
+                sweepMonitor.MeanAbsoluteYawSpeedDegreesPerSecond,
+                sweepMonitor.PeakAbsoluteYawSpeedDegreesPerSecond,
+                HeadTrackedOnly(sweepMonitor.ProfileErrorDegrees),
+                HeadTrackedOnly(sweepMonitor.FirstExtremeErrorDegrees),
+                HeadTrackedOnly(sweepMonitor.SecondExtremeErrorDegrees),
+                IsFreeHeadTrial(currentTrial) ? float.NaN : stimulus.SweepAmplitudeDegrees,
+                IsFreeHeadTrial(currentTrial) ? float.NaN : stimulus.SweepSpeedDegreesPerSecond,
                 stimulus.ApertureEdgeSoftnessDegrees,
-                fixationMonitor != null && fixationMonitor.CurrentSampleValid,
-                fixationMonitor != null && fixationMonitor.IsInsideTolerance,
-                fixationMonitor != null ? fixationMonitor.CurrentAngleDegrees : float.NaN,
-                fixationMonitor != null ? fixationMonitor.ContinuousFixationSeconds : 0f,
-                fixationMonitor != null ? fixationMonitor.ValidSampleFraction : float.NaN,
-                longestOffTargetSeconds,
-                longestInvalidGazeSeconds,
-                stimulus.DotCount,
-                stimulus.WorldCoverageDiameterDegrees,
-                stimulus.FieldRadiusMeters,
-                status);
+                gaze.SampleValid, gaze.OnTarget, gaze.AngleDegrees,
+                gaze.SteadySeconds, gaze.ValidSampleFraction,
+                lookAway.LongestLookAwaySeconds, lookAway.LongestNoDataSeconds,
+                stimulus.DotCount, stimulus.WorldCoverageDiameterDegrees, stimulus.FieldRadiusMeters,
+                status, IsFreeHeadTrial(currentTrial), frameTiming);
         }
 
-        private string GetHeadTrackedMotionProblem()
+            // Die Fehlerwerte zur Sollbahn gibt es nur bei geführten HeadTracked-Trials.
+        // In allen anderen Durchgängen steht NaN in der Datei.
+        private float HeadTrackedOnly(float value)
         {
-            if (!checkHeadMotion || currentTrial == null ||
-                currentTrial.MotionMode != RandomDotMotionMode.HeadTracked)
-            {
-                return null;
-            }
-
-            if (sweepMonitor == null)
-            {
-                return "missing_sweep_monitor";
-            }
-
-            if (sweepMonitor.MaximumAbsoluteYawDegrees >
-                maxHeadTurnDegrees)
-            {
-                return "head_yaw_too_large";
-            }
-
-            if (sweepMonitor.CompletedHalfSweeps <
-                requiredSweeps)
-            {
-                return "head_sweep_incomplete";
-            }
-
-            if (sweepMonitor.MeanAbsoluteYawSpeedDegreesPerSecond <
-                minMeanHeadSpeed)
-            {
-                return "head_sweep_too_slow";
-            }
-
-            if (sweepMonitor.PeakAbsoluteYawSpeedDegreesPerSecond >
-                maxPeakHeadSpeed)
-            {
-                return "head_sweep_too_fast";
-            }
-
-            if (sweepMonitor.ProfileErrorDegrees > maximumProfileErrorDegrees)
-            {
-                return "head_sweep_profile_mismatch";
-            }
-
-            return null;
+            return currentTrial.MotionMode == RandomDotMotionMode.HeadTracked && !freeHeadMovement
+                ? value : float.NaN;
         }
 
         private bool TryAppendResult(RandomDotTrialResult result)
@@ -1201,6 +1621,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             try
             {
                 experimentFiles.AppendResult(result, totalTrials);
+                if (result.FrameTiming.SlowFrames > 0) trialsWithSlowFrames++;
                 return true;
             }
             catch (Exception exception)
@@ -1215,51 +1636,22 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // Punkte ausblenden, kurz warten und dann den nächsten Durchgang holen.
             // Der neutrale graue Kreis bleibt durchgehend sichtbar. So wechseln
             // weder mittlere Helligkeit noch Größe der kreisförmigen Öffnung.
-            StopMotionCoroutine();
+            StopAndClear(ref motionCoroutine);
             stimulus.ShowFixationOnly();
-            RandomDotTrial finishedTrial = currentTrial;
             currentTrial = null;
 
-            if (trialQueue == null || !trialQueue.TryPeekNext(out RandomDotTrial next))
+            if (trialQueue == null || !trialQueue.TryPeekNext(out _))
             {
                 CompleteSession();
                 return;
             }
 
-            if (finishedTrial != null &&
-                next.MotionBlockIndex != finishedTrial.MotionBlockIndex)
+            if (TryStartBlockPause())
             {
-                sessionState = RandomDotSessionState.PausedBetweenMotionBlocks;
-                WriteMarker(string.Format(
-                    CultureInfo.InvariantCulture,
-                    "MotionBlockPause;task=random_dot_instrument;completed_block={0};next_block={1};next_mode={2}",
-                    finishedTrial.MotionBlockIndex,
-                    next.MotionBlockIndex,
-                    next.MotionMode));
-                Debug.Log(
-                    $"Bewegungsblock {finishedTrial.MotionBlockIndex} beendet. Pause; mit F5 startet Block {next.MotionBlockIndex} ({next.MotionMode}).",
-                    this);
                 return;
             }
 
-            if (finishedTrial != null &&
-                next.MiniBlockIndex != finishedTrial.MiniBlockIndex)
-            {
-                sessionState = RandomDotSessionState.PausedBetweenMiniBlocks;
-                WriteMarker(string.Format(
-                    CultureInfo.InvariantCulture,
-                    "MiniBlockPause;task=random_dot_instrument;motion_block={0};completed_miniblock={1};next_miniblock={2}",
-                    finishedTrial.MotionBlockIndex,
-                    finishedTrial.MiniBlockIndex,
-                    next.MiniBlockIndex));
-                Debug.Log(
-                    $"Unterblock {finishedTrial.MiniBlockIndex} beendet. Kurze Pause; mit F5 geht es mit Unterblock {next.MiniBlockIndex} weiter.",
-                    this);
-                return;
-            }
-
-            sessionState = RandomDotSessionState.InterTrial;
-
+            sessionState = State.InterTrial;
             if (pauseSeconds <= 0f)
             {
                 BeginNextAttempt();
@@ -1270,21 +1662,42 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
         }
 
-        public void ResumePausedSession()
+        private bool TryStartBlockPause()
         {
-            if (sessionState != RandomDotSessionState.PausedBetweenMiniBlocks &&
-                sessionState != RandomDotSessionState.PausedBetweenMotionBlocks)
-            {
-                return;
-            }
+            // Viertelblöcke: Nach 25, 50 und 75 % der geplanten gültigen Trials eine
+            // Pause. Wiederholte ungültige Trials zählen nicht mit. Das rote Kreuz und
+            // die graue Fläche bleiben stehen; Text steht darüber und darunter.
+            int nextPause = pausesTaken + 1;
+            if (blocksPerSession <= 1 || nextPause >= blocksPerSession) return false;
+            int boundary = Mathf.RoundToInt(totalTrials * nextPause / (float)blocksPerSession);
+            if (validTrialsCompleted < boundary) return false;
 
-            RandomDotSessionState pausedState = sessionState;
-            WriteMarker(
-                "BlockPauseEnded;task=random_dot_instrument;pause_type=" +
-                pausedState);
-            sessionState = RandomDotSessionState.InterTrial;
-            BeginTrainingOrNextAttempt();
+            pausesTaken = nextPause;
+            sessionState = State.PausedBetweenMiniBlocks;
+            stimulus.ShowFixationOnly();
+            if (stimulus.Observer != null)
+            {
+                headTrainingView ??= new RandomDotHeadSweepTrainingView(stimulus.Observer);
+                headTrainingView.ShowBlockPause(pausesTaken, blocksPerSession);
+            }
+            WriteMarker("BlockPauseStarted;task=random_dot_instrument;block={0};of={1};valid_trials={2}",
+                pausesTaken, blocksPerSession, validTrialsCompleted);
+            Debug.Log($"Pause nach Block {pausesTaken} von {blocksPerSession} ({validTrialsCompleted} gültige " +
+                $"Trials). Weiter mit {ResponseInputController.GetReadableKeyName(startSessionKey)}.", this);
+            return true;
         }
+
+        /// <summary>Versuchsleiter beendet die Viertelblock-Pause (F5).</summary>
+        public void ContinueAfterBlockPause()
+        {
+            if (sessionState != State.PausedBetweenMiniBlocks) return;
+            headTrainingView?.Hide();
+            WriteMarker("BlockPauseEnded;task=random_dot_instrument;block={0}", pausesTaken);
+            sessionState = State.InterTrial;
+            BeginNextAttempt();
+        }
+
+        public int PausesTaken => pausesTaken;
 
         private IEnumerator BeginNextAttemptAfterDelay()
         {
@@ -1296,21 +1709,49 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             // Zum Schluss: Marker in die Aufnahme schreiben und die
             // Eye-Tracking-Aufzeichnung beenden.
-            currentTrial = null;
             currentTrialNumber = totalTrials;
-            WriteMarker(string.Format(
-                CultureInfo.InvariantCulture,
-                "SessionCompleted;task=random_dot_instrument;valid_trials={0};presentations={1}",
-                validTrialsCompleted,
-                presentationCount));
-            stimulus?.Hide();
+            WriteMarker("SessionCompleted;task=random_dot_instrument;valid_trials={0};presentations={1};" +
+                "presentations_with_slow_frames={2}", validTrialsCompleted, presentationCount, trialsWithSlowFrames);
+            if (trialsWithSlowFrames > 0)
+                Debug.LogWarning($"{trialsWithSlowFrames} von {presentationCount} Darbietungen hatten ausgefallene " +
+                    "Frames (Spalte slow_frames in der CSV). Die Bewegung kann dort geruckelt haben.", this);
+            EndSession(State.Completed);
+            if (stimulus.Observer != null)
+            {
+                headTrainingView ??= new RandomDotHeadSweepTrainingView(stimulus.Observer);
+                headTrainingView.ShowWelcome(
+                    ResponseInputController.GetReadableKeyName(startSessionKey),
+                    ResponseInputController.GetReadableKeyName(startOtherMotionSessionKey),
+                    ResponseInputController.GetReadableKeyName(trainingKey),
+                    ResponseInputController.GetReadableKeyName(previewKey), sessionMotionMode, completed: true);
+            }
+            Debug.Log($"Random-Dot-Sitzung vollständig gespeichert: {validTrialsCompleted} gültige Trials " +
+                $"aus {presentationCount} Präsentationen.\n" + activeSessionFolder, this);
+        }
+
+        private void FailAfterWriteError(Exception exception)
+        {
+            Debug.LogError("Random-Dot-Trial konnte nicht gespeichert werden; die Sitzung wird beendet: " +
+                exception.Message, this);
+            WriteMarker("SessionAborted;task=random_dot_instrument;reason=result_write_error");
+            StopPendingCoroutines();
+            headTrainingView?.Hide();
+            EndSession(State.Aborted);
+        }
+
+        // Beendet die Sitzung: Punkte aus, Aufnahme stoppen, Zustand setzen.
+        // Das brauchen Abbrechen, Fertigwerden und Schreibfehler gleichermaßen.
+        private void EndSession(State endState)
+        {
+            if (stimulus != null)
+            {
+                stimulus.Hide();
+                stimulus.SessionRunning = false;
+            }
+
             StopEyeTrackingRecording();
-            sessionState = RandomDotSessionState.Completed;
-            SessionFinished?.Invoke(sessionState);
-            Debug.Log(
-                $"Random-Dot-Sitzung vollständig gespeichert: {validTrialsCompleted} gültige Trials aus {presentationCount} Präsentationen.\n" +
-                activeSessionFolder,
-                this);
+            currentTrial = null;
+            sessionState = endState;
         }
 
         private void HandleHalfSweepCompleted(int count, float sweepDegrees)
@@ -1318,21 +1759,16 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // Der Sweep Monitor sagt Bescheid, sobald die Bewegung wieder an einem
             // Rand angekommen ist. So kann man hinterher nachzählen, wie oft die
             // Punkte in einem Durchgang hin und her gelaufen sind.
-            if (sessionState != RandomDotSessionState.PresentingMotion ||
-                currentTrial == null)
+            if (sessionState != State.PresentingMotion || currentTrial == null)
             {
                 return;
             }
 
-            WriteMarker(string.Format(
-                CultureInfo.InvariantCulture,
-                "MotionHalfSweep;task=random_dot_instrument;sequence={0};count={1};sweep_deg={2:F3};instrument_k={3:F4};instrument_m={4:F4};axis={5}",
-                currentTrial.SequenceIndex,
-                count,
-                sweepDegrees,
-                currentTrial.InstrumentDistortionK,
-                currentTrial.InstrumentMagnificationM,
-                currentTrial.SweepAxis));
+            WriteMarker(
+                "MotionHalfSweep;task=random_dot_instrument;sequence={0};count={1};sweep_deg={2:F3};" +
+                "instrument_k={3:F4};instrument_m={4:F4};axis={5}",
+                currentTrial.SequenceIndex, count, sweepDegrees, currentTrial.InstrumentDistortionK,
+                currentTrial.InstrumentMagnificationM, currentTrial.SweepAxis);
         }
 
         private void StartEyeTracking(DateTime sessionStartUtc)
@@ -1345,22 +1781,24 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return;
             }
 
-            if (eyeTrackingToolbox.IsRecording)
-            {
-                eyeTrackingToolbox.StopRecording();
-            }
-
+            StopEyeTrackingRecording();
             eyeTrackingToolbox.SetOutputFolder(activeSessionFolder);
             eyeTrackingToolbox.StartRecording(experimentFiles.BaseFileName);
-            WriteMarker(string.Format(
-                CultureInfo.InvariantCulture,
-                "SessionStart;task=random_dot_instrument;participant={0};session={1};seed={2};planned_trials={3};utc={4};mapping={5}",
-                CheckerboardExperimentFiles.SanitizeIdentifier(participantId, "pilot"),
-                CheckerboardExperimentFiles.SanitizeIdentifier(sessionLabel, "random_dot"),
-                randomSeed,
-                trialPlan.Count,
-                sessionStartUtc.ToString("O", CultureInfo.InvariantCulture),
-                RandomDotExperimentFiles.MappingVersion));
+            WriteMarker(
+                "SessionStart;task=random_dot_instrument;participant={0};session={1};seed={2};" +
+                "planned_trials={3};utc={4};mapping={5};dot_density_per_deg2={6:F4};" +
+                "simulated_speed_reference={7};simulated_image_center_speed_deg_s={8:F3};" +
+                "object_speed_deg_s={9:F3};controller_mapping={10};convex_control={11};" +
+                "concave_control={12};response_keys_swapped={13}",
+                ExperimentFilesBase.SanitizeIdentifier(participantId, "pilot"),
+                ExperimentFilesBase.SanitizeIdentifier(sessionLabel, "random_dot"),
+                randomSeed, trialPlan.Count, sessionStartUtc.ToString("O", CultureInfo.InvariantCulture),
+                RandomDotExperimentFiles.MappingVersion, stimulus.DotDensity,
+                simulatedSpeedReference, simulatedImageCenterSpeed, sweepSpeed,
+                keyboardController.VrControllerMapping,
+                keyboardController.GetResponseControlName(CheckerboardCurvatureResponse.Convex),
+                keyboardController.GetResponseControlName(CheckerboardCurvatureResponse.Concave),
+                keyboardController.SwapResponseKeys ? 1 : 0);
         }
 
         private string BuildTrialStartMarker(RandomDotTrial trial)
@@ -1370,152 +1808,182 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // weiß man beim Auswerten, welcher Blickwert zu welcher Bedingung gehört.
             return string.Format(
                 CultureInfo.InvariantCulture,
-                "TrialStart;task=random_dot_instrument;presentation={0};sequence={1};condition={2};repetition={3};" +
-                "attempt={4};eye={5};fov_deg={6:F3};edge_softness_deg={7:F3};" +
+                "TrialStart;task=random_dot_instrument;presentation={0};sequence={1};" +
+                "condition={2};repetition={3};attempt={4};eye={5};fov_deg={6:F3};edge_softness_deg={7:F3};" +
                 "instrument_distortion_k={8:F4};instrument_magnification_m={9:F4};" +
                 "content_zoom={10:F4};motion={11};direction={12};duration_s={13:F3};" +
-                "amplitude_deg={14:F3};speed_deg_s={15:F3};dot_seed={16};axis={17}",
-                presentationCount,
-                trial.SequenceIndex,
-                trial.ConditionIndex,
-                trial.Repetition,
-                trial.AttemptNumber,
-                trial.EyePresentation,
-                trial.AngularDiameterDegrees,
-                stimulus.ApertureEdgeSoftnessDegrees,
-                trial.InstrumentDistortionK,
-                trial.InstrumentMagnificationM,
-                trial.ContentZoom,
-                trial.MotionMode,
-                RandomDotSimulatedSweep.DirectionLabel(
-                    trial.SweepAxis, trial.SweepDirection),
-                motionSeconds,
-                sweepAmplitudeDegrees,
-                sweepSpeed,
-                trial.DotSeed,
-                trial.SweepAxis);
+                "amplitude_deg={14:F3};speed_deg_s={15:F3};dot_seed={16};axis={17};dot_count={18};" +
+                "image_center_speed_deg_s={19:F3};head_motion_constraint={20}",
+                presentationCount, trial.SequenceIndex, trial.ConditionIndex, trial.Repetition,
+                trial.AttemptNumber, trial.EyePresentation, trial.AngularDiameterDegrees,
+                stimulus.ApertureEdgeSoftnessDegrees, trial.InstrumentDistortionK,
+                trial.InstrumentMagnificationM, trial.ContentZoom, trial.MotionMode,
+                IsFreeHeadTrial(trial) ? "Free" : trial.DirectionLabel,
+                IsOpenEndedTrial(trial) ? float.NaN : MotionSeconds(trial),
+                IsFreeHeadTrial(trial) ? float.NaN : SweepAmplitude(trial),
+                IsFreeHeadTrial(trial) ? float.NaN : SweepSpeed(trial),
+                trial.DotSeed, trial.SweepAxis, stimulus.DotCount,
+                RandomDotSimulatedSweep.ImageCenterSpeed(
+                    IsFreeHeadTrial(trial) ? float.NaN : SweepSpeed(trial),
+                    trial.InstrumentMagnificationM, trial.ContentZoom),
+                trial.MotionMode == RandomDotMotionMode.SimulatedYaw
+                    ? "simulated" : IsFreeHeadTrial(trial) ? "free" : "guided");
         }
 
         private void ResolveReferences()
         {
             // Felder, die im Inspector leer geblieben sind, werden hier in der Szene
             // gesucht. Was schon eingetragen ist, wird nicht angefasst.
-            stimulus ??= FindAnyObjectByType<RandomDotFieldStimulus>();
-            keyboardController ??= stimulus != null
-                ? stimulus.GetComponent<RandomDotKeyboardController>()
-                : null;
-            sweepMonitor ??= stimulus != null
-                ? stimulus.GetComponent<RandomDotHeadSweepMonitor>()
-                : null;
-            eyeTrackingToolbox ??= EyeTrackingToolbox.Instance;
-            eyeTrackingToolbox ??= FindAnyObjectByType<EyeTrackingToolbox>();
-            fixationMonitor ??= FindAnyObjectByType<RandomDotFixationMonitor>();
+            stimulus = UnityTools.FindIfMissing(stimulus);
+            if (stimulus != null && keyboardController == null)
+            {
+                keyboardController = stimulus.GetComponent<RandomDotKeyboardController>();
+            }
+
+            if (stimulus != null && sweepMonitor == null)
+            {
+                sweepMonitor = stimulus.GetComponent<RandomDotHeadSweepMonitor>();
+            }
+
+            if (eyeTrackingToolbox == null)
+            {
+                eyeTrackingToolbox = EyeTrackingToolbox.Instance;
+            }
+
+            eyeTrackingToolbox = UnityTools.FindIfMissing(eyeTrackingToolbox);
+            fixationMonitor = UnityTools.FindIfMissing(fixationMonitor);
         }
 
-        private void EnsureWorldCoverageSupportsPlan(
-            IReadOnlyList<RandomDotTrial> plan)
+        // Wie schnell im Trial über die Außenwelt geschwenkt wird, in Grad
+        // Objektwinkel pro Sekunde. Im HeadTracked-Block ist das die mittlere
+        // Kopfgeschwindigkeit. Im simulierten Block hängt es von der gewählten
+        // Definition ab: Bei "Bildmitte" wird so geschwenkt, dass die Punkte in der
+        // Bildmitte bei jedem m gleich schnell laufen, also bei großem m langsamer.
+        private float SweepSpeed(RandomDotTrial trial) =>
+            trial.MotionMode == RandomDotMotionMode.HeadTracked
+                ? sweepSpeed
+                : RandomDotSimulatedSweep.ObjectSpeed(simulatedSpeedReference, sweepSpeed,
+                    simulatedImageCenterSpeed, trial.InstrumentMagnificationM, trial.ContentZoom);
+
+        private bool IsFreeHeadTrial(RandomDotTrial trial) =>
+            trial.MotionMode == RandomDotMotionMode.HeadTracked && freeHeadMovement;
+
+        /// <summary>Ergebnis der letzten Übungsrückmeldung; null = keine Rückmeldung (k nicht eindeutig).</summary>
+        public bool? LastTrainingAnswerCorrect { get; private set; }
+
+        /// <summary>
+        /// Welche Antwort im Training als eindeutig gilt: k bis concaveMaxK = konkav,
+        /// k ab convexMinK = konvex, dazwischen None (keine Rückmeldung).
+        /// </summary>
+        public static CheckerboardCurvatureResponse ExpectedTrainingResponse(
+            float k, float concaveMaxK, float convexMinK)
         {
-            // Das Mesh enthält Richtungen der wirklichen Außenwelt. Bei großem m
-            // reicht deshalb ein kleiner Quellbereich; bei kleinerem m muss er
-            // breiter werden. Diese Rechnung nimmt für alle geplanten Trials den
-            // größten benötigten Bereich, damit dieselbe Punktwelt erhalten bleibt
-            // und beim Schwenken keine Lücken am Rand auftauchen.
-            if (stimulus == null || plan == null || plan.Count == 0)
-            {
-                return;
-            }
+            if (k <= concaveMaxK) return CheckerboardCurvatureResponse.Concave;
+            if (k >= convexMinK) return CheckerboardCurvatureResponse.Convex;
+            return CheckerboardCurvatureResponse.None;
+        }
 
-            const double radiansToDegrees = 180.0 / Math.PI;
-            const float safetyMarginDegrees = 1f;
-            float requiredDiameterDegrees = 0f;
+        /// <summary>So weit darf der Kopf im HeadTracked-Block drehen, bevor die Punktwelt endet.</summary>
+        public float HeadTrackedReachDegrees => Mathf.Max(sweepAmplitudeDegrees, headTurnSafetyDegrees);
 
+        private void KeepPreviewPointWorldLikeSession()
+        {
+            // In der Vorschau mit aktiver Kopfbewegung dieselbe Reichweite wie in der
+            // Sitzung (Head Turn Safety Degrees), nicht World Coverage. Wird bei jeder
+            // Änderung von FOV, m, k oder Zoom nachgeführt. Simulated behält World Coverage.
+            if (stimulus == null || stimulus.MotionMode != RandomDotMotionMode.HeadTracked) return;
+            float coverage = Mathf.Min(RandomDotFieldStimulus.MaximumCoverageDegrees,
+                RandomDotFieldStimulus.CoverageNeeded(stimulus.FieldOfViewDegrees, stimulus.ContentZoom,
+                    stimulus.InstrumentMagnificationM, stimulus.InstrumentDistortionK, HeadTrackedReachDegrees));
+            if (Mathf.Abs(coverage - stimulus.WorldCoverageDiameterDegrees) > 0.05f)
+                stimulus.SetWorldCoverage(coverage);
+        }
+
+        private bool IsOpenEndedTrial(RandomDotTrial trial) =>
+            IsFreeHeadTrial(trial) && openEndedActiveTrials;
+
+        private bool OpenEndedSession =>
+            sessionMotionMode == RandomDotMotionMode.HeadTracked && freeHeadMovement && openEndedActiveTrials;
+
+        // Wie weit das Feld im Trial zu jeder Seite der Mitte schwenkt, in Grad. Der
+        // simulierte Schwenk läuft in der eingestellten Zeit mit fester Geschwindigkeit
+        // einmal von der einen Seite zur anderen, also die halbe Strecke zu jeder Seite.
+        // Die Dauer bleibt bei jedem m gleich; bei "Bildmitte" wird deshalb die
+        // Schwenkweite in der Außenwelt mit wachsendem m kleiner.
+        private float SweepAmplitude(RandomDotTrial trial, float? simulatedSecondsOverride = null) =>
+            trial.MotionMode == RandomDotMotionMode.HeadTracked
+                ? sweepAmplitudeDegrees
+                : 0.5f * SweepSpeed(trial) * (simulatedSecondsOverride ?? simulatedSweepSeconds);
+
+        // Wie lange die Punkte im Trial zu sehen sind, in Sekunden.
+        private float MotionSeconds(RandomDotTrial trial) =>
+            trial.MotionMode == RandomDotMotionMode.HeadTracked ? headTrackedSeconds : simulatedSweepSeconds;
+
+        private float WorldCoverageFor(RandomDotTrial trial, float? simulatedSecondsOverride = null)
+        {
+            // Wie groß die Punktwelt für diesen Trial sein muss. Im HeadTracked-Block
+            // kann der Kopf weiter drehen als der Sollschwenk. Dafür gibt es dort den
+            // größeren Sicherheitsbereich.
+            float reach = trial.MotionMode == RandomDotMotionMode.HeadTracked
+                ? Mathf.Max(sweepAmplitudeDegrees, headTurnSafetyDegrees)
+                : SweepAmplitude(trial, simulatedSecondsOverride);
+            return RandomDotFieldStimulus.CoverageNeeded(trial.AngularDiameterDegrees, trial.ContentZoom,
+                trial.InstrumentMagnificationM, trial.InstrumentDistortionK, reach);
+        }
+
+        private void CheckPointWorlds(IReadOnlyList<RandomDotTrial> plan)
+        {
+            // Vor dem Start wird für alle Trials einmal nachgerechnet, ob die
+            // Punktwelt überall unter die Grenzen passt. Lieber hier abbrechen als
+            // mitten in der Messung.
+            int fewestDots = int.MaxValue;
+            int mostDots = 0;
             foreach (RandomDotTrial trial in plan)
             {
-                double finalHalfAngle =
-                    0.5 * trial.AngularDiameterDegrees * Math.PI / 180.0;
-                double apparentBeforeContentZoom = Math.Atan(
-                    Math.Tan(finalHalfAngle) / trial.ContentZoom);
-
-                if (trial.InstrumentDistortionK * apparentBeforeContentZoom >=
-                    Math.PI / 2.0 - 1e-5)
+                // Der Stimulus würde zu kleine oder zu große Werte stillschweigend
+                // abschneiden. Dann liefe der Schwenk anders als eingestellt.
+                float speed = SweepSpeed(trial);
+                float amplitude = SweepAmplitude(trial);
+                if (speed < RandomDotFieldStimulus.MinimumSweepSpeed
+                    || speed > RandomDotFieldStimulus.MaximumSweepSpeed
+                    || amplitude < RandomDotFieldStimulus.MinimumSweepAmplitudeDegrees
+                    || amplitude > RandomDotFieldStimulus.MaximumSweepAmplitudeDegrees)
                 {
-                    throw new ArgumentOutOfRangeException(
-                        nameof(contentZoomValues),
-                        "Diese Kombination aus k, FOV und Content Zoom erreicht " +
-                        "den Umkehrpunkt der Instrumentenabbildung.");
+                    throw new ArgumentOutOfRangeException(nameof(simulatedImageCenterSpeed), string.Format(
+                        CultureInfo.InvariantCulture,
+                        "Bei m = {0} ergibt sich im {1}-Block ein Schwenk mit {2:F4} Grad pro Sekunde und " +
+                        "{3:F4} Grad je Seite. Erlaubt sind {4} bis {5} Grad pro Sekunde und {6} bis {7} Grad.",
+                        trial.InstrumentMagnificationM, trial.MotionMode, speed, amplitude,
+                        RandomDotFieldStimulus.MinimumSweepSpeed, RandomDotFieldStimulus.MaximumSweepSpeed,
+                        RandomDotFieldStimulus.MinimumSweepAmplitudeDegrees,
+                        RandomDotFieldStimulus.MaximumSweepAmplitudeDegrees));
                 }
 
-                double objectHalfAngle =
-                    MerlitzBinocularReferenceMath.ObjectAngleFromApparent(
-                        apparentBeforeContentZoom,
-                        trial.InstrumentMagnificationM,
-                        trial.InstrumentDistortionK);
-                float yawCoverageDegrees =
-                    trial.MotionMode == RandomDotMotionMode.HeadTracked
-                        ? Mathf.Max(
-                            sweepAmplitudeDegrees,
-                            headTurnSafetyDegrees)
-                        : sweepAmplitudeDegrees;
-                float trialCoverage = 2f * (
-                    (float)(objectHalfAngle * radiansToDegrees) +
-                    yawCoverageDegrees +
-                    safetyMarginDegrees);
-                requiredDiameterDegrees = Mathf.Max(
-                    requiredDiameterDegrees,
-                    trialCoverage);
+                float coverage = WorldCoverageFor(trial);
+                if (coverage > RandomDotFieldStimulus.MaximumCoverageDegrees)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(instrumentMagnificationMValues),
+                        "Die Kombination aus FOV, k, m, Content Zoom und Schwenkweite braucht mehr als " +
+                        "170 Grad Punktwelt oder erreicht den Umkehrpunkt der Instrumentenabbildung.");
+                }
+
+                float m = trial.InstrumentMagnificationM;
+                int dots = RandomDotFieldStimulus.DotCountFor(
+                    stimulus.DotDensity, m, trial.ContentZoom, coverage);
+                if (dots > RandomDotFieldStimulus.MaximumDotCount)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(instrumentMagnificationMValues),
+                        $"Bei m = {m} braucht der {trial.MotionMode}-Block {dots} Punkte, erlaubt sind " +
+                        $"{RandomDotFieldStimulus.MaximumDotCount}. Die Punktdichte am Random Dot Field " +
+                        "senken oder Head Turn Safety verkleinern.");
+                }
+
+                fewestDots = Mathf.Min(fewestDots, dots);
+                mostDots = Mathf.Max(mostDots, dots);
             }
 
-            if (requiredDiameterDegrees > 170f)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(instrumentMagnificationMValues),
-                    "Die geplante Kombination aus FOV, Vergrößerung und " +
-                    "Schwenkweite braucht mehr als 170 Grad Punktabdeckung.");
-            }
-
-            float previousCoverage = stimulus.WorldCoverageDiameterDegrees;
-            float resolvedCoverage = Mathf.Max(
-                previousCoverage,
-                requiredDiameterDegrees);
-            if (resolvedCoverage <=
-                previousCoverage + 0.001f)
-            {
-                return;
-            }
-
-            double previousCapAreaFactor = 1.0 - Math.Cos(
-                0.5 * previousCoverage * Math.PI / 180.0);
-            double resolvedCapAreaFactor = 1.0 - Math.Cos(
-                0.5 * resolvedCoverage * Math.PI / 180.0);
-            int previousDotCount = stimulus.DotCount;
-            int densityMatchedDotCount = (int)Math.Ceiling(
-                previousDotCount * resolvedCapAreaFactor /
-                Math.Max(previousCapAreaFactor, 1e-9));
-            int resolvedDotCount = Mathf.Clamp(
-                densityMatchedDotCount,
-                RandomDotFieldStimulus.MinimumDotCount,
-                RandomDotFieldStimulus.MaximumDotCount);
-
-            stimulus.ConfigurePointField(
-                resolvedDotCount,
-                stimulus.RandomSeed,
-                resolvedCoverage);
-            Debug.Log(string.Format(
-                CultureInfo.InvariantCulture,
-                "Random-Dot-Weltabdeckung automatisch von {0:F2}° auf {1:F2}° erweitert; Punktzahl für konstante Flächendichte von {2} auf {3} gesetzt.",
-                previousCoverage,
-                resolvedCoverage,
-                previousDotCount,
-                resolvedDotCount),
-                this);
-
-            if (resolvedDotCount < densityMatchedDotCount)
-            {
-                Debug.LogWarning(
-                    "Die maximale Punktzahl wurde erreicht; bei dieser sehr großen " +
-                    "Weltabdeckung ist die Punktdichte etwas geringer als geplant.",
-                    this);
-            }
+            Debug.Log($"Punktwelt pro Trial: {fewestDots} bis {mostDots} Punkte, damit es in der " +
+                $"Bildmitte immer {stimulus.DotDensity:F3} Punkte pro Quadratgrad sind.", this);
         }
 
         private void SubscribeEvents()
@@ -1550,61 +2018,32 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             eventsSubscribed = false;
         }
 
-        private void ResetFixationCounters()
+        // Blickkontrolle und Wegschau-Zähler fangen für den Durchgang bei null an.
+        private void ResetFixationChecks()
         {
-            // Jeder Versuch fängt mit frischen Zählern bei null an. Sonst würde man
-            // die Aussetzer vom vorigen Durchgang mitschleppen.
-            currentOffTargetSeconds = 0f;
-            currentInvalidGazeSeconds = 0f;
-            longestOffTargetSeconds = 0f;
-            longestInvalidGazeSeconds = 0f;
-        }
-
-        private IReadOnlyList<RandomDotMotionMode> BuildMotionBlockOrder()
-        {
-            var orderedModes = new List<RandomDotMotionMode>(motionModes);
-            if (counterbalanceMotionBlockOrderByParticipantId &&
-                ShouldReverseMotionBlockOrder(participantId))
+            if (fixationMonitor != null)
             {
-                orderedModes.Reverse();
+                fixationMonitor.ResetFixationWindow();
             }
 
-            return orderedModes;
-        }
-
-        private static bool ShouldReverseMotionBlockOrder(string identifier)
-        {
-            string value = identifier ?? string.Empty;
-            int digitStart = value.Length;
-            while (digitStart > 0 && char.IsDigit(value[digitStart - 1]))
-            {
-                digitStart--;
-            }
-
-            if (digitStart < value.Length &&
-                long.TryParse(
-                    value.Substring(digitStart),
-                    NumberStyles.None,
-                    CultureInfo.InvariantCulture,
-                    out long participantNumber))
-            {
-                return (participantNumber & 1L) == 0L;
-            }
-
-            // Auch Kennungen ohne Zahl bekommen eine reproduzierbare Zuordnung.
-            uint stableHash = 2166136261u;
-            foreach (char character in value.ToUpperInvariant())
-            {
-                stableHash ^= character;
-                stableHash *= 16777619u;
-            }
-
-            return (stableHash & 1u) == 0u;
+            lookAway.Reset();
         }
 
         private void WriteMarker(string message)
         {
-            eyeTrackingToolbox?.WriteMessage(message);
+            if (standaloneTraining) return;
+            if (eyeTrackingToolbox != null)
+            {
+                eyeTrackingToolbox.WriteMessage(message);
+            }
+        }
+
+        // Wie string.Format, aber immer mit Punkt als Dezimaltrennzeichen, egal
+        // welche Sprache Windows eingestellt hat. Sonst stünde mal 0,5 und mal 0.5
+        // in der Aufnahme.
+        private void WriteMarker(string format, params object[] values)
+        {
+            WriteMarker(string.Format(CultureInfo.InvariantCulture, format, values));
         }
 
         private void StopEyeTrackingRecording()
@@ -1615,49 +2054,22 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
         }
 
-        private void StopMotionCoroutine()
+        // Hält eine laufende Coroutine an und merkt sich, dass keine mehr läuft.
+        private void StopAndClear(ref Coroutine coroutine)
         {
-            if (motionCoroutine == null)
+            if (coroutine != null)
             {
-                return;
+                StopCoroutine(coroutine);
+                coroutine = null;
             }
-
-            StopCoroutine(motionCoroutine);
-            motionCoroutine = null;
         }
 
         private void StopPendingCoroutines()
         {
-            StopMotionCoroutine();
-            if (headTrainingCoroutine != null)
-            {
-                StopCoroutine(headTrainingCoroutine);
-                headTrainingCoroutine = null;
-            }
-
-            if (interTrialCoroutine == null)
-            {
-                return;
-            }
-
-            StopCoroutine(interTrialCoroutine);
-            interTrialCoroutine = null;
-        }
-
-        private void FailAfterWriteError(Exception exception)
-        {
-            Debug.LogError(
-                "Random-Dot-Trial konnte nicht gespeichert werden; die Sitzung wird beendet: " +
-                exception.Message,
-                this);
-            WriteMarker("SessionAborted;task=random_dot_instrument;reason=result_write_error");
-            StopPendingCoroutines();
-            headTrainingView?.Hide();
-            stimulus?.Hide();
-            StopEyeTrackingRecording();
-            currentTrial = null;
-            sessionState = RandomDotSessionState.Aborted;
-            SessionFinished?.Invoke(sessionState);
+            StopAndClear(ref simulatedTrainingCoroutine);
+            StopAndClear(ref motionCoroutine);
+            StopAndClear(ref headTrainingCoroutine);
+            StopAndClear(ref interTrialCoroutine);
         }
 
         private void DisposeTrainingView()
@@ -1669,46 +2081,23 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private void OnValidate()
         {
             repeatsPerCondition = Mathf.Max(1, repeatsPerCondition);
-            repeatsPerBlock = Mathf.Clamp(
-                repeatsPerBlock,
-                1,
-                repeatsPerCondition);
-            motionSeconds = Mathf.Max(0.1f, motionSeconds);
+            simulatedTrainingRepeatsPerValue = Mathf.Max(1, simulatedTrainingRepeatsPerValue);
+            // Die Konkav-Grenze muss unter der Konvex-Grenze liegen.
+            feedbackConcaveMaxK = Mathf.Min(feedbackConcaveMaxK, feedbackConvexMinK - 0.01f);
+            simulatedSweepSeconds = Mathf.Clamp(simulatedSweepSeconds, 0.1f, 5f);
+            headTrackedSeconds = Mathf.Max(0.1f, headTrackedSeconds);
             sweepAmplitudeDegrees = Mathf.Clamp(sweepAmplitudeDegrees, 0.1f, 30f);
-            sweepSpeed = Mathf.Clamp(
-                sweepSpeed,
-                0.1f,
-                60f);
-            requiredGoodTrainingSweeps = Mathf.Clamp(
-                requiredGoodTrainingSweeps, 2, 10);
-            maximumProfileErrorDegrees = Mathf.Clamp(
-                maximumProfileErrorDegrees, 0.1f, 3f);
-            maximumTrainingEndpointErrorDegrees = Mathf.Clamp(
-                maximumTrainingEndpointErrorDegrees, 0.1f, 3f);
-            headTurnSafetyDegrees = Mathf.Clamp(
-                headTurnSafetyDegrees,
-                3f,
-                60f);
-            turnaroundDegrees = Mathf.Clamp(
-                turnaroundDegrees,
-                0.5f,
-                30f);
-            requiredSweeps = Mathf.Clamp(
-                requiredSweeps,
-                1,
-                10);
-            maxHeadTurnDegrees = Mathf.Clamp(
-                maxHeadTurnDegrees,
-                turnaroundDegrees,
-                headTurnSafetyDegrees);
-            minMeanHeadSpeed = Mathf.Clamp(
-                minMeanHeadSpeed,
-                0f,
-                20f);
-            maxPeakHeadSpeed = Mathf.Clamp(
-                maxPeakHeadSpeed,
-                Mathf.Max(0.1f, minMeanHeadSpeed),
-                30f);
+            sweepSpeed = Mathf.Clamp(sweepSpeed, 0.1f, 60f);
+            simulatedImageCenterSpeed = Mathf.Clamp(simulatedImageCenterSpeed, 0.5f, 120f);
+            requiredGoodTrainingSweeps = Mathf.Clamp(requiredGoodTrainingSweeps, 2, 10);
+            maximumProfileErrorDegrees = Mathf.Clamp(maximumProfileErrorDegrees, 0.1f, 3f);
+            maximumTrainingEndpointErrorDegrees = Mathf.Clamp(maximumTrainingEndpointErrorDegrees, 0.1f, 3f);
+            headTurnSafetyDegrees = Mathf.Clamp(headTurnSafetyDegrees, 3f, 60f);
+            turnaroundDegrees = Mathf.Clamp(turnaroundDegrees, 0.5f, 30f);
+            requiredSweeps = Mathf.Clamp(requiredSweeps, 1, 10);
+            maxHeadTurnDegrees = Mathf.Clamp(maxHeadTurnDegrees, turnaroundDegrees, headTurnSafetyDegrees);
+            minMeanHeadSpeed = Mathf.Clamp(minMeanHeadSpeed, 0f, 20f);
+            maxPeakHeadSpeed = Mathf.Clamp(maxPeakHeadSpeed, Mathf.Max(0.1f, minMeanHeadSpeed), 30f);
             maxLookAwaySeconds = Mathf.Max(0f, maxLookAwaySeconds);
             maxNoDataSeconds = Mathf.Max(0f, maxNoDataSeconds);
             maxSampleAgeSeconds = Mathf.Max(0.01f, maxSampleAgeSeconds);

@@ -3,9 +3,9 @@ using System;
 namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     /// <summary>
-    /// Vergleicht die gemessene Kopfbewegung mit derselben Sinusbahn, die der
-    /// simulierte Modus zeichnet. Zeitgewichtung verhindert, dass die Bildrate
-    /// die Bewertung verändert.
+    /// Vergleicht die gemessene Kopfbewegung mit der Sinusbahn hin und her, der
+    /// die Person im HeadTracked-Block folgen soll. Zeitgewichtung verhindert,
+    /// dass die Bildrate die Bewertung verändert.
     /// </summary>
     public sealed class RandomDotSweepProfileEvaluator
     {
@@ -18,9 +18,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private double nearestSecondExtremeTimeError = double.PositiveInfinity;
 
         public RandomDotSweepProfileEvaluator(
-            float amplitudeDegrees,
-            float speedDegreesPerSecond,
-            RandomDotSweepDirection direction)
+            float amplitudeDegrees, float speedDegreesPerSecond, RandomDotSweepDirection direction)
         {
             if (amplitudeDegrees <= 0f)
             {
@@ -41,28 +39,27 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             ? (float)Math.Sqrt(weightedSquaredError / measuredSeconds)
             : float.PositiveInfinity;
 
-        public float FirstExtremeErrorDegrees { get; private set; } =
-            float.PositiveInfinity;
+        public float FirstExtremeErrorDegrees { get; private set; } = float.PositiveInfinity;
 
-        public float SecondExtremeErrorDegrees { get; private set; } =
-            float.PositiveInfinity;
+        public float SecondExtremeErrorDegrees { get; private set; } = float.PositiveInfinity;
 
         public void AddSample(double elapsedSeconds, float yawDegrees, float deltaSeconds)
         {
+            // Frames mit einer Lücke von mehr als einer Viertelsekunde zählen
+            // nicht mit, sonst würde ein einzelner Hänger das Ergebnis dominieren.
             if (elapsedSeconds < 0d || deltaSeconds <= 0f || deltaSeconds > 0.25f)
             {
                 return;
             }
 
-            float target = RandomDotSimulatedSweep.EvaluateYawDegrees(
-                elapsedSeconds,
-                amplitudeDegrees,
-                speedDegreesPerSecond,
-                direction);
+            float target = RandomDotSimulatedSweep.EvaluateBackAndForthDegrees(
+                elapsedSeconds, amplitudeDegrees, speedDegreesPerSecond, direction);
             double error = yawDegrees - target;
             weightedSquaredError += error * error * deltaSeconds;
             measuredSeconds += deltaSeconds;
 
+            // Für die beiden Umkehrpunkte zählt jeweils der Messwert, der zeitlich
+            // am nächsten daran liegt.
             double firstExtremeSeconds = amplitudeDegrees / speedDegreesPerSecond;
             double timingError = Math.Abs(elapsedSeconds - firstExtremeSeconds);
             if (timingError < nearestFirstExtremeTimeError)

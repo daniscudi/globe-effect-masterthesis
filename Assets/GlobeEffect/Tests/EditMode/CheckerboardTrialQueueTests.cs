@@ -1,4 +1,4 @@
-﻿using GlobeEffect.VRCheckerboard.Experiment;
+using GlobeEffect.VRCheckerboard.Experiment;
 using NUnit.Framework;
 
 namespace GlobeEffect.VRCheckerboard.Tests
@@ -29,17 +29,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(repeat, Is.SameAs(last));
         }
 
-        private static CheckerboardTrial CreateTrial(
-            int sequence,
-            float visualSpaceL)
+        private static CheckerboardTrial CreateTrial(int sequence, float visualSpaceL)
         {
-            return new CheckerboardTrial(
-                sequence,
-                conditionIndex: sequence,
-                repetition: 1,
-                attemptNumber: 1,
-                angularDiameterDegrees: 90f,
-                eyePresentation: CheckerboardEyePresentation.BothEyes,
+            return new CheckerboardTrial(sequence, conditionIndex: sequence, repetition: 1, attemptNumber: 1,
+                angularDiameterDegrees: 90f, eyePresentation: CheckerboardEyePresentation.BothEyes,
                 visualSpaceL: visualSpaceL);
         }
     }

@@ -9,6 +9,9 @@
 [Mm]emoryCaptures/
 [Rr]ecordings/
 [Mm]easurements/
+# Unity crash-recovery copies of unsaved scenes
+/[Aa]ssets/_[Rr]ecovery/
+/[Aa]ssets/_[Rr]ecovery.meta
 
 # IDEs and generated project files
 .vs/

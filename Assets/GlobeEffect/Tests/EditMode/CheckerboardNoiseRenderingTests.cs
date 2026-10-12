@@ -11,9 +11,23 @@ namespace GlobeEffect.VRCheckerboard.Tests
     {
         // Liest das tatsächlich gerenderte Bild aus. Ein reiner Rechentest auf
         // der CPU würde Fehler der Shaderberechnung auf der Grafikkarte übersehen.
-        [TestCase(0.5f)]
-        [TestCase(1f)]
-        public void NoiseContainsBothColorsAndRespondsToLargeSeeds(float cellSize)
+        // Bei 90 Grad Blickwinkel ist m11 = 1. Dann ist ein Pixel in der Bildmitte
+        // 2 / Höhe im Bogenmaß groß, bei 1000 Pixeln also etwa 0,1146 Grad.
+        [Test]
+        public void DegreesPerPixel_MatchesHandCalculation()
+        {
+            Matrix4x4 projection = Matrix4x4.Perspective(90f, 1f, 0.1f, 100f);
+            float degreesPerPixel = VrCheckerboardStimulus.DegreesPerPixel(projection, 1000);
+            Assert.That(degreesPerPixel, Is.EqualTo(Mathf.Rad2Deg * 0.002f).Within(1e-4f));
+        }
+
+        // Das Testbild ist nur 256 Pixel groß, ein Pixel sind hier etwa 0,45 Grad.
+        // Die Punkte müssen deshalb mehrere Pixel groß sein. Kleinere Punkte
+        // werden durch die Kantenglättung richtigerweise grau.
+        [TestCase(3f)]
+        [TestCase(4f)]
+        [TestCase(6f)]
+        public void NoiseContainsBothColorsAndRespondsToLargeSeeds(float dotSize)
         {
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
                 Assert.Ignore("Der Bildtest braucht eine aktive Grafikausgabe.");
@@ -43,12 +57,22 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 stimulus.SetAngularDiameter(70f);
                 stimulus.SetApertureEdgeSoftness(0f);
                 var settings = new SerializedObject(stimulus);
-                settings.FindProperty("noiseSizeDegrees").floatValue = cellSize;
+                // Hier wird bewusst in Grad getestet, damit die drei Größen fest sind.
+                settings.FindProperty("noiseSizeInPixels").boolValue = false;
+                settings.FindProperty("noiseDotSizeDegrees").floatValue = dotSize;
                 settings.ApplyModifiedPropertiesWithoutUndo();
 
                 // Zwei benachbarte große Zahlen dürfen nicht zum gleichen Float
                 // gerundet werden. Dazu prüfen wir die Grenzen des Seed-Bereichs.
-                int[] seeds = { 20260900, 20260901, 20310902, 0, int.MinValue, int.MaxValue };
+                // Die beiden letzten Einträge sind zwei aufeinanderfolgende
+                // Rauschbilder derselben Maske: Auch sie müssen sich unterscheiden,
+                // sonst würde die Maske im Versuch nicht flimmern.
+                int[] seeds =
+                {
+                    20260900, 20260901, 20310902, 0, int.MinValue, int.MaxValue,
+                    VrCheckerboardStimulus.NoiseFrameSeed(20260901, 1),
+                    VrCheckerboardStimulus.NoiseFrameSeed(20260901, 2)
+                };
                 Color32[] previous = null;
                 foreach (int seed in seeds)
                 {
@@ -66,8 +90,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
                         if (pixel.r < 15 && pixel.g < 15 && pixel.b < 15) black++;
                         if (previous != null && !pixel.Equals(previous[y * 256 + x])) changed++;
                     }
-                    Assert.That(white, Is.GreaterThan(4000), "Weiße Noise-Felder fehlen, Seed " + seed);
-                    Assert.That(black, Is.GreaterThan(4000), "Schwarze Noise-Felder fehlen, Seed " + seed);
+                    Assert.That(white, Is.GreaterThan(3000), "Weiße Noise-Felder fehlen, Seed " + seed);
+                    Assert.That(black, Is.GreaterThan(3000), "Schwarze Noise-Felder fehlen, Seed " + seed);
                     if (previous != null)
                         Assert.That(changed, Is.GreaterThan(3000), "Neuer Seed muss das Muster ändern.");
                     stimulus.ShowNoise(seed);
@@ -84,6 +108,34 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 Object.DestroyImmediate(target);
                 Object.DestroyImmediate(readback);
             }
+        }
+
+        [Test]
+        public void NoiseFrameIndex_AdvancesWithTheRefreshRate()
+        {
+            // 30 Bilder pro Sekunde: Ein Bild steht 33 ms.
+            Assert.That(VrCheckerboardStimulus.NoiseFrameIndex(0d, 30f), Is.EqualTo(0));
+            Assert.That(VrCheckerboardStimulus.NoiseFrameIndex(0.03d, 30f), Is.EqualTo(0));
+            Assert.That(VrCheckerboardStimulus.NoiseFrameIndex(0.04d, 30f), Is.EqualTo(1));
+            Assert.That(VrCheckerboardStimulus.NoiseFrameIndex(1d, 30f), Is.EqualTo(30));
+
+            // Bei 0 Hz bleibt die Maske stehen.
+            Assert.That(VrCheckerboardStimulus.NoiseFrameIndex(100d, 0f), Is.EqualTo(0));
+        }
+
+        [Test]
+        public void NoiseFrameSeed_StartsWithTheMaskSeedAndChangesEveryFrame()
+        {
+            const int maskSeed = 20260901;
+            Assert.That(VrCheckerboardStimulus.NoiseFrameSeed(maskSeed, 0), Is.EqualTo(maskSeed));
+
+            var seen = new System.Collections.Generic.HashSet<int>();
+            for (int frame = 0; frame < 1000; frame++)
+            {
+                seen.Add(VrCheckerboardStimulus.NoiseFrameSeed(maskSeed, frame));
+            }
+
+            Assert.That(seen.Count, Is.EqualTo(1000), "Jedes Rauschbild braucht einen eigenen Seed.");
         }
 
         private static Color32[] ReadImage(Camera camera, RenderTexture target, Texture2D readback)

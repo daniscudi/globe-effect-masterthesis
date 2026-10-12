@@ -8,7 +8,7 @@
     {
         _DarkColor ("Dark Color", Color) = (0, 0, 0, 1)
         _LightColor ("Light Color", Color) = (1, 1, 1, 1)
-        _FixationBackgroundColor ("Fixation Background", Color) = (0.5, 0.5, 0.5, 1)
+        _FixationBackgroundColor ("Background", Color) = (0.73, 0.73, 0.73, 1)
         _FixationColor ("Fixation Color", Color) = (1, 0, 0, 1)
         _ApparentHalfAngleRad ("Apparent Half Angle [rad]", Float) = 0.785398
         _ApertureEdgeSoftnessRad ("Aperture Edge Softness [rad]", Float) = 0.0174533
@@ -147,6 +147,20 @@
                 return value ^ (value >> 16);
             }
 
+            float NoiseCellValue(int2 cell)
+            {
+                // Aus Zellnummer und Seed entsteht reproduzierbar ein schwarzer
+                // oder weißer Punkt. Seed und Zellnummern bleiben ganze Zahlen,
+                // auch negative Zellnummern werden über ihre Bits eindeutig
+                // einbezogen. Früher steckte der große Seed in einer Sinusrechnung;
+                // dabei gingen Unterschiede verloren und die Maske konnte je nach
+                // Grafikkarte fast ganz schwarz werden.
+                uint bits = MixNoiseBits(asuint(cell.x) ^ asuint(_NoiseSeed));
+                bits = MixNoiseBits(bits ^ asuint(cell.y) ^ 0x9e3779b9u);
+                // Das oberste Bit entscheidet: 0 = dunkel, 1 = hell.
+                return (float)(bits >> 31);
+            }
+
             fixed4 Frag(VertexToFragment input) : SV_Target
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
@@ -197,7 +211,11 @@
                 // Ohne Kreisblende bleibt apertureAlpha bei 1 und das ganze
                 // quadratische Gitter wird sichtbar. Das ist nur zur Kontrolle
                 // gedacht; im eigentlichen Versuch bleibt die Öffnung aktiv.
-                clip(apertureAlpha - 0.001);
+                //
+                // Außerhalb vom Kreis ist nur der graue Hintergrund zu sehen. Das
+                // wird ganz am Ende ausgewählt und nicht schon hier mit return,
+                // weil die Kantenglättung (fwidth) weiter unten bei allen
+                // Nachbarpixeln mitrechnen muss.
 
                 float sourceRadius;
                 if (_VisualSpaceL < 1e-6)
@@ -241,24 +259,33 @@
                     _LightColor,
                     checkerMix);
 
-                // Für die kurze Maske wird die angezeigte Fläche in kleine Zellen
+                // Für die Maske wird die angezeigte Fläche in kleine Zellen
                 // geteilt. Aus Zellkoordinate und Seed entsteht reproduzierbar ein
-                // schwarzes oder weißes Feld. Das ist keine weitere l-Verzerrung.
-                int2 noiseCell = (int2)floor(
-                    displayPosition / max(_NoiseCellSizeUv, 1e-6));
-                // Früher wurde der große Seed direkt in eine Sinusrechnung
-                // eingesetzt. Dabei gingen Unterschiede zwischen Zellen verloren;
-                // je nach Grafikkarte konnte die Maske fast oder ganz schwarz werden.
-                // Jetzt bleiben Seed und Zellnummern ganze Zahlen. Auch negative
-                // Zellnummern werden anhand ihrer Bits eindeutig mit einbezogen.
-                uint noiseBits = MixNoiseBits(asuint(noiseCell.x) ^ asuint(_NoiseSeed));
-                noiseBits = MixNoiseBits(noiseBits ^ asuint(noiseCell.y) ^ 0x9e3779b9u);
-                // Das oberste Bit entscheidet: 0 = dunkel, 1 = hell.
-                float noiseValue = (float)(noiseBits >> 31);
-                fixed4 noiseColor = lerp(
-                    _DarkColor,
-                    _LightColor,
-                    step(0.5, noiseValue));
+                // schwarzer oder weißer Punkt. Das ist keine weitere l-Verzerrung.
+                // Das C#-Skript wechselt den Seed mit der eingestellten Rate; dadurch
+                // flimmert die Maske wie ein Fernseher ohne Empfang.
+                //
+                // Die Kanten zwischen den Zellen werden geglättet, genau wie beim
+                // Schachbrett. Ohne das springt jede harte Kante im Headset bei
+                // jeder winzigen Kopfbewegung um ein Pixel hin und her, und man
+                // sieht wandernde waagrechte und senkrechte Linien.
+                //
+                // So geht das Glätten: noisePosition zählt in Zellen. Zwischen den
+                // Mitten zweier Nachbarzellen wird nur auf einer Breite von einem
+                // Bildpixel (pixelWidth) weich von der einen zur anderen Farbe
+                // übergeblendet. Innerhalb einer Zelle bleibt sie rein schwarz
+                // oder rein weiß.
+                float2 noisePosition = displayPosition / max(_NoiseCellSizeUv, 1e-6);
+                float2 pixelWidth = max(fwidth(noisePosition), 1e-4);
+                float2 shifted = noisePosition - 0.5;
+                int2 cell = (int2)floor(shifted);
+                float2 between = shifted - floor(shifted);
+                float2 blend = saturate((between - 0.5) / pixelWidth + 0.5);
+                float noiseValue = lerp(
+                    lerp(NoiseCellValue(cell), NoiseCellValue(cell + int2(1, 0)), blend.x),
+                    lerp(NoiseCellValue(cell + int2(0, 1)), NoiseCellValue(cell + int2(1, 1)), blend.x),
+                    blend.y);
+                fixed4 noiseColor = lerp(_DarkColor, _LightColor, noiseValue);
 
                 fixed4 visiblePattern = lerp(
                     checkerColor,
@@ -281,7 +308,30 @@
                     * step(0.5, _FixationEnabled);
 
                 fixed4 finalColor = lerp(color, _FixationColor, fixationMask);
-                finalColor.a *= apertureAlpha;
+
+                // Am weichen Rand wird das Bild nicht durchsichtig, sondern in den
+                // grauen Hintergrund übergeblendet. Schwarz und Weiß werden dabei
+                // also nur immer grauer, die mittlere Helligkeit bleibt gleich.
+                // Ein Rand, der nach Schwarz dunkler wird, sieht dagegen aus wie
+                // eine beleuchtete Kugel und kann "konvex" vortäuschen.
+                //
+                // Im Gamma-Farbraum sind die Farbwerte nicht die echte Helligkeit.
+                // Deshalb wird zum Mischen kurz in echte (lineare) Helligkeit
+                // umgerechnet und danach zurück.
+                float3 background = _FixationBackgroundColor.rgb;
+                #if defined(UNITY_COLORSPACE_GAMMA)
+                    finalColor.rgb = LinearToGammaSpace(lerp(
+                        GammaToLinearSpace(background),
+                        GammaToLinearSpace(finalColor.rgb),
+                        apertureAlpha));
+                #else
+                    finalColor.rgb = lerp(background, finalColor.rgb, apertureAlpha);
+                #endif
+
+                // Ganz außen liefert die l-Formel keine sinnvollen Werte mehr.
+                // Dort wird deshalb direkt das Grau genommen.
+                finalColor.rgb = apertureAlpha <= 0.001 ? background : finalColor.rgb;
+                finalColor.a = 1.0;
                 return finalColor;
             }
             ENDCG

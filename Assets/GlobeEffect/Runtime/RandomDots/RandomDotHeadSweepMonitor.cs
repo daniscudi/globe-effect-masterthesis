@@ -24,8 +24,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         [SerializeField]
         private RandomDotFieldStimulus stimulus;
-        [Header("Motion Log")]
 
+        [Header("Motion Log")]
         [FormerlySerializedAs("yawThresholdDegrees")]
         [SerializeField, Range(0.5f, 45f)]
         [Tooltip("Ab wie vielen Grad zu einer Seite das als Rand zählt.")]
@@ -65,6 +65,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private bool hasPreviousYawSample;
         private RandomDotSweepProfileEvaluator profileEvaluator;
         private double profileStartSeconds;
+        private double previousProfileElapsedSeconds;
+        private bool hasPreviousProfileSample;
         private bool trackingProfile;
         private bool trackingYaw;
 
@@ -75,19 +77,17 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public int RequiredHalfSweeps => requiredHalfSweeps;
         public float YawThresholdDegrees => turnaroundDegrees;
         public float MaximumAbsoluteYawDegrees => maxHeadTurnDegrees;
-        public float MeanAbsoluteYawSpeedDegreesPerSecond =>
-            meanHeadSpeed;
-        public float PeakAbsoluteYawSpeedDegreesPerSecond =>
-            peakHeadSpeed;
+        public float MeanAbsoluteYawSpeedDegreesPerSecond => meanHeadSpeed;
+        public float PeakAbsoluteYawSpeedDegreesPerSecond => peakHeadSpeed;
         public float MinimumYawDegrees => counter?.MinimumYawDegrees ?? 0f;
         public float MaximumYawDegrees => counter?.MaximumYawDegrees ?? 0f;
         public bool RequirementMet => completedHalfSweeps >= requiredHalfSweeps;
-        public float ProfileErrorDegrees => profileEvaluator?.RootMeanSquareErrorDegrees ??
-            float.PositiveInfinity;
-        public float FirstExtremeErrorDegrees => profileEvaluator?.FirstExtremeErrorDegrees ??
-            float.PositiveInfinity;
-        public float SecondExtremeErrorDegrees => profileEvaluator?.SecondExtremeErrorDegrees ??
-            float.PositiveInfinity;
+        public float ProfileErrorDegrees =>
+            profileEvaluator?.RootMeanSquareErrorDegrees ?? float.PositiveInfinity;
+        public float FirstExtremeErrorDegrees =>
+            profileEvaluator?.FirstExtremeErrorDegrees ?? float.PositiveInfinity;
+        public float SecondExtremeErrorDegrees =>
+            profileEvaluator?.SecondExtremeErrorDegrees ?? float.PositiveInfinity;
 
         private void Awake()
         {
@@ -112,36 +112,22 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
             if (trackingProfile && profileEvaluator != null)
             {
-                double elapsed = Time.realtimeSinceStartupAsDouble -
-                    profileStartSeconds;
-                float deltaSeconds = hasPreviousProfileSample
-                    ? (float)(elapsed - previousProfileElapsedSeconds)
-                    : 0f;
+                double elapsed = Time.realtimeSinceStartupAsDouble - profileStartSeconds;
+                float deltaSeconds =
+                    hasPreviousProfileSample ? (float)(elapsed - previousProfileElapsedSeconds) : 0f;
                 profileEvaluator.AddSample(elapsed, currentYawDegrees, deltaSeconds);
                 previousProfileElapsedSeconds = elapsed;
                 hasPreviousProfileSample = true;
             }
 
             counter ??= new AlternatingHeadSweepCounter(turnaroundDegrees);
-            if (counter.Update(currentYawDegrees))
+            bool sweepCompleted = counter.Update(currentYawDegrees);
+            maxHeadTurnDegrees = counter.MaximumAbsoluteYawDegrees;
+            if (sweepCompleted)
             {
                 completedHalfSweeps = counter.CompletedHalfSweeps;
-                maxHeadTurnDegrees = counter.MaximumAbsoluteYawDegrees;
                 HalfSweepCompleted?.Invoke(completedHalfSweeps, currentYawDegrees);
             }
-            else
-            {
-                maxHeadTurnDegrees = counter.MaximumAbsoluteYawDegrees;
-            }
-        }
-
-        public void Configure(
-            Transform observerTransform,
-            RandomDotFieldStimulus randomDotStimulus)
-        {
-            observer = observerTransform;
-            stimulus = randomDotStimulus;
-            ResetForTrial();
         }
 
         public void ConfigureCriterion(float thresholdDegrees, int halfSweeps)
@@ -156,8 +142,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             // Wohin die Person gerade schaut, gilt ab jetzt als Nullstellung.
             // Alles danach wird als Abweichung von dieser Richtung gemessen.
             FindReferences();
-            startDirection = RemoveUpDownTilt(
-                observer != null ? observer.forward : Vector3.forward);
+            startDirection = RemoveUpDownTilt(observer != null ? observer.forward : Vector3.forward);
             counter = new AlternatingHeadSweepCounter(turnaroundDegrees);
             currentYawDegrees = 0f;
             completedHalfSweeps = 0;
@@ -177,18 +162,11 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             previousProfileElapsedSeconds = 0d;
         }
 
-        private double previousProfileElapsedSeconds;
-        private bool hasPreviousProfileSample;
-
         public void StartProfileTracking(
-            float amplitudeDegrees,
-            float speedDegreesPerSecond,
-            RandomDotSweepDirection direction)
+            float amplitudeDegrees, float speedDegreesPerSecond, RandomDotSweepDirection direction)
         {
-            profileEvaluator = new RandomDotSweepProfileEvaluator(
-                amplitudeDegrees,
-                speedDegreesPerSecond,
-                direction);
+            profileEvaluator =
+                new RandomDotSweepProfileEvaluator(amplitudeDegrees, speedDegreesPerSecond, direction);
             profileStartSeconds = Time.realtimeSinceStartupAsDouble;
             previousProfileElapsedSeconds = 0d;
             hasPreviousProfileSample = false;
@@ -215,9 +193,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             }
 
             float deltaSeconds = (float)(now - previousSampleTime);
-            float deltaYaw = Mathf.Abs(Mathf.DeltaAngle(
-                previousYawDegrees,
-                yawDegrees));
+            float deltaYaw = Mathf.Abs(Mathf.DeltaAngle(previousYawDegrees, yawDegrees));
             previousYawDegrees = yawDegrees;
             previousSampleTime = now;
 
@@ -230,21 +206,17 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
             accumulatedAbsoluteYawDegrees += deltaYaw;
             accumulatedMeasurementSeconds += deltaSeconds;
-            meanHeadSpeed =
-                accumulatedMeasurementSeconds > 1e-5f
-                    ? accumulatedAbsoluteYawDegrees /
-                        accumulatedMeasurementSeconds
-                    : 0f;
+            meanHeadSpeed = accumulatedMeasurementSeconds > 1e-5f
+                ? accumulatedAbsoluteYawDegrees / accumulatedMeasurementSeconds
+                : 0f;
 
+            // Die Spitzengeschwindigkeit wird leicht geglättet (etwa über 0,15 s),
+            // damit ein einzelner zittriger Frame nicht als Ruck zählt.
             float instantaneousSpeed = deltaYaw / deltaSeconds;
             float smoothingFactor = 1f - Mathf.Exp(-deltaSeconds / 0.15f);
             smoothedAbsoluteYawSpeedDegreesPerSecond = Mathf.Lerp(
-                smoothedAbsoluteYawSpeedDegreesPerSecond,
-                instantaneousSpeed,
-                smoothingFactor);
-            peakHeadSpeed = Mathf.Max(
-                peakHeadSpeed,
-                smoothedAbsoluteYawSpeedDegreesPerSecond);
+                smoothedAbsoluteYawSpeedDegreesPerSecond, instantaneousSpeed, smoothingFactor);
+            peakHeadSpeed = Mathf.Max(peakHeadSpeed, smoothedAbsoluteYawSpeedDegreesPerSecond);
         }
 
         private float MeasureRealHeadYaw()
@@ -254,13 +226,19 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 return 0f;
             }
 
+            return YawFromStart(startDirection, observer);
+        }
+
+        /// <summary>
+        /// Wie weit ist der Kopf seit der Startrichtung nach links oder rechts
+        /// gedreht, in Grad? Das Kopftraining im Experiment Manager nutzt das auch.
+        /// </summary>
+        public static float YawFromStart(Vector3 startDirection, Transform head)
+        {
             // SignedAngle gibt links und rechts mit unterschiedlichem Vorzeichen
             // zurück. Genau das brauchen wir hier.
-            Vector3 currentForward = RemoveUpDownTilt(observer.forward);
-            return Vector3.SignedAngle(
-                startDirection,
-                currentForward,
-                Vector3.up);
+            Vector3 currentForward = RemoveUpDownTilt(head.forward);
+            return Vector3.SignedAngle(startDirection, currentForward, Vector3.up);
         }
 
         private void FindReferences()
@@ -270,26 +248,28 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             if (stimulus == null)
             {
                 stimulus = GetComponent<RandomDotFieldStimulus>();
-                stimulus ??= FindAnyObjectByType<RandomDotFieldStimulus>();
+            }
+
+            stimulus = UnityTools.FindIfMissing(stimulus);
+
+            if (observer == null && stimulus != null)
+            {
+                observer = stimulus.Observer;
             }
 
             if (observer == null)
             {
-                observer = stimulus != null ? stimulus.Observer : null;
-                Camera mainCamera = Camera.main;
-                observer ??= mainCamera != null ? mainCamera.transform : null;
+                observer = UnityTools.MainCameraTransform();
             }
         }
 
-        private static Vector3 RemoveUpDownTilt(Vector3 direction)
+        public static Vector3 RemoveUpDownTilt(Vector3 direction)
         {
             // Ob der Kopf nach oben oder unten geneigt ist, interessiert hier nicht.
             // Uns interessiert nur das Drehen nach links und rechts. Deshalb wird
             // der Höhenanteil einfach auf null gesetzt.
             direction.y = 0f;
-            return direction.sqrMagnitude > 1e-8f
-                ? direction.normalized
-                : Vector3.forward;
+            return direction.sqrMagnitude > 1e-8f ? direction.normalized : Vector3.forward;
         }
 
         private void OnValidate()

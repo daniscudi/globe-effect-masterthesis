@@ -6,20 +6,31 @@ Oomes et al. (2009). Daneben gibt es einen getrennten Random-Dot-Test für die
 Wahrnehmung während einer simulierten Schwenkbewegung.
 
 Eine kurze Bedienungs- und Arbeitsübersicht steht in `AKTUELLER_STAND.md`.
+Die aktuelle Pilot-Checkliste mit Inspector-Zuständigkeiten, vorgefundenen
+Szeneneinstellungen und offenen Protokollentscheidungen steht in
+[CHECKERBOARD_PILOT.md](CHECKERBOARD_PILOT.md).
 
 ## Was der Checkerboard-Test macht
 
 Die Versuchsperson fixiert zuerst das rote Kreuz und sieht danach kurz ein
-kreisrundes Schachbrett mit einem festen Verzerrungswert. Anschließend erscheint
-eine Schwarz-Weiß-Noise-Maske. Sie bleibt zusammen mit dem Fixationskreuz bis
-zur Antwort sichtbar. Im Hauptversuch wird kein zusätzlicher Antworttext mehr
-eingeblendet, damit er nicht vom Reiz oder von der Fixation ablenkt.
+kreisrundes Schachbrett mit einem festen Verzerrungswert. Direkt danach beginnt
+die Antwortphase. Je nach gewähltem Ablauf ist dabei eine flimmernde
+Schwarz-Weiß-Noise-Maske (Ablauf A) oder eine graue Fläche (Ablauf B) zu sehen,
+jeweils mit Fixationskreuz. Die andere Darstellung folgt nach der Antwort als
+kurze Phase vor dem nächsten Schachbrett. Im Hauptversuch wird kein zusätzlicher
+Antworttext mehr eingeblendet, damit er nicht vom Reiz oder von der Fixation
+ablenkt.
 
-Im Training wird die feste Tastenbelegung vorher erklärt:
+Die Tastenbelegung steht auf dem Welcome Screen, im Training und vor dem
+Hauptversuch im Headset. Sie richtet sich nach der im Inspector gewählten
+Zuordnung, zum Beispiel:
 
-* `UP = CATEGORY A`
+* `TRIGGER = A / OUTWARD`
 
-* `DOWN = CATEGORY B`
+* `TRACKPAD CLICK = B / INWARD`
+
+Auf der Tastatur gelten zusätzlich Pfeil hoch (Category A) und Pfeil runter
+(Category B).
 
 Category A wird dort als nach außen gewölbt und Category B als nach innen
 gewölbt beschrieben. Dazu werden zuerst zwei deutliche Beispiele gezeigt.
@@ -38,8 +49,8 @@ eingestellt.
 ## Was der Random-Dot-Test macht
 
 Die Versuchsperson fixiert ein rotes Kreuz in der Mitte einer runden Öffnung.
-Schwarze und weiße Punkte bewegen sich dahinter automatisch von links nach
-rechts und wieder zurück. Die Öffnung und das Fixationskreuz bleiben dabei
+Schwarze und weiße Punkte bewegen sich dahinter im simulierten Trial einmal
+in eine Richtung. Die Öffnung und das Fixationskreuz bleiben dabei
 kopffest. Eine tatsächliche Kopfbewegung ist für die Hauptbedingung nicht nötig.
 
 Die aktuelle Instrumentenfassung setzt vor jedem Durchgang eine feste
@@ -51,6 +62,10 @@ wieder nur die Entscheidung:
 * Pfeil links: Bewegung wirkt konkav.
 
 * Pfeil rechts: Bewegung wirkt konvex.
+
+Im Headset antwortet die Person stattdessen mit Trigger und Trackpad-Klick am
+VR-Controller. Welche Taste welche Antwort gibt, liest sie nach `F5` vor dem
+ersten Durchgang im Headset; ein weiteres `F5` startet dann den ersten Trial.
 
 Aus `P(konvex | k, m)` kann später für jede Vergrößerung der Übergang bestimmt
 werden, an dem konkav und konvex gleich häufig geantwortet werden. Dieser
@@ -203,6 +218,27 @@ Am `Checkerboard Stimulus` und am `Random Dot Field` gibt es den Wert
 Die Angabe erfolgt in Winkelgrad und nicht in Pixeln. Dadurch bleibt die
 Randbreite auch bei anderer Auflösung oder auf der XR-4 vergleichbar. 
 
+Genau (Random-Dot-Shader): θ ist der dargestellte Sehwinkel eines Bildpunkts
+zur Bildmitte des jeweiligen Auges, also nach der Instrumentenabbildung mit m
+und k. θ_A = FOV/2 ist der Blendenradius, s = `Edge Softness Degrees`. Die
+Deckkraft ist
+
+```text
+α(θ) = 1 − smoothstep(θ_A − s, θ_A, θ),   smoothstep(e0, e1, x) = t²(3 − 2t),
+t = clamp((x − e0) / (e1 − e0), 0, 1)
+```
+
+Bis `θ_A − s` ist alles voll sichtbar, zwischen `θ_A − s` und `θ_A` wird mit
+S-förmigem Verlauf zur Außenfarbe (`Background Color`, Kamera-Löschfarbe)
+übergeblendet, ab `θ_A` ist nur noch die Außenfarbe zu sehen. Beispiel FOV 70°,
+s = 10°: Übergang im Ring von 25° bis 35° Exzentrizität. Punkte und Kreisfläche
+(`Field Background Color`) werden mit demselben α gemischt; die Mischung ist
+linear in den gamma-kodierten Farbwerten (Projekt im Gamma-Farbraum), nicht in
+der Leuchtdichte. Bei s = 0 gibt es eine harte Kante bei θ_A. Die Kreisfläche
+wird als Gleitkommafarbe an den Shader übergeben, damit gleiche Farben innen
+und außen exakt gleich gerundet werden (früher 8-Bit-Vertexfarbe: 0,5 ergab
+innen 128, außen 127, der Kreis war minimal sichtbar).
+
 Am `Checkerboard Stimulus` kann `Use Circular Aperture` für eine technische
 Kontrolle ausgeschaltet werden. Dann sieht man das vollständige quadratische
 Gitter. Für den eigentlichen Versuch bleibt der Haken eingeschaltet. Der
@@ -264,18 +300,40 @@ laufen.
 
 ## Ablauf eines Durchgangs
 
-1. Auf neutralem Hintergrund erscheint zunächst nur das Fixationskreuz.
-2. Nach stabiler Fixation wird das Checkerboard für die eingestellte Zeit
-   eingeblendet. Der Startwert beträgt 600 ms.
-3. Direkt danach erscheint eine statische Schwarz-Weiß-Noise-Maske mit
-   Fixationskreuz. Sie bleibt bis zur Antwort sichtbar.
+Am `Checkerboard Experiment Manager` wird unter `Trial Sequence` einer von zwei
+Abläufen gewählt:
+
+* A: Checkerboard → Noise-Maske mit Antwort → graue Fläche → nächstes
+  Checkerboard
+
+* B: Checkerboard → graue Fläche mit Antwort → Noise-Maske → nächstes
+  Checkerboard
+
+Die Schritte im Einzelnen:
+
+1. Vor dem Checkerboard steht die Phase vor dem Stimulus: bei A die graue
+   Fläche, bei B die Noise-Maske, jeweils mit Fixationskreuz. Sie dauert
+   mindestens `Pre Stimulus Seconds` (voreingestellt 0,5 s). Mit
+   Fixationskontrolle geht es erst weiter, wenn zusätzlich der Blick ruhig auf
+   dem Kreuz liegt.
+2. Das Checkerboard wird für die eingestellte Zeit eingeblendet. Der Startwert
+   beträgt 600 ms.
+3. Direkt danach beginnt die Antwortphase: bei A mit der Noise-Maske, bei B mit
+   der grauen Fläche, jeweils mit Fixationskreuz.
 4. Die im Training gelernte Antwort wird ohne erneuten Hinweistext gegeben. Die
-   voreingestellte maximale Antwortzeit beträgt 5 Sekunden.
+   Antwortzeit begrenzt `Response Timeout Seconds`; `0` bedeutet ohne Zeitlimit.
 5. Antwort, Reaktionszeit, `l`, FOV, Augenmodus und Fixationswerte werden sofort
-   gespeichert.
-6. Nach der Antwort erscheint für 500 ms eine neue Noise-Verteilung. Danach
-   beginnt direkt die graue Fixationsphase des nächsten Durchgangs. Ein schwarzer
-   Zwischenbildschirm wird vermieden.
+   gespeichert. Pro Durchgang zählt nur die erste Antwort; weitere Tastendrücke
+   werden bis zur nächsten Antwortphase ignoriert.
+6. Nach der Antwort beginnt sofort die Phase vor dem nächsten Stimulus mit der
+   jeweils anderen Darstellung. Ein schwarzer Zwischenbildschirm wird vermieden.
+
+Die Noise-Maske sieht aus wie das Ameisenmuster eines Fernsehers ohne Empfang:
+viele kleine schwarze und weiße Punkte, die ständig neu ausgewürfelt werden. Sie
+erscheint in derselben runden Öffnung wie das Checkerboard. Punktgröße und
+Aktualisierungsrate stehen am `Checkerboard Stimulus` (`Noise Dot Size Degrees`,
+voreingestellt 0,15°, und `Noise Refresh Rate Hz`, voreingestellt 30 Hz; `0`
+lässt das Bild stehen).
 
 ## Welcome Screen und Training
 
@@ -299,7 +357,8 @@ Wenn die Fixation während der Darbietung zu lange verloren geht:
 
 1. Das Muster wird ausgeblendet.
 2. Die Präsentation wird als ungültig gespeichert und nicht ausgewertet.
-3. Dieselbe Bedingung wird ans Ende des aktuellen Unterblocks gehängt.
+3. Beim Checkerboard kommt dieselbe Bedingung ans Ende der Trial-Liste;
+   bei Random Dots ans Ende des aktuellen Bewegungsblocks.
 4. Die übrige zufällige Reihenfolge bleibt erhalten.
 
 Kurze Blickunterbrechungen und vollständig ungültige Blickdaten besitzen
@@ -318,18 +377,30 @@ stattdessen eine Obergrenze.
 
 * Pfeil runter: Category B
 
+* Trigger und Trackpad-Klick am VR-Controller: die beiden Antworten, in beiden
+  Tests
+
 * `C`: Eye-Tracking-Kalibrierung der vorhandenen Toolbox
 
-Beim Random-Dot-Test werden die Pfeiltasten erst angenommen, nachdem die
+Beim Random-Dot-Test werden Antworten erst angenommen, nachdem die
 Bewegungsphase beendet und das Punktfeld ausgeblendet wurde.
 
-Am `Checkerboard Keyboard Controller` kann `Swap Response Keys` aktiviert
-werden. Dadurch lässt sich die Zuordnung zwischen Versuchspersonen
+Für die VR-Controller gibt es in beiden Tests dieselbe Auswahl:
+
+* Trackpad-Klick = konkav, Trigger = konvex
+
+* Trackpad-Klick = konvex, Trigger = konkav
+
+Beim Checkerboard steht sie am `Checkerboard Experiment Manager`
+(`Controller Mapping`), beim Random-Dot-Test am `Random Dot Keyboard Controller`
+(`Vr Controller Mapping`). Gemeint ist ein Klick auf das Trackpad; eine bloße
+Berührung zählt nicht, und Halten oder Loslassen löst keine weitere Antwort aus.
+Mit der Auswahl lässt sich die Zuordnung zwischen Versuchspersonen
 ausbalancieren. Innerhalb einer Person bleibt sie für Training und Hauptversuch
-fest, damit nicht bei jedem Trial eine neue Belegung gelesen werden muss. Der
-Experimenter Monitor und alle Antwortanzeigen zeigen automatisch die gerade
-gültige Belegung. Die verwendete Zuordnung steht zusätzlich im Trialplan und in
-den Eye-Tracking-Markern.
+fest. Die Anzeigen im Headset und der Experimenter Monitor zeigen automatisch
+die gerade gültige Belegung. Sie steht zusätzlich im Trialplan und in den
+Eye-Tracking-Markern. Die Tastatur funktioniert daneben weiter;
+`Swap Response Keys` vertauscht nur die beiden Tasten der Tastatur.
 
 ## Einstellungen im Inspector
 
@@ -356,12 +427,17 @@ Die wichtigsten Einstellungen befinden sich am Objekt
 
 * `Stimulus Duration Seconds`: Dauer des Checkerboards; voreingestellt auf 0,6 s
 
-* `Post Response Noise Seconds`: Dauer der neuen Noise-Verteilung nach der
-  Antwort; voreingestellt auf 0,5 s
+* `Trial Sequence`: Ablauf A (Noise-Maske in der Antwortphase, danach graue
+  Fläche) oder B (graue Fläche in der Antwortphase, danach Noise-Maske)
+
+* `Pre Stimulus Seconds`: Mindestdauer der Phase vor dem nächsten Checkerboard;
+  voreingestellt auf 0,5 s
 
 * `Response Timeout Seconds`: maximale Antwortzeit; 0 bedeutet ohne Zeitlimit
 
 * `Convex Response Key` und `Concave Response Key`: Tasten der beiden Antworten
+
+* `Controller Mapping`: welche Controller-Taste welche Antwort gibt
 
 * `Require Training Before Session`: verlangt ein abgeschlossenes Training vor F5
 
@@ -378,7 +454,8 @@ technischen Pilotlauf gedacht. Sie sind noch keine festgelegten Bedingungen der
 Masterarbeit. Die Listen können im Inspector vollständig geändert werden.
 
 Am Objekt `Checkerboard Stimulus` werden Aussehen, Felderzahl, Farben, Größe des
-Fixationskreuzes und die weiche Blendenkante eingestellt. Während einer Sitzung
+Fixationskreuzes, die weiche Blendenkante sowie Punktgröße und
+Aktualisierungsrate der Noise-Maske eingestellt. Während einer Sitzung
 setzt der Experiment Manager FOV, `l`, Content Zoom und Augenmodus automatisch.
 
 Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
@@ -389,77 +466,200 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   Checkerboard
 
 * `Instrument Magnification M Values`: eine oder mehrere
-  Fernglasvergrößerungen; voreingestellt ist `10`
+  Fernglasvergrößerungen zwischen `1` und `20`; voreingestellt ist `10`
 
 * `Content Zoom Values`: optionaler Nach-Zoom; für die Instrumentensimulation
   normalerweise `1`
 
-* `Repeats Per Condition`: Wiederholungen jeder Kombination
+* k-Werte und Wiederholungen (Inspector-Tabelle „k-Werte und Wiederholungen“,
+  Felder `Instrument Distortion K Values` und `Repeats Per K Value`): jedes k hat
+  eine eigene Wiederholungszahl. Pilotdesign: k 0 und 0,2 je 8-mal, 0,6 bis 1,4
+  in 0,1-Schritten je 25-mal, 1,8 und 2,0 je 8-mal, zusammen 257 Trials pro
+  Bewegungsart. k darf 0 bis 2 sein, solange k · FOV/2 unter 90° bleibt (bei
+  FOV 70 also bis 2; bei FOV 90 startet k = 2 nicht). Checkerboard analog mit
+  `Repeats Per L Value`: l 0,2 16-mal, 0,3 bis 1,1 je 25-mal, 1,2 8-mal = 249.
 
-* `Repeats Per Block`: Wiederholungen jeder Bedingung pro Unterblock;
-  mit `25` insgesamt und `5` pro Unterblock entstehen fünf Abschnitte je
-  Bewegungsart
+* `Repeats Per Condition`: gilt für jedes k bzw. l ohne eigenen Eintrag und für
+  neu hinzugefügte Zeilen.
 
-* `Motion Seconds`: sichtbare Dauer der Bewegung; der Pilotwert beträgt
-  `5 s`
+* `Blocks Per Session` (beide Tests, voreingestellt 4): Viertelblöcke. Nach 25,
+  50 und 75 % der geplanten gültigen Trials (bei 257 nach 64, 128, 193; bei 249
+  nach 62, 124, 187) erscheint „SHORT BREAK“; rotes Kreuz und graue Fläche
+  bleiben sichtbar, Antworten zählen nicht. Weiter erst, wenn der Versuchsleiter
+  `F5` drückt. Wiederholte ungültige Trials zählen nicht mit; am Ende keine
+  Pause. Marker `BlockPauseStarted`/`BlockPauseEnded`. `1` = keine Pausen.
+  `mini_block_index` in der CSV bleibt aus Kompatibilitätsgründen `1`.
+
+* `Simulated Sweep Seconds`: wie lange die Punkte im simulierten Block zu
+  sehen sind; voreingestellt `0,8 s`. In dieser Zeit schwenkt das Feld
+  einmal in eine Richtung und kehrt nicht um.
+
+* `Head Tracked Seconds`: wie lange die Punkte im aktiven
+  `HeadTracked`-Block zu sehen sind; der Pilotwert beträgt `5 s`
 
 * `Simulated Sweep Axis`: `Horizontal` (Standard, links/rechts) oder
   `Vertical` (oben/unten) für den simulierten Block. Der aktive
-  `HeadTracked`-Block und sein Training bleiben horizontal. Die Achse und
-  die passende Startrichtung (`RightFirst`/`LeftFirst` bzw.
-  `UpFirst`/`DownFirst`) werden in Plan, Ergebnissen und Trial-Markern
-  gespeichert. Die Auswahl erzeugt keine zusätzlichen Trials; für einen
+  geführte `HeadTracked`-Block und sein Training bleiben horizontal. Freie aktive
+  Bewegung kann auch oben/unten oder schräg erfolgen. Die Achse und
+  die Richtung werden in Plan, Ergebnissen und Trial-Markern gespeichert:
+  beim simulierten Schwenk `Right`/`Left` bzw. `Up`/`Down`, beim
+  Kopfschwenk die Seite des ersten Schwenks (`RightFirst`/`LeftFirst`). Die Auswahl erzeugt keine zusätzlichen Trials; für einen
   Vergleich beider Achsen sind getrennte Sitzungen nötig.
 
-* `Sweep Amplitude Degrees`: Zielschwenkweite je Seite; für `10x` zunächst `2°`
+* `Sweep Amplitude Degrees`: Zielschwenkweite des Kopfes je Seite im
+  geführten `HeadTracked`-Block und im Kopftraining; für `10x` zunächst `2°`
 
-* `Sweep Speed`: reale Instrument-/Kopfgeschwindigkeit;
-  für `10x` zunächst `1,2°/s` als mittlere absolute Geschwindigkeit,
-  entsprechend ungefähr `12°/s` mittlerer Bildgeschwindigkeit in der Bildmitte
+* `Simulated Speed Reference`: worauf sich die Geschwindigkeit des simulierten
+  Schwenks bezieht. `Bildmitte` (Voreinstellung): Die Punkte laufen in der
+  Bildmitte bei jedem `m` gleich schnell, nämlich mit
+  `Simulated Image Center Speed`. `Objektwinkel`: die bisherige Definition, das
+  Instrument schwenkt bei jedem `m` mit `Sweep Speed` über die Außenwelt, und
+  die Punkte laufen in der Bildmitte `m`-mal so schnell. Siehe Abschnitt
+  „Geschwindigkeit des simulierten Schwenks“.
 
-* Der simulierte Schwenk ist sinusförmig. Mit `±2°`, `1,2°/s` und `5 s`
-  startet er in der Mitte, erreicht nach etwa `1,67 s` die erste Seite und
-  nach `5 s` die andere Seite. An den Umkehrpunkten steht die Bewegung kurz.
+* `Simulated Image Center Speed`: sichtbare Winkelgeschwindigkeit der Punkte in
+  der Bildmitte, voreingestellt `12°/s`. Das entspricht dem bisherigen Stand
+  mit `10x` und `1,2°/s`.
+
+* `Sweep Speed`: reale Instrument-/Kopfgeschwindigkeit in Grad Objektwinkel pro
+  Sekunde, voreingestellt `1,2°/s`. Im `HeadTracked`-Block ist das die mittlere
+  Geschwindigkeit des Sinusprofils. Im simulierten Block gilt der Wert nur bei
+  der Einstellung `Objektwinkel`.
+
+* Der simulierte Schwenk geht nur in eine Richtung und hat eine feste
+  Geschwindigkeit. Bei `10x` läuft er mit `1,2°/s` und `0,8 s` von `-0,48°`
+  nach `+0,48°`, die Mitte der Bewegung liegt also genau geradeaus. Ob nach
+  links oder rechts, wechselt von Trial zu Trial in zufälliger Reihenfolge;
+  beide Richtungen kommen bei gerader Wiederholungszahl gleich oft vor,
+  bei 25 Wiederholungen pro Bedingung 12- beziehungsweise 13-mal.
+
+* Vorschau: Im Play Mode schaltet `P` eine reine Live-Vorschau ein/aus;
+  `F6` beendet sie ebenfalls. Kein Training, keine Trials, keine Aufzeichnung.
+  Das gilt auch beim Checkerboard. Im Manager-Inspector unter
+  **Live-Vorschau ohne Messung** werden die verknüpften Stimuluswerte direkt
+  bearbeitet. Vor dem Öffnen wird ihre gesamte Konfiguration gesichert.
+  Beim Beenden mit `P`/`F6` oder direktem Start von Training/Sitzung werden alle
+  Vorschauänderungen verworfen, auch Punkt-/Gittergröße, Farben, Fixationskreuz
+  und Raster. Der Trial Plan bleibt davon unabhängig.
+  In der Random-Dot-Vorschau schwenkt das Feld optional immer
+  weiter (`Loop Sweep In Preview` am `Random Dot Field`). Der Schwenk läuft
+  dabei über die ganze Punktwelt und fängt am Ende wieder von vorne an; mit
+  `40,6°` World Coverage und `1,2°/s` dauert ein Durchlauf etwa `26 s`. Die
+  Vorschau benutzt die Werte am `Random Dot Field` (`m`, `k`, FOV,
+  Geschwindigkeit, Richtung). Erst mit `F5` gelten die Werte des Experiment
+  Managers, und jeder Schwenk läuft genau einmal.
+
+* Random Dots, Vorschau übernehmen: Im Manager-Inspector unter
+  **Live-Vorschau ohne Messung** übernimmt **Vorschau-Werte ins Experiment
+  übernehmen** FOV, m, Zoom, Auge, Bewegungsart (`Session Motion Mode`),
+  Schwenkachse und Geschwindigkeit (Bezug + Wert) in den Versuchsplan. Listen
+  werden durch den einen Vorschau-Wert ersetzt. Das Punktbild (Dichte,
+  Punktgröße, Edge Softness, Farben) bleibt danach erhalten. Die k-Liste wird
+  nicht verändert. Im Play Mode geht das nur bei laufender Vorschau (`P`); es
+  gilt sofort für `F5`/`F7` und wird nach dem Stoppen des Play Mode in die Szene
+  geschrieben (Konsole meldet es, dann Szene mit Strg+S speichern).
+  Beim ersten Übernehmen wird der bisherige Stand gesichert;
+  **Originalwerte wiederherstellen** holt ihn zurück (auch nach mehrmaligem
+  Übernehmen). Auf dem Lab-PC vor `git pull` die Originalwerte wiederherstellen
+  oder die Szenenänderung verwerfen, sonst gibt es einen Konflikt in der Szene.
+
+* `Free Head Movement` ist standardmäßig an: In aktiven Haupttrials darf der
+  Kopf frei nach links/rechts, oben/unten oder schräg bewegt werden. Es gibt
+  keine Sollbahn, Wende-, Amplituden- oder Geschwindigkeitsprüfung und keine
+  Wiederholung wegen solcher Abweichungen. Blickkontrolle/Wiedervorlage bleibt
+  davon unabhängig. Die Punktwelt ist endlich: `Head Turn Safety Degrees`
+  beschreibt die Reserve um die Startblickrichtung, keine unbegrenzte 360°-Welt.
+
+* Wenn `Free Head Movement` aus ist, bleibt der geführte Links-Rechts-Schwenk
+  erhalten. Mit `±2°`,
+  `1,2°/s` und `5 s` startet er in der Mitte, erreicht nach etwa `1,67 s` die
+  erste Seite und nach `5 s` die andere Seite. An den Umkehrpunkten steht die
+  Bewegung kurz.
 
 * `Train Head Movement`: zeigt vor dem aktiven Block ein Kopfbewegungstraining
   mit blauem Sollmarker, gelbem Marker für den echten Kopf und kurzen Tönen
   an den Umkehrpunkten. `F5` startet das Training; `F6` bricht die Sitzung ab.
+  Das geführte Training bleibt auch bei freien Haupttrials erhalten.
+  Seine Dauer wird nötigenfalls bis zum zweiten Wendepunkt verlängert; eine
+  kurze freie Haupttrial-Dauer wird dadurch nicht verboten. Nach dem Training
+  erklären separate Instruktionen die tatsächlich gewählte Haupttrial-Regel.
+
+* `Train Simulated Motion`: eigenes Training vor dem simulierten Block. Kopf
+  stillhalten, Kreuz anschauen, kurze simulierte Bewegung sehen, dann antworten.
+  Die Werte stehen unter `Simulated Training K Values`; Wiederholungen unter
+  `Simulated Training Repeats Per Value`. Subjektive Formurteile erhalten keine
+  vorgegebene Richtig-/Falsch-Rückmeldung und zählen nicht als Mess-Trials.
+
+* `T` startet auch ohne Sitzung ein eigenständiges Training. Mit `Practice
+  Motion Mode` wird Simulated oder Active gewählt. `F5` bestätigt die
+  Trainingsinstruktionen, `F6` beendet das Training. Es entstehen keine
+  Sitzungsdateien. In einer Messung wählt der Manager das Training passend zum
+  jeweiligen Bewegungsblock; diese Übungen erhöhen die Haupttrial-Zähler nicht.
+
+* `Show Reference Grid` in der Live-Vorschau zeigt ein gerades, kopffestes
+  Karopapier-Raster. Es wird weder durch `k`, `m` oder Zoom verzerrt noch
+  mitgeschwenkt. Die Punkte bewegen sich darüber. Abstand, Linienbreite und
+  Farbe sind einstellbar. Das Raster bleibt während Training und Messung aus.
 
 * `Required Good Training Sweeps`: Anzahl unmittelbar aufeinanderfolgender
   gelungener Übungsschwenks, voreingestellt auf vier. Die Anfangsrichtung
   wechselt zwischen den Versuchen.
 
 * `Maximum Profile Error Degrees`: tolerierte mittlere Abweichung der
-  tatsächlichen Kopfbewegung vom Sinusprofil, im Training und in aktiven
+  tatsächlichen Kopfbewegung vom Sinusprofil, im Training und in geführten aktiven
   Haupttrials voreingestellt auf `0,9°`. Zusätzlich werden Auslenkung,
   Seitenwechsel und Geschwindigkeitsgrenzen geprüft.
 
 * `Maximum Training Endpoint Error Degrees`: tolerierter Fehler an den beiden
   Umkehrpunkten während des Trainings, voreingestellt auf `0,9°`.
 
-* `Motion Modes`: Basisreihenfolge der getrennten Bewegungsblöcke
+* `Session Motion Mode`: genau eine Bewegungsart pro Sitzung. `F5` startet diese
+  Auswahl, `F7` startet die andere Variante als neue Sitzung. Beide Tasten sind
+  einstellbar. `T` übt dieselbe Auswahl ohne Messdateien.
 
-* `Counterbalance Motion Block Order By Participant Id`: kehrt diese Reihenfolge
-  automatisch für jede zweite fortlaufende Versuchsperson um (`pilot_001` Basis,
-  `pilot_002` umgekehrt)
+* `Head Turn Safety Degrees`: so weit darf der Kopf im `HeadTracked`-Block von
+  der Blickrichtung zu Trialbeginn weg drehen (in jede Richtung), ohne dass am
+  Rand eine leere Fläche erscheint; voreingestellt auf `30°`. Der Inspector zeigt
+  darunter für jedes m, wie viele Punkte das braucht (Grenze 500.000). Gilt auch
+  in der Vorschau, wenn dort `Motion Mode = HeadTracked` gewählt ist; `World
+  Coverage` am Random Dot Field gilt nur für die Simulated-Vorschau.
 
-* `Head Tracked Coverage Yaw Degrees`: unsichtbarer Sicherheitspuffer der
-  Punktwelt; voreingestellt auf `15°` je Seite
-
-* `Validate Head Tracked Motion`: wiederholt aktive Durchgänge, wenn der
+* `Check Head Motion` (früher `Validate Head Tracked Motion`): wiederholt geführte aktive Durchgänge, wenn der
   Seitenwechsel fehlt oder Auslenkung beziehungsweise Geschwindigkeit außerhalb
   der eingestellten Grenzen liegen
+
+* Random-Dot-Ergebnisse enthalten zusätzlich `head_motion_constraint`:
+  `simulated`, `free` oder `guided`. Alle bisherigen CSV-Spalten bleiben an
+  ihrer Position. Bei freien Haupttrials stehen Sollamplitude, Sollgeschwindigkeit,
+  nominelle Bildmitten-Geschwindigkeit und Sinusfehler auf `NaN`, da es dort
+  keine Sollbahn gibt. Die bestehenden Sweep-Messwerte beschreiben weiterhin
+  Yaw (links/rechts), nicht die gesamte 3D-Bewegung. Soweit die Blickaufnahme
+  aktiv ist, enthält sie zusätzlich die Kopfpose. Plan-Achse und Plan-Richtung
+  sind bei `free` keine Bewegungsanweisung. Die Mapping-Version ist jetzt `v8`.
 
 * `Eye Presentations`: beide, nur linkes oder nur rechtes Auge
 
 * Fixations- und Wiederholungsgrenzen wie beim Checkerboard
 
-Die beiden Bewegungsarten werden nicht trialweise vermischt, sondern als
-getrennte Blöcke in der Reihenfolge der Liste ausgeführt. Nach jedem Unterblock
-und zwischen den Bewegungsblöcken hält die Sitzung an; `F5` setzt sie fort. Nur
-innerhalb eines Unterblocks wird mit dem Seed gemischt. Die Richtung des ersten
-Schwenks wird über die Wiederholungen möglichst gleich auf links und rechts
-verteilt. Gleiche Wiederholungen verschiedener `k`-Stufen und beider
+Am `Random Dot Keyboard Controller` (am Objekt `Random Dot Field`) stehen die
+Antworttasten: die beiden Tasten der Tastatur, `Use Vr Controller Buttons` und
+`Vr Controller Mapping`.
+
+Eine Sitzung enthält nur Simulated Panning ODER aktive Kopfbewegung, jeweils
+als ein vollständig gemischter Plan mit Viertelpausen (`Blocks Per Session`).
+Mit dem Pilotdesign (13 k-Stufen, Randwerte 8-mal, Mitte 25-mal), einem FOV,
+einem Augenmodus, einem m und Zoom 1 sind das 257 gültige Trials pro
+Sitzung. Weitere eingestellte Bedingungen
+multiplizieren die Anzahl; ungültige Trials werden zusätzlich wiederholt.
+Danach endet die Sitzung und die Aufnahme wird gestoppt. `F7` startet die andere
+Variante mit eigenem Plan, passenden Anweisungen/Training und neuen Messdateien.
+Es gibt keine automatische Reihenfolge oder Zusammenführung zu 350 Trials;
+die Reihenfolge der zwei Sitzungen wird im Versuchsprotokoll festgelegt.
+Die kompatiblen CSV-Indizes `motion_block_index` und `mini_block_index` bleiben 1.
+Die Schwenkrichtung
+(beim Kopfschwenk die Richtung des ersten Schwenks) wechselt über die
+Wiederholungen jeder Bedingung, sodass links und rechts möglichst gleich oft vorkommen;
+durch das Mischen ist die Reihenfolge zufällig. Gleiche Wiederholungen verschiedener `k`-Stufen und beider
 Bewegungsarten verwenden vergleichbare Punkt-Seeds, damit die Punktverteilung
 nicht mit einer Bedingung verwechselt wird.
 
@@ -467,7 +667,8 @@ Vor dem ersten Head-Tracked-Trial eines Blocks erscheint die Anleitung im
 Headset. Nach `F5` folgt die Person dem blauen Marker mit langsamen, kleinen
 Kopfdrehungen und beobachtet den gelben Ist-Marker. Die Anzeige verlangt
 zwischen Übungsdurchgängen eine Rückkehr zur Mitte. Nach vier passenden
-Durchgängen startet der Block automatisch. Das Display und die Töne erscheinen
+Durchgängen erklärt eine weitere Instruktion die freie oder geführte Hauptbewegung;
+`F5` startet danach die Trials. Das Display und die Töne erscheinen
 im Hauptversuch nicht. Auch dort wird das tatsächliche Bewegungsprofil
 kontrolliert; stark abweichende Versuche werden später wiederholt.
 
@@ -479,12 +680,112 @@ der Hintergrund in allen Phasen unverändert schwarz.
 
 Das sichtbare Feld hat innen einen neutralgrauen Hintergrund für symmetrischen
 Kontrast der schwarzen und weißen Punkte. Außerhalb der kreisförmigen Feldblende
-ist der Hintergrund nahezu schwarz. Für Head-Tracked-Trials wird die erzeugte
-Punktwelt automatisch bis zum Sicherheitspuffer erweitert. Die Punktzahl wächst
-dabei proportional zur Kugelkappenfläche, damit die sichtbare Punktdichte nicht
-vom Bewegungsbereich abhängt. Für die aktuellen `70°`, `10x` und `±15°`
-Sicherheitsabdeckung sind rund `40,6°` Quellenfeld und `24.500` Punkte
-voreingestellt.
+ist der Hintergrund nahezu schwarz.
+
+### Geschwindigkeit des simulierten Schwenks
+
+Drei Geschwindigkeiten sind zu unterscheiden:
+
+* Objektwinkel: wie schnell das Instrument über die Außenwelt schwenkt. Das
+  ist die Größe, mit der der Shader rechnet.
+
+* Sichtbarer Bildwinkel: wie schnell ein Punkt im Bild wandert. In der
+  Bildmitte ist das bei jedem `k` genau `m * Content Zoom` mal so schnell wie
+  der Objektwinkel. Zum Rand hin wird es je nach `k` schneller oder langsamer;
+  dieser Unterschied ist der eigentliche Reiz.
+
+* Kartesische Bildkoordinate (Tangens des Bildwinkels): in der Bildmitte
+  gleich dem Bildwinkel, zum Rand hin wächst sie zusätzlich mit `1 / cos²`.
+
+Mit `Simulated Speed Reference = Bildmitte` wird die Objektgeschwindigkeit für
+jeden Trial so gewählt, dass die Punkte in der Bildmitte immer mit
+`Simulated Image Center Speed` laufen:
+
+    Objektgeschwindigkeit = Bildmitte-Geschwindigkeit / (m * Content Zoom)
+
+Dieselbe Normierung gilt jetzt auch für die Live-Vorschau: Dort
+`Preview Speed Reference = Bildmitte` und `Preview Image Center Speed` einstellen.
+Beispiel ohne zusätzlichen Content Zoom: gewünschte `5°/s` bedeuten bei
+`m = 1, 10, 20` virtuelle Schwenkgeschwindigkeiten von `5, 0,5, 0,25°/s`.
+Die Vorschau-Einstellungen sind unabhängig von den Trainings-/Messwerten am
+Manager und werden beim Verlassen der Vorschau zurückgesetzt.
+
+Das Verhältnis zwischen Mitte und Rand bleibt dabei für jedes `k` unverändert.
+Die Dauer des Schwenks bleibt bei jedem `m` gleich; in der Außenwelt wird die
+Schwenkweite mit wachsendem `m` kleiner. Mit `12°/s` und `0,8 s`:
+
+| m | Objektgeschwindigkeit | Schwenkweite je Seite | sichtbarer Weg in der Bildmitte |
+|---|---|---|---|
+| 5 | 2,4°/s | 0,96° | 9,6° |
+| 10 | 1,2°/s | 0,48° | 9,6° |
+| 14 | 0,86°/s | 0,34° | 9,6° |
+| 20 | 0,6°/s | 0,24° | 9,6° |
+
+Mit `Objektwinkel` (bisherige Definition, `1,2°/s`) laufen die Punkte in der
+Bildmitte dagegen mit `6`, `12`, `16,8` und `24°/s`.
+
+Der `HeadTracked`-Block ist davon nicht betroffen: Dort bestimmt die echte
+Kopfbewegung die Bildbewegung, und die Punkte laufen in der Bildmitte weiterhin
+`m`-mal so schnell wie der Kopf dreht. Objekt- und Bildmitte-Geschwindigkeit
+stehen für jeden Trial in `sweep_speed_deg_per_s` und
+`image_center_speed_deg_per_s`.
+
+### Punktdichte
+
+Die Punktzahl wird nicht direkt eingestellt. Am `Random Dot Field` steht
+stattdessen `Dot Density`: wie viele Punkte pro Quadratgrad in der Bildmitte
+liegen sollen, voreingestellt `0,19` (ungefähr ein Punkt alle `2,3°`). Daraus
+rechnet das Skript für jeden Trial selbst aus, wie groß die Punktwelt sein muss
+und wie viele Punkte hineingehören. So sieht das Feld bei jedem `m` gleich dicht
+aus; ohne diese Anpassung wäre es bei `14x` etwa doppelt so dünn wie bei `10x`.
+
+Die Rechnung dahinter: In der Bildmitte vergrößert das Instrument bei jedem
+`k` genau um `m`, ein optionaler Content Zoom noch einmal um seinen Wert. Eine
+kleine Fläche der Außenwelt erscheint im Bild also `(m * Zoom)²`-mal so groß,
+und genau um diesen Faktor dichter werden die Punkte in der Außenwelt gesetzt:
+
+    Punktzahl = Dichte * (m * Zoom)² * Fläche der Punktwelt
+
+Die Punktwelt ist eine Kugelkappe. Sie deckt ab, was man durch den Kreis
+sieht, plus die Schwenkweite zu jeder Seite und `1°` Reserve. Im
+`HeadTracked`-Block kommt statt der Schwenkweite der Sicherheitspuffer dazu.
+Am Rand des Kreises staucht oder streckt das Instrument je nach `k`; dort ist
+die Dichte deshalb nicht überall gleich. Das ist gewollt, denn genau so
+verhält sich auch ein echtes Fernglas. Alle `k`-Stufen zeigen bei gleichem `m`
+dieselbe Außenwelt.
+
+Mit `70°` FOV, `0,19` Dichte und den Werten oben ergeben sich pro Trial:
+
+| m | simulierter Block | HeadTracked-Block |
+|---|---|---|
+| 5 | 1.200 - 1.600 Punkte | 7.800 - 8.800 Punkte |
+| 10 | 1.500 - 2.000 Punkte | 22.500 - 24.300 Punkte |
+| 14 | 1.700 - 2.300 Punkte | 39.700 - 42.100 Punkte |
+| 20 | 2.100 - 2.700 Punkte | 74.700 - 78.000 Punkte |
+
+Die Werte des simulierten Blocks gelten für die Voreinstellung `Bildmitte` mit
+`12°/s`. Der `HeadTracked`-Block braucht bei `20x` knapp `78.000` Punkte; der
+Aufbau dauert auf dem Entwicklungsrechner etwa `35 ms` und passiert einmal pro
+Trial, während nur das Kreuz zu sehen ist.
+
+Beim Start einer Sitzung wird für alle Trials nachgerechnet, ob die Punktwelt
+unter `170°` und unter `500.000` Punkten bleibt; sonst startet die Sitzung nicht
+und die Konsole nennt die Ursache. Die Grenze ist keine technische Grenze; sie
+verhindert, dass die Punktzahl still abgeschnitten und die Dichte damit zwischen
+Bedingungen ungleich wird. Mehr Punkte verlängern den Aufbau pro Trial (grob
+linear; aus den `35 ms` bei 78.000 Punkten geschätzt etwa `0,2 s` bei 500.000,
+nicht gemessen). Punktzahl und Größe der Punktwelt
+stehen für jeden Trial in `dot_count` und `world_coverage_diameter_deg`, die
+Dichte im Marker `SessionStart`.
+
+Ob der Rechner mitkommt, steht ebenfalls pro Trial in der CSV:
+`frames_presented` (Bilder während der Darbietung), `slow_frames` (Bilder, die
+länger als das 1,5-Fache der Bildwiederholzeit brauchten, bei 90 Hz also über
+16,7 ms), `max_frame_ms` und `expected_frame_ms` (Bildwiederholzeit von Headset
+bzw. Monitor). In VR werden ausgefallene Bilder hochgerechnet; die Bewegung kann
+dann ruckeln, ohne dass es am Monitor auffällt. Trials mit `slow_frames > 0`
+sollte man sich deshalb ansehen. Am Sitzungsende meldet die Konsole, wie viele
+Darbietungen betroffen waren.
 
 ## Eye Tracking und Messdateien
 
@@ -535,8 +836,11 @@ In `*_trials.csv` stehen unter anderem:
 * Versionskennung der verwendeten Abbildung
 
 Marker wie `TrialStart`, `StimulusEnded`, `NoiseMaskStarted`,
-`ResponsePromptShown`, `TrialResponse`, `TrialInvalid` und `TrialRepeatQueued`
-verbinden den Versuchsablauf zeitlich mit den Rohdaten.
+`GrayScreenStarted`, `TrialResponse`, `TrialInvalid` und `TrialRepeatQueued`
+verbinden den Versuchsablauf zeitlich mit den Rohdaten. `NoiseMaskStarted` und
+`GrayScreenStarted` nennen mit `phase=response` oder `phase=pre_stimulus`, zu
+welcher Phase die Darstellung gehört. Der gewählte Ablauf steht als
+`trial_sequence` im Plan, in jeder Ergebniszeile und in den Markern.
 
 Beim Random-Dot-Test werden zusätzlich unter anderem festgehalten:
 
@@ -597,6 +901,140 @@ muss am `Checkerboard Experiment Manager` vorübergehend `Require Fixation`
 deaktiviert werden. Diese Einstellung ist nur für den technischen Test gedacht
 und darf bei einer Messung nicht ausgeschaltet bleiben.
 
+## Vive Pro Eye
+
+Derselbe Projektstand läuft ohne Umstellung auch mit der HTC Vive Pro Eye. Das
+Headset wird über OpenXR (SteamVR) angesprochen, das Eye Tracking über das
+SRanipal-SDK unter `Assets/ViveSR`.
+
+### Voraussetzungen auf dem Lab-PC
+
+* Unity 6000.5.6f1 und Git (das Varjo-Paket wird beim ersten Öffnen über Git
+  geladen)
+
+* SteamVR läuft und ist als OpenXR-Runtime festgelegt (SteamVR-Einstellungen,
+  Bereich OpenXR)
+
+* VIVE Console beziehungsweise die SRanipal-Runtime läuft (`sr_runtime.exe`,
+  Roboter-Symbol im Infobereich der Taskleiste)
+
+* Varjo Base läuft auf diesem PC nicht
+
+Danach genügt `git pull`. In Unity ist nichts einzustellen: keine Werte im
+Inspector, keine Project Settings, keine Pakete.
+
+### Was automatisch gewählt wird
+
+An der `Eye Tracking Toolbox` steht der Provider in beiden Szenen auf `Auto`.
+Beim Start des Play Mode wird entschieden:
+
+| Rechner | XR-Loader | Eye Tracker |
+| --- | --- | --- |
+| Varjo-PC, Varjo Base läuft | `VarjoLoader` | `Varjo` |
+| Vive-PC, SteamVR und SRanipal-Runtime laufen | `OpenXRLoader` | `SRanipal` |
+| Laptop ohne Headset und ohne Runtime | keiner | `Dummy` |
+
+XR Plug-in Management versucht die Loader in Listenreihenfolge, zuerst Varjo,
+dann OpenXR. Der erste Loader, der startet, gewinnt. Die Konsole zeigt die
+Entscheidung beim Start, zum Beispiel:
+
+```text
+XR-Loader aktiv: OpenXRLoader (OpenXR-Runtime: SteamVR/OpenXR). Eye-Tracker: SRanipal (eingestellt: Auto).
+SRanipal Eye Tracking bereit (Eye v2, Callback registriert).
+```
+
+Dieselben Angaben stehen im Experimenter Monitor und als Marker
+`EyeTrackingProvider;configured=…;active=…;xr_loader=…` am Anfang jeder
+Aufzeichnung.
+
+Der `Dummy` lässt den Blick der Maus folgen und ist nur für einen Tastaturtest
+am Laptop gedacht. Fällt `Auto` auf den `Dummy`, während ein XR-Headset aktiv
+ist oder `Require Fixation` eingeschaltet ist, startet `F5` keine Sitzung. Der
+Grund steht dann rot im Experimenter Monitor und in der Konsole.
+
+### Zwei Regeln
+
+* In `Project Settings -> XR Plug-in Management` keine Häkchen umschalten. Unity
+  sortiert die Loader dabei alphabetisch neu, OpenXR steht dann vor Varjo, und
+  auf dem Varjo-PC würde der falsche Loader starten. Der EditMode-Test
+  `XrLoaderSetupTests` meldet eine vertauschte Reihenfolge;
+  `git checkout -- Assets/XR` stellt sie wieder her.
+
+* Bleibt die Vive dunkel und die Konsole meldet `XR-Loader aktiv: VarjoLoader`,
+  läuft auf dem Vive-PC Varjo Base. Varjo Base beenden und den Play Mode neu
+  starten.
+
+### Unterschiede in der Gaze-Datei
+
+Die Spalten und ihre Reihenfolge sind bei allen Eye Trackern gleich. Bei
+SRanipal gilt:
+
+* Ursprünge und Richtungen sind wie bei Varjo ins Unity-Kamerasystem
+  umgerechnet (linkshändig, Meter, +x nach rechts).
+
+* `left_validata`, `right_validata` und `combined_validata` folgen dem
+  SRanipal-Bit „Blickrichtung gültig“.
+
+* `tracking_status`, `left_tracking_status` und `right_tracking_status`
+  enthalten die SRanipal-Validitätsmaske: 1 = Ursprung, 2 = Richtung,
+  4 = Pupillendurchmesser, 8 = Lidöffnung, 16 = Pupillenposition. Bei
+  `tracking_status` kommt 65536 hinzu, wenn SRanipal „kein Nutzer“ meldet.
+
+* `eye_timestamp` bleibt in Nanosekunden. SRanipal liefert Millisekunden, die
+  Auflösung ist deshalb 1 ms.
+
+* `ipd_mm` ist `NaN`, weil SRanipal keinen Augenabstand liefert.
+  `gaze_distance`, Pupillendurchmesser und Lidöffnung sind `NaN`, solange
+  SRanipal den jeweiligen Wert als ungültig markiert.
+
+### Checkliste für den ersten Test am Headset
+
+Die SRanipal-Anbindung wurde ohne Headset entwickelt. Vor der ersten Messung
+einmal vollständig durchgehen:
+
+1. Start: Die Konsole meldet `OpenXRLoader`, `SteamVR` als OpenXR-Runtime und
+   `SRanipal` als Eye Tracker. Der Experimenter Monitor zeigt dasselbe. Unity
+   bleibt beim Start nicht hängen.
+
+2. Bild: Das Muster erscheint im Headset. Mit Augenmodus „nur links“ und „nur
+   rechts“ sieht jeweils nur das genannte Auge das Bild.
+
+3. Kalibrierung: `C` startet die SRanipal-Kalibrierung im Headset. Unity läuft
+   währenddessen weiter, und danach meldet die Konsole
+   `SRanipal-Blickkalibrierung abgeschlossen`.
+
+4. Validität: Beim Blick auf das Kreuz zeigt der Experimenter Monitor
+   `ON TARGET`. Beim Schließen der Augen wechselt er auf `NO VALID GAZE`.
+
+5. Blickstrahl: Beim Blick auf das Fixationskreuz liegt die `Blickabweichung`
+   deutlich unter der Toleranz. Beim Blick nach rechts wird
+   `combined_eye_gaze.x` in der Gaze-Datei positiv, beim Blick nach oben
+   `combined_eye_gaze.y`.
+
+6. Augenpositionen: In der Gaze-Datei ist `left_eye_origin.x` negativ (etwa
+   -0,03) und `right_eye_origin.x` positiv. Sind die Vorzeichen vertauscht,
+   stimmt die Spiegelung in `SRanipalGazeConversion.cs` nicht.
+
+7. Abtastrate: Eine kurze Aufzeichnung mit `F9` enthält etwa 120 Zeilen pro
+   Sekunde, und `frame_number` steigt ohne Lücken.
+
+8. Fixationsabbruch: Wegschauen während eines Trials macht den Trial ungültig
+   und stellt ihn hinten an (`TrialInvalid`, `TrialRepeatQueued`).
+
+9. Antworten: In beiden Tests lösen Trigger und Trackpad-Klick am
+   Vive-Controller die beiden Antworten aus, passend zur eingestellten
+   Zuordnung. Eine bloße Berührung des Trackpads, Halten und Loslassen lösen
+   nichts aus.
+
+10. Messdatei: Am Anfang der Aufzeichnung steht der Marker
+    `EyeTrackingProvider;configured=Auto;active=SRanipal;xr_loader=OpenXRLoader`.
+
+11. Ende: Der Play Mode lässt sich beenden und erneut starten, ohne dass Unity
+    hängen bleibt.
+
+Zum Vergleich einmal auf dem Varjo-PC starten: Die Konsole meldet dort
+weiterhin `VarjoLoader` und `Varjo`.
+
 ## Wichtige Dateien
 
 ```text
@@ -608,6 +1046,7 @@ Assets/GlobeEffect/
 │   ├── Scripts/
 │   │   ├── VisualSpaceRadialMapping.cs
 │   │   ├── VrCheckerboardStimulus.cs
+│   │   ├── ResponseInputController.cs
 │   │   └── CheckerboardKeyboardController.cs
 │   ├── Resources/
 │   │   ├── GlobeEffectHelmholtzCheckerboard.shader
@@ -623,13 +1062,26 @@ Assets/GlobeEffect/
 │   │   ├── RandomDotSimulatedSweep.cs
 │   │   └── RandomDotKeyboardController.cs
 │   └── EyeTracking/
-│       └── CheckerboardFixationMonitor.cs
+│       ├── CheckerboardFixationMonitor.cs
+│       ├── EyeTrackingToolbox.cs
+│       ├── EyeTrackerProviderResolver.cs
+│       └── EyeTrackers/
+│           ├── VarjoEyeTracker.cs
+│           ├── SRanipalEyeTracker.cs
+│           ├── SRanipalGazeConversion.cs
+│           └── DummyEyeTracker.cs
 ├── Editor/
 │   └── ExperimenterMonitorWindow.cs
 └── Tests/EditMode/
     ├── VisualSpaceRadialMappingTests.cs
     ├── CheckerboardTrialPlannerTests.cs
-    └── CheckerboardTrialQueueTests.cs
+    ├── CheckerboardTrialQueueTests.cs
+    ├── CheckerboardTrialSequenceTests.cs
+    ├── ResponseInputControllerTests.cs
+    ├── ExperimentFlowPlayTests.cs
+    ├── SRanipalGazeConversionTests.cs
+    ├── EyeTrackerProviderResolverTests.cs
+    └── XrLoaderSetupTests.cs
 ```
 
 `VisualSpaceRadialMapping.cs` enthält die C#-Referenzrechnung. Der Shader führt
