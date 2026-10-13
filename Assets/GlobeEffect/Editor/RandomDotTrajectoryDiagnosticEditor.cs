@@ -9,21 +9,19 @@ namespace GlobeEffect.VRCheckerboard.Editor
     {
         public override void OnInspectorGUI()
         {
-            EditorGUILayout.HelpBox("Technische Diagnose, keine Messung. Farbige Punkte (Raster unter Marker Columns/Rows) und ihre " +
-                "Spuren verwenden den Originalshader. k = 1: Tangensbedingung. " +
-                "Anordnung gilt bei Schwenkwinkel null; am Anfang steht das Feld seitlich versetzt. " +
-                "Instrument-/Bewegungsänderungen starten neu. Das Messlineal verändert keine Bahnen. " +
-                "Leertaste pausiert, R startet neu.", MessageType.Info);
-            EditorGUILayout.HelpBox("Flow Coordinates: A ist die flache Bildschirmgeometrie. S und M " +
-                "rechnen dieselbe Bewegung in andere Koordinaten um; M ist der Spezialfall l = 0. " +
-                "Pfeile sind Messsymbole auf demselben Bildgitter, keine neuen Punktbahnen. " +
-                "Daraus folgt noch keine wahrgenommene Zylinder- oder Kugelform.", MessageType.Info);
+            EditorGUILayout.HelpBox("Technical check, not a measurement. Colored markers and their trails " +
+                "show how the dots move with the same shader as in the experiment. k = 1 is straight. " +
+                "Changing the binoculars or the movement restarts it. Space = pause, R = restart.",
+                MessageType.Info);
+            EditorGUILayout.HelpBox("Flow Coordinates: A = speeds on the flat screen. S and M show the same " +
+                "movement in other units (M is the case l = 0). The arrows only show speed, they are not " +
+                "dot paths, and they do not tell which shape a person sees.", MessageType.Info);
             DrawDefaultInspector();
             using (new EditorGUI.DisabledScope(!Application.isPlaying))
             {
                 var diagnostic = (RandomDotTrajectoryDiagnostic)target;
-                if (GUILayout.Button("Pause / Weiter")) diagnostic.TogglePause();
-                if (GUILayout.Button("Neustart und Spuren löschen")) diagnostic.Restart();
+                if (GUILayout.Button("Pause / Continue")) diagnostic.TogglePause();
+                if (GUILayout.Button("Restart And Clear Trails")) diagnostic.Restart();
             }
         }
     }

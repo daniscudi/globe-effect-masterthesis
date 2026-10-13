@@ -28,14 +28,14 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [Header("Motion Log")]
         [FormerlySerializedAs("yawThresholdDegrees")]
         [SerializeField, Range(0.5f, 45f)]
-        [Tooltip("Ab wie vielen Grad zu einer Seite das als Rand zählt.")]
+        [Tooltip("How far the head must turn to each side before it counts as a turn, in degrees.")]
         private float turnaroundDegrees = 1.5f;
 
         [SerializeField, Range(1, 20)]
-        [Tooltip("Mindestzahl vollständiger Wechsel zwischen linker und rechter Seite. Der Experiment Manager kann unvollständige Durchgänge wiederholen.")]
+        [Tooltip("Minimum number of full left-right turns.")]
         private int requiredHalfSweeps = 1;
 
-        [Header("Runtime Status")]
+        [Header("Current Status")]
         [SerializeField]
         private float currentYawDegrees;
 

@@ -39,10 +39,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// </summary>
     public enum CheckerboardTrialSequence
     {
-        [InspectorName("A: Noise-Maske (Antwort), dann graue Fläche")]
+        [InspectorName("A: Noise While Answering, Then Grey")]
         NoiseResponseThenGray = 0,
 
-        [InspectorName("B: Graue Fläche (Antwort), dann Noise-Maske")]
+        [InspectorName("B: Grey While Answering, Then Noise")]
         GrayResponseThenNoise = 1
     }
 
@@ -106,18 +106,19 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         [Header("Session")]
         [SerializeField]
-        [Tooltip("Kennung der Versuchsperson. Hier gehören keine echten Namen rein, sondern zum Beispiel pilot_001.")]
+        [Tooltip("Code for the participant, e.g. pilot_001. Do not enter real names.")]
         private string participantId = "pilot_001";
 
         [SerializeField]
         private string sessionLabel = "checkerboard_pilot";
 
         [SerializeField]
-        [Tooltip("Mit derselben Zahl und denselben Einstellungen kommt wieder genau dieselbe Reihenfolge heraus.")]
+        [Tooltip("Same number and same settings = exactly the same trial order again.")]
         private int randomSeed = 20260901;
 
         [SerializeField]
-        [Tooltip("Wohin die Messdaten kommen. Leer lassen ist normal, dann landen sie im Ordner measurements im Projekt.")]
+        [Tooltip("Folder for the data files. Leave empty to save into the measurements folder of the " +
+            "project.")]
         private string outputRoot = string.Empty;
 
         [SerializeField]
@@ -126,77 +127,83 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [Header("Trial Plan")]
         [FormerlySerializedAs("angularDiametersDegrees")]
         [SerializeField]
-        [Tooltip("Wie groß der runde Ausschnitt sein soll, in Grad. Es können auch mehrere Werte drinstehen, dann wird jeder davon gezeigt.")]
+        [Tooltip("Size of the round window in degrees. With several values, each size is tested.")]
         private List<float> fieldOfViewValues = new() { 90f };
 
         [SerializeField]
-        [Tooltip("Auf welchen Augen gezeigt wird: beide, nur links oder nur rechts.")]
+        [Tooltip("Which eyes see the image: both, only left or only right.")]
         private List<CheckerboardEyePresentation> eyePresentations = new()
         {
             CheckerboardEyePresentation.BothEyes
         };
 
         [SerializeField]
-        [Tooltip("Alle l-Werte, die gezeigt werden sollen. l = 1 ist gerade, l = 0,5 ist der Helmholtz-Punkt. Das hier sind nur Pilotwerte, die Liste darf komplett geändert werden.")]
+        [Tooltip("All grid distortions (l) that are tested. l = 1 is a straight grid, l = 0.5 is the " +
+            "Helmholtz point.")]
         private List<float> visualSpaceLValues = new() { 1.2f, 1f, 0.8f, 0.6f, 0.5f, 0.4f, 0.2f };
 
         [FormerlySerializedAs("repetitionsPerCondition")]
         [SerializeField, Min(1)]
-        [Tooltip("Wie oft jede Kombination gezeigt wird. Mehr Wiederholungen heißt sicherere Ergebnisse, aber auch eine längere Sitzung. Gilt für jedes l ohne eigenen Eintrag in Repeats Per L Value.")]
+        [Tooltip("How often each combination is shown, if an l value has no own number below.")]
         private int repeatsPerCondition = 3;
 
         [SerializeField]
-        [Tooltip("Wiederholungen pro l, in derselben Reihenfolge wie die l-Liste (z. B. Randwerte 8 oder 16, Mitte 25). " +
-            "Leer oder zu kurz: für die fehlenden l gilt Repeats Per Condition.")]
+        [Tooltip("How often each l value is shown, in the same order as the l list. Missing entries use " +
+            "Repeats Per Condition.")]
         private List<int> repeatsPerLValue = new();
 
         [SerializeField, Range(1, 10)]
-        [Tooltip("In wie viele Blöcke eine Sitzung geteilt wird. 4 = Viertelblöcke: nach 25, 50 und 75 % der " +
-            "gültigen Trials eine Pause mit rotem Kreuz, die der Versuchsleiter mit F5 beendet. 1 = keine Pausen.")]
+        [Tooltip("Splits the session into parts with a break in between. 4 = breaks after 25, 50 and 75 % " +
+            "of the trials (red cross, continue with F5). 1 = no breaks.")]
         private int blocksPerSession = 4;
 
-        [Header("Fixation And Repeats")]
+        [Header("Gaze Check")]
         [SerializeField]
-        [Tooltip("Das Muster kommt erst, wenn der Blick ruhig auf dem Kreuz liegt, und wird dabei auch weiter überwacht. Für eine echte Messung muss das an sein.")]
+        [Tooltip("The checkerboard only appears when the participant looks steadily at the cross. Must be " +
+            "on for real measurements.")]
         private bool requireFixation = true;
 
         [FormerlySerializedAs("maximumOffTargetSeconds")]
         [SerializeField, Min(0f)]
-        [Tooltip("So lange darf die Person am Stück vom Kreuz wegschauen. Danach wird der Durchgang ungültig.")]
+        [Tooltip("How long the participant may look away from the cross before the trial is repeated later " +
+            "(s).")]
         private float maxLookAwaySeconds = 0.15f;
 
         [FormerlySerializedAs("maximumInvalidGazeSeconds")]
         [SerializeField, Min(0f)]
-        [Tooltip("So lange darf am Stück gar kein brauchbarer Blickwert kommen, zum Beispiel beim Blinzeln.")]
+        [Tooltip("How long the eye tracker may give no gaze data, e.g. when blinking, before the trial is " +
+            "repeated later (s).")]
         private float maxNoDataSeconds = 0.2f;
 
         [FormerlySerializedAs("maximumGazeSampleAgeSeconds")]
         [SerializeField, Min(0.01f)]
-        [Tooltip("Ist der letzte Blickwert älter als das hier, gilt er als nicht mehr aktuell und zählt wie gar kein Wert.")]
+        [Tooltip("Gaze data older than this counts as missing (s).")]
         private float maxSampleAgeSeconds = 0.1f;
 
         [FormerlySerializedAs("maximumAttemptsPerTrial")]
         [SerializeField, Min(0)]
-        [Tooltip("Wie oft derselbe Durchgang höchstens wiederholt werden darf. 0 heißt: so lange, bis es klappt.")]
+        [Tooltip("How often one trial may be tried in total. 0 = until it works.")]
         private int maxRepeatsPerTrial;
 
         [Header("Timing")]
         [SerializeField]
-        [Tooltip("A: Schachbrett, Noise-Maske mit Antwort, graue Fläche, nächstes Schachbrett. B: Schachbrett, graue Fläche mit Antwort, Noise-Maske, nächstes Schachbrett.")]
+        [Tooltip("A: checkerboard, noise while answering, grey, next checkerboard. B: checkerboard, grey " +
+            "while answering, noise, next checkerboard.")]
         private CheckerboardTrialSequence trialSequence = CheckerboardTrialSequence.NoiseResponseThenGray;
 
         [FormerlySerializedAs("stimulusDurationSeconds")]
         [SerializeField, Min(0.01f)]
-        [Tooltip("Wie lange das Schachbrett zu sehen ist. 0,6 sind 600 Millisekunden.")]
+        [Tooltip("How long the checkerboard is shown (s). 0.6 = 600 ms.")]
         private float patternSeconds = 0.6f;
 
         [FormerlySerializedAs("responseTimeoutSeconds")]
         [SerializeField, Min(0f)]
-        [Tooltip("Wie lange die Person ab Beginn der Antwortphase Zeit zum Antworten hat. 0 heißt: unbegrenzt.")]
+        [Tooltip("How long the participant has to answer (s). 0 = no limit.")]
         private float answerTimeoutSeconds = 5f;
 
         [SerializeField, Min(0f)]
-        [Tooltip("Wie lange die Phase vor dem nächsten Schachbrett mindestens dauert, in Sekunden: bei A die graue Fläche, bei B die Noise-Maske. Mit Fixationskontrolle geht es erst weiter, wenn zusätzlich der Blick ruhig auf dem Kreuz liegt.")]
+        [Tooltip("Minimum time before the next checkerboard (s): grey in order A, noise in order B. With " +
+            "gaze check on it also waits until the participant looks at the cross.")]
         private float preStimulusSeconds = 0.5f;
 
         [Header("Response Keys")]
@@ -207,55 +214,57 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private Key concaveResponseKey = Key.DownArrow;
 
         [SerializeField]
-        [Tooltip("Nimmt im Headset Trigger und Trackpad-Klick an. Die Pfeiltasten funktionieren zusätzlich weiter zum Testen am Laptop.")]
+        [Tooltip("Answers can also be given with the VR controller (trigger and trackpad click). The arrow " +
+            "keys keep working.")]
         private bool useVrControllerButtons = true;
 
         // Früher war das ein Häkchen "Swap Response Buttons". Aus = erster
         // Eintrag, An = zweiter Eintrag; gespeicherte Szenen behalten ihren Wert.
         [FormerlySerializedAs("swapResponseButtons")]
         [SerializeField]
-        [Tooltip("Welche Controller-Taste welche Antwort gibt. Konvex ist Category A (nach außen), konkav Category B (nach innen). Vor einer Sitzung einstellen und währenddessen nicht ändern.")]
+        [Tooltip("Which controller button means convex and which concave. Do not change it during a " +
+            "session.")]
         private VrControllerMapping controllerMapping = VrControllerMapping.TrackpadConcaveTriggerConvex;
 
         [FormerlySerializedAs("categoryAResponseText")]
         [SerializeField]
-        [Tooltip("Wie diese Antwort der Person genannt wird. Gespeichert wird sie im Code und in der CSV weiter als Convex.")]
+        [Tooltip("Word the participant sees for convex (bulging out). The data file always says Convex.")]
         private string categoryALabel = "CATEGORY A";
 
         [FormerlySerializedAs("categoryBResponseText")]
         [SerializeField]
-        [Tooltip("Wie diese Antwort der Person genannt wird. Gespeichert wird sie im Code und in der CSV weiter als Concave.")]
+        [Tooltip("Word the participant sees for concave (bulging in). The data file always says Concave.")]
         private string categoryBLabel = "CATEGORY B";
 
-        [Header("Welcome And Training")]
+        [Header("Practice")]
         [SerializeField]
-        [Tooltip("Taste, mit der vom Startbildschirm aus das Training losgeht.")]
+        [Tooltip("Key that starts the practice from the start screen.")]
         private Key trainingKey = Key.T;
 
         [SerializeField]
-        [Tooltip("Schaltet eine reine Muster-Vorschau ohne Training, Trials oder Aufzeichnung ein/aus.")]
+        [Tooltip("Turns the preview on or off. Nothing is recorded.")]
         private Key previewKey = Key.P;
 
         [SerializeField]
-        [Tooltip("Was die Live-Vorschau zeigt: aus = Schachbrett, an = Noise-Maske (um Punktgröße und " +
-            "Flimmerrate zu beurteilen). Umschalten geht auch während der Vorschau.")]
+        [Tooltip("Off = preview shows the checkerboard. On = preview shows the noise. Can be switched " +
+            "while the preview runs.")]
         private bool previewShowsNoise;
 
         [SerializeField]
-        [Tooltip("In der laufenden Vorschau: Nachbild-Test abspielen (Schachbrett, dann Maske, dann " +
-            "graue Fläche). Auf der grauen Fläche sieht man, ob vom Schachbrett ein Nachbild bleibt.")]
+        [Tooltip("During the preview: plays checkerboard, then noise, then grey. On the grey screen you " +
+            "can check if an afterimage of the checkerboard stays.")]
         private Key maskDemoKey = Key.M;
 
         [SerializeField, Range(0.1f, 10f)]
-        [Tooltip("Nachbild-Test: wie lange das Schachbrett zu sehen ist, in Sekunden.")]
+        [Tooltip("Afterimage test: how long the checkerboard is shown (s).")]
         private float maskDemoPatternSeconds = 2f;
 
         [SerializeField, Range(0.1f, 10f)]
-        [Tooltip("Nachbild-Test: wie lange danach die Noise-Maske zu sehen ist, in Sekunden.")]
+        [Tooltip("Afterimage test: how long the noise is shown after it (s).")]
         private float maskDemoMaskSeconds = 1f;
 
         [SerializeField, Range(0.1f, 10f)]
-        [Tooltip("Nachbild-Test: wie lange danach die graue Fläche zu sehen ist, in Sekunden.")]
+        [Tooltip("Afterimage test: how long the grey screen is shown at the end (s).")]
         private float maskDemoGraySeconds = 3f;
 
         // Stand vor dem ersten "Vorschau-Werte übernehmen". Leer heißt: es wurde
@@ -264,46 +273,51 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private string valuesBeforePreviewTakeover = string.Empty;
 
         [SerializeField]
-        [Tooltip("Taste zum Weiterblättern im Training. Damit startet später auch der erste Durchgang.")]
+        [Tooltip("Key to go to the next step in the practice. It also starts the first trial.")]
         private Key continueTrainingKey = Key.Space;
 
         [SerializeField]
-        [Tooltip("Ist das an, geht der Versuch erst los, wenn das Training einmal komplett durchlaufen wurde.")]
+        [Tooltip("If on, the session can only start after the practice was done once.")]
         private bool requireTrainingBeforeSession = true;
 
         [FormerlySerializedAs("trainingCategoryAVisualSpaceL")]
         [SerializeField, Range(0f, 1.4f)]
-        [Tooltip("Das deutliche Beispiel für Category A im Training. Der Wert sollte klar zu erkennen sein und trotzdem im Bereich liegen, der später im Versuch vorkommt.")]
+        [Tooltip("l value of the clear convex example in the practice. Should be easy to see but inside " +
+            "the tested range.")]
         private float trainingExampleA = 1.2f;
 
         [FormerlySerializedAs("trainingCategoryBVisualSpaceL")]
         [SerializeField, Range(0f, 1.4f)]
-        [Tooltip("Das deutliche Beispiel für Category B im Training. Der Wert sollte klar zu erkennen sein und trotzdem im Bereich liegen, der später im Versuch vorkommt.")]
+        [Tooltip("l value of the clear concave example in the practice. Should be easy to see but inside " +
+            "the tested range.")]
         private float trainingExampleB = 0.2f;
 
         [FormerlySerializedAs("trainingVisualSpaceLValues")]
         [SerializeField]
-        [Tooltip("Die l-Werte für die Übungsdurchgänge. Jeder kommt gleich oft dran, und es gibt keine Rückmeldung, ob die Antwort stimmte.")]
+        [Tooltip("l values for the practice trials. Each is shown equally often. There is no right/wrong " +
+            "feedback.")]
         private List<float> trainingLValues = new() { 0.2f, 0.4f, 0.8f, 1.2f };
 
         [FormerlySerializedAs("trainingRepetitionsPerValue")]
         [SerializeField, Min(1)]
-        [Tooltip("Wie oft jeder Übungswert im Training drankommt.")]
+        [Tooltip("How often each practice l value is shown.")]
         private int trainingRepeatsPerValue = 3;
 
         [FormerlySerializedAs("trainingExampleStimulusSeconds")]
         [SerializeField, Min(0.1f)]
-        [Tooltip("Wie lange die beiden deutlichen Beispiele für Category A und B gezeigt werden. Die normalen Übungsdurchgänge bleiben so kurz wie im richtigen Experiment.")]
+        [Tooltip("How long the two clear examples are shown (s). The practice trials after them are as " +
+            "short as in the real test.")]
         private float trainingExampleSeconds = 2f;
 
         [FormerlySerializedAs("trainingExampleNoiseSeconds")]
         [SerializeField, Min(0f)]
-        [Tooltip("Wie lange nach den beiden Beispielen die Darstellung der Antwortphase zu sehen ist: bei A die Noise-Maske, bei B die graue Fläche.")]
+        [Tooltip("What comes after each example and for how long (s): noise in order A, grey in order B.")]
         private float trainingNoiseSeconds = 0.5f;
 
         [FormerlySerializedAs("trainingFixationSecondsWithoutEyeTracking")]
         [SerializeField, Min(0f)]
-        [Tooltip("Wie lange im Training die Phase vor dem Muster mindestens dauert, wenn die Blickkontrolle aus ist. Dann kann ja nicht gemessen werden, ob der Blick ruhig liegt. Gilt nur, wenn der Wert größer ist als Pre Stimulus Seconds.")]
+        [Tooltip("Minimum wait before each practice image when the gaze check is off (s). Only used if " +
+            "larger than Time Before Checkerboard.")]
         private float trainingFixationSeconds = 0.5f;
 
         [Header("Keys")]
@@ -313,7 +327,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [SerializeField]
         private Key abortSessionKey = Key.F6;
 
-        [Header("Runtime Status (Read Only)")]
+        [Header("Current Status")]
         [SerializeField]
         private CheckerboardSessionState sessionState = CheckerboardSessionState.Idle;
 

@@ -94,7 +94,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             {
                 DrawStatusBlock("PLAY MODE STOPPED", new Color(0.27f, 0.32f, 0.38f));
                 EditorGUILayout.HelpBox(
-                    "Das Fenster liest die Fixationsdaten automatisch, sobald der Play Mode läuft.",
+                    "The gaze data shows up here automatically when Play Mode runs.",
                     MessageType.Info);
                 DrawAutoOpenSetting();
                 return;
@@ -122,10 +122,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
             else
             {
-                DrawStatusBlock("NO FIXATION MONITOR", new Color(0.65f, 0.36f, 0.08f));
+                DrawStatusBlock("NO TEST FOUND", new Color(0.65f, 0.36f, 0.08f));
                 EditorGUILayout.HelpBox(
-                    "In der geöffneten Szene wurde kein Checkerboard- oder " +
-                    "Random-Dot-Fixationsmonitor gefunden.",
+                    "No checkerboard or random dot test was found in the open scene.",
                     MessageType.Warning);
             }
 
@@ -157,24 +156,24 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 bool hasStimulus = stimulus != null;
 
                 Row("Test", "Checkerboard");
-                Row("Session", hasSession ? session.SessionState.ToString() : "Nicht gefunden");
+                Row("Session", hasSession ? session.SessionState.ToString() : "Not found");
                 Row("Trial",
                     hasSession ? FormatTrial(session.CurrentTrialNumber, session.TotalTrials) : Missing);
-                Row("Gültig abgeschlossen", hasSession ? Number(session.ValidTrialsCompleted) : Missing);
-                Row("Präsentationen", hasSession ? Number(session.PresentationCount) : Missing);
-                Row("Visual-Space l", hasStimulus ? Number(stimulus.VisualSpaceL, "F3") : Missing);
+                Row("Valid Trials Done", hasSession ? Number(session.ValidTrialsCompleted) : Missing);
+                Row("Trials Shown (With Repeats)", hasSession ? Number(session.PresentationCount) : Missing);
+                Row("Grid Distortion l", hasStimulus ? Number(stimulus.VisualSpaceL, "F3") : Missing);
                 Row("FOV", hasStimulus ? Number(stimulus.AngularDiameterDegrees, "F1", "°") : Missing);
-                Row("Augenmodus", hasStimulus ? stimulus.EyePresentation.ToString() : Missing);
+                Row("Eyes", hasStimulus ? stimulus.EyePresentation.ToString() : Missing);
                 // Konvex ist Category A, konkav Category B.
-                Row("Ablauf", hasSession ? session.TrialSequence.ToString() : Missing);
-                Row("Antwort Controller", hasSession ? session.ControllerSummary : Missing);
-                Row("Antwort Tastatur", hasSession ? session.KeyboardSummary : Missing);
-                Row("Training", hasSession && session.TrainingCompleted
-                    ? "abgeschlossen"
-                    : "noch nicht abgeschlossen");
-                Row("Fixationsbruch", hasSession && session.RequireFixation
-                    ? "Trial ungültig, Wiederholung hinten"
-                    : "Kontrolle ausgeschaltet");
+                Row("Trial Order", hasSession ? session.TrialSequence.ToString() : Missing);
+                Row("Controller Answers", hasSession ? session.ControllerSummary : Missing);
+                Row("Keyboard Answers", hasSession ? session.KeyboardSummary : Missing);
+                Row("Practice", hasSession && session.TrainingCompleted
+                    ? "done"
+                    : "not done yet");
+                Row("Looking Away", hasSession && session.RequireFixation
+                    ? "trial is repeated later"
+                    : "gaze check is off");
             }
         }
 
@@ -197,33 +196,33 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 bool hasSweep = sweep != null;
 
                 Row("Test", "Random Dot Instrument");
-                Row("Session", hasSession ? session.SessionState.ToString() : "Nicht gefunden");
+                Row("Session", hasSession ? session.SessionState.ToString() : "Not found");
                 Row("Trial",
                     hasSession ? FormatTrial(session.CurrentTrialNumber, session.TotalTrials) : Missing);
-                Row("Bewegungsart", hasSession ? session.SessionMotionMode.ToString() : Missing);
+                Row("Movement Type", hasSession ? session.SessionMotionMode.ToString() : Missing);
                 if (hasSession && session.SessionState == RandomDotSessionState.ResponseInstructions)
                 {
                     EditorGUILayout.HelpBox(
-                        "Die Person liest die Tastenbelegung – mit F5 starten.", MessageType.Info);
+                        "The participant is reading the answer keys. Press F5 to start.", MessageType.Info);
                 }
 
-                Row("Instrument k", hasStimulus ? Number(stimulus.InstrumentDistortionK, "F3") : Missing);
-                Row("Vergrößerung m",
+                Row("Distortion k", hasStimulus ? Number(stimulus.InstrumentDistortionK, "F3") : Missing);
+                Row("Magnification m",
                     hasStimulus ? Number(stimulus.InstrumentMagnificationM, "F2", "x") : Missing);
-                Row("Content Zoom", hasStimulus ? Number(stimulus.ContentZoom, "F2") : Missing);
-                Row("Gierwinkel", hasSweep ? Number(sweep.CurrentYawDegrees, "F2", "°") : Missing);
-                Row("Bewegungswechsel", hasSweep ? Number(sweep.CompletedHalfSweeps) : Missing);
-                Row("Mittlere Kopfgeschwindigkeit",
+                Row("Extra Zoom", hasStimulus ? Number(stimulus.ContentZoom, "F2") : Missing);
+                Row("Head Turn Left/Right", hasSweep ? Number(sweep.CurrentYawDegrees, "F2", "°") : Missing);
+                Row("Left-Right Turns", hasSweep ? Number(sweep.CompletedHalfSweeps) : Missing);
+                Row("Average Head Speed",
                     hasSweep ? Number(sweep.MeanAbsoluteYawSpeedDegreesPerSecond, "F2", "°/s") : Missing);
-                Row("Spitzen-Kopfgeschwindigkeit",
+                Row("Top Head Speed",
                     hasSweep ? Number(sweep.PeakAbsoluteYawSpeedDegreesPerSecond, "F2", "°/s") : Missing);
-                Row("Maximale Kopfauslenkung",
+                Row("Largest Head Turn",
                     hasSweep ? Number(sweep.MaximumAbsoluteYawDegrees, "F2", "°") : Missing);
-                Row("Antwort Controller", hasSession ? session.ControllerSummary : Missing);
-                Row("Antwort Tastatur", hasSession ? session.KeyboardSummary : Missing);
-                Row("Fixationsbruch", hasSession && session.RequireFixation
-                    ? "Trial ungültig, Wiederholung hinten"
-                    : "Kontrolle ausgeschaltet");
+                Row("Controller Answers", hasSession ? session.ControllerSummary : Missing);
+                Row("Keyboard Answers", hasSession ? session.KeyboardSummary : Missing);
+                Row("Looking Away", hasSession && session.RequireFixation
+                    ? "trial is repeated later"
+                    : "gaze check is off");
             }
         }
 
@@ -245,7 +244,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     color = new Color(0.72f, 0.10f, 0.10f);
                     break;
                 default:
-                    label = "NO VALID GAZE";
+                    label = "NO GAZE DATA";
                     color = new Color(0.78f, 0.52f, 0.04f);
                     break;
             }
@@ -254,12 +253,12 @@ namespace GlobeEffect.VRCheckerboard.Editor
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 float angle = fixation.CurrentAngleDegrees;
-                Row("Blickabweichung", float.IsNaN(angle) ? Missing : Number(angle, "F2", "°"));
-                Row("Toleranz", Number(fixation.ToleranceDegrees, "F2", "°"));
-                Row("Kontinuierliche Fixation",
+                Row("Distance From Cross", float.IsNaN(angle) ? Missing : Number(angle, "F2", "°"));
+                Row("Allowed Distance", Number(fixation.ToleranceDegrees, "F2", "°"));
+                Row("Steady Look",
                     Number(fixation.ContinuousFixationSeconds, "F2") + " / " +
                     Number(fixation.RequiredContinuousSeconds, "F2") + " s");
-                Row("Fixationskriterium", fixation.RequirementMet ? "ERFÜLLT" : "NICHT ERFÜLLT");
+                Row("Gaze Check", fixation.RequirementMet ? "OK" : "NOT YET");
             }
         }
 
@@ -273,7 +272,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             {
                 Row("XR-Loader", EyeTrackerProviderResolver.GetActiveXrLoaderName());
                 Row("Eye Tracker", toolbox != null
-                    ? toolbox.ActiveProvider + " (eingestellt: " + toolbox.Provider + ")"
+                    ? toolbox.ActiveProvider + " (chosen: " + toolbox.Provider + ")"
                     : Missing);
             }
 
@@ -316,7 +315,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
         private static void DrawAutoOpenSetting()
         {
             EditorGUILayout.Space(6f);
-            Row("Automatisch bei Play öffnen", AutoOpenEnabled ? "JA" : "NEIN");
+            Row("Open Automatically On Play", AutoOpenEnabled ? "YES" : "NO");
         }
 
         private void EnsureStyles()

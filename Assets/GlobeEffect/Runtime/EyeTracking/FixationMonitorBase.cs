@@ -82,17 +82,17 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         [SerializeField]
         private TStimulus stimulus;
 
-        [Header("Fixation Criterion")]
+        [Header("Gaze Check")]
         [SerializeField, Range(0.1f, 15f)]
-        [Tooltip("Wie weit der Blick höchstens vom Kreuz weg sein darf, in Grad.")]
+        [Tooltip("How far the gaze may be from the cross, in degrees.")]
         private float toleranceDegrees = 3f;
 
         [FormerlySerializedAs("requiredContinuousSeconds")]
         [SerializeField, Min(0f)]
-        [Tooltip("Wie lange der Blick am Stück ruhig liegen muss, in Sekunden.")]
+        [Tooltip("How long the gaze must stay on the cross (s).")]
         private float requiredSteadySeconds = 0.3f;
 
-        [Header("Runtime Status")]
+        [Header("Current Status")]
         [SerializeField]
         private bool currentSampleValid;
 

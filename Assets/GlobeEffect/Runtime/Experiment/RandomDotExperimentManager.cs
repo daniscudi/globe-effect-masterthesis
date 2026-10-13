@@ -79,21 +79,22 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         [Header("Session")]
         [SerializeField]
-        [Tooltip("Kennung der Versuchsperson. Hier gehören keine echten Namen rein, sondern zum Beispiel pilot_001.")]
+        [Tooltip("Code for the participant, e.g. pilot_001. Do not enter real names.")]
         private string participantId = "pilot_001";
 
         [SerializeField]
         private string sessionLabel = "random_dot_instrument_pilot";
 
         [SerializeField]
-        [Tooltip("Mit derselben Zahl und denselben Einstellungen kommt wieder genau dieselbe Reihenfolge heraus.")]
+        [Tooltip("Same number and same settings = exactly the same trial order again.")]
         private int randomSeed = 20260901;
 
         [SerializeField]
         private int dotSeedBase = 24680;
 
         [SerializeField]
-        [Tooltip("Wohin die Messdaten kommen. Leer lassen ist normal, dann landen sie im Ordner measurements im Projekt.")]
+        [Tooltip("Folder for the data files. Leave empty to save into the measurements folder of the " +
+            "project.")]
         private string outputRoot = string.Empty;
 
         [SerializeField]
@@ -102,11 +103,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [Header("Trial Plan")]
         [FormerlySerializedAs("angularDiametersDegrees")]
         [SerializeField]
-        [Tooltip("Wie groß der runde Ausschnitt sein soll, in Grad. Es können auch mehrere Werte drinstehen, dann wird jeder davon gezeigt.")]
+        [Tooltip("Size of the round window in degrees. With several values, each size is tested.")]
         private List<float> fieldOfViewValues = new() { 90f };
 
         [SerializeField]
-        [Tooltip("Auf welchen Augen gezeigt wird: beide, nur links oder nur rechts.")]
+        [Tooltip("Which eyes see the image: both, only left or only right.")]
         private List<CheckerboardEyePresentation> eyePresentations = new()
         {
             CheckerboardEyePresentation.BothEyes
@@ -115,143 +116,145 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [SerializeField]
         [FormerlySerializedAs("stimulusKValues")]
         [FormerlySerializedAs("visualSpaceLValues")]
-        [Tooltip("Alle Instrumentenverzeichnungen k. k = 1 ist geometrisch gerade, k = 0,5 der Helmholtz-/Kreispunkt. Der subjektiv neutrale k-Wert schätzt das l der Person.")]
+        [Tooltip("All distortions (k) that are tested. k = 1 is straight, k = 0.5 is the Helmholtz point. " +
+            "The k that looks flat to the participant estimates their l.")]
         private List<float> instrumentDistortionKValues = new() { 1.2f, 1f, 0.8f, 0.6f, 0.5f, 0.4f, 0.2f };
 
         [SerializeField]
-        [Tooltip("Fernglasvergrößerungen m. Ein einzelner Wert hält m fest; mehrere Werte machen m zu einem Versuchsparameter. 10 entspricht einem typischen 10x-Fernglas.")]
+        [Tooltip("Magnification of the simulated binoculars (m). 10 = normal 10x binoculars. With several " +
+            "values, each is tested.")]
         private List<float> instrumentMagnificationMValues = new() { 10f };
 
         [SerializeField]
         [FormerlySerializedAs("magnifications")]
-        [Tooltip("Optionaler Nach-Zoom für das Punktfeld. Für die Fernglassimulation auf 1 lassen; die echte Instrumentenvergrößerung steht in m.")]
+        [Tooltip("Extra zoom on top of the magnification. Leave at 1 for the binocular test.")]
         private List<float> contentZoomValues = new() { 1f };
 
         [SerializeField]
-        [Tooltip("Eine Bewegungsart pro Sitzung. F5 startet diese Auswahl; F7 startet die andere als neue Sitzung.")]
+        [Tooltip("Movement type of this session. F5 starts this type, F7 starts the other type as a new " +
+            "session.")]
         private RandomDotMotionMode sessionMotionMode = RandomDotMotionMode.SimulatedYaw;
 
         [FormerlySerializedAs("repetitionsPerCondition")]
         [SerializeField, Min(1)]
-        [Tooltip("Wie oft jede Kombination gezeigt wird. Mehr Wiederholungen heißt sicherere Ergebnisse, aber auch eine längere Sitzung. Gilt für jedes k ohne eigenen Eintrag in Repeats Per K Value.")]
+        [Tooltip("How often each combination is shown, if a k value has no own number below.")]
         private int repeatsPerCondition = 3;
 
         [SerializeField]
-        [Tooltip("Wiederholungen pro k, in derselben Reihenfolge wie die k-Liste (z. B. Randwerte 8, Mitte 25). " +
-            "Leer oder zu kurz: für die fehlenden k gilt Repeats Per Condition.")]
+        [Tooltip("How often each k value is shown, in the same order as the k list. Missing entries use " +
+            "Repeats Per Condition.")]
         private List<int> repeatsPerKValue = new();
 
         [SerializeField, Range(1, 10)]
-        [Tooltip("In wie viele Blöcke eine Sitzung geteilt wird. 4 = Viertelblöcke: nach 25, 50 und 75 % der " +
-            "gültigen Trials eine Pause mit rotem Kreuz, die der Versuchsleiter mit F5 beendet. 1 = keine Pausen.")]
+        [Tooltip("Splits the session into parts with a break in between. 4 = breaks after 25, 50 and 75 % " +
+            "of the trials (red cross, continue with F5). 1 = no breaks.")]
         private int blocksPerSession = 4;
 
-        [Header("Simulated Sweep")]
+        [Header("Simulated Movement")]
         [SerializeField]
-        [Tooltip("Achse des simulierten Schwenks: Horizontal = links/rechts, Vertical = oben/unten. " +
-            "Freie aktive Kopfbewegung ist nicht an diese Achse gebunden.")]
+        [Tooltip("Direction of the simulated movement: Horizontal = left/right, Vertical = up/down.")]
         private RandomDotSweepAxis simulatedSweepAxis = RandomDotSweepAxis.Horizontal;
 
         [SerializeField, Range(0.1f, 5f)]
-        [Tooltip("Wie lange die Punkte im SimulatedYaw-Block zu sehen sind, in Sekunden. In dieser Zeit schwenkt das Feld einmal in eine Richtung, ohne umzukehren. Ob nach links oder rechts, wechselt von Trial zu Trial in zufälliger Reihenfolge, und beide Richtungen kommen gleich oft dran.")]
+        [Tooltip("How long the dots are shown in a simulated trial (s). The dots move once in one " +
+            "direction. Left and right come equally often in random order.")]
         private float simulatedSweepSeconds = 0.8f;
 
         [SerializeField]
-        [Tooltip("Worauf sich die Geschwindigkeit des simulierten Schwenks bezieht. Bildmitte: Die Punkte laufen in der Bildmitte bei jedem m gleich schnell durch das Bild (Simulated Image Center Speed). Objektwinkel: bisherige Definition, das Instrument schwenkt bei jedem m mit Sweep Speed, und das Bild läuft in der Mitte m-mal so schnell. Die durch k erzeugten Unterschiede zwischen Mitte und Rand bleiben in beiden Fällen erhalten. Der HeadTracked-Block ist davon nicht betroffen.")]
+        [Tooltip("Image Center: the dots in the middle move equally fast at every magnification. Object " +
+            "Angle: the binoculars turn equally fast, so the dots move faster at higher " +
+            "magnification.")]
         private RandomDotSweepSpeedReference simulatedSpeedReference = RandomDotSweepSpeedReference.ImageCenter;
 
         [SerializeField, Range(0.5f, 120f)]
-        [Tooltip("Sichtbare Winkelgeschwindigkeit der Punkte in der Bildmitte, in Grad pro Sekunde. Gilt nur bei der Einstellung Bildmitte. 12 entspricht dem bisherigen Stand mit m = 10 und 1,2 Grad pro Sekunde.")]
+        [Tooltip("Speed of the dots in the middle of the image, in degrees per second. Only used with " +
+            "Image Center.")]
         private float simulatedImageCenterSpeed = 12f;
 
         [FormerlySerializedAs("sweepSpeedDegreesPerSecond")]
         [SerializeField, Range(0.1f, 60f)]
-        [Tooltip("Wie schnell über die Außenwelt geschwenkt wird, in Grad Objektwinkel pro Sekunde. Im HeadTracked-Block ist es die mittlere Geschwindigkeit der Kopfbewegung, die an den Umkehrpunkten langsamer wird. Im SimulatedYaw-Block gilt der Wert nur bei der Einstellung Objektwinkel; dann bleibt die Geschwindigkeit die ganze Zeit gleich. Überschreibt den Vorschauwert am Random Dot Field.")]
+        [Tooltip("How fast the binoculars turn, in degrees per second. Simulated: only used with Object " +
+            "Angle. Guided head movement: the average speed of the head.")]
         private float sweepSpeed = 1.2f;
 
-        [Header("Active Head Tracked Sweep")]
+        [Header("Head-Tracked Movement")]
         [FormerlySerializedAs("motionSeconds")]
         [FormerlySerializedAs("motionDurationSeconds")]
         [SerializeField, Min(0.1f)]
-        [Tooltip("Wie lange die Punkte im HeadTracked-Block zu sehen sind, in Sekunden. " +
-            "Die Bewegung kann frei oder optional geführt sein.")]
+        [Tooltip("How long the dots are shown in a head-tracked trial (s).")]
         private float headTrackedSeconds = 5f;
 
         [SerializeField, Range(0.1f, 30f)]
-        [Tooltip("Wie weit die Person den Kopf im HeadTracked-Block zu jeder Seite drehen soll, in Grad.")]
+        [Tooltip("Guided head movement: how far to turn the head to each side, in degrees.")]
         private float sweepAmplitudeDegrees = 2f;
 
         [SerializeField]
-        [Tooltip("Vor dem aktiven Bewegungsblock die Kopfbewegung mit Soll- und Ist-Marker üben.")]
+        [Tooltip("Before head-tracked trials, practice the head movement with a target marker.")]
         private bool trainHeadMovement = true;
 
         [SerializeField, Range(2, 10)]
-        [Tooltip("So viele passende Übungsschwenks hintereinander, abwechselnd rechts und links zuerst, sind für den aktiven Block nötig.")]
+        [Tooltip("How many good practice turns in a row are needed before the head-tracked trials start.")]
         private int requiredGoodTrainingSweeps = 4;
 
         [SerializeField, Range(0.1f, 3f)]
-        [Tooltip("Maximaler zeitgewichteter mittlerer Winkelfehler zwischen Kopfbewegung und Sinusbahn. Gilt im Training und bei aktiven Haupttrials.")]
+        [Tooltip("How far the head may be off the guided path on average, in degrees.")]
         private float maximumProfileErrorDegrees = 0.9f;
 
         [SerializeField, Range(0.1f, 3f)]
-        [Tooltip("Maximaler Fehler an den beiden Soll-Umkehrpositionen im Training.")]
+        [Tooltip("Practice: how far the head may miss the two turning points, in degrees.")]
         private float maximumTrainingEndpointErrorDegrees = 0.9f;
 
         [FormerlySerializedAs("headTrackedCoverageYawDegrees")]
         [SerializeField, Range(3f, 60f)]
-        [Tooltip("So weit darf der Kopf im HeadTracked-Block von der Blickrichtung zu Trialbeginn weg " +
-            "drehen (in jede Richtung), ohne dass am Rand eine leere Fläche erscheint. Größere Werte " +
-            "brauchen deutlich mehr Punkte. Gilt auch für die Vorschau mit Motion Mode HeadTracked.")]
+        [Tooltip("How far the head may turn from the start direction without reaching the end of the dot " +
+            "field, in degrees. Larger values need many more dots.")]
         private float headTurnSafetyDegrees = 30f;
 
         [FormerlySerializedAs("validateHeadTrackedMotion")]
         [SerializeField]
-        [Tooltip("Ungenügende, zu schnelle oder zu große aktive Kopfbewegungen werden gespeichert und später wiederholt.")]
+        [Tooltip("Head movements that are too small, too fast or too big are saved and repeated later.")]
         private bool checkHeadMotion = true;
 
         [SerializeField]
-        [Tooltip("Aktive Haupttrials sind frei: links/rechts, oben/unten und ohne Solltempo. " +
-            "Keine Wiederholung wegen Sinusbahn, Wendepunkten oder Geschwindigkeit. " +
-            "Blickkontrolle bleibt unabhängig aktiv. Das geführte Kopftraining bleibt erhalten.")]
+        [Tooltip("On = the head may move in any direction at any speed. Off = the participant follows a " +
+            "guided left-right path. The gaze check stays on.")]
         private bool freeHeadMovement = true;
 
         [SerializeField]
-        [Tooltip("Nur mit Free Head Movement: Die Punkte bleiben sichtbar, bis die Person antwortet. " +
-            "Kein Zeitlimit, keine Richtung und kein Tempo vorgegeben; Head Tracked Seconds gilt dann nicht. " +
-            "Nach der Antwort kommt das graue Feld (Pause Seconds), dann der nächste Trial.")]
+        [Tooltip("Dots stay until the participant answers. No time limit, direction or speed. Only with " +
+            "Free Head Movement.")]
         private bool openEndedActiveTrials = true;
 
-        [Header("Active Velocity Gate")]
+        [Header("Dots Only At Right Head Speed")]
         [SerializeField]
-        [Tooltip("Aktive Trials - Punkte erst zeigen, wenn der Kopf gleichmäßig im richtigen Tempo " + 
-            "schwenkt, dann für Simulated Sweep Seconds (zB 0,8s) wie bei Simulated. " +
-            "Hat Vorrang vor Open Ended Active Trials.")]
+        [Tooltip("Head-tracked trials: dots only appear while the head turns steadily at the right speed, " +
+            "then stay for the same time as in simulated trials. Replaces No Time Limit.")]
         private bool useVelocityGate = true;
 
         [SerializeField]
-        [Tooltip("Welche Kopfdrehung zählt. Horizontal = links oder rechts wie der simulierte Schwenk.")]
+        [Tooltip("Which head turn counts. Horizontal = left or right, like the simulated movement.")]
         private HeadVelocityAxis velocityGateAxis = HeadVelocityAxis.Horizontal;
 
         [SerializeField, Range(0.05f, 1f)]
-        [Tooltip("Erlaubte Abweichung vom Zieltempo als Anteil. 0,5 = Zieltempo plus/minus 50%.")]
+        [Tooltip("How much the head speed may differ from the target speed. 0.5 = target ±50 %.")]
         private float velocityTolerance = 0.5f;
 
         [SerializeField, Range(0f, 1f)]
-        [Tooltip("So lange muss das Tempo am Stück im Bereich liegen, bevor die Punkte erscheinen, in Sekunden.")]
+        [Tooltip("How long the head speed must be right before the dots appear (s).")]
         private float velocityHoldSeconds = 0.15f;
 
         [SerializeField, Range(0f, 0.5f)]
-        [Tooltip("So lange darf das Tempo während der Darbietung am Stück außerhalb liegen, " +
-            "bevor der Trial ungültig wird und später wiederholt wird, in Sekunden.")]
+        [Tooltip("How long the head speed may be wrong while the dots are shown before the trial is " +
+            "repeated later (s).")]
         private float velocityGraceSeconds = 0.1f;
 
         [SerializeField, Range(0.02f, 0.5f)]
-        [Tooltip("Glättung der gemessenen Kopfgeschwindigkeit (Zeitkonstante in Sekunden).")]
+        [Tooltip("Smooths the measured head speed so small shakes do not count (s).")]
         private float velocitySmoothingSeconds = 0.1f;
 
-        [Header("Simulated Panning Practice")]
+        [Header("Practice")]
         [SerializeField]
-        [Tooltip("Vor einem simulierten Bewegungsblock eigene Übungstrials ohne Kopfbewegungs-Sinus.")]
+        [Tooltip("Before simulated trials, give practice trials without head movement.")]
         private bool trainSimulatedMotion = true;
 
         [SerializeField]
@@ -261,95 +264,94 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private int simulatedTrainingRepeatsPerValue = 2;
 
         [SerializeField]
-        [Tooltip("Vor den Übungstrials je ein beschriftetes Beispiel für KONVEX und KONKAV, wie beim " +
-            "Checkerboard: erst länger (Example Long Seconds), dann noch einmal so kurz wie in der " +
-            "Messung (Simulated Sweep Seconds). Danach Übung ohne Hinweise.")]
+        [Tooltip("Before the practice, show one labelled example for CONVEX and CONCAVE: first long, then " +
+            "as short as in the real test.")]
         private bool showSimulatedExamples = true;
 
         [SerializeField, Range(0f, 2f)]
-        [Tooltip("k des Beispiels für KONVEX.")]
+        [Tooltip("k value of the convex example.")]
         private float exampleConvexK = 1.2f;
 
         [SerializeField, Range(0f, 2f)]
-        [Tooltip("k des Beispiels für KONKAV.")]
+        [Tooltip("k value of the concave example.")]
         private float exampleConcaveK = 0.2f;
 
         [SerializeField, Range(0.5f, 10f)]
-        [Tooltip("Erste, längere Darbietung jedes Beispiels in Sekunden. Gleiche Geschwindigkeit wie " +
-            "in der Messung, nur länger, also ein weiterer Schwenk.")]
+        [Tooltip("How long the first, long showing of each example lasts (s).")]
         private float exampleLongSeconds = 2.5f;
 
         [SerializeField, Range(0.2f, 10f)]
-        [Tooltip("Wie lange der Hinweistext vor jeder Beispiel-Darbietung im Headset steht, in Sekunden.")]
+        [Tooltip("How long the text before each example is shown (s).")]
         private float exampleTextSeconds = 3f;
 
         [SerializeField]
-        [Tooltip("Nach jeder Übungsantwort kurz anzeigen, ob sie zum Beispiel passte. Nur bei eindeutigen " +
-            "Extremwerten (Grenzen unten); für k dazwischen gibt es bewusst keine Rückmeldung, " +
-            "damit keine persönliche Grenze antrainiert wird. Gilt nicht in der Messung. " +
-            "Standardmäßig aus: die beschrifteten Beispiele ersetzen sie.")]
+        [Tooltip("After each practice answer, show if it was right. Only for clear k values (see below), " +
+            "never in the real test.")]
         private bool simulatedTrainingFeedback;
 
         [SerializeField, Range(0f, 2f)]
-        [Tooltip("Übungs-k bis zu diesem Wert gilt eindeutig als KONKAV.")]
+        [Tooltip("Practice k values up to this count as clearly concave.")]
         private float feedbackConcaveMaxK = 0.3f;
 
         [SerializeField, Range(0f, 2f)]
-        [Tooltip("Übungs-k ab diesem Wert gilt eindeutig als KONVEX.")]
+        [Tooltip("Practice k values from this count as clearly convex.")]
         private float feedbackConvexMinK = 1.1f;
 
         [SerializeField, Range(0.2f, 5f)]
-        [Tooltip("Wie lange die Rückmeldung im Headset steht, in Sekunden.")]
+        [Tooltip("How long right/wrong is shown (s).")]
         private float feedbackSeconds = 1.5f;
 
         [FormerlySerializedAs("headTrackedTurnaroundThresholdDegrees")]
         [SerializeField, Range(0.5f, 30f)]
-        [Tooltip("Diese Auslenkung muss auf beiden Seiten erreicht werden. Bei einer Zielamplitude von 2 Grad sind 1,5 Grad ein robuster Umkehrpunkt.")]
+        [Tooltip("How far the head must turn to each side before it counts as a turn, in degrees.")]
         private float turnaroundDegrees = 1.5f;
 
         [FormerlySerializedAs("requiredHeadSweepAlternations")]
         [SerializeField, Range(1, 10)]
-        [Tooltip("Wie viele vollständige Wechsel zwischen den beiden Umkehrpunkten mindestens vorkommen müssen.")]
+        [Tooltip("Minimum number of full left-right turns.")]
         private int requiredSweeps = 1;
 
         [FormerlySerializedAs("maximumValidHeadYawDegrees")]
         [SerializeField, Range(0f, 30f)]
-        [Tooltip("So weit darf der Kopf höchstens zur Seite gedreht werden, in Grad. Wer weiter dreht, dessen Durchgang zählt nicht.")]
+        [Tooltip("Turning the head further than this makes the trial invalid, in degrees.")]
         private float maxHeadTurnDegrees = 4f;
 
         [FormerlySerializedAs("minimumMeanHeadSpeedDegreesPerSecond")]
         [SerializeField, Range(0f, 20f)]
-        [Tooltip("So schnell muss der Kopf im Schnitt mindestens bewegt werden, in Grad pro Sekunde. Darunter war die Bewegung zu langsam.")]
+        [Tooltip("Head moving slower than this on average makes the trial invalid (degrees per second).")]
         private float minMeanHeadSpeed = 0.5f;
 
         [FormerlySerializedAs("maximumPeakHeadSpeedDegreesPerSecond")]
         [SerializeField, Range(0.1f, 30f)]
-        [Tooltip("So schnell darf der Kopf in der Spitze höchstens werden, in Grad pro Sekunde. Darüber war die Bewegung ein Ruck.")]
+        [Tooltip("Head moving faster than this at any moment makes the trial invalid (degrees per second).")]
         private float maxPeakHeadSpeed = 2.5f;
 
-        [Header("Fixation And Repeats")]
+        [Header("Gaze Check")]
         [SerializeField]
-        [Tooltip("Die Punkte kommen erst, wenn der Blick ruhig auf dem Kreuz liegt, und werden dabei auch weiter überwacht. Für eine echte Messung muss das an sein.")]
+        [Tooltip("The dots only appear when the participant looks steadily at the cross. Must be on for " +
+            "real measurements.")]
         private bool requireFixation = true;
 
         [FormerlySerializedAs("maximumOffTargetSeconds")]
         [SerializeField, Min(0f)]
-        [Tooltip("So lange darf die Person am Stück vom Kreuz wegschauen. Danach wird der Durchgang ungültig.")]
+        [Tooltip("How long the participant may look away from the cross before the trial is repeated later " +
+            "(s).")]
         private float maxLookAwaySeconds = 0.15f;
 
         [FormerlySerializedAs("maximumInvalidGazeSeconds")]
         [SerializeField, Min(0f)]
-        [Tooltip("So lange darf am Stück gar kein brauchbarer Blickwert kommen, zum Beispiel beim Blinzeln.")]
+        [Tooltip("How long the eye tracker may give no gaze data, e.g. when blinking, before the trial is " +
+            "repeated later (s).")]
         private float maxNoDataSeconds = 0.2f;
 
         [FormerlySerializedAs("maximumGazeSampleAgeSeconds")]
         [SerializeField, Min(0.01f)]
-        [Tooltip("Ist der letzte Blickwert älter als das hier, gilt er als nicht mehr aktuell und zählt wie gar kein Wert.")]
+        [Tooltip("Gaze data older than this counts as missing (s).")]
         private float maxSampleAgeSeconds = 0.1f;
 
         [FormerlySerializedAs("maximumAttemptsPerTrial")]
         [SerializeField, Min(0)]
-        [Tooltip("Wie oft derselbe Durchgang höchstens wiederholt werden darf. 0 heißt: so lange, bis es klappt.")]
+        [Tooltip("How often one trial may be tried in total. 0 = until it works.")]
         private int maxRepeatsPerTrial;
 
         [Header("Timing")]
@@ -362,7 +364,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private Key startSessionKey = Key.F5;
 
         [SerializeField]
-        [Tooltip("Startet im Ruhezustand die jeweils andere Bewegungsart als separate Sitzung.")]
+        [Tooltip("Starts a new session with the other movement type.")]
         private Key startOtherMotionSessionKey = Key.F7;
 
         [SerializeField]
@@ -372,7 +374,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private Key trainingKey = Key.T;
 
         [SerializeField]
-        [Tooltip("Reine Live-Vorschau ohne Sitzung, Training oder Datenaufzeichnung ein/aus.")]
+        [Tooltip("Turns the preview on or off. Nothing is recorded.")]
         private Key previewKey = Key.P;
 
         // Stand vor dem ersten "Vorschau-Werte übernehmen". Leer heißt: es wurde
@@ -380,7 +382,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [SerializeField, HideInInspector]
         private string valuesBeforePreviewTakeover = string.Empty;
 
-        [Header("Runtime Status (Read Only)")]
+        [Header("Current Status")]
         [SerializeField]
         private RandomDotSessionState sessionState = RandomDotSessionState.Idle;
 

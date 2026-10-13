@@ -39,33 +39,33 @@ namespace GlobeEffect.VRCheckerboard
 
         [Header("Field Of View")]
         [SerializeField]
-        [Tooltip("Der Kopf im XR-Rig. Normalerweise ist das die Main Camera im XR Origin.")]
+        [Tooltip("The head camera of the XR rig, usually the Main Camera.")]
         private Transform observer;
 
         [FormerlySerializedAs("angularDiameterDegrees")]
         [SerializeField, Range(1f, 170f)]
-        [Tooltip("Wie groß der runde Ausschnitt ist, in Grad. 90 heißt 90 Grad von einem Rand zum anderen.")]
+        [Tooltip("Size of the round window in degrees, from edge to edge.")]
         private float fieldOfViewDegrees = 90f;
 
         [FormerlySerializedAs("apertureEdgeSoftnessDegrees")]
         [SerializeField, Range(0f, 10f)]
-        [Tooltip("Breite des weichen Kreisrands in Grad, mittig auf dem FOV-Rand: voll sichtbar bis " +
-            "FOV/2 - Softness/2, 50 % genau bei FOV/2, weg ab FOV/2 + Softness/2. Das FOV ist damit der " +
-            "Halbwertsdurchmesser. 0 gibt eine harte Kante bei FOV/2.")]
+        [Tooltip("Width of the soft edge of the round window, in degrees. The edge fades from full to " +
+            "nothing; the window size is measured at the middle of this fade. 0 = sharp edge.")]
         private float edgeSoftnessDegrees = 1f;
 
         [SerializeField]
-        [Tooltip("Schaltet den runden Ausschnitt an. Zum Prüfen kann man ihn ausmachen, dann sieht man das ganze viereckige Gitter.")]
+        [Tooltip("Shows the checkerboard in a round window. Turn off to see the whole grid.")]
         private bool useCircularAperture = true;
 
         [Header("Grid Distortion")]
         [SerializeField, Range(0f, 1.4f)]
-        [Tooltip("l = 1 gibt ein gerades Gitter, l = 0,5 den Helmholtz-Punkt. Kleinere Werte gehen weiter in die kissenförmige Richtung, Werte über 1 in die tonnenförmige.")]
+        [Tooltip("Grid distortion (l). 1 = straight grid, 0.5 = Helmholtz point. Smaller = pincushion, " +
+            "above 1 = barrel.")]
         private float visualSpaceL = 0.5f;
 
         [FormerlySerializedAs("gridLineSpacingDegrees")]
         [SerializeField, Range(0.5f, 45f)]
-        [Tooltip("Abstand zwischen zwei Gitterlinien in Grad. Oomes et al. haben 10 Grad benutzt.")]
+        [Tooltip("Size of one checkerboard square in degrees.")]
         private float gridSpacingDegrees = 10f;
 
         [SerializeField]
@@ -76,17 +76,17 @@ namespace GlobeEffect.VRCheckerboard
 
         [Header("Display And Fixation")]
         [SerializeField]
-        [Tooltip("Auf beiden Augen zeigen oder nur auf einem.")]
+        [Tooltip("Show to both eyes or only one.")]
         private CheckerboardEyePresentation eyePresentation =
             CheckerboardEyePresentation.BothEyes;
 
         [SerializeField]
-        [Tooltip("Zeigt das Kreuz in der Mitte.")]
+        [Tooltip("Shows the cross in the center.")]
         private bool showFixationTarget = true;
 
         [FormerlySerializedAs("fixationTargetSizeDegrees")]
         [SerializeField, Range(0.05f, 5f)]
-        [Tooltip("Wie groß das Fixationskreuz insgesamt ist, in Grad.")]
+        [Tooltip("Size of the cross in degrees.")]
         private float fixationSizeDegrees = 0.5f;
 
         [SerializeField]
@@ -100,7 +100,8 @@ namespace GlobeEffect.VRCheckerboard
         // nicht 0,5, sondern ungefähr 0,73 (0,73 hoch 2,2 ergibt 0,5).
         [FormerlySerializedAs("fixationBackgroundColor")]
         [SerializeField]
-        [Tooltip("Grauer Hintergrund in der Fixationsphase und rund um den Kreis. Bei Schwarz und Weiß als Musterfarben passt 0,73 (RGB 186): Das ist genauso hell wie beide im Schnitt. 0,5 wäre im Headset deutlich dunkler.")]
+        [Tooltip("Grey around the window and between images. 0.73 is as bright as black and white on " +
+            "average.")]
         private Color backgroundColor = new Color(0.73f, 0.73f, 0.73f);
 
         // Die Maske soll ein Nachbild des Schachbretts verhindern. Eine Maske wirkt
@@ -116,55 +117,52 @@ namespace GlobeEffect.VRCheckerboard
         // Kopfbewegung.
         [Header("Noise Mask")]
         [SerializeField]
-        [Tooltip("Breitband: Zufallsmuster in mehreren Zellgrößen gleich " +
-            "gewichtet überlagert, dann schwarz/weiß. Maskiert grobe und feine Strukturen des Schachbretts " +
-            ". Einfach: eine Zellgröße in Grad (Noise Dot Size Degrees). Fein: Zellgröße in " +
-            "Bildpixeln (Noise Dot Size Pixels), Ameisenmuster.")]
+        [Tooltip("Kind of noise between images. Fine and coarse spots: covers the checkerboard best. One " +
+            "spot size: all spots the same size. Fine pixels: very fine 'TV static'.")]
         private NoiseMaskType noiseType = NoiseMaskType.Broadband;
 
         [SerializeField, Range(0.1f, 10f)]
-        [Tooltip("Breitband: kleinste Zellgröße in Grad (feinste Oktave).")]
+        [Tooltip("Size of the smallest spots, in degrees.")]
         private float noiseBroadbandFinestDegrees = 0.5f;
 
         [SerializeField, Range(0.5f, 20f)]
-        [Tooltip("Breitband: größte Zellgröße in Grad (gröbste Oktave). Bei 10-Grad-Schachbrettfeldern " +
-            "etwa 8: grob genug für die Grundfrequenz des Schachbretts, aber kein eigenes grobes Muster.")]
+        [Tooltip("Size of the largest spots, in degrees. About 8 fits 10 degree checkerboard squares.")]
         private float noiseBroadbandCoarsestDegrees = 8f;
 
         [SerializeField, Range(1f, 10f)]
-        [Tooltip("Nur bei Noise Type Fein. Wie groß ein Punkt des Rauschens ist, in Bildpixeln. 1 ist das Feinste, was das Headset zeigen kann. Ab etwa 1,5 bleibt das Bild auch bei kleinen Kopfbewegungen ruhig. Gemeint sind die Pixel, die Unity rendert. Steht die Auflösung in SteamVR über 100 %, ist so ein Pixel etwas kleiner als ein Pixel im Display.")]
+        [Tooltip("Size of one spot in screen pixels. 1 = finest possible.")]
         private float noiseDotSizePixels = 1.5f;
 
         [SerializeField, Range(0.02f, 10f)]
-        [Tooltip("Nur bei Noise Type Einfach. Wie groß ein einzelner Punkt des Rauschens ist, in Grad in der Bildmitte. Unter etwa 0,08 Grad ist ein Punkt in der Vive Pro Eye kleiner als ein Bildpixel.")]
+        [Tooltip("Size of one spot in degrees.")]
         private float noiseDotSizeDegrees = 0.15f;
 
         [SerializeField, Range(0f, 120f)]
-        [Tooltip("Wie oft pro Sekunde das Rauschen neu ausgewürfelt wird. 0 lässt das Bild stehen. Mehr als die Bildrate des Headsets (90 Hz) bringt nichts.")]
+        [Tooltip("How often per second the noise changes. 0 = still image. More than 90 has no effect.")]
         private float noiseRefreshRateHz = 30f;
 
-        [Header("Response Text")]
+        [Header("Text")]
         [FormerlySerializedAs("responsePromptColor")]
         [SerializeField]
         private Color textColor = Color.white;
 
         [FormerlySerializedAs("responsePromptDistanceMeters")]
         [SerializeField, Min(0.5f)]
-        [Tooltip("Wie weit vorne der Text liegt. Das hat nichts mit dem Schachbrett zu tun.")]
+        [Tooltip("How far away the text is shown (m).")]
         private float textDistanceMeters = 10f;
 
         [FormerlySerializedAs("responsePromptCharacterSize")]
         [SerializeField, Range(0.005f, 0.1f)]
-        [Tooltip("Wie groß die Buchstaben im Text sind.")]
+        [Tooltip("Size of the letters.")]
         private float textSize = 0.04f;
 
         [SerializeField]
-        [Tooltip("Soll gleich alles sichtbar sein, wenn der Play Mode startet?")]
+        [Tooltip("Show everything right when Play Mode starts.")]
         private bool visibleAtStart = true;
 
         [Header("Advanced")]
         [SerializeField]
-        [Tooltip("Optional ein eigenes Material mit dem Checkerboard-Shader. Normalerweise bleibt das leer.")]
+        [Tooltip("Own material with the checkerboard shader. Usually leave empty.")]
         private Material materialOverride;
 
         private MeshFilter meshFilter;
@@ -819,13 +817,13 @@ namespace GlobeEffect.VRCheckerboard
     // Art der Noise-Maske (siehe Tooltip an noiseType).
     public enum NoiseMaskType
     {
-        [InspectorName("Fein (Pixel, Ameisenmuster)")]
+        [InspectorName("Fine Pixels (TV Static)")]
         FinePixels = 0,
 
-        [InspectorName("Eine Zellgröße in Grad")]
+        [InspectorName("One Spot Size")]
         SingleScaleDegrees = 1,
 
-        [InspectorName("Breitband (mehrere Zellgrößen)")]
+        [InspectorName("Fine And Coarse Spots")]
         Broadband = 2
     }
 

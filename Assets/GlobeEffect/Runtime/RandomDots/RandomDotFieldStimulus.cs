@@ -76,41 +76,42 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         [Header("Observer And Dot Field")]
         [SerializeField]
-        [Tooltip("Der Kopf im XR-Rig, also normalerweise die Main Camera.")]
+        [Tooltip("The head camera of the XR rig, usually the Main Camera.")]
         private Transform observer;
 
         [FormerlySerializedAs("angularDiameterDegrees")]
         [SerializeField, Range(5f, 170f)]
-        [Tooltip("Scheinbarer Winkeldurchmesser des sichtbaren Fernglasfelds im HMD, in Grad.")]
+        [Tooltip("Size of the round binocular window in degrees.")]
         private float fieldOfViewDegrees = 90f;
 
         [FormerlySerializedAs("apertureEdgeSoftnessDegrees")]
         [SerializeField, Range(0f, 10f)]
-        [Tooltip("Breite des weichen Kreisrands in Grad, mittig auf dem FOV-Rand: voll sichtbar bis " +
-            "FOV/2 - Softness/2, 50 % genau bei FOV/2, weg ab FOV/2 + Softness/2. Das FOV ist damit der " +
-            "Halbwertsdurchmesser. 0 gibt eine harte Kante bei FOV/2.")]
+        [Tooltip("Width of the soft edge of the round window, in degrees. The edge fades from full to " +
+            "nothing; the window size is measured at the middle of this fade. 0 = sharp edge.")]
         private float edgeSoftnessDegrees = 1f;
 
         [SerializeField, Min(MinimumRadiusMeters)]
-        [Tooltip("Nur die technische Größe des Meshes. Der Shader zeichnet Richtungen, deshalb sieht man diesen Abstand nicht als Entfernung.")]
+        [Tooltip("Technical size of the dot sphere. You cannot see this distance. Leave it.")]
         private float fieldRadiusMeters = 5f;
 
         [FormerlySerializedAs("worldCoverageDiameterDegrees")]
         [SerializeField, Range(1f, MaximumCoverageDegrees)]
-        [Tooltip("Wie groß die erzeugte Außenwelt ist, in Grad, vor der Instrumentenabbildung. Gilt nur für die Vorschau. Im Versuch rechnet der Experiment Manager die passende Größe für jeden Trial selbst aus.")]
+        [Tooltip("Size of the dot field in the preview, in degrees. In trials it is calculated " +
+            "automatically.")]
         private float worldCoverageDegrees = 40.6f;
 
         [SerializeField, Range(0.01f, 1f)]
-        [Tooltip("Wie dicht die Punkte in der Bildmitte liegen, in Punkten pro Quadratgrad. Die Punktzahl rechnet das Skript daraus selbst aus, damit es bei jedem m gleich dicht aussieht. 0,19 heißt ungefähr ein Punkt alle 2,3 Grad und entspricht dem alten Stand mit 24.500 Punkten bei m = 10.")]
+        [Tooltip("How many dots per square degree in the image center. Looks the same at every " +
+            "magnification.")]
         private float dotDensity = 0.19f;
 
         [FormerlySerializedAs("dotAngularDiameterDegrees")]
         [SerializeField, Range(0.02f, 2f)]
-        [Tooltip("Wie groß ein einzelner Punkt ist, in Grad.")]
+        [Tooltip("Size of one dot in degrees.")]
         private float dotSizeDegrees = 0.22f;
 
         [SerializeField]
-        [Tooltip("Gleicher Seed heißt: dieselben Punkte an denselben Stellen in denselben Farben.")]
+        [Tooltip("Same number = the same dots in the same places and colors.")]
         private int randomSeed = 20260828;
 
         [SerializeField]
@@ -120,30 +121,31 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private Color lightColor = Color.white;
 
         [SerializeField]
-        [Tooltip("Farbe innerhalb der kreisförmigen Fernglasöffnung, unabhängig vom Außenhintergrund.")]
+        [Tooltip("Color inside the round window, behind the dots.")]
         private Color fieldBackgroundColor = Color.gray;
 
         [SerializeField]
-        [Tooltip("Farbe außerhalb der kreisförmigen Öffnung. Edge Softness blendet das Punktfeld zu dieser Farbe aus.")]
+        [Tooltip("Color outside the round window.")]
         private Color backgroundColor = Color.black;
 
         [SerializeField, Range(0f, 1f)]
-        [Tooltip("Wie viele Punkte hell sind. 0,5 heißt halb schwarz und halb weiß.")]
+        [Tooltip("Share of light dots. 0.5 = half dark, half light.")]
         private float lightDotFraction = 0.5f;
 
-        [Header("Merlitz Instrument Optics")]
+        [Header("Binocular Optics")]
         [FormerlySerializedAs("merlitzK")]
         [FormerlySerializedAs("visualSpaceL")]
         [SerializeField, Range(0f, 2f)]
-        [Tooltip("Verzeichnung k des simulierten Instruments. k = 1 ist die Tangentenbedingung, k = 0,5 der Helmholtz-/Kreispunkt. Werte über 1 setzen die Familie in die tonnenförmige Richtung fort.")]
+        [Tooltip("Distortion of the simulated binoculars (k). 1 = straight, 0.5 = Helmholtz point. Above 1 " +
+            "= barrel shape.")]
         private float instrumentDistortionK = 0.5f;
 
         [SerializeField, Range(MinimumInstrumentMagnification, MaximumInstrumentMagnification)]
-        [Tooltip("Paraxiale Fernglasvergrößerung m. 10 entspricht einem typischen 10x-Fernglas.")]
+        [Tooltip("Magnification of the binoculars (m). 10 = normal 10x binoculars.")]
         private float instrumentMagnificationM = 10f;
 
         [SerializeField, Range(MinimumContentZoom, MaximumContentZoom)]
-        [Tooltip("Optionaler zusätzlicher Zoom nach der Instrumentenabbildung. Für den Fernglasversuch normalerweise 1 lassen.")]
+        [Tooltip("Extra zoom on top of the magnification. Usually 1.")]
         private float contentZoom = 1f;
 
         [SerializeField]
@@ -161,50 +163,51 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [SerializeField]
         private Color fixationColor = Color.red;
 
-        [Header("Motion (Preview And Runtime Status)")]
+        [Header("Movement")]
         [SerializeField]
         private RandomDotMotionMode motionMode = RandomDotMotionMode.SimulatedYaw;
 
         [SerializeField]
-        [Tooltip("Achse des simulierten Schwenks. Aktive Kopfbewegung funktioniert auch oben/unten.")]
+        [Tooltip("Direction of the simulated movement.")]
         private RandomDotSweepAxis sweepAxis = RandomDotSweepAxis.Horizontal;
 
         [SerializeField, Range(MinimumSweepAmplitudeDegrees, MaximumSweepAmplitudeDegrees)]
-        [Tooltip("Wie weit der simulierte Schwenk zu jeder Seite der Mitte reicht. Er läuft einmal von der einen Seite zur anderen, insgesamt also die doppelte Strecke. Beim Start einer Sitzung überschreibt der Experiment Manager diesen Wert.")]
+        [Tooltip("How far the simulated movement goes to each side. Set automatically when a session " +
+            "starts.")]
         private float simulatedYawAmplitudeDegrees = 2f;
 
         [SerializeField]
-        [Tooltip("Nur Vorschau: Bildmitte hält die sichtbare Geschwindigkeit bei jedem m gleich. " +
-            "Objektwinkel hält stattdessen den virtuellen Schwenk gleich schnell. " +
-            "Für Trainings-/Mess-Trials gelten die Einstellungen am Experiment Manager.")]
+        [Tooltip("Preview only. Image Center: dots in the middle move equally fast at every magnification. " +
+            "Object Angle: the binoculars turn equally fast.")]
         private RandomDotSweepSpeedReference previewSpeedReference = RandomDotSweepSpeedReference.ImageCenter;
 
         [SerializeField, Range(0.5f, 120f)]
-        [Tooltip("Nur Vorschau: gewünschte Punktgeschwindigkeit nahe der Bildmitte in Grad pro Sekunde. " +
-            "Der virtuelle Schwenk wird durch m und Content Zoom geteilt.")]
+        [Tooltip("Preview only: speed of the dots in the image center (degrees per second).")]
         private float previewImageCenterSpeed = 12f;
 
         [SerializeField, Range(MinimumSweepSpeed, MaximumSweepSpeed)]
-        [Tooltip("Wie schnell das Instrument im simulierten Schwenk über die Außenwelt schwenkt, in Grad Objektwinkel pro Sekunde. Im Bild laufen die Punkte in der Mitte m-mal so schnell. Die Geschwindigkeit bleibt die ganze Zeit gleich. Beim Start einer Sitzung überschreibt der Experiment Manager diesen Wert.")]
+        [Tooltip("How fast the binoculars turn (degrees per second). The dots in the middle move m times " +
+            "faster. Set automatically when a session starts.")]
         private float simulatedYawSpeedDegreesPerSecond = 1.2f;
 
         [SerializeField]
-        [Tooltip("RightFirst heißt: Das Fernglas schwenkt nach rechts, bei vertikaler Achse nach oben. LeftFirst schwenkt nach links bzw. unten. Die Punkte wandern dabei jeweils zur anderen Seite. Der Experiment Manager setzt die Richtung pro Trial.")]
+        [Tooltip("Which way the binoculars turn. The dots move the other way. Set automatically in each " +
+            "trial.")]
         private RandomDotSweepDirection sweepDirection =
             RandomDotSweepDirection.RightFirst;
 
         [SerializeField]
-        [Tooltip("Solange keine Sitzung läuft, schwenkt das Feld immer weiter, damit man sich die Bewegung in Ruhe anschauen kann. Der Schwenk läuft dabei über die ganze Punktwelt und fängt am Ende wieder von vorne an. Je größer World Coverage Degrees, desto länger dauert ein Durchlauf. Im Versuch läuft der Schwenk immer nur einmal und so lang wie am Experiment Manager eingestellt.")]
+        [Tooltip("Preview only: the movement repeats so you can watch it calmly.")]
         private bool loopSweepInPreview = true;
 
-        [Header("Preview Reference Grid (Not An Experimental Stimulus)")]
+        [Header("Straight Grid (Preview Only)")]
         [SerializeField]
-        [Tooltip("Gerades, kopffestes Karopapier zum Vergleichen der Punktbahnen. Keine Verzeichnung, " +
-            "kein Mitschwenken. Während Training und Messung immer aus.")]
+        [Tooltip("Straight grid to compare the dot paths with. Preview only, never shown in practice or " +
+            "trials.")]
         private bool showReferenceGrid;
 
         [SerializeField, Range(0.5f, 20f)]
-        [Tooltip("Linienabstand in der flachen u,v-Bildebene, als Winkelabstand nahe der Mitte angegeben.")]
+        [Tooltip("Distance between the grid lines, in degrees.")]
         private float referenceGridSpacingDegrees = 5f;
 
         [SerializeField, Range(0.5f, 4f)]
@@ -218,7 +221,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private bool visibleAtStart = true;
 
         [SerializeField]
-        [Tooltip("Optional ein eigenes Material mit dem Random-Dot-Shader. Normalerweise bleibt das leer.")]
+        [Tooltip("Own material with the random dot shader. Usually leave empty.")]
         private Material materialOverride;
 
         private MeshFilter meshFilter;
@@ -944,15 +947,19 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     public enum RandomDotMotionMode
     {
         // Die Person dreht den Kopf selbst.
+        [InspectorName("Head-Tracked (Participant Turns Head)")]
         HeadTracked = 0,
 
         // Der Computer macht die Bewegung. Das ist der normale Fall im Versuch.
+        [InspectorName("Simulated (Computer Moves The Dots)")]
         SimulatedYaw = 1
     }
 
     public enum RandomDotSweepDirection
     {
+        [InspectorName("Left (Or Down)")]
         LeftFirst = 0,
+        [InspectorName("Right (Or Up)")]
         RightFirst = 1
     }
 
@@ -965,10 +972,10 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     // Worauf sich die Geschwindigkeit des simulierten Schwenks bezieht.
     public enum RandomDotSweepSpeedReference
     {
-        [InspectorName("Objektwinkel (bisher): das Instrument schwenkt mit Sweep Speed")]
+        [InspectorName("Object Angle: Binoculars Turn Equally Fast")]
         ObjectAngle = 0,
 
-        [InspectorName("Bildmitte: gleiche sichtbare Geschwindigkeit bei jedem m")]
+        [InspectorName("Image Center: Dots Move Equally Fast")]
         ImageCenter = 1
     }
 }

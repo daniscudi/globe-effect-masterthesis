@@ -12,12 +12,12 @@ namespace GlobeEffect.VRCheckerboard
     [DefaultExecutionOrder(100)]
     public sealed class NaturalScenePanoramaPreview : MonoBehaviour
     {
-        [Header("Foto und Kamera")]
+        [Header("Photo And Camera")]
         public Texture2D panorama;
         public Camera observerCamera;
         [Range(-180, 180)] public float panoramaYawDegrees = 90;
 
-        [Header("Instrument – live einstellbar")]
+        [Header("Binoculars (Change Live)")]
         [Range(0, 1.4f)] public float distortionK = 1;
         [Range(1, 20)] public float magnification = 1;
         [Range(0.1f, 4)] public float contentZoom = 1;
@@ -25,13 +25,13 @@ namespace GlobeEffect.VRCheckerboard
         [Range(0, 10)] public float edgeSoftnessDegrees = 1;
         public Color backgroundColor = Color.black;
 
-        [Header("Bewegung – keine Trials")]
+        [Header("Movement (No Trials)")]
         public RandomDotMotionMode motionMode = RandomDotMotionMode.SimulatedYaw;
         public RandomDotSweepAxis sweepAxis = RandomDotSweepAxis.Horizontal;
         public RandomDotSweepDirection sweepDirection = RandomDotSweepDirection.RightFirst;
-        [Tooltip("Bildgeschwindigkeit im Zentrum. Die virtuelle Kopfgeschwindigkeit wird durch m und Zoom geteilt.")]
+        [Tooltip("Speed in the image center (degrees per second).")]
         [Range(0, 60)] public float imageCenterSpeed = 12;
-        [Tooltip("Amplitude im angezeigten Bild. Auch sie wird durch m und Zoom geteilt.")]
+        [Tooltip("How far the image moves to each side, in degrees.")]
         [Range(1, 40)] public float imageSweepAmplitudeDegrees = 12;
         public bool paused;
         public bool showFixationTarget = true;

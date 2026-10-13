@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using GlobeEffect.VRCheckerboard.Experiment;
@@ -11,9 +12,97 @@ namespace GlobeEffect.VRCheckerboard.Editor
     /// Einstellungszentrale für beide Versuche. Darstellung und Blickkriterium
     /// werden direkt an den verknüpften Komponenten bearbeitet, nicht kopiert.
     /// Bestehende Szenen, Feldnamen und Zuständigkeiten bleiben erhalten.
+    ///
+    /// Alle sichtbaren Texte sind bewusst einfaches Englisch, damit auch Leute
+    /// ohne Vorwissen den Versuch einstellen können.
     /// </summary>
     public abstract class ExperimentManagerEditor : UnityEditor.Editor
     {
+        // Einfachere Anzeigenamen nur für Felder, deren Name sonst unverständlich
+        // wäre. Die serialisierten Feldnamen bleiben unverändert (Szenen, Tests).
+        private static readonly Dictionary<string, string> SimpleLabels = new()
+        {
+            // Noise-Maske und Nachbild-Test
+            ["noiseBroadbandFinestDegrees"] = "Smallest Spots (degrees)",
+            ["noiseBroadbandCoarsestDegrees"] = "Largest Spots (degrees)",
+            ["noiseDotSizeDegrees"] = "Spot Size (degrees)",
+            ["noiseDotSizePixels"] = "Spot Size (pixels)",
+            ["noiseRefreshRateHz"] = "Noise Changes Per Second",
+            ["maskDemoKey"] = "Afterimage Test Key",
+            ["maskDemoPatternSeconds"] = "Afterimage Test: Checkerboard (s)",
+            ["maskDemoMaskSeconds"] = "Afterimage Test: Noise (s)",
+            ["maskDemoGraySeconds"] = "Afterimage Test: Grey Screen (s)",
+            // Checkerboard-Ablauf und Training
+            ["trialSequence"] = "Trial Order",
+            ["patternSeconds"] = "Checkerboard Time (s)",
+            ["answerTimeoutSeconds"] = "Time To Answer (s)",
+            ["preStimulusSeconds"] = "Time Before Checkerboard (s)",
+            ["categoryALabel"] = "Word For Convex Answer",
+            ["categoryBLabel"] = "Word For Concave Answer",
+            ["trainingExampleA"] = "Convex Example (l)",
+            ["trainingExampleB"] = "Concave Example (l)",
+            ["trainingNoiseSeconds"] = "Screen After Example (s)",
+            ["trainingFixationSeconds"] = "Min Wait Before Practice Image (s)",
+            ["visualSpaceL"] = "Grid Distortion (l)",
+            ["gridSpacingDegrees"] = "Square Size (degrees)",
+            ["useCircularAperture"] = "Round Window",
+            // Blendenrand und Fixation
+            ["edgeSoftnessDegrees"] = "Soft Edge Width (degrees)",
+            ["maxSampleAgeSeconds"] = "Ignore Gaze Data Older Than (s)",
+            ["toleranceDegrees"] = "Allowed Distance From Cross (degrees)",
+            ["requiredSteadySeconds"] = "Steady Look Needed (s)",
+            // Random Dots: Plan und Bewegung
+            ["dotSeedBase"] = "Dot Layout Seed",
+            ["instrumentMagnificationMValues"] = "Magnification Values (m)",
+            ["contentZoomValues"] = "Extra Zoom Values",
+            ["sessionMotionMode"] = "Movement Type",
+            ["simulatedSweepSeconds"] = "Dots Shown (s)",
+            ["simulatedSpeedReference"] = "Speed Measured At",
+            ["simulatedImageCenterSpeed"] = "Dot Speed In Image Center (deg/s)",
+            ["sweepSpeed"] = "Turn Speed (deg/s)",
+            ["pauseSeconds"] = "Grey Pause Between Trials (s)",
+            ["headTrackedSeconds"] = "Dots Shown (s)",
+            ["headTurnSafetyDegrees"] = "Head Turn Range (degrees)",
+            ["openEndedActiveTrials"] = "No Time Limit",
+            ["useVelocityGate"] = "Dots Only At Right Head Speed",
+            ["velocityGateAxis"] = "Head Turn Direction",
+            ["velocityTolerance"] = "Speed Tolerance",
+            ["velocityHoldSeconds"] = "Steady Time Before Dots (s)",
+            ["velocityGraceSeconds"] = "Max Time At Wrong Speed (s)",
+            ["velocitySmoothingSeconds"] = "Speed Smoothing (s)",
+            ["checkHeadMotion"] = "Repeat Bad Head Movements",
+            ["maximumProfileErrorDegrees"] = "Max Path Error (degrees)",
+            ["maximumTrainingEndpointErrorDegrees"] = "Max Turning Point Error (degrees)",
+            ["turnaroundDegrees"] = "Turn Counts From (degrees)",
+            ["requiredSweeps"] = "Min Left-Right Turns",
+            ["requiredGoodTrainingSweeps"] = "Good Practice Turns Needed",
+            // Random Dots: Training
+            ["showSimulatedExamples"] = "Show Labelled Examples",
+            ["exampleConvexK"] = "Convex Example (k)",
+            ["exampleConcaveK"] = "Concave Example (k)",
+            ["exampleLongSeconds"] = "Long Example (s)",
+            ["exampleTextSeconds"] = "Text Before Example (s)",
+            ["simulatedTrainingFeedback"] = "Show Right/Wrong After Practice",
+            ["feedbackConcaveMaxK"] = "Clearly Concave Up To (k)",
+            ["feedbackConvexMinK"] = "Clearly Convex From (k)",
+            ["feedbackSeconds"] = "Right/Wrong Shown (s)",
+            // Random Dots: Punktfeld und Vorschau
+            ["instrumentDistortionK"] = "Distortion (k)",
+            ["instrumentMagnificationM"] = "Magnification (m)",
+            ["contentZoom"] = "Extra Zoom",
+            ["fieldBackgroundColor"] = "Color Inside Window",
+            ["lightDotFraction"] = "Share Of Light Dots",
+            ["dotDensity"] = "Dots Per Square Degree",
+            ["motionMode"] = "Movement Type",
+            ["simulatedYawAmplitudeDegrees"] = "Movement Range (degrees)",
+            ["previewSpeedReference"] = "Speed Measured At",
+            ["previewImageCenterSpeed"] = "Dot Speed In Image Center (deg/s)",
+            ["simulatedYawSpeedDegreesPerSecond"] = "Binocular Turn Speed (deg/s)",
+            ["loopSweepInPreview"] = "Repeat Movement",
+            ["worldCoverageDegrees"] = "Dot Field Size (degrees)",
+            ["fieldRadiusMeters"] = "Technical: Field Radius (m)",
+        };
+
         protected abstract bool ConfigurationLocked { get; }
         public override bool RequiresConstantRepaint() => Application.isPlaying;
 
@@ -22,14 +111,15 @@ namespace GlobeEffect.VRCheckerboard.Editor
             serializedObject.Update();
             EditorGUILayout.HelpBox(explanation, MessageType.Info);
             if (ConfigurationLocked)
-                EditorGUILayout.HelpBox("Einstellungen erst nach Ende oder Abbruch ändern.", MessageType.Info);
+                EditorGUILayout.HelpBox("Settings are locked while a session or practice is running.",
+                    MessageType.Info);
             EditorGUI.BeginDisabledGroup(ConfigurationLocked);
         }
 
         protected void EndSettings(params string[] statusFields)
         {
             EditorGUI.EndDisabledGroup();
-            if (Section("Laufender Status", false))
+            if (Section("Current Status", false))
             {
                 using (new EditorGUI.DisabledScope(true)) Fields(serializedObject, statusFields);
             }
@@ -52,7 +142,11 @@ namespace GlobeEffect.VRCheckerboard.Editor
             foreach (string name in names)
             {
                 SerializedProperty property = owner.FindProperty(name);
-                if (property != null) EditorGUILayout.PropertyField(property, true);
+                if (property == null) continue;
+                if (SimpleLabels.TryGetValue(name, out string label))
+                    EditorGUILayout.PropertyField(property, new GUIContent(label, property.tooltip), true);
+                else
+                    EditorGUILayout.PropertyField(property, true);
             }
         }
 
@@ -62,7 +156,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             Object component = serializedObject.FindProperty(reference).objectReferenceValue;
             if (component == null)
             {
-                EditorGUILayout.HelpBox("Verweis fehlt: " + reference + ". Unter Verweise zuweisen.",
+                EditorGUILayout.HelpBox("Missing link: " + reference + ". Set it under \"Links And Advanced\".",
                     MessageType.Warning);
                 return;
             }
@@ -77,36 +171,37 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         protected void FixationSettings()
         {
-            if (!Section("Blickkontrolle")) return;
+            if (!Section("Gaze Check")) return;
             Fields(serializedObject, "requireFixation");
             if (!serializedObject.FindProperty("requireFixation").boolValue)
-                EditorGUILayout.HelpBox("Blickkontrolle ist AUS. Zentralfixation wird nicht geprüft.",
-                    MessageType.Warning);
+                EditorGUILayout.HelpBox("Gaze check is OFF. It is not checked whether the participant looks " +
+                    "at the cross.", MessageType.Warning);
             LinkedFields("fixationMonitor", "toleranceDegrees", "requiredSteadySeconds");
             LinkedFields("eyeTrackingToolbox", "provider");
             Fields(serializedObject, "maxLookAwaySeconds", "maxNoDataSeconds", "maxSampleAgeSeconds",
                 "maxRepeatsPerTrial");
-            EditorGUILayout.HelpBox("Max Repeats Per Trial begrenzt bisher alle Versuche inklusive " +
-                "Erstversuch; 0 bedeutet unbegrenzt.", MessageType.Info);
+            EditorGUILayout.HelpBox("Max Repeats Per Trial counts all tries of a trial, including the first. " +
+                "0 = no limit.", MessageType.Info);
         }
 
         protected int Count(string name) => serializedObject.FindProperty(name).arraySize;
 
         /// <summary>
-        /// "Vorschau-Werte ins Experiment übernehmen" und "Originalwerte wiederherstellen",
+        /// "Use Preview Values For The Experiment" und "Restore Original Values",
         /// gleich für beide Manager. whatIsTakenOver erklärt, welche Werte wohin gehen.
         /// </summary>
         protected void PreviewTakeoverButtons(MonoBehaviour manager, string whatIsTakenOver)
         {
             var takeover = (IPreviewTakeoverManager)manager;
             EditorGUILayout.Space(4);
-            EditorGUILayout.HelpBox(whatIsTakenOver + " Im Play Mode nur bei laufender Vorschau; nach dem " +
-                "Stoppen wird es in die Szene übernommen – dann Szene speichern.", MessageType.Info);
+            EditorGUILayout.HelpBox(whatIsTakenOver + " In Play Mode this only works while the preview is " +
+                "on. The values are written to the scene when Play Mode stops; then save the scene.",
+                MessageType.Info);
             // Im Play Mode ohne Vorschau trägt der Stimulus Werte des letzten Trials.
             bool canTakeOver = !Application.isPlaying || takeover.IsPreviewActive;
             using (new EditorGUI.DisabledScope(!canTakeOver))
             {
-                if (GUILayout.Button("Vorschau-Werte ins Experiment übernehmen"))
+                if (GUILayout.Button("Use Preview Values For The Experiment"))
                 {
                     serializedObject.ApplyModifiedProperties();
                     PreviewTakeoverEditor.TakeOver(manager);
@@ -115,7 +210,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
             using (new EditorGUI.DisabledScope(!takeover.HasValuesBeforePreviewTakeover))
             {
-                if (GUILayout.Button("Originalwerte wiederherstellen"))
+                if (GUILayout.Button("Restore Original Values"))
                 {
                     serializedObject.ApplyModifiedProperties();
                     PreviewTakeoverEditor.Restore(manager);
@@ -123,8 +218,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 }
             }
             if (takeover.HasValuesBeforePreviewTakeover)
-                EditorGUILayout.HelpBox("Versuchsplan enthält übernommene Vorschau-Werte. " +
-                    "Originalwerte sind gesichert.", MessageType.Warning);
+                EditorGUILayout.HelpBox("The trial plan uses values from the preview. The original values are " +
+                    "saved and can be restored.", MessageType.Warning);
         }
 
         /// <summary>
@@ -143,7 +238,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
             repeats.arraySize = values.arraySize;
 
-            EditorGUILayout.LabelField($"{label}-Werte und Wiederholungen", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"Tested {label} values × how often", EditorStyles.boldLabel);
             long sum = 0;
             int removeIndex = -1;
             for (int index = 0; index < values.arraySize; index++)
@@ -165,7 +260,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 values.DeleteArrayElementAtIndex(removeIndex);
                 repeats.DeleteArrayElementAtIndex(removeIndex);
             }
-            if (GUILayout.Button($"+ {label}-Wert"))
+            if (GUILayout.Button($"+ Add {label} value"))
             {
                 values.arraySize++;
                 repeats.arraySize = values.arraySize;
@@ -177,11 +272,11 @@ namespace GlobeEffect.VRCheckerboard.Editor
         protected string BlockText(long trials)
         {
             int blocks = serializedObject.FindProperty("blocksPerSession").intValue;
-            if (blocks <= 1) return ", ohne Pausen";
-            var pauses = new System.Collections.Generic.List<string>();
+            if (blocks <= 1) return ", no breaks";
+            var pauses = new List<string>();
             for (int pause = 1; pause < blocks; pause++)
                 pauses.Add(Mathf.RoundToInt(trials * pause / (float)blocks).ToString());
-            return $", {blocks} Blöcke (Pausen nach {string.Join(", ", pauses)} gültigen Trials, weiter mit F5)";
+            return $", {blocks} blocks (breaks after {string.Join(", ", pauses)} valid trials, continue with F5)";
         }
     }
 
@@ -194,93 +289,89 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         public override void OnInspectorGUI()
         {
-            BeginSettings("Hier den Versuch einstellen. FOV, Augenmodus und Verzerrungswerte kommen " +
-                "aus dem Trial Plan. Diese Werte am Stimulus sind nur Vorschau und werden überschrieben.");
-            if (Section("Sitzung und Versuchsplan"))
+            BeginSettings("Set up the checkerboard experiment here. Window size, eyes and grid distortion " +
+                "for the trials come from the trial plan below.");
+            if (Section("Session And Trial Plan"))
             {
                 Fields(serializedObject, "participantId", "sessionLabel", "randomSeed", "fieldOfViewValues",
                     "eyePresentations", "repeatsPerCondition");
                 long repetitions = LevelTable("visualSpaceLValues", "repeatsPerLValue", "l");
                 long trials = (long)Count("fieldOfViewValues") * Count("eyePresentations") * repetitions;
                 Fields(serializedObject, "blocksPerSession");
-                EditorGUILayout.HelpBox($"Geplant: {trials} gültige Trials{BlockText(trials)}. " +
-                    "Ungültige Darbietungen kommen zusätzlich dazu.", MessageType.Info);
+                EditorGUILayout.HelpBox($"Planned: {trials} valid trials{BlockText(trials)}. " +
+                    "Trials that fail (for example looking away) are repeated on top.", MessageType.Info);
             }
-            if (Section("Ablauf und Zeiten"))
+            if (Section("Timing"))
             {
                 Fields(serializedObject, "trialSequence", "patternSeconds", "answerTimeoutSeconds",
                     "preStimulusSeconds");
                 bool noiseResponse = serializedObject.FindProperty("trialSequence").enumValueIndex == 0;
                 EditorGUILayout.HelpBox(noiseResponse
-                    ? "A: Schachbrett → Noise + Antwort → Grau → nächstes Schachbrett."
-                    : "B: Schachbrett → Grau + Antwort → Noise → nächstes Schachbrett.", MessageType.Info);
-                EditorGUILayout.LabelField("Antwortzeit 0 = unbegrenzt; Pre Stimulus = Mindestdauer.",
+                    ? "A: checkerboard → noise while answering → grey → next checkerboard."
+                    : "B: checkerboard → grey while answering → noise → next checkerboard.", MessageType.Info);
+                EditorGUILayout.LabelField("Time To Answer 0 = no limit. Time Before Checkerboard is a minimum.",
                     EditorStyles.wordWrappedMiniLabel);
             }
             FixationSettings();
-            if (Section("Antworten und Tasten"))
+            if (Section("Answers And Keys"))
             {
                 Fields(serializedObject, "convexResponseKey", "concaveResponseKey", "useVrControllerButtons",
                     "controllerMapping", "categoryALabel", "categoryBLabel");
                 LinkedFields("keyboardController", "swapResponseKeys", "logResponses");
                 Fields(serializedObject, "startSessionKey", "abortSessionKey");
             }
-            if (Section("Training", false))
+            if (Section("Practice", false))
                 Fields(serializedObject, "requireTrainingBeforeSession", "trainingKey", "continueTrainingKey",
                     "trainingExampleA", "trainingExampleB", "trainingLValues", "trainingRepeatsPerValue",
                     "trainingExampleSeconds", "trainingNoiseSeconds", "trainingFixationSeconds");
-            if (Section("Live-Vorschau ohne Messung"))
+            if (Section("Live Preview (No Recording)"))
             {
                 Fields(serializedObject, "previewKey", "previewShowsNoise");
-                EditorGUILayout.HelpBox("Im Play Mode P drücken (erneut P oder F6 beendet). " +
-                    "Hier live FOV, Rand, l, Gitter, Augenmodus, Farben, Kreuz und Noise ändern. " +
-                    "Preview Shows Noise schaltet zwischen Schachbrett und Noise-Maske um. " +
-                    "Die Vorschau ist nicht der Trial Plan.", MessageType.Info);
+                EditorGUILayout.HelpBox("In Play Mode press P to start the preview (P or F6 ends it). " +
+                    "Change the settings below and see the result right away. " +
+                    "Preview Shows Noise switches between checkerboard and noise.", MessageType.Info);
                 LinkedFields("stimulus", "fieldOfViewDegrees", "edgeSoftnessDegrees", "useCircularAperture",
                     "visualSpaceL", "gridSpacingDegrees", "eyePresentation", "darkColor", "lightColor",
                     "backgroundColor", "showFixationTarget", "fixationSizeDegrees", "fixationColor");
                 NoiseFields();
                 Fields(serializedObject, "maskDemoKey", "maskDemoPatternSeconds", "maskDemoMaskSeconds",
                     "maskDemoGraySeconds");
-                EditorGUILayout.HelpBox("Nachbild-Test: in der laufenden Vorschau M drücken (oder Knopf). " +
-                    "Schachbrett, dann die eingestellte Maske, dann graue Fläche. Bleibt auf der grauen Fläche " +
-                    "ein Nachbild des Schachbretts sichtbar, maskiert die Maske zu schwach. Noise Type " +
-                    "umstellen und wiederholen.", MessageType.Info);
-                EditorGUILayout.HelpBox("Beim Beenden der Vorschau oder Start von Training/Messung werden " +
-                    "alle Stimuluswerte auf den Stand vor der Vorschau zurückgesetzt – außer nach " +
-                    "„Vorschau-Werte ins Experiment übernehmen“.", MessageType.Info);
+                EditorGUILayout.HelpBox("Afterimage test: during the preview press M (or the button). It shows " +
+                    "the checkerboard, then the noise, then a grey screen. If you still see the checkerboard " +
+                    "on the grey screen, try another noise type.", MessageType.Info);
+                EditorGUILayout.HelpBox("When the preview ends, all changes are undone – unless you press " +
+                    "\"Use Preview Values For The Experiment\".", MessageType.Info);
                 var manager = (CheckerboardExperimentManager)target;
-                if (Application.isPlaying && GUILayout.Button("Vorschau ein / aus"))
+                if (Application.isPlaying && GUILayout.Button("Preview On / Off"))
                 {
                     serializedObject.ApplyModifiedProperties();
                     manager.TogglePreview();
                 }
                 using (new EditorGUI.DisabledScope(!Application.isPlaying || !manager.IsPreviewActive))
                 {
-                    if (GUILayout.Button(manager.IsMaskDemoRunning ? "Nachbild-Test läuft …" : "Nachbild-Test abspielen"))
+                    if (GUILayout.Button(manager.IsMaskDemoRunning ? "Afterimage Test Running …" : "Play Afterimage Test"))
                     {
                         serializedObject.ApplyModifiedProperties();
                         manager.PlayMaskDemo();
                     }
                 }
-                PreviewTakeoverButtons(manager, "Übernehmen schreibt FOV und Augenmodus der Vorschau in " +
-                    "„Sitzung und Versuchsplan“ (Listen werden durch den einen Vorschau-Wert ersetzt) und " +
-                    "behält die Darstellung (Edge Softness, Kreisblende, Gitterabstand, Farben, Fixationskreuz, " +
-                    "Noise). Die l-Liste bleibt unverändert.");
+                PreviewTakeoverButtons(manager, "\"Use Preview Values\" puts the preview window size and eyes " +
+                    "into the trial plan and keeps the look (edge, grid size, colors, cross, noise). " +
+                    "The l values are not changed.");
             }
-            if (Section("Muster, Fixationskreuz und Noise", false))
+            if (Section("Pattern, Cross And Noise", false))
             {
                 LinkedFields("stimulus", "edgeSoftnessDegrees", "useCircularAperture", "gridSpacingDegrees",
                     "darkColor", "lightColor", "showFixationTarget", "fixationSizeDegrees", "fixationColor",
                     "backgroundColor");
                 NoiseFields();
             }
-            if (Section("Verweise und erweiterte Einstellungen", false))
+            if (Section("Links And Advanced", false))
             {
                 Fields(serializedObject, "stimulus", "keyboardController", "eyeTrackingToolbox", "fixationMonitor",
                     "outputRoot", "autoStartOnPlay");
-                EditorGUILayout.HelpBox("Auto Start umgeht das Training. Nur für technische Tests verwenden. " +
-                    "Den Eye-Tracking-Provider an der Toolbox einstellen.", MessageType.Info);
+                EditorGUILayout.HelpBox("Auto Start On Play skips the practice. Only use it for technical tests. " +
+                    "The eye tracker is chosen on the Eye Tracking Toolbox.", MessageType.Info);
                 LinkedFields("stimulus", "observer", "textColor", "textDistanceMeters", "textSize",
                     "visibleAtStart", "materialOverride");
             }
@@ -302,13 +393,12 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 LinkedFields("stimulus", "noiseDotSizePixels");
             LinkedFields("stimulus", "noiseRefreshRateHz");
             if (stimulus != null && type == NoiseMaskType.Broadband)
-                EditorGUILayout.HelpBox($"{stimulus.NoiseOctaves} Zellgrößen von {stimulus.NoiseDotSizeDegrees:0.##}° " +
-                    $"bis {stimulus.NoiseBroadbandCoarsestDegrees:0.##}°, je Faktor 2, gleich gewichtet.",
+                EditorGUILayout.HelpBox($"{stimulus.NoiseOctaves} spot sizes from {stimulus.NoiseDotSizeDegrees:0.##}° " +
+                    $"to {stimulus.NoiseBroadbandCoarsestDegrees:0.##}°, each twice as big as the one before.",
                     MessageType.None);
             if (type == NoiseMaskType.FinePixels)
-                EditorGUILayout.HelpBox("Feines Rauschen maskiert ein grobes Schachbrett kaum: Masken wirken nur " +
-                    "nahe ihrer eigenen Größenordnung (Stromeyer & Julesz, 1972). Für das Nachbild Breitband " +
-                    "verwenden.", MessageType.Warning);
+                EditorGUILayout.HelpBox("Very fine noise hardly hides the large checkerboard squares, so an " +
+                    "afterimage may stay. Fine and coarse spots work better.", MessageType.Warning);
         }
     }
 
@@ -320,9 +410,10 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         public override void OnInspectorGUI()
         {
-            BeginSettings("Hier den Versuch einstellen. Der Manager setzt FOV, k, m, Zoom und Bewegung pro Trial. " +
-                "Am Stimulus bleiben Punktgröße, Dichte, Farben und Kreuz. Antworten stehen am Keyboard Controller.");
-            if (Section("Sitzung und Versuchsplan"))
+            BeginSettings("Set up the random dot experiment here. Window size, distortion k, magnification " +
+                "and movement for the trials come from the trial plan below. Dot size, density and colors are " +
+                "set on the dot field. The answer keys are set on the keyboard controller.");
+            if (Section("Session And Trial Plan"))
             {
                 Fields(serializedObject, "participantId", "sessionLabel", "randomSeed", "dotSeedBase",
                     "fieldOfViewValues", "eyePresentations", "instrumentMagnificationMValues",
@@ -331,21 +422,22 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 long trials = (long)Count("fieldOfViewValues") * Count("eyePresentations")
                     * Count("instrumentMagnificationMValues") * Count("contentZoomValues") * repetitions;
                 Fields(serializedObject, "blocksPerSession");
-                EditorGUILayout.HelpBox($"Geplant: {trials} gültige Trials für genau eine Bewegungsart" +
-                    $"{BlockText(trials)}. Die andere Variante startet als neue Sitzung.", MessageType.Info);
+                EditorGUILayout.HelpBox($"Planned: {trials} valid trials for one movement type" +
+                    $"{BlockText(trials)}. The other movement type is started as a new session (F7).",
+                    MessageType.Info);
             }
-            if (Section("Simulierte Bewegung"))
+            if (Section("Simulated Movement"))
             {
                 Fields(serializedObject, "simulatedSweepAxis", "simulatedSweepSeconds", "simulatedSpeedReference",
                     "simulatedImageCenterSpeed", "sweepSpeed", "pauseSeconds");
                 bool centerSpeed = serializedObject.FindProperty("simulatedSpeedReference").enumValueIndex == 1;
                 EditorGUILayout.HelpBox(centerSpeed
-                    ? "Bildmitte: gleiche sichtbare Punktgeschwindigkeit bei jedem m. " +
-                        "Virtueller Schwenk = Simulated Image Center Speed / (m × Zoom)."
-                    : "Objektwinkel: der Schwenk bleibt gleich schnell. Die Punkte werden bei höherem m schneller.",
+                    ? "Image Center: the dots in the middle move equally fast at every magnification."
+                    : "Object Angle: the binoculars turn equally fast, so the dots move faster at higher " +
+                        "magnification.",
                     centerSpeed ? MessageType.Info : MessageType.Warning);
             }
-            if (Section("Aktive Kopfbewegung"))
+            if (Section("Head-Tracked Movement"))
             {
                 Fields(serializedObject, "freeHeadMovement");
                 bool free = serializedObject.FindProperty("freeHeadMovement").boolValue;
@@ -360,22 +452,18 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 // Bei Geschwindigkeitserkennung steht die Erklärung schon bei deren Einstellungen.
                 if (!gated)
                     EditorGUILayout.HelpBox(openEnded
-                        ? "OFFEN: Die Punkte bleiben sichtbar, bis die Person antwortet. " +
-                            "Frei umschauen, beliebig lange und in jede Richtung. Danach graues Feld " +
-                            "(Pause Seconds) und der nächste Trial. Die Punktwelt reicht nur Head Turn " +
-                            "Safety Degrees weit um die Startblickrichtung."
+                        ? "NO TIME LIMIT: the dots stay until the participant answers. The head may move " +
+                            "freely in any direction. Then a grey pause and the next trial."
                         : free
-                            ? "FREI: beliebige Richtung, kein Solltempo, keine Sinus-/Wendeprüfung. " +
-                                "Blickkontrolle bleibt aktiv. Der Punktvorrat ist endlich: " +
-                                "Head Turn Safety Degrees legt die verfügbare Reserve um die Startblickrichtung fest."
-                            : "GEFÜHRT: bisherige Links-Rechts-Sinusbahn. Bei aktiver Prüfung werden " +
-                                "abweichende Haupttrials wiederholt.", MessageType.Info);
+                            ? "FREE: the head may move in any direction at any speed. The gaze check stays on."
+                            : "GUIDED: the participant follows a left-right path. Trials with a bad head " +
+                                "movement are repeated if Repeat Bad Head Movements is on.", MessageType.Info);
                 if (!free)
                     Fields(serializedObject, "checkHeadMotion", "sweepAmplitudeDegrees", "sweepSpeed",
                         "maximumProfileErrorDegrees", "turnaroundDegrees", "requiredSweeps",
                         "maxHeadTurnDegrees", "minMeanHeadSpeed", "maxPeakHeadSpeed");
             }
-            if (Section("Training", false))
+            if (Section("Practice", false))
             {
                 Fields(serializedObject, "trainingKey", "trainSimulatedMotion",
                     "showSimulatedExamples", "exampleConvexK", "exampleConcaveK", "exampleLongSeconds",
@@ -385,29 +473,27 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "requiredGoodTrainingSweeps", "sweepAmplitudeDegrees", "sweepSpeed",
                     "maximumProfileErrorDegrees", "maximumTrainingEndpointErrorDegrees", "turnaroundDegrees",
                     "requiredSweeps", "maxHeadTurnDegrees", "minMeanHeadSpeed", "maxPeakHeadSpeed");
-                EditorGUILayout.HelpBox("T übt die ausgewählte Session Motion Mode ohne Messdateien. " +
-                    "In einer Sitzung wird das Training passend zur gewählten Bewegungsart gewählt. " +
-                    "Das Kopftraining bleibt geführt, auch wenn die Haupttrials frei sind.", MessageType.Info);
+                EditorGUILayout.HelpBox("T starts a practice of the chosen movement type without saving data. " +
+                    "In a session the practice matching the movement type is used. The head movement practice " +
+                    "is always guided.", MessageType.Info);
             }
             FixationSettings();
-            if (Section("Antworten und Tasten"))
+            if (Section("Answers And Keys"))
             {
                 LinkedFields("keyboardController", "concaveKey", "convexKey", "swapResponseKeys",
                     "useVrControllerButtons", "vrControllerMapping", "logResponses");
                 Fields(serializedObject, "startSessionKey", "startOtherMotionSessionKey", "abortSessionKey");
             }
-            if (Section("Punktfeld und Fixationskreuz", false))
+            if (Section("Dot Field And Cross", false))
                 LinkedFields("stimulus", "dotDensity", "dotSizeDegrees", "darkColor", "lightColor",
                     "fieldBackgroundColor", "backgroundColor", "lightDotFraction", "edgeSoftnessDegrees", "showFixationTarget",
                     "fixationSizeDegrees", "fixationColor");
-            if (Section("Live-Vorschau ohne Messung"))
+            if (Section("Live Preview (No Recording)"))
             {
                 Fields(serializedObject, "previewKey");
-                EditorGUILayout.HelpBox("Im Play Mode P drücken; erneut P oder F6 beendet. " +
-                    "Hier live k, m, FOV und Bewegungsart ändern. Die Vorschau ist nicht der Trial Plan. " +
-                    "Das gerade Raster ist nur eine feste Referenz und bleibt in Training und Messung aus. " +
-                    "Punktwelt: Bei Motion Mode HeadTracked gilt wie in der Sitzung Head Turn Safety Degrees " +
-                    "(World Coverage wird dann überschrieben), bei SimulatedYaw World Coverage.",
+                EditorGUILayout.HelpBox("In Play Mode press P to start the preview (P or F6 ends it). " +
+                    "Change the settings below and see the result right away. The straight reference grid is " +
+                    "only for comparing and is never shown in practice or measurement.",
                     MessageType.Info);
                 LinkedFields("stimulus", "fieldOfViewDegrees", "edgeSoftnessDegrees", "dotDensity",
                     "dotSizeDegrees", "darkColor", "lightColor", "backgroundColor", "fieldBackgroundColor",
@@ -417,21 +503,19 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "simulatedYawSpeedDegreesPerSecond", "sweepDirection",
                     "loopSweepInPreview", "worldCoverageDegrees", "showReferenceGrid",
                     "referenceGridSpacingDegrees", "referenceGridWidthPixels", "referenceGridColor");
-                EditorGUILayout.HelpBox("Beim Beenden der Vorschau oder Start von Training/Messung werden " +
-                    "alle Stimuluswerte auf den Stand vor der Vorschau zurückgesetzt – außer nach " +
-                    "„Vorschau-Werte ins Experiment übernehmen“.", MessageType.Info);
+                EditorGUILayout.HelpBox("When the preview ends, all changes are undone – unless you press " +
+                    "\"Use Preview Values For The Experiment\".", MessageType.Info);
                 var manager = (RandomDotExperimentManager)target;
-                if (Application.isPlaying && GUILayout.Button("Vorschau ein / aus"))
+                if (Application.isPlaying && GUILayout.Button("Preview On / Off"))
                 {
                     serializedObject.ApplyModifiedProperties();
                     manager.TogglePreview();
                 }
-                PreviewTakeoverButtons(manager, "Übernehmen schreibt FOV, m, Zoom, Auge, Bewegungsart, " +
-                    "Achse und Geschwindigkeit der Vorschau in „Sitzung und Versuchsplan“ bzw. „Simulierte " +
-                    "Bewegung“ (Listen werden durch den einen Vorschau-Wert ersetzt) und behält das Punktbild " +
-                    "(Dichte, Punktgröße, Edge Softness, Farben). Die k-Liste bleibt unverändert.");
+                PreviewTakeoverButtons(manager, "\"Use Preview Values\" puts the preview window size, " +
+                    "magnification, extra zoom, eyes, movement type, direction and speed into the trial plan and " +
+                    "keeps the look (dot density, dot size, edge, colors). The k values are not changed.");
             }
-            if (Section("Verweise und erweiterte Einstellungen", false))
+            if (Section("Links And Advanced", false))
             {
                 Fields(serializedObject, "stimulus", "keyboardController", "sweepMonitor", "eyeTrackingToolbox",
                     "fixationMonitor", "outputRoot", "autoStartOnPlay");
@@ -451,16 +535,16 @@ namespace GlobeEffect.VRCheckerboard.Editor
             float tolerance = serializedObject.FindProperty("velocityTolerance").floatValue;
             float seconds = serializedObject.FindProperty("simulatedSweepSeconds").floatValue;
             EditorGUILayout.HelpBox(
-                "GESCHWINDIGKEITSERKENNUNG: Kreuz und graue Fläche, bis der Kopf gleichmäßig im " +
-                $"richtigen Tempo schwenkt. Zieltempo {targetSpeed:0.##} °/s Kopfdrehung (wie Simulated, " +
-                $"erstes m), erlaubt {targetSpeed * (1f - tolerance):0.##} bis {targetSpeed * (1f + tolerance):0.##} °/s. " +
-                $"Nach Hold Seconds im Bereich erscheinen die Punkte für {seconds:0.##} s (Simulated Sweep " +
-                "Seconds), danach Antwort. Verlässt das Tempo den Bereich länger als Grace Seconds, wird der " +
-                "Trial ungültig und später wiederholt (status head_speed_out_of_range). Gemessene Werte " +
-                "stehen pro Trial in der CSV (head_speed_*).", MessageType.Info);
+                "The participant first sees only the cross. When the head turns steadily at the right speed, " +
+                $"the dots appear for {seconds:0.##} s, then the participant answers. Right speed: " +
+                $"{targetSpeed * (1f - tolerance):0.##} to {targetSpeed * (1f + tolerance):0.##} degrees per " +
+                $"second (target {targetSpeed:0.##}, same as the simulated movement). If the speed is wrong " +
+                "for too long while the dots are shown, the trial is repeated later. The measured head speeds " +
+                "are saved for every trial.", MessageType.Info);
             if (targetSpeed < 1.5f)
-                EditorGUILayout.HelpBox("Das Zieltempo ist sehr langsam und liegt nah am natürlichen Kopfzittern. " +
-                    "Im Pilot die CSV-Spalten head_speed_* prüfen und Tolerance/Hold anpassen.", MessageType.Warning);
+                EditorGUILayout.HelpBox("This is a very slow head movement, close to small natural head shakes. " +
+                    "Check the measured head speeds after a test run and adjust Speed Tolerance if needed.",
+                    MessageType.Warning);
         }
 
         private void HeadTurnReachInfo()
@@ -475,8 +559,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
             SerializedProperty ms = serializedObject.FindProperty("instrumentMagnificationMValues");
             SerializedProperty zooms = serializedObject.FindProperty("contentZoomValues");
             SerializedProperty ks = serializedObject.FindProperty("instrumentDistortionKValues");
-            var culture = CultureInfo.GetCultureInfo("de-DE");
-            var text = new StringBuilder($"Punkte bis ±{reach:0.#}° Kopfdrehung ab Trialbeginn, in jede Richtung.");
+            var culture = CultureInfo.InvariantCulture;
+            var text = new StringBuilder($"Dots are there up to ±{reach:0.#}° head turn from where the head " +
+                "pointed at the start of the trial, in every direction.");
             bool tooMuch = false;
             for (int mi = 0; mi < ms.arraySize; mi++)
             {
@@ -500,11 +585,12 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 }
                 bool overLimit = mostDots > RandomDotFieldStimulus.MaximumDotCount;
                 tooMuch |= impossible || overLimit;
-                text.Append($"\nm = {m.ToString("0.##", culture)}: bis ca. {mostDots.ToString("N0", culture)} Punkte");
+                text.Append($"\nm = {m.ToString("0.##", culture)}: up to about {mostDots.ToString("N0", culture)} dots");
                 if (overLimit)
-                    text.Append($" – über {RandomDotFieldStimulus.MaximumDotCount.ToString("N0", culture)}, Sitzung startet nicht");
+                    text.Append($" – more than {RandomDotFieldStimulus.MaximumDotCount.ToString("N0", culture)}, " +
+                        "the session will not start");
                 if (impossible)
-                    text.Append(" – Punktwelt größer als 170°, Sitzung startet nicht");
+                    text.Append(" – dot field larger than 170°, the session will not start");
             }
             EditorGUILayout.HelpBox(text.ToString(), tooMuch ? MessageType.Warning : MessageType.Info);
         }

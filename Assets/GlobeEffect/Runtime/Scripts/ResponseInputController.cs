@@ -12,10 +12,10 @@ namespace GlobeEffect.VRCheckerboard
     /// </summary>
     public enum VrControllerMapping
     {
-        [InspectorName("Trackpad-Klick = konkav, Trigger = konvex")]
+        [InspectorName("Trackpad Click = Concave, Trigger = Convex")]
         TrackpadConcaveTriggerConvex = 0,
 
-        [InspectorName("Trackpad-Klick = konvex, Trigger = konkav")]
+        [InspectorName("Trackpad Click = Convex, Trigger = Concave")]
         TrackpadConvexTriggerConcave = 1
     }
 
@@ -124,28 +124,30 @@ namespace GlobeEffect.VRCheckerboard
     {
         [Header("Response Keys")]
         [SerializeField]
-        [Tooltip("Taste für konkav, also nach innen gewölbt. Beim Checkerboard ist das Category B.")]
+        [Tooltip("Key for concave (bulging in).")]
         private Key concaveKey = Key.LeftArrow;
 
         [SerializeField]
-        [Tooltip("Taste für konvex, also nach außen gewölbt. Beim Checkerboard ist das Category A.")]
+        [Tooltip("Key for convex (bulging out).")]
         private Key convexKey = Key.RightArrow;
 
         [SerializeField]
-        [Tooltip("Vertauscht die beiden Tasten der Tastatur. Die Zuordnung am VR-Controller wird darunter getrennt eingestellt.")]
+        [Tooltip("Swaps the two keyboard keys. The controller buttons are set separately below.")]
         private bool swapResponseKeys;
 
         [SerializeField]
-        [Tooltip("Schreibt jede Antwort zusätzlich in die Unity Console.")]
+        [Tooltip("Also writes every answer to the Unity Console.")]
         private bool logResponses;
 
         [Header("VR Controller")]
         [SerializeField]
-        [Tooltip("Nimmt zusätzlich Trigger und Trackpad-Klick von einem angeschlossenen VR-Controller an. Die Tastatur funktioniert weiter.")]
+        [Tooltip("Answers can also be given with the VR controller (trigger and trackpad click). The " +
+            "keyboard keeps working.")]
         private bool useVrControllerButtons = true;
 
         [SerializeField]
-        [Tooltip("Welche Controller-Taste welche Antwort gibt. Vor einer Sitzung einstellen und währenddessen nicht ändern. Beim Checkerboard überschreibt der Experiment Manager diesen Wert mit seiner eigenen Einstellung.")]
+        [Tooltip("Which controller button means convex and which concave. Do not change it during a " +
+            "session. In the checkerboard test the setting on the experiment manager is used.")]
         private VrControllerMapping vrControllerMapping = VrControllerMapping.TrackpadConcaveTriggerConvex;
 
         public event Action<CheckerboardCurvatureResponse> ResponseSubmitted;

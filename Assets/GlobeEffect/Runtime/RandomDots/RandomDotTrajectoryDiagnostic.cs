@@ -14,7 +14,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     [DefaultExecutionOrder(100)]
     public sealed class RandomDotTrajectoryDiagnostic : MonoBehaviour
     {
-        [Header("Instrument – live einstellbar; Änderungen starten neu")]
+        [Header("Binoculars (Changes Restart The Movement)")]
         [Range(0f, 2f)] public float distortionK = 1f;
         [Range(1f, 20f)] public float magnification = 10f;
         [Range(20f, 100f)] public float fieldOfViewDegrees = 60f;
@@ -22,18 +22,18 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public RandomDotSweepAxis sweepAxis = RandomDotSweepAxis.Horizontal;
         public RandomDotSweepDirection sweepDirection = RandomDotSweepDirection.LeftFirst;
 
-        [Header("Einseitiger Schwenk – gleiche Zeitfunktion wie im Experiment")]
+        [Header("One-Way Movement (Same As In The Experiment)")]
         [Range(0.5f, 60f)] public float imageCenterSpeed = 12f;
         [Range(0.2f, 8f)] public float durationSeconds = 2f;
         [Range(0.05f, 2f)] public float playbackSpeed = 1f;
         public bool loop;
 
-        [Header("Punkte und Referenzraster")]
-        [Tooltip("Wie viele Spalten Punkte nebeneinander. Jede Spalte hat ihre eigene Farbe, von rot über grün bis blau.")]
+        [Header("Markers And Grid")]
+        [Tooltip("Number of marker columns. Each column has its own color, from red to blue.")]
         [Range(1, 15)] public int markerColumns = 3;
-        [Tooltip("Wie viele Punkte übereinander in jeder Spalte. Nach oben werden sie heller.")]
+        [Tooltip("Number of markers in each column. They get lighter towards the top.")]
         [Range(1, 15)] public int markerRows = 3;
-        [Tooltip("Abstand der Spalten/Zeilen in der unveränderten mittleren Blickstellung. Punkte, die damit über 80 Grad hinaus liegen würden, fallen weg.")]
+        [Tooltip("Distance between markers in degrees. Markers beyond 80 degrees are left out.")]
         [Range(2f, 25f)] public float markerSpacingDegrees = 10f;
         [Range(0.1f, 2f)] public float markerSizeDegrees = 0.45f;
         [Range(10, 160)] public int trailSamples = 80;
@@ -42,19 +42,18 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [Range(1f, 15f)] public float gridSpacingDegrees = 5f;
         public bool showDesktopInstructions = true;
 
-        [Header("Optic-Flow-Diagnose – nur Messfarben, keine neue Verzeichnung")]
+        [Header("Speed Colors (Calculated, Not Measured)")]
         public bool showSpeedHeatmap = true;
         public bool showVelocityArrows = true;
-        [Tooltip("Berechnete Koordinatenraten für den laufenden Schwenk. Keine gemessene Wahrnehmung; " +
-            "S/M-Pfeile sind Messsymbole, nicht Bildschirm-Bahnrichtungen. Farben bleiben bei Pause stehen.")]
+        [Tooltip("Which speeds are shown as colors. These are calculated, not measured perception.")]
         public RandomDotDiagnosticCoordinates flowCoordinates = RandomDotDiagnosticCoordinates.LinearImage;
-        [Tooltip("Gemeinsame feste Farbskala. Werte über 1 NICHT abschneiden wie im alten Plot.")]
+        [Tooltip("Fixed color scale shared by all plots.")]
         [Range(0f, 0.99f)] public float flowColorMinimum = 0.7f;
         [Range(1.01f, 3f)] public float flowColorMaximum = 1.1f;
         [Range(0.1f, 0.8f)] public float heatmapOpacity = 0.45f;
-        [Tooltip("Ungerade Rastergröße, damit ein Referenzpfeil genau in der Mitte liegt.")]
+        [Tooltip("Number of arrows per row. Use an odd number so one arrow sits in the center.")]
         [Range(5, 17)] public int arrowGridSize = 9;
-        [Tooltip("Gemeinsame Pfeillänge für A/S/M; Länge bleibt proportional zur relativen Geschwindigkeit.")]
+        [Tooltip("Length of the arrows. Longer arrow = faster.")]
         [Range(0.3f, 2f)] public float arrowSize = 1f;
         [Range(0.5f, 3f)] public float arrowThickness = 1f;
         public Color arrowColor = new Color(0.05f, 0.05f, 0.05f, 0.95f);

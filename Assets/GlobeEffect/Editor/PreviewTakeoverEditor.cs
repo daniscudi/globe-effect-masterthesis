@@ -28,13 +28,13 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         public static void TakeOver(MonoBehaviour manager)
         {
-            Change(manager, "Vorschau-Werte übernehmen",
+            Change(manager, "Use Preview Values",
                 () => ((IPreviewTakeoverManager)manager).TakeOverPreviewValues());
         }
 
         public static void Restore(MonoBehaviour manager)
         {
-            Change(manager, "Originalwerte wiederherstellen",
+            Change(manager, "Restore Original Values",
                 () => ((IPreviewTakeoverManager)manager).RestoreValuesBeforePreviewTakeover());
         }
 
@@ -92,7 +92,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 }
 
                 var takeover = (IPreviewTakeoverManager)manager;
-                RecordUndo(manager, "Vorschau-Werte aus dem Play Mode");
+                RecordUndo(manager, "Preview Values From Play Mode");
                 takeover.ApplyExperimentValues(pending.values);
                 takeover.ValuesBeforePreviewTakeover = pending.valuesBeforeTakeover;
                 MarkChanged(manager);

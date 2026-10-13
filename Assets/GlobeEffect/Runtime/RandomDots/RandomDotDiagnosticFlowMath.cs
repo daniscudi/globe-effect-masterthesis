@@ -5,11 +5,11 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 {
     public enum RandomDotDiagnosticCoordinates
     {
-        [InspectorName("A: flacher Bildraum (u, v)")]
+        [InspectorName("A: Flat Image (u, v)")]
         LinearImage = 0,
-        [InspectorName("S: getrennte Winkelumrechnung")]
+        [InspectorName("S: Separate Angles")]
         SeparateAngles = 1,
-        [InspectorName("M: radiale Winkelumrechnung (l = 0)")]
+        [InspectorName("M: Radial Angles (l = 0)")]
         RadialAngles = 2
     }
 

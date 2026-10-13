@@ -345,14 +345,13 @@ derselben runden Öffnung wie das Checkerboard, schwarz/weiß und mit derselben
 mittleren Helligkeit, und wird mit `Noise Refresh Rate Hz` neu ausgewürfelt
 (`0` lässt das Bild stehen). `Noise Type` am `Checkerboard Stimulus`:
 
-* **Breitband (Standard, empfohlen):** Zufallsmuster in mehreren Zellgrößen von
-  `Noise Broadband Finest Degrees` (0,5°) bis `Noise Broadband Coarsest Degrees`
-  (8°), je Faktor 2 (also 0,5°, 1°, 2°, 4°, 8°), gleich gewichtet addiert und dann
+* **Fine And Coarse Spots (Breitband, Standard):** Zufallsmuster in mehreren
+  Zellgrößen von `Smallest Spots` (0,5°) bis `Largest Spots` (8°), je Faktor 2 (also 0,5°, 1°, 2°, 4°, 8°), gleich gewichtet addiert und dann
   schwarz/weiß geschaltet. Jede Oktave erhält so etwa gleich viel Energie
   (1/f-Rauschen), von der Grundfrequenz des Schachbretts bis zu feinen Kanten.
-* **Einfach:** eine Zellgröße in Grad (`Noise Dot Size Degrees`, bis 10°).
-* **Fein (Pixel):** das frühere „Ameisenmuster“ nahe der Pixelgröße
-  (`Noise Dot Size Pixels`), nur noch zum Vergleich.
+* **One Spot Size:** eine Zellgröße in Grad (`Spot Size (degrees)`, bis 10°).
+* **Fine Pixels (TV Static):** das frühere „Ameisenmuster“ nahe der Pixelgröße
+  (`Spot Size (pixels)`), nur noch zum Vergleich.
 
 Begründung: Eine Maske wirkt nur in Größenordnungen nahe ihrer eigenen, etwa
 ± 1 Oktave (Stromeyer, C. F. & Julesz, B. (1972). Spatial-frequency masking in
@@ -366,7 +365,7 @@ bei 8°. Der Marker `SessionStart` enthält `noise_type`, `noise_broadband_deg`
 (nur bei Breitband aussagekräftig) und `noise_octaves`.
 
 Vergleich im Headset: In der Checkerboard-Vorschau (P) spielt `M` bzw. der Knopf
-„Nachbild-Test abspielen“ Schachbrett (2 s) → eingestellte Maske (1 s) → graue
+„Play Afterimage Test“ Schachbrett (2 s) → eingestellte Maske (1 s) → graue
 Fläche (3 s) ab. Bleibt auf der grauen Fläche ein Nachbild des Schachbretts,
 maskiert die Maske zu schwach. `Noise Type` umstellen und wiederholen.
 
@@ -422,9 +421,9 @@ Bewegungsphase beendet und das Punktfeld ausgeblendet wurde.
 
 Für die VR-Controller gibt es in beiden Tests dieselbe Auswahl:
 
-* Trackpad-Klick = konkav, Trigger = konvex
+* Trackpad Click = Concave, Trigger = Convex
 
-* Trackpad-Klick = konvex, Trigger = konkav
+* Trackpad Click = Convex, Trigger = Concave
 
 Beim Checkerboard steht sie am `Checkerboard Experiment Manager`
 (`Controller Mapping`), beim Random-Dot-Test am `Random Dot Keyboard Controller`
@@ -571,7 +570,7 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
 * Vorschau: Im Play Mode schaltet `P` eine reine Live-Vorschau ein/aus;
   `F6` beendet sie ebenfalls. Kein Training, keine Trials, keine Aufzeichnung.
   Das gilt auch beim Checkerboard. Im Manager-Inspector unter
-  **Live-Vorschau ohne Messung** werden die verknüpften Stimuluswerte direkt
+  **Live Preview (No Recording)** werden die verknüpften Stimuluswerte direkt
   bearbeitet. Vor dem Öffnen wird ihre gesamte Konfiguration gesichert.
   Beim Beenden mit `P`/`F6` oder direktem Start von Training/Sitzung werden alle
   Vorschauänderungen verworfen, auch Punkt-/Gittergröße, Farben, Fixationskreuz
@@ -585,8 +584,8 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   Managers, und jeder Schwenk läuft genau einmal.
 
 * Random Dots, Vorschau übernehmen: Im Manager-Inspector unter
-  **Live-Vorschau ohne Messung** übernimmt **Vorschau-Werte ins Experiment
-  übernehmen** FOV, m, Zoom, Auge, Bewegungsart (`Session Motion Mode`),
+  **Live Preview (No Recording)** übernimmt **Use Preview Values For The
+  Experiment** FOV, m, Zoom, Auge, Bewegungsart (`Session Motion Mode`),
   Schwenkachse und Geschwindigkeit (Bezug + Wert) in den Versuchsplan. Listen
   werden durch den einen Vorschau-Wert ersetzt. Das Punktbild (Dichte,
   Punktgröße, Edge Softness, Farben) bleibt danach erhalten. Die k-Liste wird
@@ -594,7 +593,7 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   gilt sofort für `F5`/`F7` und wird nach dem Stoppen des Play Mode in die Szene
   geschrieben (Konsole meldet es, dann Szene mit Strg+S speichern).
   Beim ersten Übernehmen wird der bisherige Stand gesichert;
-  **Originalwerte wiederherstellen** holt ihn zurück (auch nach mehrmaligem
+  **Restore Original Values** holt ihn zurück (auch nach mehrmaligem
   Übernehmen). Auf dem Lab-PC vor `git pull` die Originalwerte wiederherstellen
   oder die Szenenänderung verwerfen, sonst gibt es einen Konflikt in der Szene.
 
@@ -603,10 +602,10 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   Farben (dunkel, hell, Hintergrund), Fixationskreuz und alle Noise-Werte.
   `Preview Shows Noise` schaltet die Vorschau zwischen Schachbrett und
   Noise-Maske um (auch während sie läuft), damit Punktgröße und Flimmerrate
-  beurteilt werden können. **Vorschau-Werte ins Experiment übernehmen** schreibt
+  beurteilt werden können. **Use Preview Values For The Experiment** schreibt
   FOV und Augenmodus in den Versuchsplan (Listen werden ersetzt) und behält die
-  Darstellung; die `l`-Liste bleibt unverändert. **Originalwerte
-  wiederherstellen**, Übernahme aus dem Play Mode in die Szene und der Hinweis
+  Darstellung; die `l`-Liste bleibt unverändert. **Restore Original
+  Values**, Übernahme aus dem Play Mode in die Szene und der Hinweis
   zum Lab-PC gelten genauso wie bei Random Dots.
 
 * `Free Head Movement` ist standardmäßig an: In aktiven Haupttrials darf der
