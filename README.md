@@ -340,12 +340,35 @@ Die Schritte im Einzelnen:
 6. Nach der Antwort beginnt sofort die Phase vor dem nächsten Stimulus mit der
    jeweils anderen Darstellung. Ein schwarzer Zwischenbildschirm wird vermieden.
 
-Die Noise-Maske sieht aus wie das Ameisenmuster eines Fernsehers ohne Empfang:
-viele kleine schwarze und weiße Punkte, die ständig neu ausgewürfelt werden. Sie
-erscheint in derselben runden Öffnung wie das Checkerboard. Punktgröße und
-Aktualisierungsrate stehen am `Checkerboard Stimulus` (`Noise Dot Size Degrees`,
-voreingestellt 0,15°, und `Noise Refresh Rate Hz`, voreingestellt 30 Hz; `0`
-lässt das Bild stehen).
+Die Noise-Maske soll ein Nachbild des Schachbretts verhindern. Sie erscheint in
+derselben runden Öffnung wie das Checkerboard, schwarz/weiß und mit derselben
+mittleren Helligkeit, und wird mit `Noise Refresh Rate Hz` neu ausgewürfelt
+(`0` lässt das Bild stehen). `Noise Type` am `Checkerboard Stimulus`:
+
+* **Breitband (Standard, empfohlen):** Zufallsmuster in mehreren Zellgrößen von
+  `Noise Broadband Finest Degrees` (0,5°) bis `Noise Broadband Coarsest Degrees`
+  (8°), je Faktor 2 (also 0,5°, 1°, 2°, 4°, 8°), gleich gewichtet addiert und dann
+  schwarz/weiß geschaltet. Jede Oktave erhält so etwa gleich viel Energie
+  (1/f-Rauschen), von der Grundfrequenz des Schachbretts bis zu feinen Kanten.
+* **Einfach:** eine Zellgröße in Grad (`Noise Dot Size Degrees`, bis 10°).
+* **Fein (Pixel):** das frühere „Ameisenmuster“ nahe der Pixelgröße
+  (`Noise Dot Size Pixels`), nur noch zum Vergleich.
+
+Begründung: Eine Maske wirkt nur in Größenordnungen nahe ihrer eigenen, etwa
+± 1 Oktave (Stromeyer, C. F. & Julesz, B. (1972). Spatial-frequency masking in
+vision: Critical bands and spread of masking. *Journal of the Optical Society
+of America, 62*(10), 1221–1232). Das Schachbrett mit 10°-Feldern hat seine
+Grundfrequenz bei etwa 0,07 Zyklen pro Grad, feines Rauschen mit 0,1°-Punkten
+liegt bei 3–5 Zyklen pro Grad, rund 6 Oktaven entfernt, und maskiert das
+Schachbrett deshalb kaum. Zu grob (Zellen so groß wie die Felder) wäre die Maske
+selbst ein grobes Muster mit eigenen Kanten; deshalb endet die gröbste Oktave
+bei 8°. Der Marker `SessionStart` enthält `noise_type`, `noise_broadband_deg`
+(nur bei Breitband aussagekräftig) und `noise_octaves`.
+
+Vergleich im Headset: In der Checkerboard-Vorschau (P) spielt `M` bzw. der Knopf
+„Nachbild-Test abspielen“ Schachbrett (2 s) → eingestellte Maske (1 s) → graue
+Fläche (3 s) ab. Bleibt auf der grauen Fläche ein Nachbild des Schachbretts,
+maskiert die Maske zu schwach. `Noise Type` umstellen und wiederholen.
 
 ## Welcome Screen und Training
 

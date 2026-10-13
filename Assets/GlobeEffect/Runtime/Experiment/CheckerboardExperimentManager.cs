@@ -241,6 +241,23 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "Flimmerrate zu beurteilen). Umschalten geht auch während der Vorschau.")]
         private bool previewShowsNoise;
 
+        [SerializeField]
+        [Tooltip("In der laufenden Vorschau: Nachbild-Test abspielen (Schachbrett, dann Maske, dann " +
+            "graue Fläche). Auf der grauen Fläche sieht man, ob vom Schachbrett ein Nachbild bleibt.")]
+        private Key maskDemoKey = Key.M;
+
+        [SerializeField, Range(0.1f, 10f)]
+        [Tooltip("Nachbild-Test: wie lange das Schachbrett zu sehen ist, in Sekunden.")]
+        private float maskDemoPatternSeconds = 2f;
+
+        [SerializeField, Range(0.1f, 10f)]
+        [Tooltip("Nachbild-Test: wie lange danach die Noise-Maske zu sehen ist, in Sekunden.")]
+        private float maskDemoMaskSeconds = 1f;
+
+        [SerializeField, Range(0.1f, 10f)]
+        [Tooltip("Nachbild-Test: wie lange danach die graue Fläche zu sehen ist, in Sekunden.")]
+        private float maskDemoGraySeconds = 3f;
+
         // Stand vor dem ersten "Vorschau-Werte übernehmen". Leer heißt: es wurde
         // nichts übernommen. "Originalwerte wiederherstellen" holt ihn zurück.
         [SerializeField, HideInInspector]
@@ -336,6 +353,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private string settingsBeforePreview;
         private string lookToKeepAfterPreview;
         private bool previewShowingNoise;
+        private Coroutine maskDemoCoroutine;
 
         // Die Blickwerte vom Ende des Durchgangs. Leer (null), solange der
         // Durchgang noch läuft.
@@ -426,7 +444,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             if (!CheckRequiredRecording()) return;
             // Schachbrett/Noise-Maske in der Vorschau live umschalten.
-            if (previewActive && previewShowsNoise != previewShowingNoise) ShowPreviewDisplay();
+            if (previewActive && maskDemoCoroutine == null && previewShowsNoise != previewShowingNoise)
+                ShowPreviewDisplay();
             // Hier werden nur die Tasten vom Versuchsleiter abgefragt: starten,
             // trainieren, abbrechen, weiter. Die Antworttasten A und B laufen
             // weiter über den Keyboard Controller.
@@ -442,6 +461,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 if (previewActive && keyboard[abortSessionKey].wasPressedThisFrame)
                 {
                     StopPreview();
+                    return;
+                }
+
+                if (previewActive && keyboard[maskDemoKey].wasPressedThisFrame)
+                {
+                    PlayMaskDemo();
                     return;
                 }
 
@@ -557,6 +582,31 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             ShowPreviewDisplay();
         }
 
+        public bool IsMaskDemoRunning => maskDemoCoroutine != null;
+
+        /// <summary>
+        /// Nachbild-Test in der Vorschau: Schachbrett, dann die eingestellte Maske, dann
+        /// graue Fläche. So lässt sich vergleichen, welche Maske das Nachbild löscht.
+        /// </summary>
+        public void PlayMaskDemo()
+        {
+            if (!previewActive) return;
+            StopAndClear(ref maskDemoCoroutine);
+            maskDemoCoroutine = StartCoroutine(RunMaskDemo());
+        }
+
+        private IEnumerator RunMaskDemo()
+        {
+            stimulus.Show();
+            yield return new WaitForSecondsRealtime(maskDemoPatternSeconds);
+            stimulus.ShowNoise(unchecked(randomSeed + Time.frameCount));
+            yield return new WaitForSecondsRealtime(maskDemoMaskSeconds);
+            stimulus.ShowFixationOnly();
+            yield return new WaitForSecondsRealtime(maskDemoGraySeconds);
+            maskDemoCoroutine = null;
+            ShowPreviewDisplay();
+        }
+
         private void ShowPreviewDisplay()
         {
             previewShowingNoise = previewShowsNoise;
@@ -573,6 +623,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private void RestorePreviewSettings()
         {
             if (!previewActive) return;
+            StopAndClear(ref maskDemoCoroutine);
             previewActive = false;
             if (stimulus != null && !string.IsNullOrEmpty(settingsBeforePreview))
                 stimulus.RestorePreviewSettings(settingsBeforePreview);
@@ -1450,14 +1501,16 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             WriteMarker(
                 "SessionStart;participant={0};session={1};seed={2};planned_trials={3};utc={4};mapping={5};" +
                 "noise_dot_deg={6:F4};noise_dot_px={7:F2};noise_refresh_hz={8:F2};" +
-                "background_rgb={9:F3}/{10:F3}/{11:F3};{12}",
+                "background_rgb={9:F3}/{10:F3}/{11:F3};noise_type={13};noise_broadband_deg={6:F2}-{14:F2};" +
+                "noise_octaves={15};{12}",
                 ExperimentFilesBase.SanitizeIdentifier(participantId, "pilot"),
                 ExperimentFilesBase.SanitizeIdentifier(sessionLabel, "session"),
                 randomSeed, trialPlan.Count, sessionStartUtc.ToString("O", CultureInfo.InvariantCulture),
                 VisualSpaceRadialMapping.MappingVersion,
                 stimulus.NoiseDotSizeDegrees, stimulus.NoiseDotSizePixels, stimulus.NoiseRefreshRateHz,
                 stimulus.BackgroundColor.r, stimulus.BackgroundColor.g, stimulus.BackgroundColor.b,
-                BuildTimingAndResponseFields());
+                BuildTimingAndResponseFields(), stimulus.NoiseType, stimulus.NoiseBroadbandCoarsestDegrees,
+                stimulus.NoiseOctaves);
         }
 
         // Ablauf, Zeiten und Tastenbelegung für die Marker SessionStart und

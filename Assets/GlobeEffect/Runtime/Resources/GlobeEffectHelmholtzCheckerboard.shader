@@ -19,6 +19,8 @@
         _NoiseEnabled ("Noise Enabled", Float) = 0
         _NoiseCellSizeUv ("Noise Cell Size [u/v]", Float) = 0.0349
         _NoiseSeed ("Noise Seed", Integer) = 0
+        _NoiseType ("Noise Type (0 fine, 1 single, 2 broadband)", Float) = 2
+        _NoiseOctaves ("Noise Octaves (broadband)", Float) = 5
         _EyeMode ("Eye Mode", Float) = 0
         _FixationEnabled ("Fixation Enabled", Float) = 1
         _FixationHalfSizeRad ("Fixation Half Size [rad]", Float) = 0.0043633
@@ -73,6 +75,8 @@
             float _NoiseEnabled;
             float _NoiseCellSizeUv;
             int _NoiseSeed;
+            float _NoiseType;
+            float _NoiseOctaves;
             float _EyeMode;
             float _FixationEnabled;
             float _FixationHalfSizeRad;
@@ -157,7 +161,7 @@
                 return value ^ (value >> 16);
             }
 
-            float NoiseCellValue(int2 cell)
+            float NoiseCellValue(int2 cell, uint layer)
             {
                 // Aus Zellnummer und Seed entsteht reproduzierbar ein schwarzer
                 // oder weißer Punkt. Seed und Zellnummern bleiben ganze Zahlen,
@@ -165,10 +169,59 @@
                 // einbezogen. Früher steckte der große Seed in einer Sinusrechnung;
                 // dabei gingen Unterschiede verloren und die Maske konnte je nach
                 // Grafikkarte fast ganz schwarz werden.
-                uint bits = MixNoiseBits(asuint(cell.x) ^ asuint(_NoiseSeed));
+                // layer trennt die Zellgrößen des breitbandigen Rauschens voneinander.
+                uint bits = MixNoiseBits(asuint(cell.x) ^ asuint(_NoiseSeed) ^ (layer * 0x85ebca6bu));
                 bits = MixNoiseBits(bits ^ asuint(cell.y) ^ 0x9e3779b9u);
                 // Das oberste Bit entscheidet: 0 = dunkel, 1 = hell.
                 return (float)(bits >> 31);
+            }
+
+            // Eine Rauschschicht mit Zellgröße cellSizeUv, geglättet: 0 = dunkel, 1 = hell.
+            //
+            // So geht das Glätten: noisePosition zählt in Zellen. Zwischen den
+            // Mitten zweier Nachbarzellen wird nur auf einer Breite von einem
+            // Bildpixel (pixelWidth) weich von der einen zur anderen Farbe
+            // übergeblendet. Innerhalb einer Zelle bleibt sie rein schwarz
+            // oder rein weiß.
+            float NoiseLayer(float2 displayPosition, float cellSizeUv, uint layer)
+            {
+                float2 noisePosition = displayPosition / max(cellSizeUv, 1e-6);
+                float2 pixelWidth = max(fwidth(noisePosition), 1e-4);
+                float2 shifted = noisePosition - 0.5;
+                int2 cell = (int2)floor(shifted);
+                float2 between = shifted - floor(shifted);
+                float2 blend = saturate((between - 0.5) / pixelWidth + 0.5);
+                return lerp(
+                    lerp(NoiseCellValue(cell, layer), NoiseCellValue(cell + int2(1, 0), layer), blend.x),
+                    lerp(NoiseCellValue(cell + int2(0, 1), layer), NoiseCellValue(cell + int2(1, 1), layer), blend.x),
+                    blend.y);
+            }
+
+            // Breitbandiges Rauschen: Schichten mit verdoppelter Zellgröße gleich
+            // gewichtet addieren und danach wieder schwarz/weiß schalten. Jede
+            // Oktave bekommt so gleich viel Energie (1/f), von groben bis feinen
+            // Strukturen. Eine Maske wirkt nur in Größenordnungen nahe ihrer
+            // eigenen (etwa plus/minus eine Oktave, Stromeyer & Julesz 1972);
+            // das grobe Schachbrett braucht deshalb auch grobe Anteile.
+            float BroadbandNoise(float2 displayPosition)
+            {
+                int octaves = (int)clamp(_NoiseOctaves, 1.0, 8.0);
+                float cellSize = _NoiseCellSizeUv;
+                float sum = 0.0;
+                float finest = 0.0;
+                for (int octave = 0; octave < 8; octave++)
+                {
+                    if (octave >= octaves) break;
+                    float layer = NoiseLayer(displayPosition, cellSize, (uint)octave) * 2.0 - 1.0;
+                    if (octave == 0) finest = layer;
+                    sum += layer;
+                    cellSize *= 2.0;
+                }
+                // Bei gerader Schichtzahl kann die Summe genau 0 sein. Ein winziger
+                // Anteil der feinsten Schicht entscheidet dann, statt Grau zu zeigen.
+                sum += 0.01 * finest;
+                float edge = max(fwidth(sum), 1e-4);
+                return smoothstep(-edge, edge, sum);
             }
 
             fixed4 Frag(VertexToFragment input) : SV_Target
@@ -283,22 +336,9 @@
                 // Schachbrett. Ohne das springt jede harte Kante im Headset bei
                 // jeder winzigen Kopfbewegung um ein Pixel hin und her, und man
                 // sieht wandernde waagrechte und senkrechte Linien.
-                //
-                // So geht das Glätten: noisePosition zählt in Zellen. Zwischen den
-                // Mitten zweier Nachbarzellen wird nur auf einer Breite von einem
-                // Bildpixel (pixelWidth) weich von der einen zur anderen Farbe
-                // übergeblendet. Innerhalb einer Zelle bleibt sie rein schwarz
-                // oder rein weiß.
-                float2 noisePosition = displayPosition / max(_NoiseCellSizeUv, 1e-6);
-                float2 pixelWidth = max(fwidth(noisePosition), 1e-4);
-                float2 shifted = noisePosition - 0.5;
-                int2 cell = (int2)floor(shifted);
-                float2 between = shifted - floor(shifted);
-                float2 blend = saturate((between - 0.5) / pixelWidth + 0.5);
-                float noiseValue = lerp(
-                    lerp(NoiseCellValue(cell), NoiseCellValue(cell + int2(1, 0)), blend.x),
-                    lerp(NoiseCellValue(cell + int2(0, 1)), NoiseCellValue(cell + int2(1, 1)), blend.x),
-                    blend.y);
+                float noiseValue = _NoiseType > 1.5
+                    ? BroadbandNoise(displayPosition)
+                    : NoiseLayer(displayPosition, _NoiseCellSizeUv, 0u);
                 fixed4 noiseColor = lerp(_DarkColor, _LightColor, noiseValue);
 
                 fixed4 visiblePattern = lerp(

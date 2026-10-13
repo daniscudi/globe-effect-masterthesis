@@ -58,7 +58,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 stimulus.SetApertureEdgeSoftness(0f);
                 var settings = new SerializedObject(stimulus);
                 // Hier wird bewusst in Grad getestet, damit die drei Größen fest sind.
-                settings.FindProperty("noiseSizeInPixels").boolValue = false;
+                settings.FindProperty("noiseType").enumValueIndex = (int)NoiseMaskType.SingleScaleDegrees;
                 settings.FindProperty("noiseDotSizeDegrees").floatValue = dotSize;
                 settings.ApplyModifiedPropertiesWithoutUndo();
 
@@ -136,6 +136,90 @@ namespace GlobeEffect.VRCheckerboard.Tests
             }
 
             Assert.That(seen.Count, Is.EqualTo(1000), "Jedes Rauschbild braucht einen eigenen Seed.");
+        }
+
+        [Test]
+        public void BroadbandNoise_HasCoarseStructureThatFineNoiseLacks()
+        {
+            // Wie oft haben zwei Pixel im Abstand von 2 Pixeln (knapp 1°) dieselbe Farbe?
+            // Feines Rauschen (1,5 Pixel): etwa halb so oft wie zufällig, also 0,5.
+            // Breitband (0,5° bis 8°): deutlich öfter, weil grobe Zellen mitwirken.
+            // Genau diese groben Anteile braucht es, um das grobe Schachbrett zu maskieren.
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
+                Assert.Ignore("Der Bildtest braucht eine aktive Grafikausgabe.");
+
+            float fine = SameColorFraction(NoiseMaskType.FinePixels);
+            float broadband = SameColorFraction(NoiseMaskType.Broadband);
+            Assert.That(fine, Is.LessThan(0.56f), "Feines Rauschen hat kaum grobe Struktur.");
+            Assert.That(broadband, Is.GreaterThan(0.6f), "Breitband muss grobe Struktur enthalten.");
+        }
+
+        private static float SameColorFraction(NoiseMaskType type)
+        {
+            Scene scene = EditorSceneManager.NewPreviewScene();
+            var target = new RenderTexture(256, 256, 24);
+            var readback = new Texture2D(256, 256, TextureFormat.RGBA32, false);
+            RenderTexture previousTarget = RenderTexture.active;
+            try
+            {
+                var cameraObject = new GameObject("Noise Structure Camera");
+                SceneManager.MoveGameObjectToScene(cameraObject, scene);
+                var camera = cameraObject.AddComponent<Camera>();
+                camera.enabled = false;
+                camera.scene = scene;
+                camera.fieldOfView = 90f;
+                camera.aspect = 1f;
+                camera.clearFlags = CameraClearFlags.SolidColor;
+                camera.backgroundColor = Color.black;
+                camera.targetTexture = target;
+                camera.stereoTargetEye = StereoTargetEyeMask.None;
+
+                var stimulusObject = new GameObject("Noise Structure Stimulus");
+                SceneManager.MoveGameObjectToScene(stimulusObject, scene);
+                var stimulus = stimulusObject.AddComponent<VrCheckerboardStimulus>();
+                stimulus.Observer = camera.transform;
+                stimulus.SetAngularDiameter(80f);
+                stimulus.SetApertureEdgeSoftness(0f);
+                var settings = new SerializedObject(stimulus);
+                settings.FindProperty("noiseType").enumValueIndex = (int)type;
+                settings.FindProperty("noiseDotSizePixels").floatValue = 1.5f;
+                settings.FindProperty("noiseBroadbandFinestDegrees").floatValue = 0.5f;
+                settings.FindProperty("noiseBroadbandCoarsestDegrees").floatValue = 8f;
+                settings.FindProperty("showFixationTarget").boolValue = false;
+                settings.ApplyModifiedPropertiesWithoutUndo();
+
+                int same = 0;
+                int pairs = 0;
+                int light = 0;
+                int pixels = 0;
+                // Mehrere Seeds, damit die Schätzung bei groben Zellen stabil ist.
+                foreach (int seed in new[] { 11, 22, 33, 44, 55, 66 })
+                {
+                    stimulus.ShowNoise(seed);
+                    Color32[] image = ReadImage(camera, target, readback);
+                    for (int y = 48; y < 208; y++)
+                    for (int x = 48; x < 206; x++)
+                    {
+                        bool here = image[y * 256 + x].r > 127;
+                        bool there = image[y * 256 + x + 2].r > 127;
+                        if (here == there) same++;
+                        if (here) light++;
+                        pairs++;
+                        pixels++;
+                    }
+                }
+                float lightFraction = light / (float)pixels;
+                Assert.That(lightFraction, Is.InRange(0.3f, 0.7f), $"{type}: Hell und dunkel etwa gleich häufig.");
+                return same / (float)pairs;
+            }
+            finally
+            {
+                RenderTexture.active = previousTarget;
+                EditorSceneManager.ClosePreviewScene(scene);
+                target.Release();
+                Object.DestroyImmediate(target);
+                Object.DestroyImmediate(readback);
+            }
         }
 
         [Test]

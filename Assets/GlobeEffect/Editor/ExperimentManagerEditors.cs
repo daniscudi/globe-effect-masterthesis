@@ -238,8 +238,14 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "Die Vorschau ist nicht der Trial Plan.", MessageType.Info);
                 LinkedFields("stimulus", "fieldOfViewDegrees", "edgeSoftnessDegrees", "useCircularAperture",
                     "visualSpaceL", "gridSpacingDegrees", "eyePresentation", "darkColor", "lightColor",
-                    "backgroundColor", "showFixationTarget", "fixationSizeDegrees", "fixationColor",
-                    "noiseSizeInPixels", "noiseDotSizePixels", "noiseDotSizeDegrees", "noiseRefreshRateHz");
+                    "backgroundColor", "showFixationTarget", "fixationSizeDegrees", "fixationColor");
+                NoiseFields();
+                Fields(serializedObject, "maskDemoKey", "maskDemoPatternSeconds", "maskDemoMaskSeconds",
+                    "maskDemoGraySeconds");
+                EditorGUILayout.HelpBox("Nachbild-Test: in der laufenden Vorschau M drücken (oder Knopf). " +
+                    "Schachbrett, dann die eingestellte Maske, dann graue Fläche. Bleibt auf der grauen Fläche " +
+                    "ein Nachbild des Schachbretts sichtbar, maskiert die Maske zu schwach. Noise Type " +
+                    "umstellen und wiederholen.", MessageType.Info);
                 EditorGUILayout.HelpBox("Beim Beenden der Vorschau oder Start von Training/Messung werden " +
                     "alle Stimuluswerte auf den Stand vor der Vorschau zurückgesetzt – außer nach " +
                     "„Vorschau-Werte ins Experiment übernehmen“.", MessageType.Info);
@@ -249,16 +255,26 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     serializedObject.ApplyModifiedProperties();
                     manager.TogglePreview();
                 }
+                using (new EditorGUI.DisabledScope(!Application.isPlaying || !manager.IsPreviewActive))
+                {
+                    if (GUILayout.Button(manager.IsMaskDemoRunning ? "Nachbild-Test läuft …" : "Nachbild-Test abspielen"))
+                    {
+                        serializedObject.ApplyModifiedProperties();
+                        manager.PlayMaskDemo();
+                    }
+                }
                 PreviewTakeoverButtons(manager, "Übernehmen schreibt FOV und Augenmodus der Vorschau in " +
                     "„Sitzung und Versuchsplan“ (Listen werden durch den einen Vorschau-Wert ersetzt) und " +
                     "behält die Darstellung (Edge Softness, Kreisblende, Gitterabstand, Farben, Fixationskreuz, " +
                     "Noise). Die l-Liste bleibt unverändert.");
             }
             if (Section("Muster, Fixationskreuz und Noise", false))
+            {
                 LinkedFields("stimulus", "edgeSoftnessDegrees", "useCircularAperture", "gridSpacingDegrees",
                     "darkColor", "lightColor", "showFixationTarget", "fixationSizeDegrees", "fixationColor",
-                    "backgroundColor", "noiseSizeInPixels", "noiseDotSizePixels", "noiseDotSizeDegrees",
-                    "noiseRefreshRateHz");
+                    "backgroundColor");
+                NoiseFields();
+            }
             if (Section("Verweise und erweiterte Einstellungen", false))
             {
                 Fields(serializedObject, "stimulus", "keyboardController", "eyeTrackingToolbox", "fixationMonitor",
@@ -270,6 +286,29 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
             EndSettings("sessionState", "currentTrialNumber", "totalTrials", "validTrialsCompleted",
                 "presentationCount", "activeSessionFolder");
+        }
+
+        private void NoiseFields()
+        {
+            // Nur die Felder des gewählten Noise-Typs zeigen.
+            var stimulus = serializedObject.FindProperty("stimulus").objectReferenceValue as VrCheckerboardStimulus;
+            LinkedFields("stimulus", "noiseType");
+            NoiseMaskType type = stimulus != null ? stimulus.NoiseType : NoiseMaskType.Broadband;
+            if (type == NoiseMaskType.Broadband)
+                LinkedFields("stimulus", "noiseBroadbandFinestDegrees", "noiseBroadbandCoarsestDegrees");
+            else if (type == NoiseMaskType.SingleScaleDegrees)
+                LinkedFields("stimulus", "noiseDotSizeDegrees");
+            else
+                LinkedFields("stimulus", "noiseDotSizePixels");
+            LinkedFields("stimulus", "noiseRefreshRateHz");
+            if (stimulus != null && type == NoiseMaskType.Broadband)
+                EditorGUILayout.HelpBox($"{stimulus.NoiseOctaves} Zellgrößen von {stimulus.NoiseDotSizeDegrees:0.##}° " +
+                    $"bis {stimulus.NoiseBroadbandCoarsestDegrees:0.##}°, je Faktor 2, gleich gewichtet.",
+                    MessageType.None);
+            if (type == NoiseMaskType.FinePixels)
+                EditorGUILayout.HelpBox("Feines Rauschen maskiert ein grobes Schachbrett kaum: Masken wirken nur " +
+                    "nahe ihrer eigenen Größenordnung (Stromeyer & Julesz, 1972). Für das Nachbild Breitband " +
+                    "verwenden.", MessageType.Warning);
         }
     }
 

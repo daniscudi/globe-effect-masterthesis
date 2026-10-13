@@ -103,27 +103,40 @@ namespace GlobeEffect.VRCheckerboard
         [Tooltip("Grauer Hintergrund in der Fixationsphase und rund um den Kreis. Bei Schwarz und Weiß als Musterfarben passt 0,73 (RGB 186): Das ist genauso hell wie beide im Schnitt. 0,5 wäre im Headset deutlich dunkler.")]
         private Color backgroundColor = new Color(0.73f, 0.73f, 0.73f);
 
-        // Die Maske sieht aus wie das "Ameisenmuster" eines alten Fernsehers ohne
-        // Empfang: viele kleine schwarze und weiße Punkte, die sich ständig ändern.
-        // Die frühere Kästchengröße (1 Grad) wird absichtlich nicht übernommen,
-        // sie gehörte zur alten, stehenden Maske.
+        // Die Maske soll ein Nachbild des Schachbretts verhindern. Eine Maske wirkt
+        // aber nur in Größenordnungen nahe ihrer eigenen (etwa plus/minus eine
+        // Oktave; Stromeyer & Julesz 1972, JOSA 62, 1221-1232). Das Schachbrett ist
+        // grob (10-Grad-Felder, Grundfrequenz etwa 0,07 Zyklen pro Grad), ein ganz
+        // feines "Ameisenmuster" maskiert es deshalb kaum. Standard ist darum das
+        // breitbandige Rauschen: mehrere Zellgrößen, gleiche Energie pro Oktave.
         //
-        // Kleiner als ein Bildpixel geht nicht: Dann trifft jedes Pixel zufällig
-        // nur einen von mehreren Punkten. Das gibt ein Raster, Flackern bei jeder
-        // kleinen Kopfbewegung, und die beiden Augen sehen verschiedene Bilder,
-        // was fast dreidimensional wirkt. Deshalb wird die Größe normalerweise
-        // in Pixeln eingestellt.
+        // Feines Rauschen nahe der Pixelgröße bleibt zum Vergleich wählbar. Kleiner
+        // als ein Bildpixel geht nicht: Dann trifft jedes Pixel zufällig nur einen
+        // von mehreren Punkten. Das gibt ein Raster und Flackern bei jeder kleinen
+        // Kopfbewegung.
         [Header("Noise Mask")]
         [SerializeField]
-        [Tooltip("An: Die Punktgröße wird in Bildpixeln eingestellt (Noise Dot Size Pixels). Das Skript rechnet selbst aus, wie viele Grad ein Pixel im Headset groß ist. So ist die Maske so fein wie möglich und bleibt trotzdem ruhig. Aus: Die Größe wird in Grad eingestellt (Noise Dot Size Degrees).")]
-        private bool noiseSizeInPixels = true;
+        [Tooltip("Breitband: Zufallsmuster in mehreren Zellgrößen (Finest bis Coarsest, je Faktor 2) gleich " +
+            "gewichtet überlagert, dann schwarz/weiß. Maskiert grobe und feine Strukturen des Schachbretts " +
+            "(empfohlen). Einfach: eine Zellgröße in Grad (Noise Dot Size Degrees). Fein: Zellgröße in " +
+            "Bildpixeln (Noise Dot Size Pixels), das frühere Ameisenmuster, maskiert grobe Muster kaum.")]
+        private NoiseMaskType noiseType = NoiseMaskType.Broadband;
+
+        [SerializeField, Range(0.1f, 10f)]
+        [Tooltip("Breitband: kleinste Zellgröße in Grad (feinste Oktave).")]
+        private float noiseBroadbandFinestDegrees = 0.5f;
+
+        [SerializeField, Range(0.5f, 20f)]
+        [Tooltip("Breitband: größte Zellgröße in Grad (gröbste Oktave). Bei 10-Grad-Schachbrettfeldern " +
+            "etwa 8: grob genug für die Grundfrequenz des Schachbretts, aber kein eigenes grobes Muster.")]
+        private float noiseBroadbandCoarsestDegrees = 8f;
 
         [SerializeField, Range(1f, 10f)]
-        [Tooltip("Wie groß ein Punkt des Rauschens ist, in Bildpixeln. 1 ist das Feinste, was das Headset zeigen kann. Ab etwa 1,5 bleibt das Bild auch bei kleinen Kopfbewegungen ruhig. Gemeint sind die Pixel, die Unity rendert. Steht die Auflösung in SteamVR über 100 %, ist so ein Pixel etwas kleiner als ein Pixel im Display.")]
+        [Tooltip("Nur bei Noise Type Fein. Wie groß ein Punkt des Rauschens ist, in Bildpixeln. 1 ist das Feinste, was das Headset zeigen kann. Ab etwa 1,5 bleibt das Bild auch bei kleinen Kopfbewegungen ruhig. Gemeint sind die Pixel, die Unity rendert. Steht die Auflösung in SteamVR über 100 %, ist so ein Pixel etwas kleiner als ein Pixel im Display.")]
         private float noiseDotSizePixels = 1.5f;
 
-        [SerializeField, Range(0.02f, 2f)]
-        [Tooltip("Wie groß ein einzelner Punkt des Rauschens ist, in Grad in der Bildmitte. Gilt nur, wenn Noise Size In Pixels aus ist. Unter etwa 0,08 Grad ist ein Punkt in der Vive Pro Eye kleiner als ein Bildpixel.")]
+        [SerializeField, Range(0.02f, 10f)]
+        [Tooltip("Nur bei Noise Type Einfach. Wie groß ein einzelner Punkt des Rauschens ist, in Grad in der Bildmitte. Unter etwa 0,08 Grad ist ein Punkt in der Vive Pro Eye kleiner als ein Bildpixel.")]
         private float noiseDotSizeDegrees = 0.15f;
 
         [SerializeField, Range(0f, 120f)]
@@ -205,9 +218,18 @@ namespace GlobeEffect.VRCheckerboard
         // Die Punktgröße, die gerade wirklich benutzt wird, in Grad in der
         // Bildmitte. Im Pixel-Modus ohne Kamera wird der Gradwert genommen.
         public float NoiseDotSizeDegrees =>
-            noiseSizeInPixels && TryGetDegreesPerPixel(out float degreesPerPixel)
+            noiseType == NoiseMaskType.Broadband ? noiseBroadbandFinestDegrees
+            : noiseType == NoiseMaskType.FinePixels && TryGetDegreesPerPixel(out float degreesPerPixel)
                 ? noiseDotSizePixels * degreesPerPixel
                 : noiseDotSizeDegrees;
+
+        public NoiseMaskType NoiseType => noiseType;
+        public float NoiseBroadbandCoarsestDegrees => noiseBroadbandCoarsestDegrees;
+
+        // Breitband: Zahl der Zellgrößen von Finest bis Coarsest, je Faktor 2.
+        public int NoiseOctaves => noiseType != NoiseMaskType.Broadband ? 1
+            : Mathf.Clamp(Mathf.FloorToInt(Mathf.Log(
+                noiseBroadbandCoarsestDegrees / noiseBroadbandFinestDegrees, 2f) + 0.001f) + 1, 1, 8);
 
         // Dieselbe Größe in Bildpixeln. NaN, wenn keine Kamera da ist.
         public float NoiseDotSizePixels =>
@@ -541,6 +563,8 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetFloat("_CheckerboardEnabled", checkerboardVisible ? 1f : 0f);
             propertyBlock.SetFloat("_NoiseEnabled", noiseVisible ? 1f : 0f);
             propertyBlock.SetFloat("_NoiseCellSizeUv", DegreesToUv(NoiseDotSizeDegrees));
+            propertyBlock.SetFloat("_NoiseType", (float)noiseType);
+            propertyBlock.SetFloat("_NoiseOctaves", NoiseOctaves);
             // Beim Antworttext wird immer auf beiden Augen gezeigt, damit der Text
             // auch im Monokular-Durchgang gut lesbar bleibt.
             CheckerboardEyePresentation eyeMode =
@@ -777,7 +801,10 @@ namespace GlobeEffect.VRCheckerboard
             edgeSoftnessDegrees = Mathf.Clamp(edgeSoftnessDegrees, 0f, 10f);
             visualSpaceL = Mathf.Clamp(visualSpaceL, 0f, 1.4f);
             gridSpacingDegrees = Mathf.Clamp(gridSpacingDegrees, 0.5f, 45f);
-            noiseDotSizeDegrees = Mathf.Clamp(noiseDotSizeDegrees, 0.02f, 2f);
+            noiseDotSizeDegrees = Mathf.Clamp(noiseDotSizeDegrees, 0.02f, 10f);
+            noiseBroadbandFinestDegrees = Mathf.Clamp(noiseBroadbandFinestDegrees, 0.1f, 10f);
+            noiseBroadbandCoarsestDegrees = Mathf.Clamp(noiseBroadbandCoarsestDegrees,
+                noiseBroadbandFinestDegrees, 20f);
             noiseDotSizePixels = Mathf.Clamp(noiseDotSizePixels, 1f, 10f);
             noiseRefreshRateHz = Mathf.Clamp(noiseRefreshRateHz, 0f, 120f);
             fixationSizeDegrees = Mathf.Clamp(fixationSizeDegrees, 0.05f, 5f);
@@ -789,6 +816,19 @@ namespace GlobeEffect.VRCheckerboard
     // Diese beiden kurzen Listen stehen hier mit beim Stimulus. Sie sagen direkt,
     // wie gezeigt wird und wie die Antwort gespeichert wird. Dafür lohnen sich
     // keine eigenen Dateien.
+    // Art der Noise-Maske (siehe Tooltip an noiseType).
+    public enum NoiseMaskType
+    {
+        [InspectorName("Fein (Pixel, früheres Ameisenmuster)")]
+        FinePixels = 0,
+
+        [InspectorName("Einfach (eine Zellgröße in Grad)")]
+        SingleScaleDegrees = 1,
+
+        [InspectorName("Breitband (mehrere Zellgrößen, empfohlen)")]
+        Broadband = 2
+    }
+
     public enum CheckerboardEyePresentation
     {
         BothEyes = 0,

@@ -81,7 +81,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             public bool showFixationTarget;
             public float fixationSizeDegrees;
             public Color fixationColor;
-            public bool noiseSizeInPixels;
+            public NoiseMaskType noiseType;
+            public float noiseBroadbandFinestDegrees;
+            public float noiseBroadbandCoarsestDegrees;
             public float noiseDotSizePixels;
             public float noiseDotSizeDegrees;
             public float noiseRefreshRateHz;
