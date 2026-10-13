@@ -55,16 +55,70 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(live.WouldShowDots, Is.False);
         }
 
-        private static void Feed(RandomDotLiveHeadSpeed live, float degreesPerSecond, float seconds)
+        [Test]
+        public void LeftRightPanning_IsSplitIntoTurnsWithTheirMeanSpeed()
+        {
+            // 2 s nach rechts mit 2 °/s, 2 s nach links mit 3 °/s, dann stillhalten.
+            var live = new RandomDotLiveHeadSpeed();
+            float yaw = Feed(live, degreesPerSecond: 2f, seconds: 2f);
+            yaw = Feed(live, degreesPerSecond: -3f, seconds: 2f, startYaw: yaw);
+            Feed(live, degreesPerSecond: 0f, seconds: 1f, startYaw: yaw);
+
+            Assert.That(live.LastPans.Count, Is.EqualTo(2));
+            // Der neueste zuerst: nach links. Anfahren und Abbremsen (Glättung) zählen
+            // mit, deshalb liegt das Mittel etwas unter dem gleichmäßigen Tempo.
+            Assert.That(live.LastPans[0].Direction, Is.EqualTo(-1));
+            Assert.That(live.LastPans[0].MeanHeadSpeed, Is.EqualTo(3f).Within(0.4f));
+            Assert.That(live.LastPans[0].MeanImageSpeed, Is.EqualTo(10f * live.LastPans[0].MeanHeadSpeed).Within(0.01f));
+            Assert.That(live.LastPans[1].Direction, Is.EqualTo(1));
+            Assert.That(live.LastPans[1].MeanHeadSpeed, Is.EqualTo(2f).Within(0.3f));
+            Assert.That(live.LastPans[1].Seconds, Is.EqualTo(2f).Within(0.2f));
+        }
+
+        [Test]
+        public void ShortTwitch_IsNoTurn()
+        {
+            var live = new RandomDotLiveHeadSpeed();
+            float yaw = Feed(live, degreesPerSecond: 3f, seconds: 0.2f);
+            Feed(live, degreesPerSecond: 0f, seconds: 1f, startYaw: yaw);
+
+            Assert.That(live.LastPans, Is.Empty);
+        }
+
+        [Test]
+        public void SaveSpeed_StoresTheLastSecondWhileMovingButNotWhileStill()
+        {
+            var live = new RandomDotLiveHeadSpeed();
+            float yaw = Feed(live, degreesPerSecond: 2.5f, seconds: 4f);
+
+            Assert.That(live.TrySaveSpeed(out RandomDotSavedSpeed saved), Is.True);
+            Assert.That(saved.HeadSpeed, Is.EqualTo(2.5f).Within(0.1f));
+            Assert.That(saved.ImageSpeed, Is.EqualTo(25f).Within(1f));
+            Assert.That(live.SavedSpeeds.Count, Is.EqualTo(1));
+
+            Feed(live, degreesPerSecond: 0f, seconds: 5f, startYaw: yaw);
+            Assert.That(live.TrySaveSpeed(out _), Is.False);
+            Assert.That(live.SavedSpeeds.Count, Is.EqualTo(1));
+
+            live.ClearHistory();
+            Assert.That(live.SavedSpeeds, Is.Empty);
+            Assert.That(live.LastPans, Is.Empty);
+        }
+
+        // Gibt den Gierwinkel am Ende zurück, damit die nächste Bewegung dort weitergeht.
+        private static float Feed(RandomDotLiveHeadSpeed live, float degreesPerSecond, float seconds,
+            float startYaw = 0f)
         {
             int frames = Mathf.RoundToInt(seconds / FrameSeconds);
+            float yaw = startYaw;
             for (int frame = 0; frame <= frames; frame++)
             {
-                float yaw = degreesPerSecond * frame * FrameSeconds;
+                yaw = startYaw + degreesPerSecond * frame * FrameSeconds;
                 live.AddSample(Quaternion.Euler(0f, yaw, 0f) * Vector3.forward, FrameSeconds,
                     HeadVelocityAxis.Horizontal, 0.1f, targetHeadSpeed: 2f, tolerance: 0.5f,
                     holdSecondsBeforeDots: 0.15f, imageGain: 10f);
             }
+            return yaw;
         }
     }
 }

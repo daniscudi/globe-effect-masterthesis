@@ -99,6 +99,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
             ["previewImageCenterSpeed"] = "Dot Speed In Image Center (deg/s)",
             ["simulatedYawSpeedDegreesPerSecond"] = "Binocular Turn Speed (deg/s)",
             ["loopSweepInPreview"] = "Repeat Movement",
+            ["saveHeadSpeedKey"] = "Save Natural Speed Key",
+            ["headSpeedReadoutKey"] = "Show Speed In Headset Key",
+            ["showHeadSpeedInHeadset"] = "Show Speed In Headset",
             ["worldCoverageDegrees"] = "Dot Field Size (degrees)",
             ["fieldRadiusMeters"] = "Technical: Field Radius (m)",
         };
@@ -494,6 +497,12 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 EditorGUILayout.HelpBox("In Play Mode press P to start the preview (P or F6 ends it). " +
                     "Change the settings below and see the result right away. The straight reference grid is " +
                     "only for comparing and is never shown in practice or measurement.",
+                    MessageType.Info);
+                Fields(serializedObject, "saveHeadSpeedKey", "headSpeedReadoutKey", "showHeadSpeedInHeadset");
+                EditorGUILayout.HelpBox("Finding a natural head speed: set Movement Type below to Head-Tracked, " +
+                    "put on the headset and turn your head slowly left and right, as when looking around with " +
+                    "binoculars. When it feels natural, press Space or a controller button (you hear a beep). " +
+                    "The saved speeds and your last turns are shown in the Experiment Monitor.",
                     MessageType.Info);
                 LinkedFields("stimulus", "fieldOfViewDegrees", "edgeSoftnessDegrees", "dotDensity",
                     "dotSizeDegrees", "darkColor", "lightColor", "backgroundColor", "fieldBackgroundColor",

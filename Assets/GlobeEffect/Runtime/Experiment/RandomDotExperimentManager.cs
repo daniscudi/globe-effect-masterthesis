@@ -377,6 +377,20 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [Tooltip("Turns the preview on or off. Nothing is recorded.")]
         private Key previewKey = Key.P;
 
+        [SerializeField]
+        [Tooltip("Preview: press while turning your head at a speed that feels natural. Saves the head speed " +
+            "of the last second. A controller button (trigger or trackpad click) works too.")]
+        private Key saveHeadSpeedKey = Key.Space;
+
+        [SerializeField]
+        [Tooltip("Preview: shows or hides the head speed in the headset.")]
+        private Key headSpeedReadoutKey = Key.H;
+
+        [SerializeField]
+        [Tooltip("Preview: shows the head speed and dot speed under the cross in the headset. Leave off to " +
+            "find a natural speed without looking at numbers.")]
+        private bool showHeadSpeedInHeadset;
+
         // Stand vor dem ersten "Vorschau-Werte übernehmen". Leer heißt: es wurde
         // nichts übernommen. "Originalwerte wiederherstellen" holt ihn zurück.
         [SerializeField, HideInInspector]
@@ -431,6 +445,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private readonly FrameTimingTracker frameTiming = new();
         private readonly RandomDotHeadVelocityGate velocityGate = new();
         private readonly RandomDotLiveHeadSpeed liveHeadSpeed = new();
+        private RandomDotPilotSpeedView pilotSpeedView;
+        private float pilotSavedMessageUntil;
         private int frameTimingStartFrame;
         private int trialsWithSlowFrames;
         private int pausesTaken;
@@ -513,6 +529,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 frameTiming.Add(Time.unscaledDeltaTime);
 
             Keyboard keyboard = Keyboard.current;
+            if (previewActive) UpdateHeadSpeedPilot(keyboard);
+            else pilotSpeedView?.Hide();
+
             if (keyboard != null && !IsSessionActive && !IsTrainingActive
                 && keyboard[previewKey].wasPressedThisFrame)
             {
@@ -1463,6 +1482,39 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 velocitySmoothingSeconds, target, velocityTolerance, velocityHoldSeconds, m * zoom);
         }
 
+        // Pilot in der Vorschau, mit Brille auf: Tempo speichern, das sich natürlich
+        // anfühlt (Taste oder Controller), und auf Wunsch das Tempo im Headset sehen.
+        private void UpdateHeadSpeedPilot(Keyboard keyboard)
+        {
+            if (stimulus == null || stimulus.Observer == null) return;
+            pilotSpeedView ??= new RandomDotPilotSpeedView(stimulus.Observer);
+
+            if (keyboard != null && keyboard[headSpeedReadoutKey].wasPressedThisFrame)
+                showHeadSpeedInHeadset = !showHeadSpeedInHeadset;
+
+            bool savePressed = (keyboard != null && keyboard[saveHeadSpeedKey].wasPressedThisFrame)
+                || VrControllerResponses.TryReadPress(out _);
+            if (savePressed && liveHeadSpeed.TrySaveSpeed(out RandomDotSavedSpeed saved))
+            {
+                Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                    "Pilot: natürliches Kopftempo gespeichert: {0:F2} °/s Kopf, {1:F1} °/s Punkte in der " +
+                    "Bildmitte (m × Zoom = {2:F2}). Bisher {3} Werte.", saved.HeadSpeed, saved.ImageSpeed,
+                    saved.ImageGain, liveHeadSpeed.SavedSpeeds.Count), this);
+                pilotSpeedView.PlaySavedTone();
+                pilotSavedMessageUntil = Time.unscaledTime + 1f;
+            }
+
+            // Nach dem Speichern kurz "SAVED", ohne Zahl, wenn die Anzeige aus ist.
+            string speed = string.Format(CultureInfo.InvariantCulture, "HEAD {0:F1} deg/s   DOTS {1:F0} deg/s",
+                liveHeadSpeed.AverageHeadSpeed, liveHeadSpeed.AverageImageCenterSpeed);
+            if (Time.unscaledTime < pilotSavedMessageUntil)
+                pilotSpeedView.Show(showHeadSpeedInHeadset ? "SAVED   " + speed : "SAVED");
+            else if (showHeadSpeedInHeadset)
+                pilotSpeedView.Show(speed);
+            else
+                pilotSpeedView.Hide();
+        }
+
         private void PresentCurrentTrial()
         {
             // Gibt k, m, Zusatzzoom, FOV, Augenmodus und Bewegungsart an das
@@ -2213,6 +2265,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             headTrainingView?.Dispose();
             headTrainingView = null;
+            pilotSpeedView?.Dispose();
+            pilotSpeedView = null;
         }
 
         private void OnValidate()
