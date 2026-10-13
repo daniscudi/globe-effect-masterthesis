@@ -215,7 +215,7 @@ MonoBehaviour:
   sweepAxis: 0
   simulatedYawAmplitudeDegrees: 2
   previewSpeedReference: 1
-  previewImageCenterSpeed: 23
+  previewImageCenterSpeed: 25
   simulatedYawSpeedDegreesPerSecond: 1.2
   sweepDirection: 1
   loopSweepInPreview: 1
@@ -709,7 +709,7 @@ MonoBehaviour:
   simulatedSweepAxis: 0
   simulatedSweepSeconds: 0.8
   simulatedSpeedReference: 1
-  simulatedImageCenterSpeed: 23
+  simulatedImageCenterSpeed: 25
   sweepSpeed: 1.2
   headTrackedSeconds: 5
   sweepAmplitudeDegrees: 2
