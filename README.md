@@ -209,35 +209,47 @@ Verzerrungsformel umzudefinieren.
 Am `Checkerboard Stimulus` und am `Random Dot Field` gibt es den Wert
 `Aperture Edge Softness Degrees`:
 
-* `0`: harter, klar abgeschnittener Rand
+* `0`: harter, klar abgeschnittener Rand bei FOV/2
 
-* kleiner positiver Wert: kurzer transparenter Übergang
-
-* größerer Wert: breiterer weicher Verlauf nach innen
+* positiver Wert: Breite des weichen Übergangs, **mittig auf dem FOV-Rand**
+  (seit 13.10.2026; voreingestellt in beiden Szenen `5°`)
 
 Die Angabe erfolgt in Winkelgrad und nicht in Pixeln. Dadurch bleibt die
 Randbreite auch bei anderer Auflösung oder auf der XR-4 vergleichbar. 
 
-Genau (Random-Dot-Shader): θ ist der dargestellte Sehwinkel eines Bildpunkts
-zur Bildmitte des jeweiligen Auges, also nach der Instrumentenabbildung mit m
-und k. θ_A = FOV/2 ist der Blendenradius, s = `Edge Softness Degrees`. Die
-Deckkraft ist
+Genau (beide Shader): θ ist der dargestellte Sehwinkel eines Bildpunkts zur
+Bildmitte des jeweiligen Auges (bei Random Dots nach der Instrumentenabbildung
+mit m und k). θ_A = FOV/2, s = `Edge Softness Degrees`. Die Deckkraft ist
 
 ```text
-α(θ) = 1 − smoothstep(θ_A − s, θ_A, θ),   smoothstep(e0, e1, x) = t²(3 − 2t),
+α(θ) = 1 − smoothstep(θ_A − s/2, θ_A + s/2, θ),   smoothstep(e0, e1, x) = t²(3 − 2t),
 t = clamp((x − e0) / (e1 − e0), 0, 1)
 ```
 
-Bis `θ_A − s` ist alles voll sichtbar, zwischen `θ_A − s` und `θ_A` wird mit
-S-förmigem Verlauf zur Außenfarbe (`Background Color`, Kamera-Löschfarbe)
-übergeblendet, ab `θ_A` ist nur noch die Außenfarbe zu sehen. Beispiel FOV 70°,
-s = 10°: Übergang im Ring von 25° bis 35° Exzentrizität. Punkte und Kreisfläche
-(`Field Background Color`) werden mit demselben α gemischt; die Mischung ist
-linear in den gamma-kodierten Farbwerten (Projekt im Gamma-Farbraum), nicht in
-der Leuchtdichte. Bei s = 0 gibt es eine harte Kante bei θ_A. Die Kreisfläche
-wird als Gleitkommafarbe an den Shader übergeben, damit gleiche Farben innen
-und außen exakt gleich gerundet werden (früher 8-Bit-Vertexfarbe: 0,5 ergab
-innen 128, außen 127, der Kreis war minimal sichtbar).
+Bis `θ_A − s/2` ist alles voll sichtbar, zwischen `θ_A − s/2` und `θ_A + s/2`
+wird S-förmig zur Außenfarbe übergeblendet, genau bei `θ_A` beträgt die
+Deckkraft 50 %. **Das FOV ist damit der Halbwertsdurchmesser der Blende.**
+Beispiel FOV 60°, s = 5°: voll sichtbar bis 55° Durchmesser (27,5°
+Exzentrizität), 50 % bei 60°, ganz weg ab 65°. Bei s = 0 gibt es eine harte
+Kante bei θ_A. Für die Arbeit z. B.: „kreisförmige Blende mit 60°
+Durchmesser (Halbwertspunkt) und weichem Rand von 5° Breite (smoothstep)“.
+Die gezeichneten Flächen und die Random-Dot-Punktwelt reichen bis `θ_A + s/2`.
+Messdateien seit dieser Änderung tragen eine neue `mapping_version`
+(`…-aperture-halfmax-…`); ältere Dateien hatten den Übergang ganz innerhalb
+des FOV (`θ_A − s` bis `θ_A`).
+
+Gemischt wird unterschiedlich:
+
+* Random Dots: Punkte und Kreisfläche (`Field Background Color`) werden mit
+  demselben α über die Kamera-Löschfarbe (`Background Color`) geblendet,
+  linear in den gamma-kodierten Farbwerten (Projekt im Gamma-Farbraum). Die
+  Kreisfläche wird als Gleitkommafarbe an den Shader übergeben, damit gleiche
+  Farben innen und außen exakt gleich gerundet werden (früher
+  8-Bit-Vertexfarbe: 0,5 ergab innen 128, außen 127, der Kreis war minimal
+  sichtbar).
+* Checkerboard: Muster und grauer Hintergrund werden in **linearer
+  Helligkeit** gemischt (Gamma → linear → mischen → Gamma), damit die mittlere
+  Helligkeit am Rand gleich bleibt und kein Kugel-Schatten „konvex“ vortäuscht.
 
 Am `Checkerboard Stimulus` kann `Use Circular Aperture` für eine technische
 Kontrolle ausgeschaltet werden. Dann sieht man das vollständige quadratische

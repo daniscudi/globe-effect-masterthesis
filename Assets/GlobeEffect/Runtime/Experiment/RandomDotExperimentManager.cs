@@ -1985,7 +1985,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             if (stimulus == null || stimulus.MotionMode != RandomDotMotionMode.HeadTracked) return;
             float coverage = Mathf.Min(RandomDotFieldStimulus.MaximumCoverageDegrees,
                 RandomDotFieldStimulus.CoverageNeeded(stimulus.FieldOfViewDegrees, stimulus.ContentZoom,
-                    stimulus.InstrumentMagnificationM, stimulus.InstrumentDistortionK, HeadTrackedReachDegrees));
+                    stimulus.InstrumentMagnificationM, stimulus.InstrumentDistortionK, HeadTrackedReachDegrees,
+                    stimulus.ApertureEdgeSoftnessDegrees));
             if (Mathf.Abs(coverage - stimulus.WorldCoverageDiameterDegrees) > 0.05f)
                 stimulus.SetWorldCoverage(coverage);
         }
@@ -2038,7 +2039,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 ? Mathf.Max(sweepAmplitudeDegrees, headTurnSafetyDegrees)
                 : SweepAmplitude(trial, simulatedSecondsOverride);
             return RandomDotFieldStimulus.CoverageNeeded(trial.AngularDiameterDegrees, trial.ContentZoom,
-                trial.InstrumentMagnificationM, trial.InstrumentDistortionK, reach);
+                trial.InstrumentMagnificationM, trial.InstrumentDistortionK, reach,
+                stimulus.ApertureEdgeSoftnessDegrees);
         }
 
         private void CheckPointWorlds(IReadOnlyList<RandomDotTrial> plan)

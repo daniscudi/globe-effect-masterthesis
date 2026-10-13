@@ -33,7 +33,7 @@ namespace GlobeEffect.VRCheckerboard
         /// einmal geändert wird, sieht man an den alten Dateien trotzdem, womit
         /// sie aufgenommen wurden.
         /// </summary>
-        public const string MappingVersion = "visual-space-l-tangent-normalized-cartesian-grid-v2";
+        public const string MappingVersion = "visual-space-l-tangent-normalized-cartesian-grid-aperture-halfmax-v3";
 
         /// <summary>
         /// Rechnet einen Radius im sichtbaren Kreis zurück auf die Stelle, an der

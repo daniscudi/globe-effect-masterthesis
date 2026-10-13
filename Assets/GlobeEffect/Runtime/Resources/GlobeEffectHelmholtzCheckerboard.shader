@@ -81,6 +81,16 @@
             float4 _ObserverWorldUp;
             float4 _ObserverWorldForward;
 
+            // Wie weit die gezeichnete Trägerfläche reicht. Mit Kreisblende und
+            // weichem Rand bis FOV/2 + s/2, denn der Rand liegt mittig auf dem
+            // Blendenrand (50 % Deckkraft genau bei FOV/2). Alle Musterrechnungen
+            // bleiben in Einheiten, in denen 1 der Blendenrand FOV/2 ist.
+            float CarrierHalfAngle()
+            {
+                float extra = _UseCircularAperture > 0.5 ? 0.5 * _ApertureEdgeSoftnessRad : 0.0;
+                return min(_ApparentHalfAngleRad + extra, 1.55);
+            }
+
             VertexToFragment Vert(AppData input)
             {
                 VertexToFragment output;
@@ -89,7 +99,7 @@
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
                 float2 displayPosition = input.vertex.xy * 2.0;
-                float tangentAtBoundary = tan(_ApparentHalfAngleRad);
+                float tangentAtBoundary = tan(CarrierHalfAngle());
 
                 // Aus der Stelle auf dem Träger wird eine Richtung relativ zur
                 // aktuellen Kopfpose. Deshalb bleibt das Bild kopffest und verhält
@@ -178,7 +188,10 @@
                 }
                 clip(visibleForEye - 0.5);
 
-                float2 displayPosition = input.uv * 2.0 - 1.0;
+                // In Einheiten des Blendenrands: 1 = FOV/2, auch wenn der Träger
+                // für den weichen Rand etwas größer ist.
+                float2 displayPosition = (input.uv * 2.0 - 1.0) *
+                    (tan(CarrierHalfAngle()) / tan(_ApparentHalfAngleRad));
                 float displayRadius = length(displayPosition);
 
                 // displayRadius ist linear auf dem quadratischen Träger. atan
@@ -188,8 +201,9 @@
 
                 // Das Gitter wird weiterhin auf einem quadratischen Träger
                 // berechnet. Diese unabhängige Kreisblende entscheidet erst
-                // danach, welcher Teil davon sichtbar ist. Die Softness gibt
-                // an, über wie viele Winkelgrad der Rand nach innen ausblendet.
+                // danach, welcher Teil davon sichtbar ist. Die Softness ist die
+                // Breite des weichen Rands, mittig auf dem Blendenrand: 50 %
+                // Deckkraft genau bei FOV/2 (Halbwertsdurchmesser = FOV).
                 float apertureAlpha = 1.0;
                 if (_UseCircularAperture > 0.5 &&
                     _ApertureEdgeSoftnessRad <= 1e-6)
@@ -202,10 +216,10 @@
                 {
                     float fadeStart = max(
                         0.0,
-                        _ApparentHalfAngleRad - _ApertureEdgeSoftnessRad);
+                        _ApparentHalfAngleRad - 0.5 * _ApertureEdgeSoftnessRad);
                     apertureAlpha = 1.0 - smoothstep(
                         fadeStart,
-                        _ApparentHalfAngleRad,
+                        CarrierHalfAngle(),
                         visualAngle);
                 }
                 // Ohne Kreisblende bleibt apertureAlpha bei 1 und das ganze

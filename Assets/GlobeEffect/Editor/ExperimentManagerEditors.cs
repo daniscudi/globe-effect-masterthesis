@@ -401,7 +401,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 {
                     float zoom = zooms.GetArrayElementAtIndex(zi).floatValue;
                     float coverage = RandomDotFieldStimulus.CoverageNeeded(fovs.GetArrayElementAtIndex(fi).floatValue,
-                        zoom, m, ks.GetArrayElementAtIndex(ki).floatValue, reach);
+                        zoom, m, ks.GetArrayElementAtIndex(ki).floatValue, reach, stimulus.ApertureEdgeSoftnessDegrees);
                     if (float.IsInfinity(coverage) || coverage > RandomDotFieldStimulus.MaximumCoverageDegrees)
                     {
                         impossible = true;

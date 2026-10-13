@@ -243,6 +243,63 @@ namespace GlobeEffect.VRCheckerboard.Tests
             }
         }
 
+        [Test]
+        public void SoftEdge_IsCenteredOnTheFieldOfView()
+        {
+            // FOV 70, Softness 10: voll sichtbar bis 30°, halb bei 35°, weg ab 40°.
+            // Kamera 90° auf 128 Pixel: Pixel x liegt bei atan((x + 0,5 - 64) / 64).
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
+                Assert.Ignore("Der Randtest braucht eine Grafikkarte.");
+
+            Scene scene = EditorSceneManager.NewPreviewScene();
+            var target = new RenderTexture(128, 128, 24);
+            var readback = new Texture2D(128, 128, TextureFormat.RGBA32, false);
+            RenderTexture previousTarget = RenderTexture.active;
+            try
+            {
+                var cameraObject = new GameObject("Soft Edge Camera");
+                SceneManager.MoveGameObjectToScene(cameraObject, scene);
+                var camera = cameraObject.AddComponent<Camera>();
+                camera.enabled = false;
+                camera.scene = scene;
+                camera.fieldOfView = 90f;
+                camera.aspect = 1f;
+                camera.clearFlags = CameraClearFlags.SolidColor;
+                camera.backgroundColor = Color.black;
+                camera.targetTexture = target;
+                camera.stereoTargetEye = StereoTargetEyeMask.None;
+
+                var field = new GameObject("Soft Edge Field");
+                SceneManager.MoveGameObjectToScene(field, scene);
+                var stimulus = field.AddComponent<RandomDotFieldStimulus>();
+                stimulus.Observer = camera.transform;
+                stimulus.SetAngularDiameter(70f);
+                var settings = new SerializedObject(stimulus);
+                settings.FindProperty("darkColor").colorValue = Color.clear;
+                settings.FindProperty("lightColor").colorValue = Color.clear;
+                settings.FindProperty("showFixationTarget").boolValue = false;
+                settings.FindProperty("edgeSoftnessDegrees").floatValue = 10f;
+                settings.FindProperty("fieldBackgroundColor").colorValue = Color.white;
+                settings.ApplyModifiedPropertiesWithoutUndo();
+                stimulus.ConfigurePointField(42, 40f);
+                stimulus.Show();
+
+                Color32[] pixels = Render(camera, target, readback);
+                Assert.That(pixels[64 * 128 + 99].r, Is.GreaterThan(245), "29° liegt vor dem Rand.");
+                // 34,8°: Deckkraft gut 0,5; gemischt in gamma-kodierten Werten.
+                Assert.That(pixels[64 * 128 + 108].r, Is.InRange(100, 160), "Bei FOV/2 halb sichtbar.");
+                Assert.That(pixels[64 * 128 + 120].r, Is.LessThan(10), "41° liegt hinter dem Rand.");
+            }
+            finally
+            {
+                RenderTexture.active = previousTarget;
+                EditorSceneManager.ClosePreviewScene(scene);
+                target.Release();
+                Object.DestroyImmediate(target);
+                Object.DestroyImmediate(readback);
+            }
+        }
+
         private static Color32[] Render(Camera camera, RenderTexture target, Texture2D readback)
         {
             camera.Render();

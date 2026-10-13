@@ -137,7 +137,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// </summary>
     public sealed class RandomDotExperimentFiles : ExperimentFilesBase
     {
-        public const string MappingVersion = "merlitz-instrument-k-m-free-or-guided-head-v8";
+        public const string MappingVersion = "merlitz-instrument-k-m-free-or-guided-head-aperture-halfmax-v9";
 
         private const string PlanHeader = SessionColumns +
             "sequence_index,total_planned_trials,condition_index,repetition,motion_block_index," +

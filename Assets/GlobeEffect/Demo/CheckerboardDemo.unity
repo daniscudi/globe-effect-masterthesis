@@ -153,7 +153,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.VrCheckerboardStimulus
   observer: {fileID: 799610645}
   fieldOfViewDegrees: 60
-  edgeSoftnessDegrees: 10
+  edgeSoftnessDegrees: 5
   useCircularAperture: 1
   visualSpaceL: 0.5
   gridSpacingDegrees: 8

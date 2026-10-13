@@ -49,7 +49,9 @@ namespace GlobeEffect.VRCheckerboard
 
         [FormerlySerializedAs("apertureEdgeSoftnessDegrees")]
         [SerializeField, Range(0f, 10f)]
-        [Tooltip("Wie weich der Rand des Kreises nach innen ausläuft. 0 gibt eine harte Kante.")]
+        [Tooltip("Breite des weichen Kreisrands in Grad, mittig auf dem FOV-Rand: voll sichtbar bis " +
+            "FOV/2 - Softness/2, 50 % genau bei FOV/2, weg ab FOV/2 + Softness/2. Das FOV ist damit der " +
+            "Halbwertsdurchmesser. 0 gibt eine harte Kante bei FOV/2.")]
         private float edgeSoftnessDegrees = 1f;
 
         [SerializeField]

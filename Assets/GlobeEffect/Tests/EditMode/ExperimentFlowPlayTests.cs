@@ -172,9 +172,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(Quaternion.Angle(fieldOrientation, stimulus.transform.rotation), Is.LessThan(0.01f));
             Assert.That(stimulus.InstrumentDistortionK, Is.EqualTo(0.3f));
             // Aktive Vorschau: Punktwelt wie in der Sitzung aus Head Turn Safety Degrees.
+            // Inklusive äußerer Hälfte des weichen Rands (FOV/2 + Softness/2).
             float expectedCoverage = RandomDotFieldStimulus.CoverageNeeded(stimulus.FieldOfViewDegrees,
                 stimulus.ContentZoom, stimulus.InstrumentMagnificationM, stimulus.InstrumentDistortionK,
-                manager.HeadTrackedReachDegrees);
+                manager.HeadTrackedReachDegrees, stimulus.ApertureEdgeSoftnessDegrees);
             Assert.That(stimulus.WorldCoverageDiameterDegrees, Is.EqualTo(expectedCoverage).Within(0.06f));
             var block = new MaterialPropertyBlock();
             stimulus.GetComponent<MeshRenderer>().GetPropertyBlock(block);

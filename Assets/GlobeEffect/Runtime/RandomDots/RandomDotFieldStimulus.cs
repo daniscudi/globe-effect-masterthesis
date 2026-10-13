@@ -86,7 +86,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         [FormerlySerializedAs("apertureEdgeSoftnessDegrees")]
         [SerializeField, Range(0f, 10f)]
-        [Tooltip("Wie weich der Rand des Kreises nach innen ausläuft. 0 gibt eine harte Kante.")]
+        [Tooltip("Breite des weichen Kreisrands in Grad, mittig auf dem FOV-Rand: voll sichtbar bis " +
+            "FOV/2 - Softness/2, 50 % genau bei FOV/2, weg ab FOV/2 + Softness/2. Das FOV ist damit der " +
+            "Halbwertsdurchmesser. 0 gibt eine harte Kante bei FOV/2.")]
         private float edgeSoftnessDegrees = 1f;
 
         [SerializeField, Min(MinimumRadiusMeters)]
@@ -309,7 +311,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private float FreeWorldDegrees()
         {
             float visiblePart = CoverageNeeded(fieldOfViewDegrees, contentZoom,
-                instrumentMagnificationM, instrumentDistortionK, sweepReachDegrees: 0f);
+                instrumentMagnificationM, instrumentDistortionK, sweepReachDegrees: 0f, edgeSoftnessDegrees);
             return 0.5f * (worldCoverageDegrees - visiblePart);
         }
 
@@ -522,12 +524,14 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         /// Unendlich heißt: Diese Kombination lässt sich gar nicht abbilden.
         /// </summary>
         public static float CoverageNeeded(float fieldOfViewDegrees, float zoom,
-            float magnificationM, float distortionK, float sweepReachDegrees)
+            float magnificationM, float distortionK, float sweepReachDegrees, float edgeSoftnessDegrees = 0f)
         {
             // Rückwärts gerechnet: Welcher Winkel draußen in der Welt landet genau
-            // am Rand des Kreises? Erst wird der Zusatzzoom herausgerechnet, dann
-            // die Merlitz-Formel umgedreht.
-            float edge = Mathf.Atan(Mathf.Tan(0.5f * fieldOfViewDegrees * Mathf.Deg2Rad) / zoom);
+            // am äußeren Ende des sichtbaren Kreises? Der weiche Rand liegt mittig
+            // auf FOV/2 und reicht bis FOV/2 + Softness/2. Erst wird der Zusatzzoom
+            // herausgerechnet, dann die Merlitz-Formel umgedreht.
+            float outerHalfAngle = 0.5f * (fieldOfViewDegrees + Mathf.Max(0f, edgeSoftnessDegrees));
+            float edge = Mathf.Atan(Mathf.Tan(outerHalfAngle * Mathf.Deg2Rad) / zoom);
             if (distortionK * edge >= 0.5f * Mathf.PI - 1e-5f)
             {
                 // Hinter dem Umkehrpunkt des Tangens gibt es keine sinnvolle Abbildung.

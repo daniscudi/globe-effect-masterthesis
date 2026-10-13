@@ -125,6 +125,14 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 return _InstrumentMagnificationM;
             }
 
+            // Weicher Rand mittig auf dem Blendenrand: 50 % Deckkraft genau bei
+            // FOV/2, voll sichtbar bis FOV/2 - s/2, ganz weg ab FOV/2 + s/2.
+            // Das FOV ist damit der Halbwertsdurchmesser der Blende.
+            float ApertureOuterAngle()
+            {
+                return min(_ApertureHalfAngleRad + 0.5 * _ApertureEdgeSoftnessRad, 1.55);
+            }
+
             float ResolveApertureAlpha(float displayedAngle)
             {
                 if (_ApertureEdgeSoftnessRad <= 1e-6)
@@ -134,10 +142,10 @@ Shader "GlobeEffect/Visual Space Random Dots"
 
                 float fadeStart = max(
                     0.0,
-                    _ApertureHalfAngleRad - _ApertureEdgeSoftnessRad);
+                    _ApertureHalfAngleRad - 0.5 * _ApertureEdgeSoftnessRad);
                 return 1.0 - smoothstep(
                     fadeStart,
-                    _ApertureHalfAngleRad,
+                    ApertureOuterAngle(),
                     displayedAngle);
             }
 
@@ -173,7 +181,8 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 // ausgeblendet, sodass dort der schwarze Kamerahintergrund bleibt.
                 if (isApertureBackground > 0.5)
                 {
-                    float tangentAtBoundary = tan(_ApertureHalfAngleRad);
+                    // Die graue Fläche reicht bis zum äußeren Ende des weichen Rands.
+                    float tangentAtBoundary = tan(ApertureOuterAngle());
                     float3 backgroundViewPosition = float3(
                         input.uv * tangentAtBoundary,
                         -1.0);

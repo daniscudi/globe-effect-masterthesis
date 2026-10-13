@@ -138,6 +138,63 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(seen.Count, Is.EqualTo(1000), "Jedes Rauschbild braucht einen eigenen Seed.");
         }
 
+        [Test]
+        public void SoftEdge_IsCenteredOnTheFieldOfView()
+        {
+            // FOV 70, Softness 10: voll sichtbar bis 30°, halb bei 35°, weg ab 40°.
+            // Kamera 90° auf 256 Pixel: Pixel x liegt bei atan((x + 0,5 - 128) / 128).
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
+                Assert.Ignore("Der Randtest braucht eine aktive Grafikausgabe.");
+
+            Scene scene = EditorSceneManager.NewPreviewScene();
+            var target = new RenderTexture(256, 256, 24);
+            var readback = new Texture2D(256, 256, TextureFormat.RGBA32, false);
+            RenderTexture previousTarget = RenderTexture.active;
+            try
+            {
+                var cameraObject = new GameObject("Soft Edge Camera");
+                SceneManager.MoveGameObjectToScene(cameraObject, scene);
+                var camera = cameraObject.AddComponent<Camera>();
+                camera.enabled = false;
+                camera.scene = scene;
+                camera.fieldOfView = 90f;
+                camera.aspect = 1f;
+                camera.clearFlags = CameraClearFlags.SolidColor;
+                camera.backgroundColor = Color.black;
+                camera.targetTexture = target;
+                camera.stereoTargetEye = StereoTargetEyeMask.None;
+
+                var stimulusObject = new GameObject("Soft Edge Stimulus");
+                SceneManager.MoveGameObjectToScene(stimulusObject, scene);
+                var stimulus = stimulusObject.AddComponent<VrCheckerboardStimulus>();
+                stimulus.Observer = camera.transform;
+                stimulus.SetAngularDiameter(70f);
+                stimulus.SetApertureEdgeSoftness(10f);
+                var settings = new SerializedObject(stimulus);
+                // Weißes Muster auf schwarzem Hintergrund: nur der Rand macht Grau.
+                settings.FindProperty("darkColor").colorValue = Color.white;
+                settings.FindProperty("lightColor").colorValue = Color.white;
+                settings.FindProperty("backgroundColor").colorValue = Color.black;
+                settings.FindProperty("showFixationTarget").boolValue = false;
+                settings.ApplyModifiedPropertiesWithoutUndo();
+                stimulus.ShowNoise(1);
+
+                Color32[] pixels = ReadImage(camera, target, readback);
+                Assert.That(pixels[128 * 256 + 198].r, Is.GreaterThan(245), "28,9° liegt vor dem Rand.");
+                // 35,0°: Deckkraft 0,5, gemischt in linearer Helligkeit -> gamma etwa 0,73.
+                Assert.That(pixels[128 * 256 + 217].r, Is.InRange(165, 205), "Bei FOV/2 halb sichtbar.");
+                Assert.That(pixels[128 * 256 + 240].r, Is.LessThan(10), "41,3° liegt hinter dem Rand.");
+            }
+            finally
+            {
+                RenderTexture.active = previousTarget;
+                EditorSceneManager.ClosePreviewScene(scene);
+                target.Release();
+                Object.DestroyImmediate(target);
+                Object.DestroyImmediate(readback);
+            }
+        }
+
         private static Color32[] ReadImage(Camera camera, RenderTexture target, Texture2D readback)
         {
             camera.Render();
