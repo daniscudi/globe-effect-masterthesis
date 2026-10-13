@@ -26,14 +26,20 @@ if ~exist('csv_path', 'var') || strlength(string(csv_path)) == 0
     if ~isfolder(start_folder)
         start_folder = pwd;
     end
+    % Nur '*.csv' als Filter: Der Windows-Dialog akzeptiert nur Muster der Form
+    % '*.ext'. '*_trials.csv' gab die Warnung "invalid file filter".
     [file_name, folder_name] = uigetfile( ...
-        {'*_trials.csv', 'Trials CSV (*_trials.csv)'; '*.csv', 'All CSV files (*.csv)'}, ...
-        'Choose the checkerboard or random-dot trials CSV', [start_folder, filesep]);
+        {'*.csv', 'CSV files (*.csv)'}, ...
+        'Choose the *_trials.csv file (checkerboard or random dots)', [start_folder, filesep]);
     if isequal(file_name, 0)
         disp('No file selected. Analysis cancelled.');
         return;
     end
     csv_path = fullfile(folder_name, file_name);
+    if ~endsWith(string(file_name), '_trials.csv', 'IgnoreCase', true)
+        warning('Selected file does not end with _trials.csv: %s. The fit expects the trials file.', ...
+            file_name);
+    end
 end
 csv_path = string(csv_path);
 fprintf('input file: %s\n', csv_path);
