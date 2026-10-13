@@ -79,7 +79,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// </summary>
     [DisallowMultipleComponent]
     [DefaultExecutionOrder(20)]
-    public sealed class CheckerboardExperimentManager : MonoBehaviour
+    public sealed class CheckerboardExperimentManager : MonoBehaviour, IPreviewTakeoverManager
     {
         // Hier läuft alles zusammen. Der Weg durch die Datei ist ungefähr dieser:
         //
@@ -237,6 +237,16 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private Key previewKey = Key.P;
 
         [SerializeField]
+        [Tooltip("Was die Live-Vorschau zeigt: aus = Schachbrett, an = Noise-Maske (um Punktgröße und " +
+            "Flimmerrate zu beurteilen). Umschalten geht auch während der Vorschau.")]
+        private bool previewShowsNoise;
+
+        // Stand vor dem ersten "Vorschau-Werte übernehmen". Leer heißt: es wurde
+        // nichts übernommen. "Originalwerte wiederherstellen" holt ihn zurück.
+        [SerializeField, HideInInspector]
+        private string valuesBeforePreviewTakeover = string.Empty;
+
+        [SerializeField]
         [Tooltip("Taste zum Weiterblättern im Training. Damit startet später auch der erste Durchgang.")]
         private Key continueTrainingKey = Key.Space;
 
@@ -324,6 +334,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private bool trainingResponseReceived;
         private bool previewActive;
         private string settingsBeforePreview;
+        private string lookToKeepAfterPreview;
+        private bool previewShowingNoise;
 
         // Die Blickwerte vom Ende des Durchgangs. Leer (null), solange der
         // Durchgang noch läuft.
@@ -342,6 +354,17 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public bool RequireFixation => requireFixation;
         public bool TrainingCompleted => trainingCompleted;
         public bool IsPreviewActive => previewActive;
+        public VrCheckerboardStimulus Stimulus => stimulus;
+        UnityEngine.Object IPreviewTakeoverManager.PreviewStimulus => stimulus;
+
+        // Für die Editor-Übergabe aus dem Play Mode in die Szene.
+        public string ValuesBeforePreviewTakeover
+        {
+            get => valuesBeforePreviewTakeover;
+            set => valuesBeforePreviewTakeover = value ?? string.Empty;
+        }
+
+        public bool HasValuesBeforePreviewTakeover => !string.IsNullOrEmpty(valuesBeforePreviewTakeover);
         public CheckerboardTrialSequence TrialSequence => trialSequence;
         public bool ResponseKeysSwapped => keyboardController != null && keyboardController.SwapResponseKeys;
         public string ConvexResponseKeyName => ResponseKeyName(CheckerboardCurvatureResponse.Convex);
@@ -402,6 +425,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private void Update()
         {
             if (!CheckRequiredRecording()) return;
+            // Schachbrett/Noise-Maske in der Vorschau live umschalten.
+            if (previewActive && previewShowsNoise != previewShowingNoise) ShowPreviewDisplay();
             // Hier werden nur die Tasten vom Versuchsleiter abgefragt: starten,
             // trainieren, abbrechen, weiter. Die Antworttasten A und B laufen
             // weiter über den Keyboard Controller.
@@ -529,7 +554,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             if (stimulus == null) return;
             settingsBeforePreview = JsonUtility.ToJson(stimulus);
             previewActive = true;
-            stimulus.Show();
+            ShowPreviewDisplay();
+        }
+
+        private void ShowPreviewDisplay()
+        {
+            previewShowingNoise = previewShowsNoise;
+            if (previewShowsNoise) stimulus.ShowNoise(randomSeed);
+            else stimulus.Show();
         }
 
         public void StopPreview()
@@ -544,7 +576,67 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             previewActive = false;
             if (stimulus != null && !string.IsNullOrEmpty(settingsBeforePreview))
                 stimulus.RestorePreviewSettings(settingsBeforePreview);
+            // Eine übernommene Darstellung bleibt nach der Vorschau erhalten.
+            if (stimulus != null && lookToKeepAfterPreview != null)
+                stimulus.RestorePreviewSettings(lookToKeepAfterPreview);
             settingsBeforePreview = null;
+            lookToKeepAfterPreview = null;
+        }
+
+        /// <summary>
+        /// Übernimmt FOV und Augenmodus der Vorschau in den Versuchsplan (Listen werden
+        /// ersetzt) und behält die Darstellung (Edge Softness, Kreisblende, Gitterabstand,
+        /// Farben, Fixationskreuz, Noise). Die l-Liste bleibt unverändert. Beim ersten Mal
+        /// wird der bisherige Stand als Original gesichert.
+        /// </summary>
+        public bool TakeOverPreviewValues()
+        {
+            if (IsSessionActive || IsTrainingActive) return false;
+            ResolveReferences();
+            if (stimulus == null) return false;
+            if (!HasValuesBeforePreviewTakeover)
+                valuesBeforePreviewTakeover = CaptureExperimentValues();
+            CheckerboardPreviewTakeover.CopyPreviewIntoPlan(stimulus, this);
+            if (previewActive)
+                lookToKeepAfterPreview = CheckerboardPreviewTakeover.CaptureLook(JsonUtility.ToJson(stimulus));
+            return true;
+        }
+
+        /// <summary>Stand vor dem ersten Übernehmen zurückholen. Beliebig oft möglich.</summary>
+        public bool RestoreValuesBeforePreviewTakeover()
+        {
+            if (IsSessionActive || IsTrainingActive || !HasValuesBeforePreviewTakeover) return false;
+            ResolveReferences();
+            ApplyExperimentValues(valuesBeforePreviewTakeover);
+            valuesBeforePreviewTakeover = string.Empty;
+            return true;
+        }
+
+        /// <summary>Aktueller Versuchsplan plus Darstellung, so wie sie nach der Vorschau gelten.</summary>
+        public string CaptureExperimentValues()
+        {
+            ResolveReferences();
+            string look = lookToKeepAfterPreview
+                ?? (previewActive ? settingsBeforePreview : null)
+                ?? (stimulus != null ? JsonUtility.ToJson(stimulus) : "{}");
+            return CheckerboardPreviewTakeover.Capture(this, look);
+        }
+
+        public void ApplyExperimentValues(string valuesJson)
+        {
+            CheckerboardPreviewTakeover.ApplyPlan(valuesJson, this);
+            ResolveReferences();
+            if (stimulus == null) return;
+            string look = CheckerboardPreviewTakeover.LookOf(valuesJson);
+            if (Application.isPlaying)
+            {
+                stimulus.RestorePreviewSettings(look);
+                if (previewActive) lookToKeepAfterPreview = look;
+            }
+            else
+            {
+                JsonUtility.FromJsonOverwrite(look, stimulus);
+            }
         }
 
         public bool StartTraining()

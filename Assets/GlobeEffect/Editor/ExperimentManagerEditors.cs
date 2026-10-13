@@ -93,6 +93,41 @@ namespace GlobeEffect.VRCheckerboard.Editor
         protected int Count(string name) => serializedObject.FindProperty(name).arraySize;
 
         /// <summary>
+        /// "Vorschau-Werte ins Experiment übernehmen" und "Originalwerte wiederherstellen",
+        /// gleich für beide Manager. whatIsTakenOver erklärt, welche Werte wohin gehen.
+        /// </summary>
+        protected void PreviewTakeoverButtons(MonoBehaviour manager, string whatIsTakenOver)
+        {
+            var takeover = (IPreviewTakeoverManager)manager;
+            EditorGUILayout.Space(4);
+            EditorGUILayout.HelpBox(whatIsTakenOver + " Im Play Mode nur bei laufender Vorschau; nach dem " +
+                "Stoppen wird es in die Szene übernommen – dann Szene speichern.", MessageType.Info);
+            // Im Play Mode ohne Vorschau trägt der Stimulus Werte des letzten Trials.
+            bool canTakeOver = !Application.isPlaying || takeover.IsPreviewActive;
+            using (new EditorGUI.DisabledScope(!canTakeOver))
+            {
+                if (GUILayout.Button("Vorschau-Werte ins Experiment übernehmen"))
+                {
+                    serializedObject.ApplyModifiedProperties();
+                    PreviewTakeoverEditor.TakeOver(manager);
+                    serializedObject.Update();
+                }
+            }
+            using (new EditorGUI.DisabledScope(!takeover.HasValuesBeforePreviewTakeover))
+            {
+                if (GUILayout.Button("Originalwerte wiederherstellen"))
+                {
+                    serializedObject.ApplyModifiedProperties();
+                    PreviewTakeoverEditor.Restore(manager);
+                    serializedObject.Update();
+                }
+            }
+            if (takeover.HasValuesBeforePreviewTakeover)
+                EditorGUILayout.HelpBox("Versuchsplan enthält übernommene Vorschau-Werte. " +
+                    "Originalwerte sind gesichert.", MessageType.Warning);
+        }
+
+        /// <summary>
         /// Tabelle "Wert | Wiederholungen" für k bzw. l. Beide Listen bleiben gleich lang;
         /// neue Zeilen bekommen Repeats Per Condition. Gibt die Summe der Wiederholungen zurück.
         /// </summary>
@@ -196,17 +231,28 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "trainingExampleSeconds", "trainingNoiseSeconds", "trainingFixationSeconds");
             if (Section("Live-Vorschau ohne Messung"))
             {
-                Fields(serializedObject, "previewKey");
+                Fields(serializedObject, "previewKey", "previewShowsNoise");
                 EditorGUILayout.HelpBox("Im Play Mode P drücken (erneut P oder F6 beendet). " +
-                    "Diese Werte gelten nur für die Vorschau, nicht für den Trial Plan.", MessageType.Info);
-                LinkedFields("stimulus", "fieldOfViewDegrees", "visualSpaceL", "eyePresentation");
+                    "Hier live FOV, Rand, l, Gitter, Augenmodus, Farben, Kreuz und Noise ändern. " +
+                    "Preview Shows Noise schaltet zwischen Schachbrett und Noise-Maske um. " +
+                    "Die Vorschau ist nicht der Trial Plan.", MessageType.Info);
+                LinkedFields("stimulus", "fieldOfViewDegrees", "edgeSoftnessDegrees", "useCircularAperture",
+                    "visualSpaceL", "gridSpacingDegrees", "eyePresentation", "darkColor", "lightColor",
+                    "backgroundColor", "showFixationTarget", "fixationSizeDegrees", "fixationColor",
+                    "noiseSizeInPixels", "noiseDotSizePixels", "noiseDotSizeDegrees", "noiseRefreshRateHz");
                 EditorGUILayout.HelpBox("Beim Beenden der Vorschau oder Start von Training/Messung werden " +
-                    "alle Stimuluswerte auf den Stand vor der Vorschau zurückgesetzt.", MessageType.Info);
+                    "alle Stimuluswerte auf den Stand vor der Vorschau zurückgesetzt – außer nach " +
+                    "„Vorschau-Werte ins Experiment übernehmen“.", MessageType.Info);
+                var manager = (CheckerboardExperimentManager)target;
                 if (Application.isPlaying && GUILayout.Button("Vorschau ein / aus"))
                 {
                     serializedObject.ApplyModifiedProperties();
-                    ((CheckerboardExperimentManager)target).TogglePreview();
+                    manager.TogglePreview();
                 }
+                PreviewTakeoverButtons(manager, "Übernehmen schreibt FOV und Augenmodus der Vorschau in " +
+                    "„Sitzung und Versuchsplan“ (Listen werden durch den einen Vorschau-Wert ersetzt) und " +
+                    "behält die Darstellung (Edge Softness, Kreisblende, Gitterabstand, Farben, Fixationskreuz, " +
+                    "Noise). Die l-Liste bleibt unverändert.");
             }
             if (Section("Muster, Fixationskreuz und Noise", false))
                 LinkedFields("stimulus", "edgeSoftnessDegrees", "useCircularAperture", "gridSpacingDegrees",
@@ -341,7 +387,10 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     serializedObject.ApplyModifiedProperties();
                     manager.TogglePreview();
                 }
-                PreviewTakeoverButtons(manager);
+                PreviewTakeoverButtons(manager, "Übernehmen schreibt FOV, m, Zoom, Auge, Bewegungsart, " +
+                    "Achse und Geschwindigkeit der Vorschau in „Sitzung und Versuchsplan“ bzw. „Simulierte " +
+                    "Bewegung“ (Listen werden durch den einen Vorschau-Wert ersetzt) und behält das Punktbild " +
+                    "(Dichte, Punktgröße, Edge Softness, Farben). Die k-Liste bleibt unverändert.");
             }
             if (Section("Verweise und erweiterte Einstellungen", false))
             {
@@ -419,40 +468,6 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     text.Append(" – Punktwelt größer als 170°, Sitzung startet nicht");
             }
             EditorGUILayout.HelpBox(text.ToString(), tooMuch ? MessageType.Warning : MessageType.Info);
-        }
-
-        private void PreviewTakeoverButtons(RandomDotExperimentManager manager)
-        {
-            EditorGUILayout.Space(4);
-            EditorGUILayout.HelpBox("Übernehmen schreibt FOV, m, Zoom, Auge, Bewegungsart, Achse und " +
-                "Geschwindigkeit der Vorschau in „Sitzung und Versuchsplan“ bzw. „Simulierte Bewegung“ " +
-                "(Listen werden durch den einen Vorschau-Wert ersetzt) und behält das Punktbild " +
-                "(Dichte, Punktgröße, Edge Softness, Farben). Die k-Liste bleibt unverändert. " +
-                "Im Play Mode nur bei laufender Vorschau; nach dem Stoppen wird es in die Szene " +
-                "übernommen – dann Szene speichern.", MessageType.Info);
-            // Im Play Mode ohne Vorschau trägt der Stimulus Werte des letzten Trials.
-            bool canTakeOver = !Application.isPlaying || manager.IsPreviewActive;
-            using (new EditorGUI.DisabledScope(!canTakeOver))
-            {
-                if (GUILayout.Button("Vorschau-Werte ins Experiment übernehmen"))
-                {
-                    serializedObject.ApplyModifiedProperties();
-                    RandomDotPreviewTakeoverEditor.TakeOver(manager);
-                    serializedObject.Update();
-                }
-            }
-            using (new EditorGUI.DisabledScope(!manager.HasValuesBeforePreviewTakeover))
-            {
-                if (GUILayout.Button("Originalwerte wiederherstellen"))
-                {
-                    serializedObject.ApplyModifiedProperties();
-                    RandomDotPreviewTakeoverEditor.Restore(manager);
-                    serializedObject.Update();
-                }
-            }
-            if (manager.HasValuesBeforePreviewTakeover)
-                EditorGUILayout.HelpBox("Versuchsplan enthält übernommene Vorschau-Werte. " +
-                    "Originalwerte sind gesichert.", MessageType.Warning);
         }
     }
 }

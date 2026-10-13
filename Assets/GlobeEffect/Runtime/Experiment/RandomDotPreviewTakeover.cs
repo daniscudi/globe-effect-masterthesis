@@ -45,11 +45,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             var plan = new PlanValues();
             JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(manager), plan);
-            return JsonUtility.ToJson(new Snapshot
-            {
-                plan = JsonUtility.ToJson(plan),
-                look = CaptureLook(stimulusJson)
-            });
+            return PreviewTakeoverSnapshot.Combine(JsonUtility.ToJson(plan), CaptureLook(stimulusJson));
         }
 
         public static string CaptureLook(string stimulusJson)
@@ -61,25 +57,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public static void ApplyPlan(string valuesJson, RandomDotExperimentManager manager)
         {
-            JsonUtility.FromJsonOverwrite(Read(valuesJson).plan, manager);
+            JsonUtility.FromJsonOverwrite(PreviewTakeoverSnapshot.PlanOf(valuesJson), manager);
         }
 
-        public static string LookOf(string valuesJson) => Read(valuesJson).look;
-
-        private static Snapshot Read(string valuesJson)
-        {
-            Snapshot snapshot = JsonUtility.FromJson<Snapshot>(valuesJson);
-            if (snapshot == null || string.IsNullOrEmpty(snapshot.plan) || string.IsNullOrEmpty(snapshot.look))
-                throw new ArgumentException("Keine gültigen Random-Dot-Experimentwerte.", nameof(valuesJson));
-            return snapshot;
-        }
-
-        [Serializable]
-        private sealed class Snapshot
-        {
-            public string plan;
-            public string look;
-        }
+        public static string LookOf(string valuesJson) => PreviewTakeoverSnapshot.LookOf(valuesJson);
 
         // Feldnamen = RandomDotExperimentManager.
         [Serializable]

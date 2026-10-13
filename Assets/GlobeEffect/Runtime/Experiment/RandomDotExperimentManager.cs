@@ -51,7 +51,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// </summary>
     [DisallowMultipleComponent]
     [DefaultExecutionOrder(20)]
-    public sealed class RandomDotExperimentManager : MonoBehaviour
+    public sealed class RandomDotExperimentManager : MonoBehaviour, IPreviewTakeoverManager
     {
         // Das läuft fast genauso wie beim Checkerboard:
         //
@@ -446,6 +446,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public bool FreeHeadMovement => freeHeadMovement;
         public bool IsPreviewActive => previewActive;
         public RandomDotFieldStimulus Stimulus => stimulus;
+        UnityEngine.Object IPreviewTakeoverManager.PreviewStimulus => stimulus;
 
         // Für die Editor-Übergabe aus dem Play Mode in die Szene.
         public string ValuesBeforePreviewTakeover

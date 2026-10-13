@@ -575,6 +575,17 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   Übernehmen). Auf dem Lab-PC vor `git pull` die Originalwerte wiederherstellen
   oder die Szenenänderung verwerfen, sonst gibt es einen Konflikt in der Szene.
 
+* Checkerboard, Vorschau übernehmen (gleiche Bedienung): Die Live-Vorschau
+  zeigt FOV, Edge Softness, Kreisblende, `l`, Gitterabstand, Augenmodus,
+  Farben (dunkel, hell, Hintergrund), Fixationskreuz und alle Noise-Werte.
+  `Preview Shows Noise` schaltet die Vorschau zwischen Schachbrett und
+  Noise-Maske um (auch während sie läuft), damit Punktgröße und Flimmerrate
+  beurteilt werden können. **Vorschau-Werte ins Experiment übernehmen** schreibt
+  FOV und Augenmodus in den Versuchsplan (Listen werden ersetzt) und behält die
+  Darstellung; die `l`-Liste bleibt unverändert. **Originalwerte
+  wiederherstellen**, Übernahme aus dem Play Mode in die Szene und der Hinweis
+  zum Lab-PC gelten genauso wie bei Random Dots.
+
 * `Free Head Movement` ist standardmäßig an: In aktiven Haupttrials darf der
   Kopf frei nach links/rechts, oben/unten oder schräg bewegt werden. Es gibt
   keine Sollbahn, Wende-, Amplituden- oder Geschwindigkeitsprüfung und keine
