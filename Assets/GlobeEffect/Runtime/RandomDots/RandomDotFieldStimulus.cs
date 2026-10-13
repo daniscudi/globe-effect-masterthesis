@@ -258,6 +258,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public float WorldCoverageDiameterDegrees => worldCoverageDegrees;
         public int DotCount => dotCount;
         public float DotDensity => dotDensity;
+        public float DotSizeDegrees => dotSizeDegrees;
         public int RandomSeed => randomSeed;
         public float InstrumentDistortionK => instrumentDistortionK;
         public float InstrumentMagnificationM => instrumentMagnificationM;

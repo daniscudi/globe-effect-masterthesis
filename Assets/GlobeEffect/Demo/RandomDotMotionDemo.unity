@@ -192,7 +192,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.RandomDots.RandomDotFieldStimulus
   observer: {fileID: 684958492}
-  fieldOfViewDegrees: 70
+  fieldOfViewDegrees: 60
   edgeSoftnessDegrees: 5
   fieldRadiusMeters: 5
   worldCoverageDegrees: 40.6
@@ -669,7 +669,7 @@ MonoBehaviour:
   outputRoot: 
   autoStartOnPlay: 0
   fieldOfViewValues:
-  - 70
+  - 60
   eyePresentations: 00000000
   instrumentDistortionKValues:
   - 0

@@ -430,6 +430,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private CheckerboardCurvatureResponse trainingResponse;
         private readonly FrameTimingTracker frameTiming = new();
         private readonly RandomDotHeadVelocityGate velocityGate = new();
+        private readonly RandomDotLiveHeadSpeed liveHeadSpeed = new();
         private int frameTimingStartFrame;
         private int trialsWithSlowFrames;
         private int pausesTaken;
@@ -448,6 +449,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public bool FreeHeadMovement => freeHeadMovement;
         public bool IsPreviewActive => previewActive;
         public RandomDotFieldStimulus Stimulus => stimulus;
+        public RandomDotLiveHeadSpeed LiveHeadSpeed => liveHeadSpeed;
         UnityEngine.Object IPreviewTakeoverManager.PreviewStimulus => stimulus;
 
         // Für die Editor-Übergabe aus dem Play Mode in die Szene.
@@ -504,6 +506,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // abbrechen. Läuft gerade die Bewegung, wird nebenher in jedem Frame
             // geprüft, ob der Blick noch auf dem Kreuz liegt.
             if (previewActive) KeepPreviewPointWorldLikeSession();
+            UpdateLiveHeadSpeed();
 
             // Bildzeiten nur während der Darbietung zählen, ab dem Frame nach dem Start.
             if (sessionState == State.PresentingMotion && Time.frameCount > frameTimingStartFrame)
@@ -1439,6 +1442,25 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 // Während der Darbietung zu schnell, zu langsam oder angehalten.
                 InvalidateCurrentTrial("head_speed_out_of_range");
             }
+        }
+
+        // Live-Anzeige für den Experiment Monitor. Zieltempo wie beim Velocity Gate,
+        // aber für das m und den Zoom, die gerade am Punktfeld stehen (in der
+        // Vorschau also die Vorschauwerte, in der Sitzung die des laufenden Trials).
+        private void UpdateLiveHeadSpeed()
+        {
+            Transform observer = stimulus != null ? stimulus.Observer : null;
+            if (observer == null)
+            {
+                liveHeadSpeed.Reset();
+                return;
+            }
+            float m = stimulus.InstrumentMagnificationM;
+            float zoom = stimulus.ContentZoom;
+            float target = RandomDotSimulatedSweep.ObjectSpeed(simulatedSpeedReference, sweepSpeed,
+                simulatedImageCenterSpeed, m, zoom);
+            liveHeadSpeed.AddSample(observer.forward, Time.unscaledDeltaTime, velocityGateAxis,
+                velocitySmoothingSeconds, target, velocityTolerance, velocityHoldSeconds, m * zoom);
         }
 
         private void PresentCurrentTrial()

@@ -38,6 +38,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
         private double nextReferenceRefresh;
         private GUIStyle statusStyle;
         private GUIStyle centeredLabelStyle;
+        private Vector2 scrollPosition;
 
         internal static bool AutoOpenEnabled => EditorPrefs.GetBool(AutoOpenPreference, true);
 
@@ -112,6 +113,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
             // In einer Szene liegt normalerweise nur einer der beiden Tests.
             // Sind aus Versehen doch beide drin, wird das Checkerboard angezeigt.
             // Hauptsache, es ist eindeutig und flackert nicht hin und her.
+            // Scrollbar, weil beim Random-Dot-Test mit Kopftempo viele Zeilen zusammenkommen.
+            using var view = new EditorGUILayout.ScrollViewScope(scrollPosition);
+            scrollPosition = view.scrollPosition;
             if (checkerboardFixation != null)
             {
                 DrawCheckerboardMonitor();
@@ -224,6 +228,50 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     ? "trial is repeated later"
                     : "gaze check is off");
             }
+
+            if (randomDotSession != null) DrawLiveHeadSpeed(randomDotSession, randomDotStimulus);
+        }
+
+        // Live-Kopftempo für den Pilot: Wie schnell dreht der Kopf, wie schnell laufen
+        // die Punkte dabei, und würde die Geschwindigkeitserkennung sie jetzt zeigen?
+        private static void DrawLiveHeadSpeed(RandomDotExperimentManager session, RandomDotFieldStimulus stimulus)
+        {
+            RandomDotLiveHeadSpeed live = session.LiveHeadSpeed;
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField("Head Speed (Live)", EditorStyles.boldLabel);
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                if (!live.HasData)
+                {
+                    EditorGUILayout.LabelField("No head data yet.");
+                    return;
+                }
+
+                Row("Head Speed Now", Number(live.HeadSpeed, "F2", " °/s"));
+                Row("Head Speed (1 s Average)", Number(live.AverageHeadSpeed, "F2", " °/s"));
+                Row("Wanted Head Speed", Number(live.TargetHeadSpeed, "F2", " °/s") + "  (" +
+                    Number(live.MinimumHeadSpeed, "F2") + " – " + Number(live.MaximumHeadSpeed, "F2", " °/s)"));
+                Row("Dot Speed In Image Center", Number(live.ImageCenterSpeed, "F1", " °/s") +
+                    "  (1 s average " + Number(live.AverageImageCenterSpeed, "F1", " °/s)"));
+                string dotSize = stimulus != null ? "  (dot size " + Number(stimulus.DotSizeDegrees, "F2", "°)") : "";
+                Row("Dot Jump Per Frame", Number(live.ImageStepPerFrameDegrees, "F2", "°") + dotSize);
+                Row("Frames Per Second", Number(live.FramesPerSecond, "F0"));
+
+                string state = live.WouldShowDots ? "YES"
+                    : live.TooSlow ? "NO – head too slow"
+                    : live.TooFast ? "NO – head too fast"
+                    : "NOT YET – keep this speed";
+                Row("Dots Would Appear", state);
+
+                if (stimulus != null && stimulus.DotSizeDegrees > 0f
+                    && live.ImageStepPerFrameDegrees > stimulus.DotSizeDegrees)
+                    EditorGUILayout.HelpBox("The dots jump further than their own size each frame. " +
+                        "They may look jerky.", MessageType.Warning);
+            }
+            if (session.IsPreviewActive && stimulus != null
+                && stimulus.MotionMode != RandomDotMotionMode.HeadTracked)
+                EditorGUILayout.HelpBox("To feel the speed yourself, set Movement Type to Head-Tracked in the " +
+                    "preview. Then the dots move with your head.", MessageType.Info);
         }
 
         // Klappt mit beiden Fixation Monitoren, weil beide dieselbe Basisklasse
