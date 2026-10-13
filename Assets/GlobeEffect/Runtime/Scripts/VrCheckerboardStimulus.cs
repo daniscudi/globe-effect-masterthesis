@@ -116,10 +116,10 @@ namespace GlobeEffect.VRCheckerboard
         // Kopfbewegung.
         [Header("Noise Mask")]
         [SerializeField]
-        [Tooltip("Breitband: Zufallsmuster in mehreren Zellgrößen (Finest bis Coarsest, je Faktor 2) gleich " +
+        [Tooltip("Breitband: Zufallsmuster in mehreren Zellgrößen gleich " +
             "gewichtet überlagert, dann schwarz/weiß. Maskiert grobe und feine Strukturen des Schachbretts " +
-            "(empfohlen). Einfach: eine Zellgröße in Grad (Noise Dot Size Degrees). Fein: Zellgröße in " +
-            "Bildpixeln (Noise Dot Size Pixels), das frühere Ameisenmuster, maskiert grobe Muster kaum.")]
+            ". Einfach: eine Zellgröße in Grad (Noise Dot Size Degrees). Fein: Zellgröße in " +
+            "Bildpixeln (Noise Dot Size Pixels), Ameisenmuster.")]
         private NoiseMaskType noiseType = NoiseMaskType.Broadband;
 
         [SerializeField, Range(0.1f, 10f)]
@@ -819,13 +819,13 @@ namespace GlobeEffect.VRCheckerboard
     // Art der Noise-Maske (siehe Tooltip an noiseType).
     public enum NoiseMaskType
     {
-        [InspectorName("Fein (Pixel, früheres Ameisenmuster)")]
+        [InspectorName("Fein (Pixel, Ameisenmuster)")]
         FinePixels = 0,
 
-        [InspectorName("Einfach (eine Zellgröße in Grad)")]
+        [InspectorName("Eine Zellgröße in Grad")]
         SingleScaleDegrees = 1,
 
-        [InspectorName("Breitband (mehrere Zellgrößen, empfohlen)")]
+        [InspectorName("Breitband (mehrere Zellgrößen)")]
         Broadband = 2
     }
 
