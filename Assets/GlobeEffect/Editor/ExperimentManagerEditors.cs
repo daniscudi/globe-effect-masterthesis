@@ -78,6 +78,10 @@ namespace GlobeEffect.VRCheckerboard.Editor
             ["crossSignalOpacity"] = "Signal Strength",
             ["stoppedSignalSeconds"] = "Stopped Colour Shown (s)",
             ["answerSignalSeconds"] = "Answer Colour Shown (s)",
+            ["answeredSignalColor"] = "Colour: Answer Taken",
+            ["answeredSignalSeconds"] = "Answer Taken Colour Shown (s)",
+            ["practiceTextsWaitForPress"] = "Practice Texts Wait For Trackpad",
+            ["practiceContinueKey"] = "Continue Key (Experimenter)",
             ["trainActivePanning"] = "Practise Head-Tracked Trials",
             ["showActiveSpeedExample"] = "Show Calm Speed First",
             ["activePracticeKValues"] = "Practice k Values",
@@ -485,7 +489,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
             if (Section("Practice", false))
             {
-                Fields(serializedObject, "trainingKey", "trainSimulatedMotion",
+                Fields(serializedObject, "trainingKey", "practiceTextsWaitForPress", "practiceContinueKey",
+                    "trainSimulatedMotion",
                     "showSimulatedExamples", "exampleConvexK", "exampleConcaveK", "exampleLongSeconds",
                     "exampleTextSeconds",
                     "simulatedTrainingKValues", "simulatedTrainingRepeatsPerValue", "simulatedTrainingFeedback",
@@ -510,7 +515,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "useVrControllerButtons", "vrControllerMapping", "logResponses");
                 Fields(serializedObject, "startSessionKey", "startOtherMotionSessionKey", "abortSessionKey");
                 Fields(serializedObject, "showCrossSignals", "answerSignalColor", "answerSignalSeconds",
-                    "stoppedSignalColor",
+                    "answeredSignalColor", "answeredSignalSeconds", "stoppedSignalColor",
                     "crossSignalOpacity", "stoppedSignalSeconds");
             }
             if (Section("Dot Field And Cross", false))

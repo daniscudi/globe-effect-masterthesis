@@ -289,6 +289,12 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             Object.Destroy(rightTone);
         }
 
+        /// <summary>Hängt eine Zeile unten an, zum Beispiel "press trackpad to continue".</summary>
+        public void AppendFooter(string line)
+        {
+            footer.text = string.IsNullOrEmpty(footer.text) ? line : footer.text + "\n\n" + line;
+        }
+
         // Macht das Display sichtbar und setzt beide Texte.
         // showTrack sagt, ob die Schienen mit den Kugeln zu sehen sind.
         private void Show(bool showTrack, string headingText, string footerText)

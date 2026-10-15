@@ -648,8 +648,11 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   kurz): Sind die Punkte normal vorbei und die Person kann antworten, blitzt das
   Kreuz für `Answer Signal Seconds` (0,3 s) cyan auf (`Answer Signal Color`).
   Bricht ein Trial ab (Tempo geändert oder weggeschaut), blitzt es für `Stopped
-  Signal Seconds` (0,5 s) magenta (`Stopped Signal Color`). Beide Farben halb durchsichtig über der grauen Fläche
-  (`Cross Signal Opacity`, 0,6). Gilt für Simulated, Active und die Übungen; die
+  Signal Seconds` (0,5 s) magenta (`Stopped Signal Color`). Ist die Antwort
+  angenommen, blitzt es für `Answered Signal Seconds` (0,3 s) grün (`Answered
+  Signal Color`), bewusst eine andere Farbe als Cyan, damit eine schnelle Antwort
+  nicht im ersten Blitz untergeht. Alle Farben halb durchsichtig über der grauen
+  Fläche (`Cross Signal Opacity`, 0,6). Gilt für Simulated, Active und die Übungen; die
   Anleitungen im Headset erklären die Farben in einem Satz. Rot bleibt das normale
   Kreuz (und die Blockpause).
 
@@ -669,6 +672,14 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
      oder "good".
   4. Ende nach `Active Practice Good Trials` guten Übungstrials (Standard 6) oder
      spätestens nach `Active Practice Max Trials` (Standard 20).
+
+* Übungstexte zum Weiterklicken (`Practice Texts Wait For Press`, Standard an):
+  In allen Übungen (Simulated-Beispiele, "Now practise", Rückmeldungen, ruhiges
+  Tempo, Active-Practice-Rückmeldungen) bleibt der Text stehen, unten steht
+  "PRESS TRACKPAD TO CONTINUE". Weiter mit Trackpad-Klick am Controller oder, für
+  den Versuchsleiter, mit `Practice Continue Key` (Leertaste). Ein Druck, der noch
+  zur Antwort gehörte, zählt nicht. Aus = die Texte laufen wie früher nach fester
+  Zeit weiter. Nur in den Übungen, nicht in der Messung.
 
 * Wenn `Free Head Movement` aus ist, bleibt der geführte Links-Rechts-Schwenk
   erhalten. Mit `±2°`,

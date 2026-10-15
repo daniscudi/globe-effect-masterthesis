@@ -532,7 +532,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(stimulus.FixationSignal.g, Is.EqualTo(1f), "cyan");
             Object.FindAnyObjectByType<RandomDotKeyboardController>().SubmitResponse(Response.Convex);
             Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.Completed));
-            Assert.That(stimulus.FixationSignal.a, Is.Zero, "Nach der Antwort wieder normales Kreuz.");
+            // Letzter Trial: Sitzung vorbei, Punktfeld aus, kein Signal mehr.
+            Assert.That(stimulus.FixationSignal.a, Is.Zero);
 
             Dictionary<string, string> row = ReadTrialRows(manager)[0];
             Assert.That(row["status"], Is.EqualTo("valid"));
@@ -599,7 +600,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         public IEnumerator RandomDotActivePractice_StandaloneUsesTheRealDotsAndReturnsToWelcome()
         {
             // EnterPlayMode muss direkt in der Testmethode stehen, nicht verschachtelt.
-            PrepareActivePracticeScene(goodTrials: 1, maxTrials: 3);
+            PrepareActivePracticeScene(goodTrials: 1, maxTrials: 3, waitForPress: true);
             yield return new EnterPlayMode();
             yield return null;
             var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
@@ -615,8 +616,18 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Object.FindAnyObjectByType<RandomDotKeyboardController>().SubmitResponse(Response.Convex);
             yield return null;
             yield return null;
+            // Antwort angenommen: kurz grün (nicht cyan).
+            Assert.That(stimulus.FixationSignal.g, Is.EqualTo(1f));
+            Assert.That(stimulus.FixationSignal.b, Is.Zero);
             Assert.That(manager.LastActivePracticeResult, Is.EqualTo("good"));
             Assert.That(manager.ActivePracticeGoodTrials, Is.EqualTo(1));
+
+            // Der Rückmeldetext bleibt stehen, bis weitergeklickt wird.
+            double waitUntil = Time.realtimeSinceStartupAsDouble + 0.5d;
+            while (Time.realtimeSinceStartupAsDouble < waitUntil) yield return null;
+            Assert.That(manager.IsWaitingForPracticeContinue, Is.True);
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.ActivePracticeMotion));
+            manager.ContinuePractice();
 
             // Ein guter Trial reicht hier: zurück zum Startbildschirm, ohne Messdateien.
             yield return WaitForState(manager, RandomDotSessionState.Idle);
@@ -652,7 +663,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             yield return new ExitPlayMode();
         }
 
-        private static void PrepareActivePracticeScene(int goodTrials, int maxTrials)
+        private static void PrepareActivePracticeScene(int goodTrials, int maxTrials, bool waitForPress = false)
         {
             PrepareVelocityGatedScene();
             var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
@@ -664,6 +675,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             config.FindProperty("naturalHeadSpeedMin").floatValue = 1.5f;
             config.FindProperty("naturalHeadSpeedMax").floatValue = 4f;
             config.FindProperty("feedbackSeconds").floatValue = 0.2f;
+            config.FindProperty("practiceTextsWaitForPress").boolValue = waitForPress;
             config.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -1041,6 +1053,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             manager.FindProperty("trainSimulatedMotion").boolValue = false;
             manager.FindProperty("trainHeadMovement").boolValue = false;
             manager.FindProperty("trainActivePanning").boolValue = false;
+            manager.FindProperty("practiceTextsWaitForPress").boolValue = false;
             manager.FindProperty("repeatsPerCondition").intValue = 1;
             ApplySharedTestSettings(manager);
 

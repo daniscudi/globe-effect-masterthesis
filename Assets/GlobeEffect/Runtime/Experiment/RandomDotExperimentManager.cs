@@ -305,6 +305,16 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         [Header("Practice")]
         [SerializeField]
+        [Tooltip("Practice texts (examples, notes after each practice trial) stay until the participant " +
+            "presses the trackpad, or the experimenter presses the key below. Off = they go on by themselves " +
+            "after a few seconds.")]
+        private bool practiceTextsWaitForPress = true;
+
+        [SerializeField]
+        [Tooltip("Key for the experimenter to go on from a practice text.")]
+        private Key practiceContinueKey = Key.Space;
+
+        [SerializeField]
         [Tooltip("Before simulated trials, give practice trials without head movement.")]
         private bool trainSimulatedMotion = true;
 
@@ -431,6 +441,15 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private float answerSignalSeconds = 0.3f;
 
         [SerializeField]
+        [Tooltip("Colour that flashes briefly at the cross when the answer was taken. A different colour " +
+            "than Answer Now, so a quick answer does not blend into the first flash.")]
+        private Color answeredSignalColor = Color.green;
+
+        [SerializeField, Range(0.05f, 2f)]
+        [Tooltip("How long the answer-taken colour flashes (s).")]
+        private float answeredSignalSeconds = 0.3f;
+
+        [SerializeField]
         [Tooltip("Colour of the cross for a moment when a trial stopped early (head speed changed or looked " +
             "away). No answer is needed then.")]
         private Color stoppedSignalColor = Color.magenta;
@@ -536,6 +555,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private RandomDotPilotSpeedView pilotSpeedView;
         private float pilotSavedMessageUntil;
         private float crossSignalUntil;
+        private bool practiceContinueRequested;
         private int frameTimingStartFrame;
         private int trialsWithSlowFrames;
         private int pausesTaken;
@@ -1151,19 +1171,19 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
                 headTrainingView.ShowSimulatedExample(label,
                     "Watch the dots. This example is shown longer.");
-                yield return new WaitForSecondsRealtime(exampleTextSeconds);
+                yield return PracticeTextPause(exampleTextSeconds);
                 yield return PresentSimulatedExample(example, exampleLongSeconds);
 
                 headTrainingView.ShowSimulatedExample(label, string.Format(CultureInfo.InvariantCulture,
                     "The same example again,\nas briefly as in the experiment ({0:0.0#} s).",
                     simulatedSweepSeconds));
-                yield return new WaitForSecondsRealtime(exampleTextSeconds);
+                yield return PracticeTextPause(exampleTextSeconds);
                 yield return PresentSimulatedExample(example, simulatedSweepSeconds);
                 TrainingExamplesShown++;
             }
 
             headTrainingView.ShowSimulatedPracticeStart(simulatedTrainingFeedback);
-            yield return new WaitForSecondsRealtime(exampleTextSeconds);
+            yield return PracticeTextPause(exampleTextSeconds);
         }
 
         private IEnumerator PresentSimulatedExample(RandomDotTrial example, float seconds)
@@ -1235,7 +1255,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 headTrainingView.ShowSimulatedResponse(index + 1, practice.Count, BuildResponseLines());
                 ShowAnswerSignal();
                 while (!trainingResponseReceived) yield return null;
-                ClearCrossSignal();
+                ShowAnsweredSignal();
 
                 // Subjektives Formurteil: eine "richtige" Antwort gibt es nur bei
                 // eindeutigen Extremwerten. Dort sagt die Rückmeldung, was konvex
@@ -1250,7 +1270,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     headTrainingView.ShowSimulatedFeedback(LastTrainingAnswerCorrect.Value,
                         expected == CheckerboardCurvatureResponse.Convex
                             ? "CONVEX (curves outward)" : "CONCAVE (curves inward)");
-                    yield return new WaitForSecondsRealtime(feedbackSeconds);
+                    yield return PracticeTextPause(feedbackSeconds);
                 }
                 else
                 {
@@ -1278,6 +1298,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             FlashCrossSignal(answerSignalColor, answerSignalSeconds);
         }
 
+        private void ShowAnsweredSignal()
+        {
+            FlashCrossSignal(answeredSignalColor, answeredSignalSeconds);
+        }
+
         private void ShowStoppedSignal()
         {
             FlashCrossSignal(stoppedSignalColor, stoppedSignalSeconds);
@@ -1294,6 +1319,45 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             crossSignalUntil = 0f;
             if (stimulus != null) stimulus.ClearFixationSignal();
+        }
+
+        /// <summary>
+        /// Weiter vom aktuellen Übungstext (wie Leertaste oder Trackpad). Für Tests und
+        /// falls der Versuchsleiter es über den Inspector auslösen möchte.
+        /// </summary>
+        public void ContinuePractice() => practiceContinueRequested = true;
+
+        /// <summary>Wartet gerade ein Übungstext auf einen Tastendruck?</summary>
+        public bool IsWaitingForPracticeContinue { get; private set; }
+
+        // Übungstexte: bleiben stehen, bis Trackpad (Person) oder Leertaste (Versuchsleiter)
+        // gedrückt wird. Mit "Practice Texts Wait For Press" aus nach der alten festen Zeit.
+        private IEnumerator PracticeTextPause(float seconds)
+        {
+            if (!practiceTextsWaitForPress)
+            {
+                yield return new WaitForSecondsRealtime(seconds);
+                yield break;
+            }
+
+            headTrainingView?.AppendFooter("PRESS TRACKPAD TO CONTINUE");
+            practiceContinueRequested = false;
+            IsWaitingForPracticeContinue = true;
+            // Ein Druck aus dem Frame davor (zum Beispiel die Antwort) zählt nicht.
+            yield return null;
+            practiceContinueRequested = false;
+            while (true)
+            {
+                Keyboard keyboard = Keyboard.current;
+                if (practiceContinueRequested
+                    || (keyboard != null && keyboard[practiceContinueKey].wasPressedThisFrame)
+                    || (VrControllerResponses.TryReadPress(out VrControllerButton button)
+                        && button == VrControllerButton.TrackpadClick))
+                    break;
+                yield return null;
+            }
+            IsWaitingForPracticeContinue = false;
+            practiceContinueRequested = false;
         }
 
         // Active Practice gibt es nur für aktive Trials mit Geschwindigkeitserkennung.
@@ -1367,7 +1431,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             if (showActiveSpeedExample)
             {
                 headTrainingView.ShowActiveSpeedExample();
-                yield return new WaitForSecondsRealtime(exampleTextSeconds);
+                yield return PracticeTextPause(exampleTextSeconds);
                 yield return PresentSimulatedExample(BuildActiveSpeedExample(), exampleLongSeconds);
             }
 
@@ -1418,7 +1482,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     headTrainingView.ShowActivePracticeResponse(BuildResponseLines());
                     ShowAnswerSignal();
                     while (!trainingResponseReceived) yield return null;
-                    ClearCrossSignal();
+                    ShowAnsweredSignal();
                 }
 
                 float speed = presentationReferenceSpeed;
@@ -1439,7 +1503,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 sessionState = State.ActivePracticeMotion;
                 headTrainingView.ShowActivePracticeFeedback(ActivePracticeFeedbackText(LastActivePracticeResult),
                     ActivePracticeGoodTrials, activePracticeGoodTrials);
-                yield return new WaitForSecondsRealtime(Mathf.Max(1.5f, feedbackSeconds));
+                yield return PracticeTextPause(Mathf.Max(1.5f, feedbackSeconds));
             }
 
             if (!standaloneTraining && trialQueue.TryPeekNext(out RandomDotTrial next))
@@ -2015,7 +2079,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return;
             }
 
-            ClearCrossSignal();
+            ShowAnsweredSignal();
             validTrialsCompleted++;
             WriteMarker(
                 "TrialResponse;task=random_dot_instrument;sequence={0};attempt={1};" +
