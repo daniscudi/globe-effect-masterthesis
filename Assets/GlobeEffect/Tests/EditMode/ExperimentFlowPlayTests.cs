@@ -545,6 +545,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(ParseFloat(row["head_speed_reference_deg_per_s"]), Is.EqualTo(target).Within(0.2f * target));
             // Der Test dreht den Kopf sauber nach rechts: Richtung gespeichert, nichts daneben.
             Assert.That(row["head_direction"], Is.EqualTo("Right"));
+            // Punkte erst nach mindestens 3° Schwenk.
+            Assert.That(ParseFloat(row["head_turn_before_dots_deg"]), Is.GreaterThanOrEqualTo(3f));
             Assert.That(ParseFloat(row["head_offaxis_max_deviation_deg"]), Is.EqualTo(0f).Within(0.05f));
             Assert.That(ParseFloat(row["head_roll_max_deviation_deg"]), Is.EqualTo(0f).Within(0.05f));
             Assert.That(ParseFloat(row["stimulus_duration_s"]), Is.EqualTo(SimulatedSweepSeconds).Within(0.1f));
@@ -577,6 +579,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
         {
             // EnterPlayMode muss direkt in der Testmethode stehen, nicht verschachtelt.
             PrepareVelocityGatedScene();
+            // Echte Darbietungsdauer: In 0,2 s reichen Glättung plus Toleranzzeit knapp nicht.
+            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
+            config.FindProperty("simulatedSweepSeconds").floatValue = 0.8f;
+            config.ApplyModifiedPropertiesWithoutUndo();
             yield return new EnterPlayMode();
             yield return null;
             RandomDotExperimentManager manager = StartVelocityGatedSession();
@@ -763,6 +769,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             config.FindProperty("minimumMovingHeadSpeed").floatValue = 0.5f;
             config.FindProperty("velocityHoldSeconds").floatValue = 0.15f;
             config.FindProperty("minimumWaitBeforeDotsSeconds").floatValue = 0.3f;
+            config.FindProperty("minimumTurnBeforeDotsDegrees").floatValue = 3f;
             config.FindProperty("velocityGraceSeconds").floatValue = 0.1f;
             config.ApplyModifiedPropertiesWithoutUndo();
         }

@@ -648,7 +648,12 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   Die Punkte erscheinen nur, wenn der Kopf entgegengesetzt zum letzten Trial
   schwenkt (rechts, antworten, links, antworten, ...). Ein Schwenk in dieselbe
   Richtung zählt wie Stillhalten. Auch ein abgebrochener Schwenk zählt als letzte
-  Richtung. Das gibt einen ruhigen Rhythmus mit einer Pause bei jeder Antwort und
+  Richtung. `Minimum Turn Before Dots Degrees` (Standard 3°, 0 = aus) verlangt
+  zusätzlich, dass der Kopf im laufenden Schwenk schon so weit gedreht hat; erst
+  wenn alle Bedingungen gleichzeitig erfüllt sind (Wartezeit, Richtung,
+  gleichmäßig, Strecke), kommen die Punkte. Stillhalten oder Umkehren beginnt einen
+  neuen Schwenk. CSV-Spalte `head_turn_before_dots_deg`.
+  Das gibt einen ruhigen Rhythmus mit einer Pause bei jeder Antwort und
   gleicht links/rechts aus. Der erste Trial einer Sitzung (und der Übung) darf in
   beide Richtungen gehen. Der Experiment Monitor zeigt "Next Sweep"; in der
   Active Practice steht die Richtung im Headset.

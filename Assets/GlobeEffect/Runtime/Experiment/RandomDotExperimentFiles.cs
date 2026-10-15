@@ -65,6 +65,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         /// <summary>Größtes seitliches Kippen des Kopfes während der Punkte (°).</summary>
         public float HeadRollDeviation { get; }
+
+        /// <summary>Wie weit der Kopf im Schwenk schon gedreht hatte, als die Punkte kamen (°).</summary>
+        public float HeadTurnBeforeDots { get; }
         public string MotionConstraint => Trial.MotionMode == RandomDotMotionMode.SimulatedYaw
             ? "simulated" : FreeHeadMovement ? "free" : "guided";
 
@@ -113,7 +116,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             string headDirection = "",
             float offAxisSpeed = float.NaN,
             float offAxisDeviation = float.NaN,
-            float rollDeviation = float.NaN)
+            float rollDeviation = float.NaN,
+            float turnBeforeDots = float.NaN)
         {
             Trial = trial ?? throw new ArgumentNullException(nameof(trial));
             PresentationIndex = presentationIndex;
@@ -156,6 +160,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             HeadOffAxisSpeed = offAxisSpeed;
             HeadOffAxisDeviation = offAxisDeviation;
             HeadRollDeviation = rollDeviation;
+            HeadTurnBeforeDots = turnBeforeDots;
         }
     }
 
@@ -193,7 +198,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "velocity_gate_target_deg_per_s,head_speed_onset_deg_per_s,head_speed_mean_deg_per_s," +
             "head_speed_min_deg_per_s,head_speed_max_deg_per_s,head_motion_wait_s," +
             "head_speed_reference_deg_per_s,head_direction,head_offaxis_speed_mean_deg_per_s," +
-            "head_offaxis_max_deviation_deg,head_roll_max_deviation_deg";
+            "head_offaxis_max_deviation_deg,head_roll_max_deviation_deg,head_turn_before_dots_deg";
 
         public RandomDotExperimentFiles(
             string outputRoot,
@@ -270,7 +275,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 .Add(result.HeadSpeedReference)
                 // Aktive Trials: echte Richtung und Bewegung neben der Schwenkachse.
                 .Add(result.HeadDirection).Add(result.HeadOffAxisSpeed)
-                .Add(result.HeadOffAxisDeviation).Add(result.HeadRollDeviation));
+                .Add(result.HeadOffAxisDeviation).Add(result.HeadRollDeviation)
+                .Add(result.HeadTurnBeforeDots));
         }
     }
 }

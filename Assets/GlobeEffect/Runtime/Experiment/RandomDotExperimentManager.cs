@@ -254,6 +254,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [Tooltip("Slower than this the head counts as still, and no dots appear (degrees per second).")]
         private float minimumMovingHeadSpeed = 0.5f;
 
+        [SerializeField, Range(0f, 20f)]
+        [Tooltip("The dots appear only after the head has already turned this far in the current sweep " +
+            "(degrees), in addition to all other conditions. Stopping or turning around starts a new sweep. " +
+            "0 = off.")]
+        private float minimumTurnBeforeDotsDegrees = 3f;
+
         [SerializeField, Range(0f, 1f)]
         [Tooltip("How long the head must turn steadily before the dots appear (s).")]
         private float velocityHoldSeconds = 0.3f;
@@ -559,6 +565,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private string presentationDirection = string.Empty;
         // Vorzeichen des letzten Schwenks mit Punkten (+1 rechts/oben, -1 links/unten, 0 = noch keiner).
         private int lastSweepSign;
+        // Laufender Schwenk vor den Punkten: Richtung und schon gedrehte Strecke (°).
+        private int currentSweepSign;
+        private float currentSweepTravelDegrees;
+        private float presentationTurnBeforeDots = float.NaN;
         // Abbruchquote für den Experiment Monitor (laufende Sitzung).
         private int repeatedAttempts;
         private int speedChangedAttempts;
@@ -1877,6 +1887,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             offAxis.Reset();
             presentationReferenceSpeed = float.NaN;
             presentationDirection = string.Empty;
+            currentSweepSign = 0;
+            currentSweepTravelDegrees = 0f;
+            presentationTurnBeforeDots = float.NaN;
             waitingForHeadMotionSince = Time.realtimeSinceStartupAsDouble;
         }
 
@@ -1895,15 +1908,37 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     || Math.Sign(velocityGate.SignedSpeedDegreesPerSecond) == RequiredSweepSign;
                 steadyHead.Add(rightWay ? velocityGate.SpeedDegreesPerSecond : 0f, Time.unscaledDeltaTime,
                     velocityChangeTolerance, minimumMovingHeadSpeed);
+
+                // Strecke des laufenden Schwenks: zählt nur, solange der Kopf in eine (erlaubte)
+                // Richtung dreht. Stillhalten oder Umkehren beginnt einen neuen Schwenk.
+                float signed = velocityGate.SignedSpeedDegreesPerSecond;
+                bool moving = Mathf.Abs(signed) >= minimumMovingHeadSpeed;
+                if (moving && rightWay)
+                {
+                    int sign = signed >= 0f ? 1 : -1;
+                    if (sign != currentSweepSign)
+                    {
+                        currentSweepSign = sign;
+                        currentSweepTravelDegrees = 0f;
+                    }
+                    currentSweepTravelDegrees += Mathf.Abs(signed) * Time.unscaledDeltaTime;
+                }
+                else
+                {
+                    currentSweepSign = 0;
+                    currentSweepTravelDegrees = 0f;
+                }
             }
             else
                 offAxis.Add(stimulus.Observer.forward, stimulus.Observer.up, Time.unscaledDeltaTime);
         }
 
         // Wartezeit vorbei und lange genug gleichmäßig: Die Punkte dürfen kommen.
+        // Alle Bedingungen zusammen; die Mindeststrecke allein löst nie etwas aus.
         private bool HeadReadyForDots =>
             Time.realtimeSinceStartupAsDouble - waitingForHeadMotionSince >= minimumWaitBeforeDotsSeconds
-            && steadyHead.SteadySeconds >= velocityHoldSeconds;
+            && steadyHead.SteadySeconds >= velocityHoldSeconds
+            && currentSweepTravelDegrees >= minimumTurnBeforeDotsDegrees;
 
         // Das (geglättete) Tempo direkt vor den Punkten wird zum Maßstab. Nicht der
         // Mittelwert des ganzen gleichmäßigen Abschnitts: Der enthält noch einen Teil
@@ -1911,6 +1946,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private void BeginHeadSpeedPresentation()
         {
             presentationReferenceSpeed = velocityGate.SpeedDegreesPerSecond;
+            presentationTurnBeforeDots = currentSweepTravelDegrees;
             presentationDirection = RandomDotHeadOffAxisMeter.Direction(
                 velocityGate.SignedSpeedDegreesPerSecond, velocityGateAxis);
             // Auch ein abgebrochener Schwenk zählt: Der nächste geht in die andere Richtung.
@@ -2258,7 +2294,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 headDirection: IsVelocityGatedTrial(currentTrial) ? presentationDirection : string.Empty,
                 offAxisSpeed: IsVelocityGatedTrial(currentTrial) ? offAxis.MeanOffAxisSpeed : float.NaN,
                 offAxisDeviation: IsVelocityGatedTrial(currentTrial) ? offAxis.MaxOffAxisDeviationDegrees : float.NaN,
-                rollDeviation: IsVelocityGatedTrial(currentTrial) ? offAxis.MaxRollDeviationDegrees : float.NaN);
+                rollDeviation: IsVelocityGatedTrial(currentTrial) ? offAxis.MaxRollDeviationDegrees : float.NaN,
+                turnBeforeDots: IsVelocityGatedTrial(currentTrial) ? presentationTurnBeforeDots : float.NaN);
         }
 
             // Die Fehlerwerte zur Sollbahn gibt es nur bei geführten HeadTracked-Trials.

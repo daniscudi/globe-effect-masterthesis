@@ -68,6 +68,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             ["velocityGateAxis"] = "Head Turn Direction",
             ["velocityChangeTolerance"] = "Allowed Speed Change (±)",
             ["alternateSweepDirection"] = "One Sweep Per Trial, Alternating",
+            ["minimumTurnBeforeDotsDegrees"] = "Min Turn Before Dots (°)",
             ["minimumMovingHeadSpeed"] = "Head Counts As Still Below (°/s)",
             ["velocityHoldSeconds"] = "Steady Time Before Dots (s)",
             ["minimumWaitBeforeDotsSeconds"] = "Wait Before Next Dots (s)",
@@ -569,18 +570,20 @@ namespace GlobeEffect.VRCheckerboard.Editor
         private void VelocityGateSettings()
         {
             Fields(serializedObject, "velocityGateAxis", "alternateSweepDirection", "velocityChangeTolerance",
-                "minimumMovingHeadSpeed",
+                "minimumMovingHeadSpeed", "minimumTurnBeforeDotsDegrees",
                 "velocityHoldSeconds", "minimumWaitBeforeDotsSeconds", "velocityGraceSeconds",
                 "velocitySmoothingSeconds");
             var manager = (RandomDotExperimentManager)target;
             float change = serializedObject.FindProperty("velocityChangeTolerance").floatValue;
             float hold = serializedObject.FindProperty("velocityHoldSeconds").floatValue;
+            float turn = serializedObject.FindProperty("minimumTurnBeforeDotsDegrees").floatValue;
             float wait = serializedObject.FindProperty("minimumWaitBeforeDotsSeconds").floatValue;
             float seconds = serializedObject.FindProperty("simulatedSweepSeconds").floatValue;
             EditorGUILayout.HelpBox(
                 "No fixed speed: the participant turns the head as fast as feels natural. " +
                 $"The dots appear when the head has turned steadily for {hold:0.##} s (speed changes less than " +
-                $"±{change * 100f:0} %) and at least {wait:0.##} s have passed since the last trial. They stay " +
+                $"±{change * 100f:0} %), has already turned at least {turn:0.#}° in this sweep, and at least " +
+                $"{wait:0.##} s have passed since the last trial. All must be true at once. They stay " +
                 $"{seconds:0.##} s. If the speed changes by more than ±{change * 100f:0} % from the speed just " +
                 "before the dots, they disappear and the trial is repeated later. All head speeds are saved for " +
                 "every trial.", MessageType.Info);
