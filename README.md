@@ -627,8 +627,8 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   Tolerance` (±25 %). Zusätzlich muss seit Beginn des Wartens (also nach jedem
   Trial, auch nach einem Abbruch) `Minimum Wait Before Dots Seconds` (1 s)
   vergangen sein. Dann erscheinen die Punkte für `Simulated Sweep Seconds` (wie
-  Simulated), danach Antwort. Maßstab während der Punkte ist das mittlere Tempo
-  des gleichmäßigen Abschnitts direkt davor: Weicht der Kopf länger als
+  Simulated), danach Antwort. Maßstab während der Punkte ist das geglättete
+  Tempo direkt davor: Weicht der Kopf länger als
   `Velocity Grace Seconds` um mehr als ± `Velocity Change Tolerance` davon ab,
   verschwinden die Punkte, der Trial ist ungültig (`invalid:head_speed_changed`)
   und wird später wiederholt. Die Person soll so selbst merken, wenn ihr Tempo
@@ -643,6 +643,23 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   Beispiele und Übungstrials, Simulated wie Active, damit sich die Bedingungen
   darin nicht unterscheiden. Die Darbietungszeit zählt ab Beginn des Einblendens.
   Die Vorschau blendet nicht ein.
+
+* Active Practice (`Train Active Panning`, Standard an; nur für aktive Trials mit
+  Geschwindigkeitserkennung): kommt in der Sitzung nach der Tastenbelegung und vor
+  der Anleitung der echten aktiven Trials, oder allein mit `T` im Head-Tracked-
+  Modus. Nichts wird gespeichert (nur Marker und Konsole). Ablauf:
+  1. Optional (`Show Active Speed Example`): Der Computer schwenkt die Punkte einmal
+     mit dem Simulated-Tempo (k = 1, `Example Long Seconds`), der Kopf bleibt still.
+     So sieht die Person ein ruhiges Tempo.
+  2. Übungstrials genau wie die echten aktiven Trials (gleichmäßig schwenken,
+     Punkte, Abbruch bei Tempowechsel, Antwort), mit k aus `Active Practice K
+     Values` (Standard 0,2 und 1,8, also eindeutige Formen).
+  3. Nach jedem Übungstrial eine kurze Rückmeldung: "dots stopped early" (Tempo
+     geändert), "quite fast" / "quite slow" (Tempo außerhalb `Natural Head Speed
+     Min`–`Max`, Standard 1,5–4 °/s; abschaltbar mit `Active Practice Speed Hint`)
+     oder "good".
+  4. Ende nach `Active Practice Good Trials` guten Übungstrials (Standard 6) oder
+     spätestens nach `Active Practice Max Trials` (Standard 20).
 
 * Wenn `Free Head Movement` aus ist, bleibt der geführte Links-Rechts-Schwenk
   erhalten. Mit `±2°`,

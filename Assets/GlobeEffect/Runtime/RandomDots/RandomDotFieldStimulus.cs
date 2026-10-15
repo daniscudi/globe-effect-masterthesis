@@ -614,6 +614,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public static float FadeInOpacity(double secondsSinceShown, float fadeInSeconds) =>
             fadeInSeconds <= 0f ? 1f : Mathf.Clamp01((float)(secondsSinceShown / fadeInSeconds));
 
+        /// <summary>Sind die Punkte gerade an (nicht nur Kreuz und graue Fläche)?</summary>
+        public bool PointsVisible => isVisible && pointsVisible;
+
         /// <summary>Wie weit die Punkte gerade eingeblendet sind (0 bis 1).</summary>
         public float DotsOpacity =>
             FadeInOpacity(Time.realtimeSinceStartupAsDouble - dotsShownAtSeconds, dotsFadeInSeconds);

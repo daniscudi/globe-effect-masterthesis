@@ -166,6 +166,47 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 responseLines + "\n\n" + startKey + " = START TRIALS");
         }
 
+        public void ShowActivePracticeInstructions(string responseLines, string startKey, HeadVelocityAxis axis,
+            bool speedExample)
+        {
+            string direction = axis == HeadVelocityAxis.Horizontal ? "left and right" : "up and down";
+            Show(false, "ACTIVE HEAD MOVEMENT PRACTICE\n\n" +
+                (speedExample ? "First the computer shows you a calm speed.\nKeep your head still for that.\n\n" : "") +
+                "Then keep looking at the cross and turn your head\n" +
+                "steadily " + direction + ", like looking around with binoculars.\n" +
+                "The dots appear while you move.\n" +
+                "Keep the same speed until they disappear.",
+                "After the dots, answer with:\n" + responseLines + "\n\n" + startKey + " = START PRACTICE");
+        }
+
+        public void ShowActiveSpeedExample()
+        {
+            Show(false, "THIS IS A CALM SPEED\n\nKeep your head still and look at the cross.\n" +
+                "The computer moves the dots.", string.Empty);
+        }
+
+        public void ShowActivePracticeTurn(int attempt, int goodTrials, int requiredGoodTrials, HeadVelocityAxis axis)
+        {
+            string direction = axis == HeadVelocityAxis.Horizontal ? "left or right" : "up or down";
+            Show(false, "PRACTICE " + attempt + "\n\nTurn your head steadily " + direction + ".",
+                GoodTrialsText(goodTrials, requiredGoodTrials));
+        }
+
+        public void ShowActivePracticeResponse(string responseLines)
+        {
+            Show(false, "OUTWARD OR INWARD?", responseLines);
+        }
+
+        public void ShowActivePracticeFeedback(string message, int goodTrials, int requiredGoodTrials)
+        {
+            Show(false, message, GoodTrialsText(goodTrials, requiredGoodTrials));
+        }
+
+        private static string GoodTrialsText(int goodTrials, int requiredGoodTrials)
+        {
+            return "Good trials: " + goodTrials + " / " + requiredGoodTrials;
+        }
+
         public void ShowResponseInstructions(string responseLines, string startKeyName, bool openEnded = false)
         {
             Show(false,

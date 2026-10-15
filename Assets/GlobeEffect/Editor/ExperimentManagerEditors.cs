@@ -72,6 +72,14 @@ namespace GlobeEffect.VRCheckerboard.Editor
             ["minimumWaitBeforeDotsSeconds"] = "Wait Before Next Dots (s)",
             ["velocityGraceSeconds"] = "Max Time At Changed Speed (s)",
             ["dotsFadeInSeconds"] = "Dots Fade In (s)",
+            ["trainActivePanning"] = "Practise Head-Tracked Trials",
+            ["showActiveSpeedExample"] = "Show Calm Speed First",
+            ["activePracticeKValues"] = "Practice k Values",
+            ["activePracticeGoodTrials"] = "Good Practice Trials Needed",
+            ["activePracticeMaxTrials"] = "Max Practice Trials",
+            ["activePracticeSpeedHint"] = "Say If Too Fast Or Too Slow",
+            ["naturalHeadSpeedMin"] = "Natural Head Speed From (°/s)",
+            ["naturalHeadSpeedMax"] = "Natural Head Speed Up To (°/s)",
             ["velocitySmoothingSeconds"] = "Speed Smoothing (s)",
             ["checkHeadMotion"] = "Repeat Bad Head Movements",
             ["maximumProfileErrorDegrees"] = "Max Path Error (degrees)",
@@ -475,13 +483,19 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "showSimulatedExamples", "exampleConvexK", "exampleConcaveK", "exampleLongSeconds",
                     "exampleTextSeconds",
                     "simulatedTrainingKValues", "simulatedTrainingRepeatsPerValue", "simulatedTrainingFeedback",
-                    "feedbackConcaveMaxK", "feedbackConvexMinK", "feedbackSeconds", "trainHeadMovement",
+                    "feedbackConcaveMaxK", "feedbackConvexMinK", "feedbackSeconds",
+                    "trainActivePanning", "showActiveSpeedExample", "activePracticeKValues",
+                    "activePracticeGoodTrials", "activePracticeMaxTrials", "activePracticeSpeedHint",
+                    "naturalHeadSpeedMin", "naturalHeadSpeedMax", "trainHeadMovement",
                     "requiredGoodTrainingSweeps", "sweepAmplitudeDegrees", "sweepSpeed",
                     "maximumProfileErrorDegrees", "maximumTrainingEndpointErrorDegrees", "turnaroundDegrees",
                     "requiredSweeps", "maxHeadTurnDegrees", "minMeanHeadSpeed", "maxPeakHeadSpeed");
                 EditorGUILayout.HelpBox("T starts a practice of the chosen movement type without saving data. " +
-                    "In a session the practice matching the movement type is used. The head movement practice " +
-                    "is always guided.", MessageType.Info);
+                    "In a session the practice matching the movement type is used. Head-tracked trials with " +
+                    "\"Dots Only While Head Turns Steadily\" use the Active Practice with the real dots: first a " +
+                    "calm speed shown by the computer, then practice trials with a short note after each " +
+                    "(dots stopped early, quite fast, quite slow or good). Otherwise the guided head movement " +
+                    "practice is used.", MessageType.Info);
             }
             FixationSettings();
             if (Section("Answers And Keys"))

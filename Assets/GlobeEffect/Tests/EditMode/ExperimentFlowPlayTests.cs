@@ -588,6 +588,105 @@ namespace GlobeEffect.VRCheckerboard.Tests
             yield return new ExitPlayMode();
         }
 
+        [UnityTest]
+        public IEnumerator RandomDotActivePractice_StandaloneUsesTheRealDotsAndReturnsToWelcome()
+        {
+            // EnterPlayMode muss direkt in der Testmethode stehen, nicht verschachtelt.
+            PrepareActivePracticeScene(goodTrials: 1, maxTrials: 3);
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
+            var stimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
+
+            // T im Head-Tracked-Modus: Active Practice statt geführtem Kopftraining.
+            Assert.That(manager.StartTraining(), Is.True);
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.ActivePracticeInstructions));
+            manager.ConfirmTrainingInstructions();
+
+            // Gleichmäßig in natürlichem Tempo (2,5 °/s): Punkte, dann Antwort.
+            yield return SweepHead(stimulus, 2.5f, manager, RandomDotSessionState.ActivePracticeResponse);
+            Object.FindAnyObjectByType<RandomDotKeyboardController>().SubmitResponse(Response.Convex);
+            yield return null;
+            yield return null;
+            Assert.That(manager.LastActivePracticeResult, Is.EqualTo("good"));
+            Assert.That(manager.ActivePracticeGoodTrials, Is.EqualTo(1));
+
+            // Ein guter Trial reicht hier: zurück zum Startbildschirm, ohne Messdateien.
+            yield return WaitForState(manager, RandomDotSessionState.Idle);
+            AssertNoSessionFiles(manager);
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator RandomDotActivePractice_ChangingSpeedStopsTheDotsBeforeTheSessionTrials()
+        {
+            // EnterPlayMode muss direkt in der Testmethode stehen, nicht verschachtelt.
+            PrepareActivePracticeScene(goodTrials: 1, maxTrials: 1);
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
+            var stimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
+
+            // In der Sitzung kommt die Active Practice nach der Tastenbelegung.
+            Assert.That(manager.StartSession(), Is.True);
+            manager.ConfirmResponseInstructions();
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.ActivePracticeInstructions));
+            manager.ConfirmTrainingInstructions();
+
+            // Erst gleichmäßig, bis die Punkte da sind, dann deutlich schneller.
+            yield return SweepHeadUntilDots(stimulus, 2.5f);
+            yield return SweepHeadFor(stimulus, 5f, 1f);
+            Assert.That(manager.LastActivePracticeResult, Is.EqualTo("changed"));
+            Assert.That(manager.ActivePracticeGoodTrials, Is.Zero);
+
+            // Höchstzahl erreicht: weiter zur Anleitung der echten aktiven Trials.
+            yield return WaitForState(manager, RandomDotSessionState.ActiveMotionInstructions);
+            manager.AbortSession();
+            yield return new ExitPlayMode();
+        }
+
+        private static void PrepareActivePracticeScene(int goodTrials, int maxTrials)
+        {
+            PrepareVelocityGatedScene();
+            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
+            config.FindProperty("trainActivePanning").boolValue = true;
+            config.FindProperty("showActiveSpeedExample").boolValue = false;
+            config.FindProperty("activePracticeGoodTrials").intValue = goodTrials;
+            config.FindProperty("activePracticeMaxTrials").intValue = maxTrials;
+            config.FindProperty("activePracticeSpeedHint").boolValue = true;
+            config.FindProperty("naturalHeadSpeedMin").floatValue = 1.5f;
+            config.FindProperty("naturalHeadSpeedMax").floatValue = 4f;
+            config.FindProperty("feedbackSeconds").floatValue = 0.2f;
+            config.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static IEnumerator SweepHeadUntilDots(RandomDotFieldStimulus stimulus, float degreesPerSecond)
+        {
+            // Dreht die Kopfkamera gleichmäßig nach rechts, bis die Punkte erscheinen.
+            Quaternion start = stimulus.Observer.rotation;
+            double startTime = Time.realtimeSinceStartupAsDouble;
+            while (!stimulus.PointsVisible && Time.realtimeSinceStartupAsDouble - startTime < 5d)
+            {
+                float elapsed = (float)(Time.realtimeSinceStartupAsDouble - startTime);
+                stimulus.Observer.rotation = start * Quaternion.Euler(0f, degreesPerSecond * elapsed, 0f);
+                yield return null;
+            }
+            Assert.That(stimulus.PointsVisible, Is.True, "Die Punkte sind nicht erschienen.");
+        }
+
+        private static IEnumerator SweepHeadFor(RandomDotFieldStimulus stimulus, float degreesPerSecond, float seconds)
+        {
+            // Dreht die Kopfkamera eine feste Zeit lang gleichmäßig nach rechts.
+            Quaternion start = stimulus.Observer.rotation;
+            double startTime = Time.realtimeSinceStartupAsDouble;
+            while (Time.realtimeSinceStartupAsDouble - startTime < seconds)
+            {
+                float elapsed = (float)(Time.realtimeSinceStartupAsDouble - startTime);
+                stimulus.Observer.rotation = start * Quaternion.Euler(0f, degreesPerSecond * elapsed, 0f);
+                yield return null;
+            }
+        }
+
         private static void PrepareVelocityGatedScene()
         {
             PrepareRandomDotScene();
@@ -934,6 +1033,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             manager.FindProperty("pauseSeconds").floatValue = 0f;
             manager.FindProperty("trainSimulatedMotion").boolValue = false;
             manager.FindProperty("trainHeadMovement").boolValue = false;
+            manager.FindProperty("trainActivePanning").boolValue = false;
             manager.FindProperty("repeatsPerCondition").intValue = 1;
             ApplySharedTestSettings(manager);
 
