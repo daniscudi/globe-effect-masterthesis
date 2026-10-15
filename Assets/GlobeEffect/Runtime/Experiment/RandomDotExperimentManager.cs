@@ -244,6 +244,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "0.25 = ±25 %.")]
         private float velocityChangeTolerance = 0.25f;
 
+        [SerializeField]
+        [Tooltip("One sweep per trial, alternating: the dots only appear while the head turns the other way " +
+            "than in the last trial (right, answer, left, answer, ...). Gives a calm rhythm with a rest at each " +
+            "answer and balances left and right.")]
+        private bool alternateSweepDirection = true;
+
         [SerializeField, Range(0f, 2f)]
         [Tooltip("Slower than this the head counts as still, and no dots appear (degrees per second).")]
         private float minimumMovingHeadSpeed = 0.5f;
@@ -548,6 +554,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private readonly FrameTimingTracker frameTiming = new();
         private readonly RandomDotHeadVelocityGate velocityGate = new();
         private readonly RandomDotSteadyHeadDetector steadyHead = new();
+        private readonly RandomDotHeadOffAxisMeter offAxis = new();
+        // Tatsächliche Schwenkrichtung beim Einblenden (Right/Left bzw. Up/Down).
+        private string presentationDirection = string.Empty;
+        // Vorzeichen des letzten Schwenks mit Punkten (+1 rechts/oben, -1 links/unten, 0 = noch keiner).
+        private int lastSweepSign;
+        // Abbruchquote für den Experiment Monitor (laufende Sitzung).
+        private int repeatedAttempts;
+        private int speedChangedAttempts;
         private double waitingForHeadMotionSince;
         // Tempo des gleichmäßigen Abschnitts direkt vor den Punkten: Maßstab während der Punkte.
         private float presentationReferenceSpeed = float.NaN;
@@ -577,6 +591,15 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public bool IsPreviewActive => previewActive;
         public RandomDotFieldStimulus Stimulus => stimulus;
         public RandomDotLiveHeadSpeed LiveHeadSpeed => liveHeadSpeed;
+
+        /// <summary>Wie oft in dieser Sitzung Punkte gezeigt wurden, Wiederholungen eingeschlossen.</summary>
+        public int PresentationCount => presentationCount;
+
+        /// <summary>Ungültige Durchgänge dieser Sitzung (werden hinten wiederholt).</summary>
+        public int RepeatedAttempts => repeatedAttempts;
+
+        /// <summary>Davon abgebrochen, weil sich das Kopftempo während der Punkte geändert hat.</summary>
+        public int SpeedChangedAttempts => speedChangedAttempts;
         UnityEngine.Object IPreviewTakeoverManager.PreviewStimulus => stimulus;
 
         // Für die Editor-Übergabe aus dem Play Mode in die Szene.
@@ -981,6 +1004,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             totalTrials = trialPlan.Count;
             validTrialsCompleted = 0;
             presentationCount = 0;
+            repeatedAttempts = 0;
+            speedChangedAttempts = 0;
             trialsWithSlowFrames = 0;
             pausesTaken = 0;
             currentMotionBlock = 0;
@@ -989,6 +1014,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             trainedSimulatedMotionBlock = 0;
             trainedActivePracticeBlock = 0;
             instructedActiveMotionBlock = 0;
+            lastSweepSign = 0;
             sessionState = State.InterTrial;
             // Ab jetzt keine Vorschau-Dauerschleife mehr: Jeder Schwenk läuft einmal.
             stimulus.SessionRunning = true;
@@ -1127,7 +1153,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     sessionState = State.ActiveMotionInstructions;
                     headTrainingView.ShowActiveMotionInstructions(freeHeadMovement,
                         IsOpenEndedTrial(next), BuildResponseLines(), ResponseInputController.GetReadableKeyName(startSessionKey),
-                        IsVelocityGatedTrial(next), velocityGateAxis);
+                        IsVelocityGatedTrial(next), velocityGateAxis, alternateSweepDirection);
                     return;
                 }
             }
@@ -1414,7 +1440,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulus.ShowFixationOnly();
             sessionState = State.ActivePracticeInstructions;
             headTrainingView.ShowActivePracticeInstructions(ResponseLinesWithSignalNote(),
-                ResponseInputController.GetReadableKeyName(startSessionKey), velocityGateAxis, showActiveSpeedExample);
+                ResponseInputController.GetReadableKeyName(startSessionKey), velocityGateAxis, showActiveSpeedExample,
+                alternateSweepDirection);
             WriteMarker("ActivePracticeInstructions;task=random_dot_instrument");
         }
 
@@ -1425,6 +1452,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // Bewegung, damit die Person ein natürliches Tempo findet.
             sessionState = State.ActivePracticeMotion;
             ActivePracticeGoodTrials = 0;
+            lastSweepSign = 0;
             ActivePracticeAttempts = 0;
             LastActivePracticeResult = string.Empty;
 
@@ -1444,7 +1472,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 stimulus.ShowFixationOnly();
                 sessionState = State.ActivePracticeMotion;
                 headTrainingView.ShowActivePracticeTurn(ActivePracticeAttempts, ActivePracticeGoodTrials,
-                    activePracticeGoodTrials, velocityGateAxis);
+                    activePracticeGoodTrials, velocityGateAxis, RequiredSweepSign);
 
                 // Warten, bis der Kopf gleichmäßig dreht (wie im echten Trial).
                 BeginHeadSpeedWait();
@@ -1846,7 +1874,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             velocityGate.Reset();
             steadyHead.Reset();
+            offAxis.Reset();
             presentationReferenceSpeed = float.NaN;
+            presentationDirection = string.Empty;
             waitingForHeadMotionSince = Time.realtimeSinceStartupAsDouble;
         }
 
@@ -1858,8 +1888,16 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             velocityGate.AddSample(stimulus.Observer.forward, Time.unscaledDeltaTime, velocityGateAxis,
                 velocitySmoothingSeconds, minimum, maximum);
             if (!presenting)
-                steadyHead.Add(velocityGate.SpeedDegreesPerSecond, Time.unscaledDeltaTime,
+            {
+                // Abwechselnde Richtung: Ein Schwenk in die Richtung des letzten Trials
+                // zählt wie Stillhalten, die Punkte kommen erst beim Zurückschwenken.
+                bool rightWay = RequiredSweepSign == 0
+                    || Math.Sign(velocityGate.SignedSpeedDegreesPerSecond) == RequiredSweepSign;
+                steadyHead.Add(rightWay ? velocityGate.SpeedDegreesPerSecond : 0f, Time.unscaledDeltaTime,
                     velocityChangeTolerance, minimumMovingHeadSpeed);
+            }
+            else
+                offAxis.Add(stimulus.Observer.forward, stimulus.Observer.up, Time.unscaledDeltaTime);
         }
 
         // Wartezeit vorbei und lange genug gleichmäßig: Die Punkte dürfen kommen.
@@ -1873,10 +1911,24 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private void BeginHeadSpeedPresentation()
         {
             presentationReferenceSpeed = velocityGate.SpeedDegreesPerSecond;
+            presentationDirection = RandomDotHeadOffAxisMeter.Direction(
+                velocityGate.SignedSpeedDegreesPerSecond, velocityGateAxis);
+            // Auch ein abgebrochener Schwenk zählt: Der nächste geht in die andere Richtung.
+            lastSweepSign = velocityGate.SignedSpeedDegreesPerSecond >= 0f ? 1 : -1;
             velocityGate.BeginPresentation();
+            // Ab jetzt auch Nicken/Drehen neben der Schwenkachse und Kippen messen.
+            offAxis.Begin(stimulus.Observer.forward, stimulus.Observer.up, velocityGateAxis);
         }
 
         private bool HeadSpeedChangedTooLong => velocityGate.SecondsOutOfRange > velocityGraceSeconds;
+
+        // +1/-1: in diese Richtung muss der nächste Schwenk gehen, 0 = egal.
+        private int RequiredSweepSign => alternateSweepDirection ? -lastSweepSign : 0;
+
+        /// <summary>Richtung des nächsten Schwenks (Right/Left bzw. Up/Down) oder "any".</summary>
+        public string NextSweepDirection => RequiredSweepSign == 0
+            ? "any"
+            : RandomDotHeadOffAxisMeter.Direction(RequiredSweepSign, velocityGateAxis);
 
         // Live-Anzeige für den Experiment Monitor: dieselbe Erkennung "gleichmäßig"
         // wie im Trial, für das m und den Zoom, die gerade am Punktfeld stehen (in der
@@ -2124,6 +2176,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             StopAndClear(ref motionCoroutine);
             ShowStoppedSignal();
+            repeatedAttempts++;
+            if (reason == "head_speed_changed") speedChangedAttempts++;
             sweepMonitor.StopProfileTracking();
             stimulusEndUnitySeconds = Time.realtimeSinceStartupAsDouble;
             RandomDotTrial invalidTrial = currentTrial;
@@ -2200,7 +2254,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 headVelocity: IsVelocityGatedTrial(currentTrial)
                     ? velocityGate.Summarize(VelocityGateTargetSpeed(currentTrial))
                     : HeadVelocitySummary.None,
-                headSpeedReference: IsVelocityGatedTrial(currentTrial) ? presentationReferenceSpeed : float.NaN);
+                headSpeedReference: IsVelocityGatedTrial(currentTrial) ? presentationReferenceSpeed : float.NaN,
+                headDirection: IsVelocityGatedTrial(currentTrial) ? presentationDirection : string.Empty,
+                offAxisSpeed: IsVelocityGatedTrial(currentTrial) ? offAxis.MeanOffAxisSpeed : float.NaN,
+                offAxisDeviation: IsVelocityGatedTrial(currentTrial) ? offAxis.MaxOffAxisDeviationDegrees : float.NaN,
+                rollDeviation: IsVelocityGatedTrial(currentTrial) ? offAxis.MaxRollDeviationDegrees : float.NaN);
         }
 
             // Die Fehlerwerte zur Sollbahn gibt es nur bei geführten HeadTracked-Trials.

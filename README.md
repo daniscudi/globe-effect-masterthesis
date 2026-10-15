@@ -635,7 +635,23 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   unnatürlich war. CSV-Spalten: `velocity_gate_target_deg_per_s` (Kopftempo des
   simulierten Schwenks, nur zum Vergleich), `head_speed_onset/mean/min/max_deg_per_s`,
   `head_motion_wait_s`, `head_speed_reference_deg_per_s` (Maßstab während der
-  Punkte); bei Simulated NaN. Marker `WaitingForHeadMotion`.
+  Punkte), `head_direction` (tatsächliche Schwenkrichtung Right/Left bzw. Up/Down),
+  `head_offaxis_speed_mean_deg_per_s` und `head_offaxis_max_deviation_deg`
+  (Bewegung neben der Schwenkachse während der Punkte, bei horizontalem Schwenk also
+  Nicken), `head_roll_max_deviation_deg` (seitliches Kippen); bei Simulated
+  NaN bzw. leer. Damit lässt sich prüfen, ob aktive Trials so sauber waagerecht
+  waren wie Simulated (nur Messung, kein Abbruch). Der Experiment Monitor zeigt die
+  Abbruchquote ("Stopped Trials: 12 of 80 shown (15 %)", davon "Speed Changed").
+  Marker `WaitingForHeadMotion`.
+
+* Ein Schwenk pro Trial, abwechselnd (`Alternate Sweep Direction`, Standard an):
+  Die Punkte erscheinen nur, wenn der Kopf entgegengesetzt zum letzten Trial
+  schwenkt (rechts, antworten, links, antworten, ...). Ein Schwenk in dieselbe
+  Richtung zählt wie Stillhalten. Auch ein abgebrochener Schwenk zählt als letzte
+  Richtung. Das gibt einen ruhigen Rhythmus mit einer Pause bei jeder Antwort und
+  gleicht links/rechts aus. Der erste Trial einer Sitzung (und der Übung) darf in
+  beide Richtungen gehen. Der Experiment Monitor zeigt "Next Sweep"; in der
+  Active Practice steht die Richtung im Headset.
 
 * Einblenden (`Dots Fade In Seconds`, Standard 0,05 s, etwa 4–5 Frames bei 90 Hz;
   0 = kein Einblenden): Die Punkte erscheinen nicht schlagartig, sondern werden

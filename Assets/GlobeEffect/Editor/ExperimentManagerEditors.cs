@@ -67,6 +67,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             ["useVelocityGate"] = "Dots Only While Head Turns Steadily",
             ["velocityGateAxis"] = "Head Turn Direction",
             ["velocityChangeTolerance"] = "Allowed Speed Change (±)",
+            ["alternateSweepDirection"] = "One Sweep Per Trial, Alternating",
             ["minimumMovingHeadSpeed"] = "Head Counts As Still Below (°/s)",
             ["velocityHoldSeconds"] = "Steady Time Before Dots (s)",
             ["minimumWaitBeforeDotsSeconds"] = "Wait Before Next Dots (s)",
@@ -567,7 +568,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private void VelocityGateSettings()
         {
-            Fields(serializedObject, "velocityGateAxis", "velocityChangeTolerance", "minimumMovingHeadSpeed",
+            Fields(serializedObject, "velocityGateAxis", "alternateSweepDirection", "velocityChangeTolerance",
+                "minimumMovingHeadSpeed",
                 "velocityHoldSeconds", "minimumWaitBeforeDotsSeconds", "velocityGraceSeconds",
                 "velocitySmoothingSeconds");
             var manager = (RandomDotExperimentManager)target;

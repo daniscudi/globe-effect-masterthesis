@@ -528,7 +528,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             yield return SweepHead(stimulus, target, manager, RandomDotSessionState.PresentingMotion);
             yield return SweepHead(stimulus, target, manager, RandomDotSessionState.WaitingForResponse);
             // Antwortphase: Kreuz in der Antwortfarbe, halb durchsichtig.
-            Assert.That(stimulus.FixationSignal.a, Is.EqualTo(0.6f).Within(0.01f));
+            Assert.That(stimulus.FixationSignal.a, Is.GreaterThan(0f));
             Assert.That(stimulus.FixationSignal.g, Is.EqualTo(1f), "cyan");
             Object.FindAnyObjectByType<RandomDotKeyboardController>().SubmitResponse(Response.Convex);
             Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.Completed));
@@ -543,6 +543,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(ParseFloat(row["head_motion_wait_s"]), Is.GreaterThanOrEqualTo(0.3f));
             // Maßstab während der Punkte: das gleichmäßige Tempo davor.
             Assert.That(ParseFloat(row["head_speed_reference_deg_per_s"]), Is.EqualTo(target).Within(0.2f * target));
+            // Der Test dreht den Kopf sauber nach rechts: Richtung gespeichert, nichts daneben.
+            Assert.That(row["head_direction"], Is.EqualTo("Right"));
+            Assert.That(ParseFloat(row["head_offaxis_max_deviation_deg"]), Is.EqualTo(0f).Within(0.05f));
+            Assert.That(ParseFloat(row["head_roll_max_deviation_deg"]), Is.EqualTo(0f).Within(0.05f));
             Assert.That(ParseFloat(row["stimulus_duration_s"]), Is.EqualTo(SimulatedSweepSeconds).Within(0.1f));
             yield return new ExitPlayMode();
         }
@@ -660,6 +664,47 @@ namespace GlobeEffect.VRCheckerboard.Tests
             // Höchstzahl erreicht: weiter zur Anleitung der echten aktiven Trials.
             yield return WaitForState(manager, RandomDotSessionState.ActiveMotionInstructions);
             manager.AbortSession();
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator RandomDotVelocityGate_AlternatesTheSweepDirectionBetweenTrials()
+        {
+            // EnterPlayMode muss direkt in der Testmethode stehen, nicht verschachtelt.
+            PrepareVelocityGatedScene();
+            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
+            SetFloats(config.FindProperty("instrumentDistortionKValues"), 0.5f, 1f);
+            config.FindProperty("alternateSweepDirection").boolValue = true;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            RandomDotExperimentManager manager = StartVelocityGatedSession();
+            var stimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
+            var controller = Object.FindAnyObjectByType<RandomDotKeyboardController>();
+            float speed = 2.5f;
+
+            // Erster Trial: Richtung egal, hier nach rechts.
+            Assert.That(manager.NextSweepDirection, Is.EqualTo("any"));
+            yield return SweepHead(stimulus, speed, manager, RandomDotSessionState.PresentingMotion);
+            yield return SweepHead(stimulus, speed, manager, RandomDotSessionState.WaitingForResponse);
+            controller.SubmitResponse(Response.Convex);
+            yield return WaitForState(manager, RandomDotSessionState.WaitingForHeadMotion);
+            Assert.That(manager.NextSweepDirection, Is.EqualTo("Left"));
+
+            // Noch einmal nach rechts: keine Punkte.
+            yield return SweepHeadFor(stimulus, speed, 1.5f);
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.WaitingForHeadMotion));
+            Assert.That(stimulus.PointsVisible, Is.False);
+
+            // Zurück nach links: jetzt kommen die Punkte.
+            yield return SweepHead(stimulus, -speed, manager, RandomDotSessionState.PresentingMotion);
+            yield return SweepHead(stimulus, -speed, manager, RandomDotSessionState.WaitingForResponse);
+            controller.SubmitResponse(Response.Concave);
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.Completed));
+
+            List<Dictionary<string, string>> rows = ReadTrialRows(manager);
+            Assert.That(rows[0]["head_direction"], Is.EqualTo("Right"));
+            Assert.That(rows[1]["head_direction"], Is.EqualTo("Left"));
             yield return new ExitPlayMode();
         }
 

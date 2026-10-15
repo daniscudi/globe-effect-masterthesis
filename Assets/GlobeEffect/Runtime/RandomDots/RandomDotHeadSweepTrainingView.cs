@@ -129,8 +129,22 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         }
 
         public void ShowActiveMotionInstructions(bool free, bool openEnded, string responseLines, string startKey,
-            bool velocityGated = false, HeadVelocityAxis axis = HeadVelocityAxis.Horizontal)
+            bool velocityGated = false, HeadVelocityAxis axis = HeadVelocityAxis.Horizontal, bool alternate = false)
         {
+            if (free && velocityGated && alternate)
+            {
+                // Ein Schwenk pro Trial, abwechselnd: hin, antworten, zurück, antworten.
+                string sides = axis == HeadVelocityAxis.Horizontal ? "to one side" : "up or down";
+                string back = axis == HeadVelocityAxis.Horizontal ? "back to the other side" : "back the other way";
+                Show(false, "ACTIVE HEAD MOVEMENT\n\n" +
+                    "Keep looking at the cross. Each trial is one calm sweep:\n" +
+                    "turn your head steadily " + sides + ", at a natural speed.\n" +
+                    "The dots appear on the way. Keep the same speed until they disappear.\n" +
+                    "Then stop and answer. Next trial: sweep " + back + ".",
+                    responseLines + "\n\n" + startKey + " = START TRIALS");
+                return;
+            }
+
             if (free && velocityGated)
             {
                 // Geschwindigkeitserkennung: Punkte erscheinen bei gleichmäßigem Schwenk in
@@ -167,7 +181,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         }
 
         public void ShowActivePracticeInstructions(string responseLines, string startKey, HeadVelocityAxis axis,
-            bool speedExample)
+            bool speedExample, bool alternate = false)
         {
             string direction = axis == HeadVelocityAxis.Horizontal ? "left and right" : "up and down";
             Show(false, "ACTIVE HEAD MOVEMENT PRACTICE\n\n" +
@@ -175,7 +189,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 "Then keep looking at the cross and turn your head\n" +
                 "steadily " + direction + ", like looking around with binoculars.\n" +
                 "The dots appear while you move.\n" +
-                "Keep the same speed until they disappear.",
+                "Keep the same speed until they disappear." +
+                (alternate ? "\nOne sweep per trial: stop, answer, then sweep back." : ""),
                 "After the dots, answer with:\n" + responseLines + "\n\n" + startKey + " = START PRACTICE");
         }
 
@@ -185,9 +200,15 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 "The computer moves the dots.", string.Empty);
         }
 
-        public void ShowActivePracticeTurn(int attempt, int goodTrials, int requiredGoodTrials, HeadVelocityAxis axis)
+        public void ShowActivePracticeTurn(int attempt, int goodTrials, int requiredGoodTrials, HeadVelocityAxis axis,
+            int requiredSign = 0)
         {
-            string direction = axis == HeadVelocityAxis.Horizontal ? "left or right" : "up or down";
+            // Mit abwechselnder Richtung steht da, wohin es diesmal geht.
+            string direction = requiredSign == 0
+                ? (axis == HeadVelocityAxis.Horizontal ? "left or right" : "up or down")
+                : axis == HeadVelocityAxis.Horizontal
+                    ? (requiredSign > 0 ? "to the RIGHT" : "to the LEFT")
+                    : (requiredSign > 0 ? "UP" : "DOWN");
             Show(false, "PRACTICE " + attempt + "\n\nTurn your head steadily " + direction + ".",
                 GoodTrialsText(goodTrials, requiredGoodTrials));
         }
