@@ -47,6 +47,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public bool FreeHeadMovement { get; }
         public FrameTimingTracker FrameTiming { get; }
         public HeadVelocitySummary HeadVelocity { get; }
+
+        /// <summary>
+        /// Gleichmäßiges Kopftempo direkt vor den Punkten, der Maßstab während der Punkte
+        /// (°/s). NaN, wenn der Trial keine Geschwindigkeitserkennung hatte.
+        /// </summary>
+        public float HeadSpeedReference { get; }
         public string MotionConstraint => Trial.MotionMode == RandomDotMotionMode.SimulatedYaw
             ? "simulated" : FreeHeadMovement ? "free" : "guided";
 
@@ -90,7 +96,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             string status,
             bool freeHeadMovement = false,
             FrameTimingTracker frameTiming = null,
-            HeadVelocitySummary? headVelocity = null)
+            HeadVelocitySummary? headVelocity = null,
+            float headSpeedReference = float.NaN)
         {
             Trial = trial ?? throw new ArgumentNullException(nameof(trial));
             PresentationIndex = presentationIndex;
@@ -128,6 +135,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             FrameTiming = new FrameTimingTracker();
             if (frameTiming != null) FrameTiming.CopyFrom(frameTiming);
             HeadVelocity = headVelocity ?? HeadVelocitySummary.None;
+            HeadSpeedReference = headSpeedReference;
         }
     }
 
@@ -163,7 +171,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "longest_invalid_gaze_s,status,image_center_speed_deg_per_s,head_motion_constraint," +
             "frames_presented,slow_frames,max_frame_ms,expected_frame_ms," +
             "velocity_gate_target_deg_per_s,head_speed_onset_deg_per_s,head_speed_mean_deg_per_s," +
-            "head_speed_min_deg_per_s,head_speed_max_deg_per_s,head_motion_wait_s";
+            "head_speed_min_deg_per_s,head_speed_max_deg_per_s,head_motion_wait_s," +
+            "head_speed_reference_deg_per_s";
 
         public RandomDotExperimentFiles(
             string outputRoot,
@@ -235,7 +244,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 .Add(result.FrameTiming.ExpectedFrameMilliseconds)
                 .Add(result.HeadVelocity.TargetSpeed).Add(result.HeadVelocity.OnsetSpeed)
                 .Add(result.HeadVelocity.MeanSpeed).Add(result.HeadVelocity.MinSpeed)
-                .Add(result.HeadVelocity.MaxSpeed).Add(result.HeadVelocity.WaitSeconds));
+                .Add(result.HeadVelocity.MaxSpeed).Add(result.HeadVelocity.WaitSeconds)
+                // Maßstab während der Punkte: gleichmäßiges Tempo direkt davor.
+                .Add(result.HeadSpeedReference));
         }
     }
 }

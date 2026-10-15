@@ -12,9 +12,9 @@ namespace GlobeEffect.VRCheckerboard.Tests
         private const float FrameSeconds = 1f / 90f;
 
         [Test]
-        public void SteadyHeadAtTargetSpeed_ShowsImageSpeedAndWouldShowDots()
+        public void SteadyHead_ShowsImageSpeedAndWouldShowDots()
         {
-            // m = 10, Bildmitte 20 °/s: Ziel 2 °/s Kopf, ±50 %.
+            // m = 10: 2 °/s Kopf ergeben 20 °/s in der Bildmitte.
             var live = new RandomDotLiveHeadSpeed();
             Feed(live, degreesPerSecond: 2f, seconds: 3f);
 
@@ -24,23 +24,23 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(live.FramesPerSecond, Is.EqualTo(90f).Within(0.5f));
             // 20 °/s bei 90 Bildern pro Sekunde: gut 0,22° pro Frame.
             Assert.That(live.ImageStepPerFrameDegrees, Is.EqualTo(20f / 90f).Within(0.01f));
-            Assert.That(live.MinimumHeadSpeed, Is.EqualTo(1f).Within(0.001f));
-            Assert.That(live.MaximumHeadSpeed, Is.EqualTo(3f).Within(0.001f));
+            Assert.That(live.SimulatedHeadSpeed, Is.EqualTo(2f).Within(0.001f));
+            Assert.That(live.SteadySeconds, Is.GreaterThan(2f));
             Assert.That(live.WouldShowDots, Is.True);
         }
 
         [Test]
-        public void TooFastOrTooSlow_IsReportedAndWouldNotShowDots()
+        public void AnySteadySpeedCounts_ButAStillHeadDoesNot()
         {
+            // Kein Zieltempo: auch dreimal so schnell wie der simulierte Schwenk zählt.
             var fast = new RandomDotLiveHeadSpeed();
             Feed(fast, degreesPerSecond: 6f, seconds: 1f);
-            Assert.That(fast.TooFast, Is.True);
-            Assert.That(fast.WouldShowDots, Is.False);
+            Assert.That(fast.WouldShowDots, Is.True);
 
-            var slow = new RandomDotLiveHeadSpeed();
-            Feed(slow, degreesPerSecond: 0.3f, seconds: 1f);
-            Assert.That(slow.TooSlow, Is.True);
-            Assert.That(slow.WouldShowDots, Is.False);
+            var still = new RandomDotLiveHeadSpeed();
+            Feed(still, degreesPerSecond: 0.3f, seconds: 1f);
+            Assert.That(still.IsMoving, Is.False);
+            Assert.That(still.WouldShowDots, Is.False);
         }
 
         [Test]
@@ -115,8 +115,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
             {
                 yaw = startYaw + degreesPerSecond * frame * FrameSeconds;
                 live.AddSample(Quaternion.Euler(0f, yaw, 0f) * Vector3.forward, FrameSeconds,
-                    HeadVelocityAxis.Horizontal, 0.1f, targetHeadSpeed: 2f, tolerance: 0.5f,
-                    holdSecondsBeforeDots: 0.15f, imageGain: 10f);
+                    HeadVelocityAxis.Horizontal, 0.1f, simulatedHeadSpeed: 2f, steadyTolerance: 0.25f,
+                    minimumMovingSpeed: 0.5f, holdSecondsBeforeDots: 0.3f, imageGain: 10f);
             }
             return yaw;
         }

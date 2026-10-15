@@ -225,10 +225,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "Free Head Movement.")]
         private bool openEndedActiveTrials = true;
 
-        [Header("Dots Only At Right Head Speed")]
+        [Header("Dots Only While The Head Turns Steadily")]
         [SerializeField]
-        [Tooltip("Head-tracked trials: dots only appear while the head turns steadily at the right speed, " +
-            "then stay for the same time as in simulated trials. Replaces No Time Limit.")]
+        [Tooltip("Head-tracked trials: dots appear once the head turns steadily, at any speed, and stay " +
+            "for the same time as in simulated trials. Replaces No Time Limit.")]
         private bool useVelocityGate = true;
 
         [SerializeField]
@@ -236,16 +236,27 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private HeadVelocityAxis velocityGateAxis = HeadVelocityAxis.Horizontal;
 
         [SerializeField, Range(0.05f, 1f)]
-        [Tooltip("How much the head speed may differ from the target speed. 0.5 = target ±50 %.")]
-        private float velocityTolerance = 0.5f;
+        [Tooltip("How much the head speed may change and still count as steady. Before the dots: to start " +
+            "them. While the dots are shown: compared with the speed just before they appeared. " +
+            "0.25 = ±25 %.")]
+        private float velocityChangeTolerance = 0.25f;
+
+        [SerializeField, Range(0f, 2f)]
+        [Tooltip("Slower than this the head counts as still, and no dots appear (degrees per second).")]
+        private float minimumMovingHeadSpeed = 0.5f;
 
         [SerializeField, Range(0f, 1f)]
-        [Tooltip("How long the head speed must be right before the dots appear (s).")]
-        private float velocityHoldSeconds = 0.15f;
+        [Tooltip("How long the head must turn steadily before the dots appear (s).")]
+        private float velocityHoldSeconds = 0.3f;
+
+        [SerializeField, Range(0f, 5f)]
+        [Tooltip("After each trial the dots can appear again only after this time, even if the head " +
+            "already turns steadily (s). Also after a stopped trial.")]
+        private float minimumWaitBeforeDotsSeconds = 1f;
 
         [SerializeField, Range(0f, 0.5f)]
-        [Tooltip("How long the head speed may be wrong while the dots are shown before the trial is " +
-            "repeated later (s).")]
+        [Tooltip("How long the head speed may differ from the speed before the dots while they are shown. " +
+            "Longer, and the dots disappear and the trial is repeated later (s).")]
         private float velocityGraceSeconds = 0.1f;
 
         [SerializeField, Range(0.02f, 0.5f)]
@@ -359,6 +370,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [SerializeField, Min(0f)]
         private float pauseSeconds = 0.25f;
 
+        [SerializeField, Range(0f, 0.3f)]
+        [Tooltip("The dots fade in over this time instead of popping up (s). 0 = no fade. 0.05 s is about " +
+            "4-5 frames at 90 Hz. Used in all trials and practice, simulated and head-tracked.")]
+        private float dotsFadeInSeconds = 0.05f;
+
         [Header("Keys")]
         [SerializeField]
         private Key startSessionKey = Key.F5;
@@ -444,6 +460,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private CheckerboardCurvatureResponse trainingResponse;
         private readonly FrameTimingTracker frameTiming = new();
         private readonly RandomDotHeadVelocityGate velocityGate = new();
+        private readonly RandomDotSteadyHeadDetector steadyHead = new();
+        private double waitingForHeadMotionSince;
+        // Tempo des gleichmäßigen Abschnitts direkt vor den Punkten: Maßstab während der Punkte.
+        private float presentationReferenceSpeed = float.NaN;
         private readonly RandomDotLiveHeadSpeed liveHeadSpeed = new();
         private RandomDotPilotSpeedView pilotSpeedView;
         private float pilotSavedMessageUntil;
@@ -1057,7 +1077,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulus.ShowFixationOnly();
             yield return new WaitForSecondsRealtime(Mathf.Max(0.25f, pauseSeconds));
             stimulus.RestartMotionPhase();
-            stimulus.Show();
+            stimulus.Show(dotsFadeInSeconds);
             yield return new WaitForSecondsRealtime(seconds);
             stimulus.ShowFixationOnly();
         }
@@ -1112,7 +1132,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 stimulus.RestartMotionPhase();
                 trainingResponseReceived = false;
                 sessionState = State.SimulatedTrainingMotion;
-                stimulus.Show();
+                stimulus.Show(dotsFadeInSeconds);
                 yield return new WaitForSecondsRealtime(simulatedSweepSeconds);
                 stimulus.ShowFixationOnly();
                 sessionState = State.SimulatedTrainingResponse;
@@ -1432,40 +1452,56 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void BeginWaitingForHeadMotion()
         {
-            // Graue Fläche und Kreuz, noch keine Punkte. Die Messung beginnt neu.
+            // Graue Fläche und Kreuz, noch keine Punkte. Die Messung beginnt neu, und
+            // ab jetzt läuft die Pflicht-Wartezeit (auch nach einem Abbruch).
             velocityGate.Reset();
+            steadyHead.Reset();
+            presentationReferenceSpeed = float.NaN;
             stimulus.ShowFixationOnly();
             sessionState = State.WaitingForHeadMotion;
+            waitingForHeadMotionSince = Time.realtimeSinceStartupAsDouble;
             WriteMarker("WaitingForHeadMotion;task=random_dot_instrument;sequence={0};attempt={1};" +
-                "target_speed_deg_s={2:F3}", currentTrial.SequenceIndex, currentTrial.AttemptNumber,
-                VelocityGateTargetSpeed(currentTrial));
+                "simulated_speed_deg_s={2:F3};min_wait_s={3:F3}", currentTrial.SequenceIndex,
+                currentTrial.AttemptNumber, VelocityGateTargetSpeed(currentTrial), minimumWaitBeforeDotsSeconds);
         }
 
         private void UpdateVelocityGate()
         {
-            // Jeden Frame: Kopftempo messen und mit dem erlaubten Bereich vergleichen.
-            float target = VelocityGateTargetSpeed(currentTrial);
+            // Kein Zieltempo: Die Person schwenkt so schnell, wie es sich natürlich anfühlt.
+            // Vor den Punkten zählt nur, ob der Kopf gleichmäßig dreht. Während der Punkte
+            // ist das Tempo direkt davor der Maßstab (± Velocity Change Tolerance).
+            bool presenting = sessionState == State.PresentingMotion;
+            float minimum = presenting ? presentationReferenceSpeed * (1f - velocityChangeTolerance) : 0f;
+            float maximum = presenting ? presentationReferenceSpeed * (1f + velocityChangeTolerance) : float.MaxValue;
             velocityGate.AddSample(stimulus.Observer.forward, Time.unscaledDeltaTime, velocityGateAxis,
-                velocitySmoothingSeconds, target * (1f - velocityTolerance), target * (1f + velocityTolerance));
+                velocitySmoothingSeconds, minimum, maximum);
 
-            if (sessionState == State.WaitingForHeadMotion
-                && velocityGate.SecondsInRange >= velocityHoldSeconds)
+            if (sessionState == State.WaitingForHeadMotion)
             {
-                // Lange genug gleichmäßig im richtigen Tempo: jetzt die Punkte zeigen.
-                velocityGate.BeginPresentation();
-                PresentCurrentTrial();
+                steadyHead.Add(velocityGate.SpeedDegreesPerSecond, Time.unscaledDeltaTime,
+                    velocityChangeTolerance, minimumMovingHeadSpeed);
+                bool waitedLongEnough = Time.realtimeSinceStartupAsDouble - waitingForHeadMotionSince
+                    >= minimumWaitBeforeDotsSeconds;
+                if (waitedLongEnough && steadyHead.SteadySeconds >= velocityHoldSeconds)
+                {
+                    // Lange genug gleichmäßig: jetzt die Punkte zeigen. Das mittlere Tempo
+                    // dieses Abschnitts ist ab jetzt der Maßstab.
+                    presentationReferenceSpeed = steadyHead.ReferenceSpeed;
+                    velocityGate.BeginPresentation();
+                    PresentCurrentTrial();
+                }
             }
-            else if (sessionState == State.PresentingMotion
-                && velocityGate.SecondsOutOfRange > velocityGraceSeconds)
+            else if (presenting && velocityGate.SecondsOutOfRange > velocityGraceSeconds)
             {
-                // Während der Darbietung zu schnell, zu langsam oder angehalten.
-                InvalidateCurrentTrial("head_speed_out_of_range");
+                // Tempo hat sich während der Punkte zu stark geändert: abbrechen, später wiederholen.
+                InvalidateCurrentTrial("head_speed_changed");
             }
         }
 
-        // Live-Anzeige für den Experiment Monitor. Zieltempo wie beim Velocity Gate,
-        // aber für das m und den Zoom, die gerade am Punktfeld stehen (in der
+        // Live-Anzeige für den Experiment Monitor: dieselbe Erkennung "gleichmäßig"
+        // wie im Trial, für das m und den Zoom, die gerade am Punktfeld stehen (in der
         // Vorschau also die Vorschauwerte, in der Sitzung die des laufenden Trials).
+        // Das Kopftempo des simulierten Schwenks steht nur zum Vergleich daneben.
         private void UpdateLiveHeadSpeed()
         {
             Transform observer = stimulus != null ? stimulus.Observer : null;
@@ -1476,10 +1512,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
             float m = stimulus.InstrumentMagnificationM;
             float zoom = stimulus.ContentZoom;
-            float target = RandomDotSimulatedSweep.ObjectSpeed(simulatedSpeedReference, sweepSpeed,
+            float simulatedHeadSpeed = RandomDotSimulatedSweep.ObjectSpeed(simulatedSpeedReference, sweepSpeed,
                 simulatedImageCenterSpeed, m, zoom);
             liveHeadSpeed.AddSample(observer.forward, Time.unscaledDeltaTime, velocityGateAxis,
-                velocitySmoothingSeconds, target, velocityTolerance, velocityHoldSeconds, m * zoom);
+                velocitySmoothingSeconds, simulatedHeadSpeed, velocityChangeTolerance, minimumMovingHeadSpeed,
+                velocityHoldSeconds, m * zoom);
         }
 
         // Pilot in der Vorschau, mit Brille auf: Tempo speichern, das sich natürlich
@@ -1544,7 +1581,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             sessionState = State.PresentingMotion;
 
             WriteMarker(BuildTrialStartMarker(currentTrial));
-            stimulus.Show();
+            stimulus.Show(dotsFadeInSeconds);
             // Offene aktive Trials enden erst mit der Antwort, nicht nach einer Zeit.
             bool openEnded = IsOpenEndedTrial(currentTrial);
             if (!openEnded)
@@ -1770,7 +1807,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 status, IsFreeHeadTrial(currentTrial), frameTiming,
                 headVelocity: IsVelocityGatedTrial(currentTrial)
                     ? velocityGate.Summarize(VelocityGateTargetSpeed(currentTrial))
-                    : HeadVelocitySummary.None);
+                    : HeadVelocitySummary.None,
+                headSpeedReference: IsVelocityGatedTrial(currentTrial) ? presentationReferenceSpeed : float.NaN);
         }
 
             // Die Fehlerwerte zur Sollbahn gibt es nur bei geführten HeadTracked-Trials.

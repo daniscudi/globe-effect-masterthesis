@@ -231,6 +231,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private MaterialPropertyBlock propertyBlock;
         private bool isVisible = true;
         private bool pointsVisible = true;
+        // Einblenden der Punkte: ab wann und wie lange (0 = sofort voll da).
+        private double dotsShownAtSeconds;
+        private float dotsFadeInSeconds;
         private bool meshRebuildPending;
         private RandomDotMotionMode lastPreviewMotionMode;
 
@@ -595,14 +598,25 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             motionStartSeconds = Time.realtimeSinceStartupAsDouble;
         }
 
-        public void Show()
+        public void Show(float fadeInSeconds = 0f)
         {
-            // Öffnung, Punkte und Kreuz kommen zusammen.
+            // Öffnung, Punkte und Kreuz kommen zusammen. Mit fadeInSeconds > 0 werden
+            // nur die Punkte eingeblendet; Kreuz und graue Fläche sind sofort da.
             isVisible = true;
             pointsVisible = true;
+            dotsShownAtSeconds = Time.realtimeSinceStartupAsDouble;
+            dotsFadeInSeconds = Mathf.Max(0f, fadeInSeconds);
             SendValuesToShader();
             ShowOrHideRenderer();
         }
+
+        /// <summary>Deckkraft der Punkte beim Einblenden: steigt in fadeInSeconds von 0 auf 1.</summary>
+        public static float FadeInOpacity(double secondsSinceShown, float fadeInSeconds) =>
+            fadeInSeconds <= 0f ? 1f : Mathf.Clamp01((float)(secondsSinceShown / fadeInSeconds));
+
+        /// <summary>Wie weit die Punkte gerade eingeblendet sind (0 bis 1).</summary>
+        public float DotsOpacity =>
+            FadeInOpacity(Time.realtimeSinceStartupAsDouble - dotsShownAtSeconds, dotsFadeInSeconds);
 
         /// <summary>
         /// Zeigt vor dem Durchgang nur das Kreuz in der Mitte. Die Punkte bleiben
@@ -882,6 +896,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             meshRenderer.GetPropertyBlock(propertyBlock);
             propertyBlock.SetFloat("_SimulatedSweepRad", CurrentSimulatedSweepDegrees * Mathf.Deg2Rad);
             propertyBlock.SetFloat("_SimulatedSweepAxis", (float)sweepAxis);
+            propertyBlock.SetFloat("_DotsOpacity", DotsOpacity);
 
             if (observer != null)
             {

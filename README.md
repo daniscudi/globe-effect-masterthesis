@@ -619,18 +619,30 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   Movement`, Vorrang vor `Open Ended Active Trials`): Im aktiven Trial sind zuerst
   nur graue Fläche und Kreuz zu sehen. `RandomDotHeadVelocityGate` misst jeden
   Frame die Kopfdrehung (`Velocity Gate Axis`: horizontal = Yaw, optional vertikal
-  = Pitch), geglättet mit Vorzeichen (`Velocity Smoothing Seconds`), damit Zittern
-  sich aufhebt. Zieltempo = Objektwinkel-Tempo des simulierten Schwenks
-  (Bildmitte-Tempo / (m · Zoom), bei 12 °/s und m = 10 also 1,2 °/s), erlaubt
-  ± `Velocity Tolerance`. Liegt das Tempo `Velocity Hold Seconds` am Stück im
-  Bereich, erscheinen die Punkte für `Simulated Sweep Seconds` (wie Simulated),
-  danach Antwort. Verlässt es den Bereich während der Darbietung länger als
-  `Velocity Grace Seconds`, ist der Trial ungültig
-  (`invalid:head_speed_out_of_range`) und wird später wiederholt. CSV-Spalten:
-  `velocity_gate_target_deg_per_s`, `head_speed_onset/mean/min/max_deg_per_s`,
-  `head_motion_wait_s` (bei Simulated NaN); Marker `WaitingForHeadMotion`.
-  Das Zieltempo liegt nah am natürlichen Kopfzittern; im Pilot anhand der
-  CSV-Werte Toleranz und Haltezeit einstellen.
+  = Pitch), geglättet (`Velocity Smoothing Seconds`). **Es gibt kein Zieltempo**:
+  Die Person schwenkt so schnell, wie es sich natürlich anfühlt (Absprache mit dem
+  Betreuer, 2026-10-15). `RandomDotSteadyHeadDetector` prüft nur, ob der Kopf
+  gleichmäßig dreht: schneller als `Minimum Moving Head Speed` (0,5 °/s) und seit
+  `Velocity Hold Seconds` (0,3 s) ohne Tempowechsel über ± `Velocity Change
+  Tolerance` (±25 %). Zusätzlich muss seit Beginn des Wartens (also nach jedem
+  Trial, auch nach einem Abbruch) `Minimum Wait Before Dots Seconds` (1 s)
+  vergangen sein. Dann erscheinen die Punkte für `Simulated Sweep Seconds` (wie
+  Simulated), danach Antwort. Maßstab während der Punkte ist das mittlere Tempo
+  des gleichmäßigen Abschnitts direkt davor: Weicht der Kopf länger als
+  `Velocity Grace Seconds` um mehr als ± `Velocity Change Tolerance` davon ab,
+  verschwinden die Punkte, der Trial ist ungültig (`invalid:head_speed_changed`)
+  und wird später wiederholt. Die Person soll so selbst merken, wenn ihr Tempo
+  unnatürlich war. CSV-Spalten: `velocity_gate_target_deg_per_s` (Kopftempo des
+  simulierten Schwenks, nur zum Vergleich), `head_speed_onset/mean/min/max_deg_per_s`,
+  `head_motion_wait_s`, `head_speed_reference_deg_per_s` (Maßstab während der
+  Punkte); bei Simulated NaN. Marker `WaitingForHeadMotion`.
+
+* Einblenden (`Dots Fade In Seconds`, Standard 0,05 s, etwa 4–5 Frames bei 90 Hz;
+  0 = kein Einblenden): Die Punkte erscheinen nicht schlagartig, sondern werden
+  über diese Zeit eingeblendet (Shader-Wert `_DotsOpacity`). Gilt für alle Trials,
+  Beispiele und Übungstrials, Simulated wie Active, damit sich die Bedingungen
+  darin nicht unterscheiden. Die Darbietungszeit zählt ab Beginn des Einblendens.
+  Die Vorschau blendet nicht ein.
 
 * Wenn `Free Head Movement` aus ist, bleibt der geführte Links-Rechts-Schwenk
   erhalten. Mit `±2°`,

@@ -233,7 +233,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
         }
 
         // Live-Kopftempo für den Pilot: Wie schnell dreht der Kopf, wie schnell laufen
-        // die Punkte dabei, und würde die Geschwindigkeitserkennung sie jetzt zeigen?
+        // die Punkte dabei, und dreht der Kopf gleichmäßig genug, dass sie jetzt erscheinen würden?
         private static void DrawLiveHeadSpeed(RandomDotExperimentManager session, RandomDotFieldStimulus stimulus)
         {
             RandomDotLiveHeadSpeed live = session.LiveHeadSpeed;
@@ -249,8 +249,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
                 Row("Head Speed Now", Number(live.HeadSpeed, "F2", " °/s"));
                 Row("Head Speed (1 s Average)", Number(live.AverageHeadSpeed, "F2", " °/s"));
-                Row("Wanted Head Speed", Number(live.TargetHeadSpeed, "F2", " °/s") + "  (" +
-                    Number(live.MinimumHeadSpeed, "F2") + " – " + Number(live.MaximumHeadSpeed, "F2", " °/s)"));
+                Row("Steady For", Number(live.SteadySeconds, "F2", " s"));
+                Row("Simulated Equals", Number(live.SimulatedHeadSpeed, "F2", " °/s head (for comparison)"));
                 Row("Dot Speed In Image Center", Number(live.ImageCenterSpeed, "F1", " °/s") +
                     "  (1 s average " + Number(live.AverageImageCenterSpeed, "F1", " °/s)"));
                 string dotSize = stimulus != null ? "  (dot size " + Number(stimulus.DotSizeDegrees, "F2", "°)") : "";
@@ -258,9 +258,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 Row("Frames Per Second", Number(live.FramesPerSecond, "F0"));
 
                 string state = live.WouldShowDots ? "YES"
-                    : live.TooSlow ? "NO – head too slow"
-                    : live.TooFast ? "NO – head too fast"
-                    : "NOT YET – keep this speed";
+                    : !live.IsMoving ? "NO – head is still"
+                    : "NOT YET – keep turning steadily";
                 Row("Dots Would Appear", state);
 
                 if (stimulus != null && stimulus.DotSizeDegrees > 0f

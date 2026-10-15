@@ -518,11 +518,11 @@ namespace GlobeEffect.VRCheckerboard.Tests
             float target = manager.VelocityGateTargetSpeedPreview;
 
             // Kopf still: Die Punkte dürfen nicht erscheinen.
-            double waitUntil = Time.realtimeSinceStartupAsDouble + 0.4d;
+            double waitUntil = Time.realtimeSinceStartupAsDouble + 0.6d;
             while (Time.realtimeSinceStartupAsDouble < waitUntil) yield return null;
             Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.WaitingForHeadMotion));
 
-            // Gleichmäßiger Schwenk im Zieltempo: Punkte erscheinen, nach 0,8 s Antwort.
+            // Gleichmäßiger Schwenk: Punkte erscheinen, nach 0,8 s Antwort.
             // Keine Lambdas in diesen Tests: Sie überleben den Domain Reload beim
             // Wechsel in den Play Mode nicht (eingefangene Variablen werden null).
             yield return SweepHead(stimulus, target, manager, RandomDotSessionState.PresentingMotion);
@@ -534,7 +534,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(row["status"], Is.EqualTo("valid"));
             Assert.That(ParseFloat(row["velocity_gate_target_deg_per_s"]), Is.EqualTo(target).Within(0.001f));
             Assert.That(ParseFloat(row["head_speed_mean_deg_per_s"]), Is.EqualTo(target).Within(0.3f * target));
-            Assert.That(ParseFloat(row["head_motion_wait_s"]), Is.GreaterThanOrEqualTo(0.15f));
+            // Pflicht-Wartezeit (0,3 s) vor den ersten Punkten.
+            Assert.That(ParseFloat(row["head_motion_wait_s"]), Is.GreaterThanOrEqualTo(0.3f));
+            // Maßstab während der Punkte: das gleichmäßige Tempo davor.
+            Assert.That(ParseFloat(row["head_speed_reference_deg_per_s"]), Is.EqualTo(target).Within(0.2f * target));
             Assert.That(ParseFloat(row["stimulus_duration_s"]), Is.EqualTo(SimulatedSweepSeconds).Within(0.1f));
             yield return new ExitPlayMode();
         }
@@ -554,8 +557,33 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 RandomDotSessionState.PresentingMotion);
             yield return WaitForState(manager, RandomDotSessionState.WaitingForHeadMotion);
 
-            Assert.That(ReadTrialRows(manager)[0]["status"], Is.EqualTo("invalid:head_speed_out_of_range"));
+            Assert.That(ReadTrialRows(manager)[0]["status"], Is.EqualTo("invalid:head_speed_changed"));
             Assert.That(manager.ValidTrialsCompleted, Is.Zero, "Der Trial wird später wiederholt.");
+            manager.AbortSession();
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator RandomDotVelocityGate_AnySteadySpeedStartsButChangingItStopsTheTrial()
+        {
+            // EnterPlayMode muss direkt in der Testmethode stehen, nicht verschachtelt.
+            PrepareVelocityGatedScene();
+            yield return new EnterPlayMode();
+            yield return null;
+            RandomDotExperimentManager manager = StartVelocityGatedSession();
+            var stimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
+
+            // Dreimal so schnell wie der simulierte Schwenk: Es gibt kein Zieltempo,
+            // gleichmäßig reicht. Danach 40 % schneller: Das ist mehr als ±25 % vom
+            // Tempo vor den Punkten, also Abbruch und später wiederholen.
+            float speed = 3f * manager.VelocityGateTargetSpeedPreview;
+            yield return SweepHead(stimulus, speed, manager, RandomDotSessionState.PresentingMotion);
+            yield return SweepHead(stimulus, 1.4f * speed, manager, RandomDotSessionState.WaitingForHeadMotion);
+
+            Dictionary<string, string> row = ReadTrialRows(manager)[0];
+            Assert.That(row["status"], Is.EqualTo("invalid:head_speed_changed"));
+            Assert.That(ParseFloat(row["head_speed_reference_deg_per_s"]), Is.EqualTo(speed).Within(0.2f * speed));
+            Assert.That(manager.ValidTrialsCompleted, Is.Zero);
             manager.AbortSession();
             yield return new ExitPlayMode();
         }
@@ -568,8 +596,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
             SetFloats(config.FindProperty("instrumentMagnificationMValues"), 5f);
             config.FindProperty("freeHeadMovement").boolValue = true;
             config.FindProperty("useVelocityGate").boolValue = true;
-            config.FindProperty("velocityTolerance").floatValue = 0.5f;
+            config.FindProperty("velocityChangeTolerance").floatValue = 0.25f;
+            config.FindProperty("minimumMovingHeadSpeed").floatValue = 0.5f;
             config.FindProperty("velocityHoldSeconds").floatValue = 0.15f;
+            config.FindProperty("minimumWaitBeforeDotsSeconds").floatValue = 0.3f;
             config.FindProperty("velocityGraceSeconds").floatValue = 0.1f;
             config.ApplyModifiedPropertiesWithoutUndo();
         }

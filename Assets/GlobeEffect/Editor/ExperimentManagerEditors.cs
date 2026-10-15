@@ -64,11 +64,14 @@ namespace GlobeEffect.VRCheckerboard.Editor
             ["headTrackedSeconds"] = "Dots Shown (s)",
             ["headTurnSafetyDegrees"] = "Head Turn Range (degrees)",
             ["openEndedActiveTrials"] = "No Time Limit",
-            ["useVelocityGate"] = "Dots Only At Right Head Speed",
+            ["useVelocityGate"] = "Dots Only While Head Turns Steadily",
             ["velocityGateAxis"] = "Head Turn Direction",
-            ["velocityTolerance"] = "Speed Tolerance",
+            ["velocityChangeTolerance"] = "Allowed Speed Change (±)",
+            ["minimumMovingHeadSpeed"] = "Head Counts As Still Below (°/s)",
             ["velocityHoldSeconds"] = "Steady Time Before Dots (s)",
-            ["velocityGraceSeconds"] = "Max Time At Wrong Speed (s)",
+            ["minimumWaitBeforeDotsSeconds"] = "Wait Before Next Dots (s)",
+            ["velocityGraceSeconds"] = "Max Time At Changed Speed (s)",
+            ["dotsFadeInSeconds"] = "Dots Fade In (s)",
             ["velocitySmoothingSeconds"] = "Speed Smoothing (s)",
             ["checkHeadMotion"] = "Repeat Bad Head Movements",
             ["maximumProfileErrorDegrees"] = "Max Path Error (degrees)",
@@ -432,7 +435,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             if (Section("Simulated Movement"))
             {
                 Fields(serializedObject, "simulatedSweepAxis", "simulatedSweepSeconds", "simulatedSpeedReference",
-                    "simulatedImageCenterSpeed", "sweepSpeed", "pauseSeconds");
+                    "simulatedImageCenterSpeed", "sweepSpeed", "pauseSeconds", "dotsFadeInSeconds");
                 bool centerSpeed = serializedObject.FindProperty("simulatedSpeedReference").enumValueIndex == 1;
                 EditorGUILayout.HelpBox(centerSpeed
                     ? "Image Center: the dots in the middle move equally fast at every magnification."
@@ -536,24 +539,23 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private void VelocityGateSettings()
         {
-            Fields(serializedObject, "velocityGateAxis", "velocityTolerance", "velocityHoldSeconds",
-                "velocityGraceSeconds", "velocitySmoothingSeconds");
-            // Zieltempo wie bei Simulated (gleiche Rechnung wie im Manager), für das erste m.
+            Fields(serializedObject, "velocityGateAxis", "velocityChangeTolerance", "minimumMovingHeadSpeed",
+                "velocityHoldSeconds", "minimumWaitBeforeDotsSeconds", "velocityGraceSeconds",
+                "velocitySmoothingSeconds");
             var manager = (RandomDotExperimentManager)target;
-            float targetSpeed = manager.VelocityGateTargetSpeedPreview;
-            float tolerance = serializedObject.FindProperty("velocityTolerance").floatValue;
+            float change = serializedObject.FindProperty("velocityChangeTolerance").floatValue;
+            float hold = serializedObject.FindProperty("velocityHoldSeconds").floatValue;
+            float wait = serializedObject.FindProperty("minimumWaitBeforeDotsSeconds").floatValue;
             float seconds = serializedObject.FindProperty("simulatedSweepSeconds").floatValue;
             EditorGUILayout.HelpBox(
-                "The participant first sees only the cross. When the head turns steadily at the right speed, " +
-                $"the dots appear for {seconds:0.##} s, then the participant answers. Right speed: " +
-                $"{targetSpeed * (1f - tolerance):0.##} to {targetSpeed * (1f + tolerance):0.##} degrees per " +
-                $"second (target {targetSpeed:0.##}, same as the simulated movement). If the speed is wrong " +
-                "for too long while the dots are shown, the trial is repeated later. The measured head speeds " +
-                "are saved for every trial.", MessageType.Info);
-            if (targetSpeed < 1.5f)
-                EditorGUILayout.HelpBox("This is a very slow head movement, close to small natural head shakes. " +
-                    "Check the measured head speeds after a test run and adjust Speed Tolerance if needed.",
-                    MessageType.Warning);
+                "No fixed speed: the participant turns the head as fast as feels natural. " +
+                $"The dots appear when the head has turned steadily for {hold:0.##} s (speed changes less than " +
+                $"±{change * 100f:0} %) and at least {wait:0.##} s have passed since the last trial. They stay " +
+                $"{seconds:0.##} s. If the speed changes by more than ±{change * 100f:0} % from the speed just " +
+                "before the dots, they disappear and the trial is repeated later. All head speeds are saved for " +
+                "every trial.", MessageType.Info);
+            EditorGUILayout.LabelField($"For comparison: the simulated movement equals {manager.VelocityGateTargetSpeedPreview:0.##} " +
+                "°/s of head speed.", EditorStyles.wordWrappedMiniLabel);
         }
 
         private void HeadTurnReachInfo()

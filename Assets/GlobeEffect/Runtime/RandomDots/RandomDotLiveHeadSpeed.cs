@@ -6,7 +6,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     /// <summary>
     /// Live-Anzeige des Kopftempos für den Experiment Monitor, vor allem für den
     /// Pilot: Wie schnell dreht der Kopf, wie schnell laufen die Punkte dabei in der
-    /// Bildmitte, und würde die Geschwindigkeitserkennung die Punkte jetzt zeigen?
+    /// Bildmitte, und dreht der Kopf gleichmäßig genug, dass die Punkte jetzt erscheinen würden?
     ///
     /// Zusätzlich für den Pilot mit Brille auf: Jeder Schwenk wird erkannt und
     /// gemerkt ("Last Pans"), und per Tastendruck lässt sich das Tempo speichern,
@@ -33,6 +33,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private const int RememberedPans = 5;
 
         private readonly RandomDotHeadVelocityGate meter = new();
+        private readonly RandomDotSteadyHeadDetector steady = new();
         private readonly List<RandomDotPan> lastPans = new();
         private readonly List<RandomDotSavedSpeed> savedSpeeds = new();
         private float holdSeconds;
@@ -52,9 +53,13 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         /// <summary>Kopftempo über etwa die letzte Sekunde gemittelt (°/s).</summary>
         public float AverageHeadSpeed { get; private set; }
 
-        public float TargetHeadSpeed { get; private set; }
-        public float MinimumHeadSpeed { get; private set; }
-        public float MaximumHeadSpeed { get; private set; }
+        /// <summary>Kopftempo, das dem simulierten Schwenk entspricht (nur zum Vergleich, °/s).</summary>
+        public float SimulatedHeadSpeed { get; private set; }
+
+        /// <summary>Wie lange der Kopf schon am Stück gleichmäßig dreht (s).</summary>
+        public float SteadySeconds => steady.SteadySeconds;
+
+        public bool IsMoving => steady.IsMoving;
 
         /// <summary>m mal Zoom: so viel schneller als der Kopf laufen die Punkte in der Bildmitte.</summary>
         public float ImageGain { get; private set; } = 1f;
@@ -67,11 +72,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         /// <summary>Um wie viel Grad ein Punkt in der Bildmitte pro Frame springt.</summary>
         public float ImageStepPerFrameDegrees => FramesPerSecond > 0f ? ImageCenterSpeed / FramesPerSecond : 0f;
 
-        public bool TooSlow => HeadSpeed < MinimumHeadSpeed;
-        public bool TooFast => HeadSpeed > MaximumHeadSpeed;
-
-        /// <summary>Lange genug im richtigen Tempo: Der Velocity Gate würde die Punkte jetzt zeigen.</summary>
-        public bool WouldShowDots => HasData && !TooSlow && !TooFast && meter.SecondsInRange >= holdSeconds;
+        /// <summary>Lange genug gleichmäßig: Im Trial würden die Punkte jetzt erscheinen.</summary>
+        public bool WouldShowDots => HasData && steady.SteadySeconds >= holdSeconds;
 
         /// <summary>Die letzten abgeschlossenen Schwenks, der neueste zuerst.</summary>
         public IReadOnlyList<RandomDotPan> LastPans => lastPans;
@@ -83,6 +85,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public void Reset()
         {
             meter.Reset();
+            steady.Reset();
             HasData = false;
             AverageHeadSpeed = 0f;
             FramesPerSecond = 0f;
@@ -108,16 +111,14 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         }
 
         public void AddSample(Vector3 headForward, float deltaSeconds, HeadVelocityAxis axis,
-            float smoothingSeconds, float targetHeadSpeed, float tolerance, float holdSecondsBeforeDots,
-            float imageGain)
+            float smoothingSeconds, float simulatedHeadSpeed, float steadyTolerance, float minimumMovingSpeed,
+            float holdSecondsBeforeDots, float imageGain)
         {
-            TargetHeadSpeed = targetHeadSpeed;
-            MinimumHeadSpeed = targetHeadSpeed * (1f - tolerance);
-            MaximumHeadSpeed = targetHeadSpeed * (1f + tolerance);
+            SimulatedHeadSpeed = simulatedHeadSpeed;
             holdSeconds = holdSecondsBeforeDots;
             ImageGain = imageGain;
 
-            meter.AddSample(headForward, deltaSeconds, axis, smoothingSeconds, MinimumHeadSpeed, MaximumHeadSpeed);
+            meter.AddSample(headForward, deltaSeconds, axis, smoothingSeconds, 0f, float.MaxValue);
             if (deltaSeconds <= 0f) return;
 
             float blend = 1f - Mathf.Exp(-deltaSeconds / AverageSeconds);
@@ -128,6 +129,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 FramesPerSecond = 1f / deltaSeconds;
                 return;
             }
+            steady.Add(HeadSpeed, deltaSeconds, steadyTolerance, minimumMovingSpeed);
             AverageHeadSpeed = Mathf.Lerp(AverageHeadSpeed, HeadSpeed, blend);
             FramesPerSecond = Mathf.Lerp(FramesPerSecond, 1f / deltaSeconds, blend);
             UpdatePan(deltaSeconds);

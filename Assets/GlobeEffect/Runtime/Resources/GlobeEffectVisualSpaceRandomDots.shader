@@ -14,6 +14,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
         _ContentZoom ("Content Zoom", Float) = 1
         _EyeMode ("Eye Mode", Float) = 0
         _DotsEnabled ("Dots Enabled", Float) = 1
+        _DotsOpacity ("Dots Opacity (fade in)", Float) = 1
         _DotHalfSizeRad ("Dot Half Size [rad]", Float) = 0.00191986
         _ReferenceGridEnabled ("Preview reference grid", Float) = 0
         _ReferenceGridSpacingUv ("Reference grid spacing [u,v]", Float) = 0.087489
@@ -72,6 +73,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
             float _ContentZoom;
             float _EyeMode;
             float _DotsEnabled;
+            float _DotsOpacity;
             float _DotHalfSizeRad;
             float _ReferenceGridEnabled;
             float _ReferenceGridSpacingUv;
@@ -381,9 +383,11 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 clip(dotAlpha - 0.001);
 
                 clip(apertureAlpha - 0.001);
+                // _DotsOpacity blendet die Punkte ein (0 = unsichtbar, 1 = voll). Halb
+                // helle, halb dunkle Punkte: die mittlere Helligkeit bleibt dabei gleich.
                 return fixed4(
                     input.color.rgb,
-                    input.color.a * apertureAlpha * dotAlpha);
+                    input.color.a * apertureAlpha * dotAlpha * _DotsOpacity);
             }
             ENDCG
         }

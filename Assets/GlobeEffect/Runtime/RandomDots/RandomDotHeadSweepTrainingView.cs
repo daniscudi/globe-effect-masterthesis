@@ -133,12 +133,15 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         {
             if (free && velocityGated)
             {
-                // Geschwindigkeitserkennung: Punkte erscheinen erst bei ruhigem, gleichmäßigem Schwenk.
+                // Geschwindigkeitserkennung: Punkte erscheinen bei gleichmäßigem Schwenk in
+                // beliebigem Tempo und verschwinden früh, wenn sich das Tempo ändert.
                 string direction = axis == HeadVelocityAxis.Horizontal ? "left or right" : "up or down";
                 Show(false, "ACTIVE HEAD MOVEMENT\n\n" +
                     "Keep looking at the cross and turn your head\n" +
-                    "slowly and steadily " + direction + ".\n" +
+                    "steadily " + direction + ", at a speed that feels natural.\n" +
                     "The dots appear while you move.\n" +
+                    "Keep the same speed until they disappear.\n" +
+                    "If you change speed, they vanish early and come again later.\n" +
                     "Answer after they disappear.",
                     responseLines + "\n\n" + startKey + " = START TRIALS");
                 return;

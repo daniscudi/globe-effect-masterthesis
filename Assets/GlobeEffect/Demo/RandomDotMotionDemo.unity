@@ -720,7 +720,6 @@ MonoBehaviour:
   headTurnSafetyDegrees: 30
   checkHeadMotion: 1
   freeHeadMovement: 1
-  velocityTolerance: 0.35
   trainSimulatedMotion: 0
   simulatedTrainingKValues:
   - 0.2
