@@ -211,7 +211,7 @@ MonoBehaviour:
   showFixationTarget: 1
   fixationSizeDegrees: 0.5
   fixationColor: {r: 1, g: 0, b: 0, a: 1}
-  motionMode: 1
+  motionMode: 0
   sweepAxis: 0
   simulatedYawAmplitudeDegrees: 2
   previewSpeedReference: 1
@@ -691,20 +691,7 @@ MonoBehaviour:
   - 1
   sessionMotionMode: 1
   repeatsPerCondition: 25
-  repeatsPerKValue:
-  - 8
-  - 8
-  - 25
-  - 25
-  - 25
-  - 25
-  - 25
-  - 25
-  - 25
-  - 25
-  - 25
-  - 8
-  - 8
+  repeatsPerKValue: 08000000080000001900000019000000190000001900000019000000190000001900000019000000190000000800000008000000
   blocksPerSession: 4
   simulatedSweepAxis: 0
   simulatedSweepSeconds: 0.8
@@ -720,11 +707,41 @@ MonoBehaviour:
   headTurnSafetyDegrees: 30
   checkHeadMotion: 1
   freeHeadMovement: 1
+  openEndedActiveTrials: 1
+  useVelocityGate: 1
+  velocityGateAxis: 0
+  velocityChangeTolerance: 0.3
+  minimumMovingHeadSpeed: 0.4
+  velocityHoldSeconds: 0.25
+  minimumWaitBeforeDotsSeconds: 1
+  velocityGraceSeconds: 0.3
+  velocitySmoothingSeconds: 0.1
+  trainActivePanning: 1
+  showActiveSpeedExample: 1
+  activePracticeKValues:
+  - 0.2
+  - 1.8
+  activePracticeGoodTrials: 6
+  activePracticeMaxTrials: 60
+  activePracticeSpeedHint: 1
+  naturalHeadSpeedMin: 1.5
+  naturalHeadSpeedMax: 4
+  practiceTextsWaitForPress: 1
+  practiceContinueKey: 1
   trainSimulatedMotion: 0
   simulatedTrainingKValues:
   - 0.2
   - 1.2
   simulatedTrainingRepeatsPerValue: 2
+  showSimulatedExamples: 1
+  exampleConvexK: 1.2
+  exampleConcaveK: 0.2
+  exampleLongSeconds: 2.5
+  exampleTextSeconds: 3
+  simulatedTrainingFeedback: 0
+  feedbackConcaveMaxK: 0.3
+  feedbackConvexMinK: 1.1
+  feedbackSeconds: 1.5
   turnaroundDegrees: 1.5
   requiredSweeps: 1
   maxHeadTurnDegrees: 4
@@ -736,11 +753,23 @@ MonoBehaviour:
   maxSampleAgeSeconds: 0.1
   maxRepeatsPerTrial: 0
   pauseSeconds: 0.25
+  dotsFadeInSeconds: 0.05
+  showCrossSignals: 1
+  answerSignalColor: {r: 0, g: 1, b: 1, a: 1}
+  answerSignalSeconds: 0.4
+  answeredSignalColor: {r: 0, g: 1, b: 0, a: 1}
+  answeredSignalSeconds: 0.3
+  stoppedSignalColor: {r: 1, g: 0, b: 1, a: 1}
+  crossSignalOpacity: 0.7
+  stoppedSignalSeconds: 0.4
   startSessionKey: 98
   startOtherMotionSessionKey: 100
   abortSessionKey: 99
   trainingKey: 34
   previewKey: 30
+  saveHeadSpeedKey: 1
+  headSpeedReadoutKey: 22
+  showHeadSpeedInHeadset: 0
   valuesBeforePreviewTakeover: '{"plan":"{\"fieldOfViewValues\":[70.0],\"eyePresentations\":[0],\"instrumentMagnificationMValues\":[10.0],\"contentZoomValues\":[1.0],\"sessionMotionMode\":1,\"simulatedSweepAxis\":0,\"simulatedSpeedReference\":1,\"simulatedImageCenterSpeed\":12.0,\"sweepSpeed\":1.2000000476837159}","look":"{\"edgeSoftnessDegrees\":1.0,\"dotDensity\":0.1899999976158142,\"dotSizeDegrees\":0.3499999940395355,\"darkColor\":{\"r\":0.0,\"g\":0.0,\"b\":0.0,\"a\":1.0},\"lightColor\":{\"r\":1.0,\"g\":1.0,\"b\":1.0,\"a\":1.0},\"fieldBackgroundColor\":{\"r\":0.5,\"g\":0.5,\"b\":0.5,\"a\":1.0},\"backgroundColor\":{\"r\":0.0,\"g\":0.0,\"b\":0.0,\"a\":1.0},\"lightDotFraction\":0.5}"}'
   sessionState: 0
   currentTrialNumber: 0
