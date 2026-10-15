@@ -17,6 +17,15 @@ namespace GlobeEffect.VRCheckerboard
         public Camera observerCamera;
         [Range(-180, 180)] public float panoramaYawDegrees = 90;
 
+        [Header("Perspective Photo (Optional; Not A 360 Panorama)")]
+        public bool usePerspectivePhoto;
+        [Tooltip("Estimated horizontal image angle. Must describe the original uncropped photo, not the headset FOV.")]
+        [Range(5, 120)] public float photoHorizontalFieldOfView = 39.41037f;
+        [Tooltip("Rotate the source photo relative to the starting head direction.")]
+        public Vector2 photoRotationDegrees = new Vector2(0, -7);
+        [Tooltip("Conservative warning if the visible aperture reaches the photo edge. Does not constrain the head.")]
+        public bool showPhotoBoundaryWarning = true;
+
         [Header("Binoculars (Change Live)")]
         [Range(0, 1.4f)] public float distortionK = 1;
         [Range(1, 20)] public float magnification = 1;
@@ -45,11 +54,16 @@ namespace GlobeEffect.VRCheckerboard
         private MaterialPropertyBlock properties;
         private bool ownsCamera;
         private Quaternion anchor;
+        private Quaternion photoAnchor;
         private float elapsed;
         private float previousM, previousZoom;
         private RandomDotMotionMode previousMode;
 
         public float CurrentSweepDegrees { get; private set; }
+        public bool PhotoEdgeVisible { get; private set; }
+        public float PhotoVerticalFieldOfView => panorama
+            ? 2 * Mathf.Atan(Mathf.Tan(photoHorizontalFieldOfView * Mathf.Deg2Rad * 0.5f)
+                * panorama.height / panorama.width) * Mathf.Rad2Deg : 0;
 
         private void Awake()
         {
@@ -90,6 +104,7 @@ namespace GlobeEffect.VRCheckerboard
             surface.GetComponent<MeshRenderer>().sharedMaterial = material;
             surface.GetComponent<MeshRenderer>().sortingOrder = -10;
             Restart();
+            CenterPhoto();
         }
 
         private void OnEnable()
@@ -114,13 +129,24 @@ namespace GlobeEffect.VRCheckerboard
             previousMode = motionMode;
         }
 
+        [ContextMenu("Center Photo On Current Head Direction")]
+        public void CenterPhoto()
+        {
+            UpdateHeadPose();
+            photoAnchor = observerCamera ? observerCamera.transform.rotation : Quaternion.identity;
+        }
+
         private void Update()
         {
             var keyboard = Keyboard.current;
             if (keyboard != null)
             {
                 if (keyboard.spaceKey.wasPressedThisFrame) paused = !paused;
-                if (keyboard.rKey.wasPressedThisFrame) Restart();
+                if (keyboard.rKey.wasPressedThisFrame)
+                {
+                    Restart();
+                    CenterPhoto();
+                }
                 if (ownsCamera && motionMode == RandomDotMotionMode.HeadTracked && !XRSettings.isDeviceActive)
                 {
                     float yaw = (keyboard.rightArrowKey.isPressed ? 1 : 0) -
@@ -175,6 +201,17 @@ namespace GlobeEffect.VRCheckerboard
             properties.SetVector("_HeadForward", basis * Vector3.forward);
             properties.SetVector("_HeadRight", basis * Vector3.right);
             properties.SetVector("_HeadUp", basis * Vector3.up);
+            properties.SetFloat("_PerspectivePhoto", usePerspectivePhoto ? 1 : 0);
+            Vector2 photoHalfSize = new Vector2(
+                Mathf.Tan(Mathf.Clamp(photoHorizontalFieldOfView, 5, 120) * Mathf.Deg2Rad * 0.5f), 0);
+            photoHalfSize.y = photoHalfSize.x * (panorama ? (float)panorama.height / panorama.width : 1);
+            Quaternion photoRotation = photoAnchor
+                * Quaternion.Euler(photoRotationDegrees.y, photoRotationDegrees.x, 0);
+            properties.SetMatrix("_WorldToPhoto", Matrix4x4.Rotate(Quaternion.Inverse(photoRotation)));
+            properties.SetVector("_PhotoHalfSize", photoHalfSize);
+            PhotoEdgeVisible = usePerspectivePhoto
+                && ApertureReachesPhotoEdge(basis, photoRotation, fov, m, k, zoom, photoHalfSize);
+            properties.SetFloat("_PhotoWarning", showPhotoBoundaryWarning && PhotoEdgeVisible ? 1 : 0);
             properties.SetFloat("_FixationEnabled", showFixationTarget ? 1 : 0);
             properties.SetFloat("_FixationSize", fixationSizeDegrees * Mathf.Deg2Rad);
             properties.SetColor("_FixationColor", fixationColor);
@@ -182,14 +219,46 @@ namespace GlobeEffect.VRCheckerboard
             surface.GetComponent<MeshRenderer>().SetPropertyBlock(properties);
         }
 
+        // Same inverse instrument mapping as in the shader. Test the boundary and center.
+        // A warning is diagnostic only: no head clamping or automatic image re-centering.
+        private bool ApertureReachesPhotoEdge(Quaternion basis, Quaternion photoRotation,
+            float fov, float m, float k, float zoom, Vector2 halfSize)
+        {
+            Quaternion worldToPhoto = Quaternion.Inverse(photoRotation);
+            float radius = Mathf.Tan(fov * Mathf.Deg2Rad * 0.5f);
+            for (int index = -1; index < 64; index++)
+            {
+                float phase = index * 2 * Mathf.PI / 64;
+                double u = index < 0 ? 0 : radius * Mathf.Cos(phase);
+                double v = index < 0 ? 0 : radius * Mathf.Sin(phase);
+                if (!NaturalScenePanoramaMath.TryObjectCoordinates(u, v, m, k, zoom,
+                    out double x, out double y)) return true;
+                Vector3 ray = new Vector3((float)x, (float)y, 1);
+                float c = Mathf.Cos(CurrentSweepDegrees * Mathf.Deg2Rad);
+                float s = Mathf.Sin(CurrentSweepDegrees * Mathf.Deg2Rad);
+                ray = sweepAxis == RandomDotSweepAxis.Horizontal
+                    ? new Vector3(c * ray.x + s * ray.z, ray.y, -s * ray.x + c * ray.z)
+                    : new Vector3(ray.x, c * ray.y + s * ray.z, -s * ray.y + c * ray.z);
+                ray = worldToPhoto * (basis * ray);
+                if (!NaturalScenePhotoMath.TryPhotoUv(ray, halfSize, out _)) return true;
+            }
+            return false;
+        }
+
         private void OnGUI()
         {
             if (!showDesktopInstructions) return;
-            GUI.Box(new Rect(10, 10, 560, 100),
-                "Field 01 – natürliche Szene, keine Messung\n" +
+            GUI.Box(new Rect(10, 10, 660, 125),
+                (usePerspectivePhoto ? "Puno – 10x photo preview, no measurement\n"
+                    : "Field 01 – natürliche Szene, keine Messung\n") +
                 "Leertaste: Pause | R: Neustart | Einstellungen live im Inspector\n" +
                 "Aktiv: freie Kopfbewegung; am Desktop Pfeiltasten.\n" +
-                "360°-Foto, kein 3D-Modell. Hoher Zoom kann unscharf werden.");
+                (usePerspectivePhoto
+                    ? $"Foto: {photoHorizontalFieldOfView:0.0}° × {PhotoVerticalFieldOfView:0.0}°. " +
+                      "R = Ausschnitt vor dem Kopf neu zentrieren.\n" +
+                      (PhotoEdgeVisible ? "PHOTO EDGE: Kopf zurückdrehen oder R drücken."
+                          : "Begrenzter Fotoausschnitt, kein 3D-Modell; Bildwinkel aus EXIF geschätzt.")
+                    : "360°-Foto, kein 3D-Modell. Hoher Zoom kann unscharf werden."));
         }
 
         private void OnDestroy()

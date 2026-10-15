@@ -35,6 +35,9 @@ Shader "GlobeEffect/Natural Panorama"
             float _FixationSize, _FixationEnabled;
             float4 _FixationColor;
             float4 _HeadForward, _HeadRight, _HeadUp;
+            float _PerspectivePhoto, _PhotoWarning;
+            float4 _PhotoHalfSize;
+            float4x4 _WorldToPhoto;
 
             Varyings Vert(AppData input)
             {
@@ -70,18 +73,41 @@ Shader "GlobeEffect/Natural Panorama"
                 if (_Axis < 0.5) ray.xz = float2(c * ray.x + s * ray.z, -s * ray.x + c * ray.z);
                 else ray.yz = float2(c * ray.y + s * ray.z, -s * ray.y + c * ray.z);
                 ray = normalize(_HeadRight.xyz * ray.x + _HeadUp.xyz * ray.y + _HeadForward.xyz * ray.z);
-                c = cos(_Yaw); s = sin(_Yaw);
-                ray.xz = float2(c * ray.x + s * ray.z, -s * ray.x + c * ray.z);
-                float2 uv = float2(atan2(ray.x, ray.z) / (2 * UNITY_PI) + 0.5,
-                    asin(clamp(ray.y, -1, 1)) / UNITY_PI + 0.5);
-                fixed3 color = tex2D(_MainTex, uv).rgb;
+                float2 uv;
+                float imageValid = 1;
+                if (_PerspectivePhoto > 0.5)
+                {
+                    // Ordinary rectilinear photograph, not latitude/longitude.
+                    // Outside the source image: reveal background, never stretch or repeat edge pixels.
+                    float3 photoRay = mul((float3x3)_WorldToPhoto, ray);
+                    uv = 0.5 + 0.5 * photoRay.xy / (max(photoRay.z, 0.00001) * _PhotoHalfSize.xy);
+                    imageValid = step(0.00001, photoRay.z)
+                        * step(0, min(min(uv.x, uv.y), min(1 - uv.x, 1 - uv.y)));
+                }
+                else
+                {
+                    c = cos(_Yaw); s = sin(_Yaw);
+                    ray.xz = float2(c * ray.x + s * ray.z, -s * ray.x + c * ray.z);
+                    uv = float2(atan2(ray.x, ray.z) / (2 * UNITY_PI) + 0.5,
+                        asin(clamp(ray.y, -1, 1)) / UNITY_PI + 0.5);
+                }
+                fixed3 color = tex2D(_MainTex, saturate(uv)).rgb;
+                float visible = imageValid;
+                // Thin amber ring, visible in the headset too. Preview-only warning, not a stimulus cue.
+                if (_PerspectivePhoto > 0.5 && _PhotoWarning > 0.5)
+                {
+                    float border = smoothstep(_HalfAngle - 0.015, _HalfAngle - 0.008, displayAngle);
+                    color = lerp(color, fixed3(1, 0.5, 0), border);
+                    visible = max(visible, border);
+                }
                 float2 crossPosition = abs(input.plane);
                 float size = tan(_FixationSize * 0.5);
                 float crossMask = max(
                     step(crossPosition.x, size) * step(crossPosition.y, size * 0.15),
                     step(crossPosition.y, size) * step(crossPosition.x, size * 0.15));
                 color = lerp(color, _FixationColor.rgb, crossMask * _FixationEnabled);
-                return fixed4(color, alpha);
+                visible = max(visible, crossMask * _FixationEnabled);
+                return fixed4(color, alpha * visible);
             }
             ENDCG
         }

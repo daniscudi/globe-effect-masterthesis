@@ -1259,6 +1259,14 @@ Kurz gesagt:
 simuliertem oder freiem Schwenken. Kein Experiment, keine Datenerfassung.
 Bedienung und Grenzen: [NATURAL_SCENE_PREVIEW.md](NATURAL_SCENE_PREVIEW.md).
 
+### Schärfere 10×-Foto-Vorschau
+
+`Assets/GlobeEffect/Demo/NaturalPhotoPreview.unity`: hochauflösendes Stadtfoto mit
+Gebäudekanten, standardmäßig Active Panning, m = 10 und grauem Außenbereich.
+R zentriert den begrenzten Fotoausschnitt neu. Der Bildwinkel ist aus EXIF geschätzt,
+nicht optisch kalibriert. Die ursprüngliche Panorama-Szene bleibt erhalten.
+Bedienung, Quelle und Grenzen: [NATURAL_PHOTO_PREVIEW.md](NATURAL_PHOTO_PREVIEW.md).
+
 ## Literaturgrundlage
 
 * Oomes, A. H. J., Koenderink, J. J., van Doorn, A. J. und de Ridder, H.
