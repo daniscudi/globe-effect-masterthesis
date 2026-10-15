@@ -72,6 +72,12 @@ namespace GlobeEffect.VRCheckerboard.Editor
             ["minimumWaitBeforeDotsSeconds"] = "Wait Before Next Dots (s)",
             ["velocityGraceSeconds"] = "Max Time At Changed Speed (s)",
             ["dotsFadeInSeconds"] = "Dots Fade In (s)",
+            ["showCrossSignals"] = "Colour Signals At The Cross",
+            ["answerSignalColor"] = "Colour: Answer Now",
+            ["stoppedSignalColor"] = "Colour: Trial Stopped",
+            ["crossSignalOpacity"] = "Signal Strength",
+            ["stoppedSignalSeconds"] = "Stopped Colour Shown (s)",
+            ["answerSignalSeconds"] = "Answer Colour Shown (s)",
             ["trainActivePanning"] = "Practise Head-Tracked Trials",
             ["showActiveSpeedExample"] = "Show Calm Speed First",
             ["activePracticeKValues"] = "Practice k Values",
@@ -503,6 +509,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 LinkedFields("keyboardController", "concaveKey", "convexKey", "swapResponseKeys",
                     "useVrControllerButtons", "vrControllerMapping", "logResponses");
                 Fields(serializedObject, "startSessionKey", "startOtherMotionSessionKey", "abortSessionKey");
+                Fields(serializedObject, "showCrossSignals", "answerSignalColor", "answerSignalSeconds",
+                    "stoppedSignalColor",
+                    "crossSignalOpacity", "stoppedSignalSeconds");
             }
             if (Section("Dot Field And Cross", false))
                 LinkedFields("stimulus", "dotDensity", "dotSizeDegrees", "darkColor", "lightColor",

@@ -234,6 +234,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         // Einblenden der Punkte: ab wann und wie lange (0 = sofort voll da).
         private double dotsShownAtSeconds;
         private float dotsFadeInSeconds;
+        // Farbsignal am Kreuz; Alpha ist die Deckkraft, 0 = normales Kreuz.
+        private Color fixationSignalColor = Color.clear;
         private bool meshRebuildPending;
         private RandomDotMotionMode lastPreviewMotionMode;
 
@@ -614,6 +616,27 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public static float FadeInOpacity(double secondsSinceShown, float fadeInSeconds) =>
             fadeInSeconds <= 0f ? 1f : Mathf.Clamp01((float)(secondsSinceShown / fadeInSeconds));
 
+        /// <summary>
+        /// Färbt das Kreuz als Signal ein (zum Beispiel "jetzt antworten"), halb
+        /// durchsichtig mit der angegebenen Deckkraft. Die Punkte bleiben unverändert.
+        /// </summary>
+        public void SetFixationSignal(Color color, float opacity)
+        {
+            color.a = Mathf.Clamp01(opacity);
+            fixationSignalColor = color;
+            SendValuesToShader();
+        }
+
+        public void ClearFixationSignal()
+        {
+            if (fixationSignalColor.a <= 0f) return;
+            fixationSignalColor = Color.clear;
+            SendValuesToShader();
+        }
+
+        /// <summary>Aktuelles Signal am Kreuz; Alpha 0 heißt kein Signal.</summary>
+        public Color FixationSignal => fixationSignalColor;
+
         /// <summary>Sind die Punkte gerade an (nicht nur Kreuz und graue Fläche)?</summary>
         public bool PointsVisible => isVisible && pointsVisible;
 
@@ -871,6 +894,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             propertyBlock.SetFloat("_ContentZoom", contentZoom);
             propertyBlock.SetFloat("_EyeMode", (float)eyePresentation);
             propertyBlock.SetFloat("_DotsEnabled", pointsVisible ? 1f : 0f);
+            propertyBlock.SetColor("_FixationSignalColor", fixationSignalColor);
             propertyBlock.SetFloat("_DotHalfSizeRad", 0.5f * dotSizeDegrees * Mathf.Deg2Rad);
             // Nur eine unverzerrte Messlatte vor dem Kopf, nie Teil eines Trials.
             propertyBlock.SetFloat("_ReferenceGridEnabled", showReferenceGrid && !SessionRunning ? 1f : 0f);

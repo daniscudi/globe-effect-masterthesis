@@ -527,8 +527,12 @@ namespace GlobeEffect.VRCheckerboard.Tests
             // Wechsel in den Play Mode nicht (eingefangene Variablen werden null).
             yield return SweepHead(stimulus, target, manager, RandomDotSessionState.PresentingMotion);
             yield return SweepHead(stimulus, target, manager, RandomDotSessionState.WaitingForResponse);
+            // Antwortphase: Kreuz in der Antwortfarbe, halb durchsichtig.
+            Assert.That(stimulus.FixationSignal.a, Is.EqualTo(0.6f).Within(0.01f));
+            Assert.That(stimulus.FixationSignal.g, Is.EqualTo(1f), "cyan");
             Object.FindAnyObjectByType<RandomDotKeyboardController>().SubmitResponse(Response.Convex);
             Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.Completed));
+            Assert.That(stimulus.FixationSignal.a, Is.Zero, "Nach der Antwort wieder normales Kreuz.");
 
             Dictionary<string, string> row = ReadTrialRows(manager)[0];
             Assert.That(row["status"], Is.EqualTo("valid"));
@@ -580,6 +584,9 @@ namespace GlobeEffect.VRCheckerboard.Tests
             yield return SweepHead(stimulus, speed, manager, RandomDotSessionState.PresentingMotion);
             yield return SweepHead(stimulus, 1.4f * speed, manager, RandomDotSessionState.WaitingForHeadMotion);
 
+            // Abbruch: kurz die Abbruchfarbe (Magenta) am Kreuz.
+            Assert.That(stimulus.FixationSignal.a, Is.GreaterThan(0f));
+            Assert.That(stimulus.FixationSignal.g, Is.Zero, "magenta");
             Dictionary<string, string> row = ReadTrialRows(manager)[0];
             Assert.That(row["status"], Is.EqualTo("invalid:head_speed_changed"));
             Assert.That(ParseFloat(row["head_speed_reference_deg_per_s"]), Is.EqualTo(speed).Within(0.2f * speed));

@@ -15,6 +15,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
         _EyeMode ("Eye Mode", Float) = 0
         _DotsEnabled ("Dots Enabled", Float) = 1
         _DotsOpacity ("Dots Opacity (fade in)", Float) = 1
+        _FixationSignalColor ("Cross signal color (a = opacity, 0 = off)", Color) = (0, 0, 0, 0)
         _DotHalfSizeRad ("Dot Half Size [rad]", Float) = 0.00191986
         _ReferenceGridEnabled ("Preview reference grid", Float) = 0
         _ReferenceGridSpacingUv ("Reference grid spacing [u,v]", Float) = 0.087489
@@ -74,6 +75,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
             float _EyeMode;
             float _DotsEnabled;
             float _DotsOpacity;
+            float4 _FixationSignalColor;
             float _DotHalfSizeRad;
             float _ReferenceGridEnabled;
             float _ReferenceGridSpacingUv;
@@ -364,6 +366,10 @@ Shader "GlobeEffect/Visual Space Random Dots"
                     float vertical = step(abs(input.dotUv.x), 0.18);
                     float horizontal = step(abs(input.dotUv.y), 0.18);
                     clip(saturate(vertical + horizontal) - 0.5);
+                    // Signal (jetzt antworten / Trial abgebrochen): das Kreuz in der
+                    // Signalfarbe, halb durchsichtig über der grauen Fläche.
+                    if (_FixationSignalColor.a > 0.001)
+                        return _FixationSignalColor;
                     return input.color;
                 }
 

@@ -415,6 +415,34 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "4-5 frames at 90 Hz. Used in all trials and practice, simulated and head-tracked.")]
         private float dotsFadeInSeconds = 0.05f;
 
+        [Header("Signals At The Cross")]
+        [SerializeField]
+        [Tooltip("The cross briefly flashes a colour: one when the participant can answer, another when a " +
+            "trial stopped early. No sounds.")]
+        private bool showCrossSignals = true;
+
+        [SerializeField]
+        [Tooltip("Colour that flashes briefly at the cross when the dots are over and the participant can " +
+            "answer.")]
+        private Color answerSignalColor = Color.cyan;
+
+        [SerializeField, Range(0.05f, 2f)]
+        [Tooltip("How long the answer colour flashes (s).")]
+        private float answerSignalSeconds = 0.3f;
+
+        [SerializeField]
+        [Tooltip("Colour of the cross for a moment when a trial stopped early (head speed changed or looked " +
+            "away). No answer is needed then.")]
+        private Color stoppedSignalColor = Color.magenta;
+
+        [SerializeField, Range(0.1f, 1f)]
+        [Tooltip("How strong the signal colour is. Lower = more see-through over the grey background.")]
+        private float crossSignalOpacity = 0.6f;
+
+        [SerializeField, Range(0.1f, 2f)]
+        [Tooltip("How long the cross shows the stopped colour (s).")]
+        private float stoppedSignalSeconds = 0.5f;
+
         [Header("Keys")]
         [SerializeField]
         private Key startSessionKey = Key.F5;
@@ -507,6 +535,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private readonly RandomDotLiveHeadSpeed liveHeadSpeed = new();
         private RandomDotPilotSpeedView pilotSpeedView;
         private float pilotSavedMessageUntil;
+        private float crossSignalUntil;
         private int frameTimingStartFrame;
         private int trialsWithSlowFrames;
         private int pausesTaken;
@@ -586,6 +615,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // geprüft, ob der Blick noch auf dem Kreuz liegt.
             if (previewActive) KeepPreviewPointWorldLikeSession();
             UpdateLiveHeadSpeed();
+            if (crossSignalUntil > 0f && Time.unscaledTime >= crossSignalUntil) ClearCrossSignal();
 
             // Bildzeiten nur während der Darbietung zählen, ab dem Frame nach dem Start.
             if (sessionState == State.PresentingMotion && Time.frameCount > frameTimingStartFrame)
@@ -693,6 +723,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             headTrainingView ??= new RandomDotHeadSweepTrainingView(stimulus.Observer);
             stimulus.SessionRunning = false;
             stimulus.ShowFixationOnly();
+            ClearCrossSignal();
             headTrainingView.ShowWelcome(
                 ResponseInputController.GetReadableKeyName(startSessionKey),
                 ResponseInputController.GetReadableKeyName(startOtherMotionSessionKey),
@@ -968,7 +999,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulus.ShowFixationOnly();
             sessionState = State.ResponseInstructions;
             headTrainingView.ShowResponseInstructions(
-                BuildResponseLines(), ResponseInputController.GetReadableKeyName(startSessionKey),
+                ResponseLinesWithSignalNote(), ResponseInputController.GetReadableKeyName(startSessionKey),
                 OpenEndedSession);
             WriteMarker("ResponseInstructionsShown;task=random_dot_instrument");
         }
@@ -995,6 +1026,15 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             return keyboardController.BuildResponseLines(
                 "CONVEX (curves outward)", "CONCAVE (curves inward)");
+        }
+
+        // Für die Anleitungen: Tastenbelegung plus ein Satz zu den Farbsignalen am Kreuz.
+        private string ResponseLinesWithSignalNote()
+        {
+            return BuildResponseLines() + (showCrossSignals
+                ? "\n\nThe cross flashes one colour when you can answer,\n" +
+                    "and another colour if the trial stopped early."
+                : string.Empty);
         }
 
         public void AbortSession(string reason = "ManualAbort")
@@ -1165,7 +1205,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             headTrainingView ??= new RandomDotHeadSweepTrainingView(stimulus.Observer);
             stimulus.ShowFixationOnly();
             sessionState = State.SimulatedTrainingInstructions;
-            headTrainingView.ShowSimulatedInstructions(BuildResponseLines(),
+            headTrainingView.ShowSimulatedInstructions(ResponseLinesWithSignalNote(),
                 ResponseInputController.GetReadableKeyName(startSessionKey), simulatedTrainingFeedback,
                 showSimulatedExamples);
         }
@@ -1193,7 +1233,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 stimulus.ShowFixationOnly();
                 sessionState = State.SimulatedTrainingResponse;
                 headTrainingView.ShowSimulatedResponse(index + 1, practice.Count, BuildResponseLines());
+                ShowAnswerSignal();
                 while (!trainingResponseReceived) yield return null;
+                ClearCrossSignal();
 
                 // Subjektives Formurteil: eine "richtige" Antwort gibt es nur bei
                 // eindeutigen Extremwerten. Dort sagt die Rückmeldung, was konvex
@@ -1226,6 +1268,32 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 sessionState = State.InterTrial;
                 BeginNextAttempt();
             }
+        }
+
+        // Farbsignale am Kreuz, ohne Töne, jeweils nur kurz: "jetzt antworten" (Answer
+        // Signal Seconds) und "abgebrochen" (Stopped Signal Seconds). Gleich in Simulated,
+        // Active und in den Übungen.
+        private void ShowAnswerSignal()
+        {
+            FlashCrossSignal(answerSignalColor, answerSignalSeconds);
+        }
+
+        private void ShowStoppedSignal()
+        {
+            FlashCrossSignal(stoppedSignalColor, stoppedSignalSeconds);
+        }
+
+        private void FlashCrossSignal(Color color, float seconds)
+        {
+            if (!showCrossSignals || stimulus == null) return;
+            stimulus.SetFixationSignal(color, crossSignalOpacity);
+            crossSignalUntil = Time.unscaledTime + seconds;
+        }
+
+        private void ClearCrossSignal()
+        {
+            crossSignalUntil = 0f;
+            if (stimulus != null) stimulus.ClearFixationSignal();
         }
 
         // Active Practice gibt es nur für aktive Trials mit Geschwindigkeitserkennung.
@@ -1281,7 +1349,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             headTrainingView ??= new RandomDotHeadSweepTrainingView(stimulus.Observer);
             stimulus.ShowFixationOnly();
             sessionState = State.ActivePracticeInstructions;
-            headTrainingView.ShowActivePracticeInstructions(BuildResponseLines(),
+            headTrainingView.ShowActivePracticeInstructions(ResponseLinesWithSignalNote(),
                 ResponseInputController.GetReadableKeyName(startSessionKey), velocityGateAxis, showActiveSpeedExample);
             WriteMarker("ActivePracticeInstructions;task=random_dot_instrument");
         }
@@ -1336,6 +1404,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     SampleHeadSpeed(presenting: true);
                     if (HeadSpeedChangedTooLong)
                     {
+                        ShowStoppedSignal();
                         stopped = true;
                         break;
                     }
@@ -1347,7 +1416,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     trainingResponseReceived = false;
                     sessionState = State.ActivePracticeResponse;
                     headTrainingView.ShowActivePracticeResponse(BuildResponseLines());
+                    ShowAnswerSignal();
                     while (!trainingResponseReceived) yield return null;
+                    ClearCrossSignal();
                 }
 
                 float speed = presentationReferenceSpeed;
@@ -1807,6 +1878,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             ResetFixationChecks();
+            ClearCrossSignal();
             // Die aktive Punktwelt wird erst jetzt am aktuellen Kopf ausgerichtet.
             // Zwischen Fixationsbeginn und Trialstart kann sich der Kopf bewegen.
             stimulus.PlaceAroundObserver();
@@ -1880,6 +1952,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // Helligkeitssprung im Headset erzeugt.
             stimulus.ShowFixationOnly();
             sessionState = State.WaitingForResponse;
+            ShowAnswerSignal();
             WriteMarker(
                 "StimulusEnded;task=random_dot_instrument;sequence={0};attempt={1};duration_s={2:F4};" +
                 "profile_rmse_deg={3:F4};first_turn_error_deg={4:F4};second_turn_error_deg={5:F4}",
@@ -1942,6 +2015,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return;
             }
 
+            ClearCrossSignal();
             validTrialsCompleted++;
             WriteMarker(
                 "TrialResponse;task=random_dot_instrument;sequence={0};attempt={1};" +
@@ -1985,6 +2059,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             StopAndClear(ref motionCoroutine);
+            ShowStoppedSignal();
             sweepMonitor.StopProfileTracking();
             stimulusEndUnitySeconds = Time.realtimeSinceStartupAsDouble;
             RandomDotTrial invalidTrial = currentTrial;
@@ -2202,6 +2277,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         // Das brauchen Abbrechen, Fertigwerden und Schreibfehler gleichermaßen.
         private void EndSession(State endState)
         {
+            ClearCrossSignal();
             if (stimulus != null)
             {
                 stimulus.Hide();

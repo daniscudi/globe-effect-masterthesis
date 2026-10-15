@@ -644,6 +644,15 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   darin nicht unterscheiden. Die Darbietungszeit zählt ab Beginn des Einblendens.
   Die Vorschau blendet nicht ein.
 
+* Farbsignale am Kreuz (`Show Cross Signals`, Standard an, keine Töne, jeweils nur
+  kurz): Sind die Punkte normal vorbei und die Person kann antworten, blitzt das
+  Kreuz für `Answer Signal Seconds` (0,3 s) cyan auf (`Answer Signal Color`).
+  Bricht ein Trial ab (Tempo geändert oder weggeschaut), blitzt es für `Stopped
+  Signal Seconds` (0,5 s) magenta (`Stopped Signal Color`). Beide Farben halb durchsichtig über der grauen Fläche
+  (`Cross Signal Opacity`, 0,6). Gilt für Simulated, Active und die Übungen; die
+  Anleitungen im Headset erklären die Farben in einem Satz. Rot bleibt das normale
+  Kreuz (und die Blockpause).
+
 * Active Practice (`Train Active Panning`, Standard an; nur für aktive Trials mit
   Geschwindigkeitserkennung): kommt in der Sitzung nach der Tastenbelegung und vor
   der Anleitung der echten aktiven Trials, oder allein mit `T` im Head-Tracked-
