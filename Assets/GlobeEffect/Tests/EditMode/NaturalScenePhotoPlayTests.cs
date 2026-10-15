@@ -51,6 +51,13 @@ namespace GlobeEffect.VRCheckerboard.Tests
             preview.distortionK = 0.5f;
             yield return null;
             Assert.That(Difference(initial, Render(preview, "NaturalPhoto_m10_k05.png")), Is.GreaterThan(0.002f));
+            preview.distortionK = 2;
+            yield return null;
+            var values = new MaterialPropertyBlock();
+            GameObject.Find("Natural Panorama Surface").GetComponent<Renderer>().GetPropertyBlock(values);
+            Assert.That(values.GetFloat("_K"), Is.EqualTo(2), "k must not be clamped to the old 1.4 limit.");
+            Assert.That(preview.PhotoEdgeVisible, Is.False);
+            Assert.That(Difference(initial, Render(preview, "NaturalPhoto_m10_k2.png")), Is.GreaterThan(0.002f));
             preview.distortionK = 1;
             var camera = preview.observerCamera;
             camera.transform.rotation = Quaternion.Euler(0, 10, 0);

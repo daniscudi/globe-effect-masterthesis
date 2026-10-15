@@ -11,6 +11,8 @@ The earlier Field 01 panorama scene remains available and keeps its defaults.
 - Move the head freely. At the desktop use arrow keys (20 degrees/s).
 - R recenters the source photo on the current head direction and restarts simulated motion.
 - Inspector: k, magnification, FOV, edge softness, background and fixation update live.
+- k ranges from 0 to 2, matching the current random-dot instrument family.
+  At large k, the aperture is limited to the unambiguous tangent domain.
 - Photo Rotation Degrees changes the source orientation. Default pitch -7 degrees
   selects the city roofs rather than the sky/lake at the photograph's center.
 - Switching k or magnification does not automatically move the source photo with the head.
@@ -47,7 +49,7 @@ Practical headset validation remains necessary.
 
 ## Verification
 
-23 focused Unity tests passed, including existing panorama tests and new photo
+28 focused Unity tests passed, including the extended k range up to 2, existing panorama tests and new photo
 projection / source import / Play Mode / GPU image comparisons. Verified: full
 6000 x 4000 import, visible detail at 10x, k changes, a 10-degree horizontal
 head turn, no translation parallax, gray outside the photo, recentering and

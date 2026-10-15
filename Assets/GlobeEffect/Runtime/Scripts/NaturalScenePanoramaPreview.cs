@@ -27,7 +27,7 @@ namespace GlobeEffect.VRCheckerboard
         public bool showPhotoBoundaryWarning = true;
 
         [Header("Binoculars (Change Live)")]
-        [Range(0, 1.4f)] public float distortionK = 1;
+        [Range(0, 2)] public float distortionK = 1;
         [Range(1, 20)] public float magnification = 1;
         [Range(0.1f, 4)] public float contentZoom = 1;
         [Range(5, 120)] public float fieldOfViewDegrees = 60;
@@ -179,7 +179,8 @@ namespace GlobeEffect.VRCheckerboard
             UpdateHeadPose();
             float m = Mathf.Max(1, magnification);
             float zoom = Mathf.Max(0.1f, contentZoom);
-            float k = Mathf.Clamp(distortionK, 0, 1.4f);
+            float k = Mathf.Clamp(distortionK, (float)MerlitzBinocularReferenceMath.MinimumDistortionK,
+                (float)MerlitzBinocularReferenceMath.MaximumDistortionK);
             float fov = Mathf.Min(Mathf.Clamp(fieldOfViewDegrees, 5, 120),
                 (float)NaturalScenePanoramaMath.MaximumFieldOfViewDegrees(k, zoom) - 0.01f);
             CurrentSweepDegrees = motionMode == RandomDotMotionMode.SimulatedYaw
