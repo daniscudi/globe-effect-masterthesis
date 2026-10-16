@@ -17,8 +17,7 @@ namespace GlobeEffect.VRCheckerboard
             double u, double v, double m, double k, double zoom, out double x, out double y)
         {
             x = y = 0;
-            if (m <= 0 || zoom <= 0 || k < MerlitzBinocularReferenceMath.MinimumDistortionK
-                || k > MerlitzBinocularReferenceMath.MaximumDistortionK) return false;
+            if (m <= 0 || zoom <= 0 || k < 0 || k > 1.4) return false;
             double radius = Math.Sqrt(u * u + v * v);
             double angle = Math.Atan(radius / zoom);
             if (k * angle >= TangentLimit) return false;

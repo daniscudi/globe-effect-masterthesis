@@ -7,7 +7,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
 {
     public sealed class NaturalScenePanoramaMathTests
     {
-        [TestCase(0)] [TestCase(0.5)] [TestCase(1)] [TestCase(1.4)] [TestCase(1.8)] [TestCase(2)]
+        [TestCase(0)] [TestCase(0.5)] [TestCase(1)] [TestCase(1.4)]
         public void UnitMagnificationIsIdentity(double k)
         {
             Assert.That(NaturalScenePanoramaMath.TryObjectCoordinates(0.3, -0.2, 1, k, 1,
@@ -24,27 +24,13 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(y, Is.EqualTo(-0.2 / (m * 2)).Within(1e-10));
         }
 
-        [TestCase(0)] [TestCase(0.5)] [TestCase(1)] [TestCase(1.4)] [TestCase(1.8)] [TestCase(2)]
+        [TestCase(0)] [TestCase(0.5)] [TestCase(1)] [TestCase(1.4)]
         public void InverseAgreesWithForwardMapping(double k)
         {
             const double r = 0.4;
             NaturalScenePanoramaMath.TryObjectCoordinates(r, 0, 10, k, 1, out double x, out _);
             double a = MerlitzBinocularReferenceMath.ApparentAngleFromObject(Math.Atan(x), 10, k);
             Assert.That(Math.Tan(a), Is.EqualTo(r).Within(1e-10));
-        }
-
-        [Test]
-        public void ExtendedRangeKeepsTangentDomainSafe()
-        {
-            Assert.That(NaturalScenePanoramaMath.TryObjectCoordinates(0.4, 0, 10, 2, 1,
-                out _, out _), Is.True);
-            Assert.That(NaturalScenePanoramaMath.TryObjectCoordinates(0.4, 0, 10, 2.01, 1,
-                out _, out _), Is.False);
-            double maximumFov = NaturalScenePanoramaMath.MaximumFieldOfViewDegrees(2, 1);
-            Assert.That(maximumFov, Is.InRange(89.0, 90.0));
-            double outsideRadius = Math.Tan((maximumFov + 0.01) * Math.PI / 360);
-            Assert.That(NaturalScenePanoramaMath.TryObjectCoordinates(outsideRadius, 0, 10, 2, 1,
-                out _, out _), Is.False);
         }
 
         [Test]
