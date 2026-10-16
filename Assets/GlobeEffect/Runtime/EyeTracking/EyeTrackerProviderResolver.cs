@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.XR;
 using UnityEngine.XR.Management;
@@ -188,6 +190,21 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
 
         public static bool IsProcessRunning(string processName)
         {
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+            // Process.GetProcessesByName übersieht unter Unitys Mono Prozesse, die
+            // mit Administratorrechten laufen, weil es jeden Prozess öffnen muss.
+            // sr_runtime.exe läuft so. Der Toolhelp-Snapshot liest nur die
+            // Prozessliste und sieht deshalb auch diese Prozesse.
+            if (IsProcessInSnapshot(processName))
+            {
+                return true;
+            }
+#endif
+            return IsProcessRunningViaProcessApi(processName);
+        }
+
+        private static bool IsProcessRunningViaProcessApi(string processName)
+        {
             try
             {
                 Process[] processes = Process.GetProcessesByName(processName);
@@ -205,6 +222,83 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
                 return false;
             }
         }
+
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+        private const uint SnapshotProcesses = 0x00000002;
+        private static readonly IntPtr InvalidHandleValue = new(-1);
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct ProcessEntry32
+        {
+            public uint dwSize;
+            public uint cntUsage;
+            public uint th32ProcessID;
+            public IntPtr th32DefaultHeapID;
+            public uint th32ModuleID;
+            public uint cntThreads;
+            public uint th32ParentProcessID;
+            public int pcPriClassBase;
+            public uint dwFlags;
+
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+            public string szExeFile;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr CreateToolhelp32Snapshot(uint flags, uint processId);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool Process32FirstW(IntPtr snapshot, ref ProcessEntry32 entry);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool Process32NextW(IntPtr snapshot, ref ProcessEntry32 entry);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr handle);
+
+        private static bool IsProcessInSnapshot(string processName)
+        {
+            IntPtr snapshot = IntPtr.Zero;
+            try
+            {
+                snapshot = CreateToolhelp32Snapshot(SnapshotProcesses, 0);
+                if (snapshot == IntPtr.Zero || snapshot == InvalidHandleValue)
+                {
+                    return false;
+                }
+
+                var entry = new ProcessEntry32
+                {
+                    dwSize = (uint)Marshal.SizeOf<ProcessEntry32>()
+                };
+
+                for (bool more = Process32FirstW(snapshot, ref entry);
+                     more;
+                     more = Process32NextW(snapshot, ref entry))
+                {
+                    // szExeFile enthält den Dateinamen mit ".exe".
+                    string name = Path.GetFileNameWithoutExtension(entry.szExeFile);
+                    if (string.Equals(name, processName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+            finally
+            {
+                if (snapshot != IntPtr.Zero && snapshot != InvalidHandleValue)
+                {
+                    CloseHandle(snapshot);
+                }
+            }
+        }
+#endif
 
         private static string DescribeActiveXrLoader()
         {
