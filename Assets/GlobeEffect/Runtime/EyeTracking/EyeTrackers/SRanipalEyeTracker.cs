@@ -37,6 +37,10 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         // lange gar kein Update ausführt; dann werden die ältesten Samples verworfen.
         private const int MaximumBufferedSamples = 2048;
 
+        // Kommt so lange nach dem Anmelden des Callbacks kein Sample, wird einmal
+        // gewarnt (s).
+        private const float NoSampleWarningSeconds = 3f;
+
         private const int CalibrationIdle = 0;
         private const int CalibrationRunning = 1;
         private const int CalibrationFinished = 2;
@@ -60,6 +64,10 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
         private bool overflowReported;
         private volatile RuntimeState runtimeState = RuntimeState.NotStarted;
         private volatile string failureMessage = string.Empty;
+        private string initialWarning;
+        private float callbackRegisteredTime;
+        private bool sampleReceived;
+        private bool noSampleReported;
         private int calibrationState = CalibrationIdle;
         private volatile int calibrationResult;
         private GazeData currentGazeData = SRanipalGazeConversion.CreateInvalidSample();
@@ -86,22 +94,20 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
                 return;
             }
 
-            if (runtimeState != RuntimeState.Working)
+            if (runtimeState != RuntimeState.Working &&
+                !EyeTrackerProviderResolver.IsSRanipalRuntimeRunning())
             {
                 // Wurde die SRanipal-Runtime erst nach dem Start des Play Mode
                 // gestartet, lässt sich die Verbindung so ohne Neustart nachholen.
                 // Läuft sie weiterhin nicht, meldet der neue Versuch das selbst.
                 BeginRuntimeInitialization();
-                if (runtimeState == RuntimeState.Initializing)
-                {
-                    Debug.LogWarning(
-                        "SRanipal Eye Tracking war nicht bereit und wird neu " +
-                        "initialisiert. Danach C erneut drücken.",
-                        this);
-                }
-
                 return;
             }
+
+            // Läuft die Runtime, wird die Kalibrierung auch dann gestartet, wenn
+            // SRanipal einen Fehler meldet (am Lab-PC sind die Augen im
+            // SRanipal-Symbol dauerhaft rot). Danach wird die Verbindung bei
+            // Bedarf neu aufgebaut.
 
             if (Interlocked.CompareExchange(
                 ref calibrationState, CalibrationRunning, CalibrationIdle) != CalibrationIdle)
@@ -160,6 +166,12 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
             switch (runtimeState)
             {
                 case RuntimeState.Working:
+                    string warning = Interlocked.Exchange(ref initialWarning, null);
+                    if (warning != null)
+                    {
+                        Debug.LogWarning(warning, this);
+                    }
+
                     if (!callbackRegistered)
                     {
                         RegisterCallback();
@@ -181,10 +193,29 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
             {
                 Interlocked.Decrement(ref bufferedSampleCount);
                 currentGazeData = sample;
+                sampleReceived = true;
                 EyeTrackingEvent.TriggerEvent(currentGazeData);
             }
 
+            ReportNoSamplesOnce();
             ReportOverflowOnce();
+        }
+
+        private void ReportNoSamplesOnce()
+        {
+            if (sampleReceived || noSampleReported || !callbackRegistered ||
+                Time.realtimeSinceStartup - callbackRegisteredTime < NoSampleWarningSeconds)
+            {
+                return;
+            }
+
+            noSampleReported = true;
+            Debug.LogWarning(
+                $"SRanipal Eye Tracking: Der Callback ist angemeldet, aber seit " +
+                $"{NoSampleWarningSeconds:0} s kam kein einziges Sample. SRanipal liefert " +
+                "keine Blickdaten. VIVE Console/SRanipal neu starten und danach den Play " +
+                "Mode neu starten.",
+                this);
         }
 
         private void OnDisable()
@@ -242,15 +273,19 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
                 Error result = SRanipal_API.Initial(
                     SRanipal_Eye_v2.ANIPAL_TYPE_EYE_V2,
                     IntPtr.Zero);
-                if (result == Error.WORK)
+                if (result != Error.WORK)
                 {
-                    runtimeState = RuntimeState.Working;
-                    return;
+                    // Am Lab-PC meldet SRanipal dauerhaft einen Fehler (rote Augen
+                    // im SRanipal-Symbol), liefert aber trotzdem Blickdaten. Deshalb
+                    // nur warnen und den Callback trotzdem anmelden. Ob wirklich
+                    // Samples kommen, prüft Update.
+                    initialWarning =
+                        $"SRanipal_API.Initial (Eye v2) meldet {result}. Es wird trotzdem " +
+                        "versucht, Blickdaten zu empfangen.";
                 }
 
-                failureMessage =
-                    $"SRanipal_API.Initial (Eye v2) meldet {result}. Läuft SteamVR und " +
-                    "ist die Vive Pro Eye verbunden?";
+                runtimeState = RuntimeState.Working;
+                return;
             }
             catch (Exception exception)
             {
@@ -296,6 +331,13 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
                     $"SRanipal-Blickkalibrierung nicht erfolgreich beendet: {result}.",
                     this);
             }
+
+            // Wurde die Kalibrierung ohne funktionierende Verbindung gestartet,
+            // jetzt noch einmal verbinden.
+            if (runtimeState == RuntimeState.Failed)
+            {
+                BeginRuntimeInitialization();
+            }
         }
 
         private void RegisterCallback()
@@ -308,6 +350,8 @@ namespace GlobeEffect.VRCheckerboard.EyeTracking
                 if (result == (int)Error.WORK)
                 {
                     callbackRegistered = true;
+                    callbackRegisteredTime = Time.realtimeSinceStartup;
+                    noSampleReported = false;
                     Debug.Log(
                         "SRanipal Eye Tracking bereit (Eye v2, Callback registriert).",
                         this);
