@@ -215,7 +215,6 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     hasStimulus ? Number(stimulus.InstrumentMagnificationM, "F2", "x") : Missing);
                 Row("Extra Zoom", hasStimulus ? Number(stimulus.ContentZoom, "F2") : Missing);
                 Row("Head Turn Left/Right", hasSweep ? Number(sweep.CurrentYawDegrees, "F2", "°") : Missing);
-                Row("Left-Right Turns", hasSweep ? Number(sweep.CompletedHalfSweeps) : Missing);
                 Row("Average Head Speed",
                     hasSweep ? Number(sweep.MeanAbsoluteYawSpeedDegreesPerSecond, "F2", "°/s") : Missing);
                 Row("Top Head Speed",
@@ -288,66 +287,6 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 && stimulus.MotionMode != RandomDotMotionMode.HeadTracked)
                 EditorGUILayout.HelpBox("To feel the speed yourself, set Movement Type to Head-Tracked in the " +
                     "preview. Then the dots move with your head.", MessageType.Info);
-
-            DrawSavedSpeeds(live);
-            DrawLastPans(live);
-        }
-
-        // Pilot: per Taste gespeicherte "fühlt sich natürlich an"-Werte und ihr Mittel.
-        private static void DrawSavedSpeeds(RandomDotLiveHeadSpeed live)
-        {
-            EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField("Saved Natural Speeds", EditorStyles.boldLabel);
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-            {
-                var saved = live.SavedSpeeds;
-                if (saved.Count == 0)
-                {
-                    EditorGUILayout.LabelField("None yet. In the preview press Space or a controller button " +
-                        "while turning at a speed that feels natural.", EditorStyles.wordWrappedLabel);
-                    return;
-                }
-
-                float sum = 0f, imageSum = 0f, min = float.MaxValue, max = 0f;
-                foreach (RandomDotSavedSpeed speed in saved)
-                {
-                    sum += speed.HeadSpeed;
-                    imageSum += speed.ImageSpeed;
-                    min = Mathf.Min(min, speed.HeadSpeed);
-                    max = Mathf.Max(max, speed.HeadSpeed);
-                }
-                Row("Saved", Number(saved.Count));
-                Row("Average Head Speed", Number(sum / saved.Count, "F2", " °/s") + "  (" +
-                    Number(min, "F2") + " – " + Number(max, "F2", " °/s)"));
-                Row("Average Dot Speed", Number(imageSum / saved.Count, "F1", " °/s") + " in the image center");
-                for (int index = saved.Count - 1; index >= Mathf.Max(0, saved.Count - 5); index--)
-                    Row("  #" + (index + 1), Number(saved[index].HeadSpeed, "F2", " °/s head, ") +
-                        Number(saved[index].ImageSpeed, "F1", " °/s dots"));
-                EditorGUILayout.LabelField("To use it: put the average dot speed into Dot Speed In Image Center " +
-                    "(Simulated Movement). The wanted head speed follows automatically.",
-                    EditorStyles.wordWrappedMiniLabel);
-                if (GUILayout.Button("Clear Saved Speeds And Turns")) live.ClearHistory();
-            }
-        }
-
-        // Pilot: die letzten erkannten Schwenks, auch ohne Tastendruck.
-        private static void DrawLastPans(RandomDotLiveHeadSpeed live)
-        {
-            EditorGUILayout.Space(6f);
-            EditorGUILayout.LabelField("Last Turns", EditorStyles.boldLabel);
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-            {
-                if (live.LastPans.Count == 0)
-                {
-                    EditorGUILayout.LabelField("No turns yet. A turn ends when the head stops or changes " +
-                        "direction.", EditorStyles.wordWrappedLabel);
-                    return;
-                }
-                foreach (RandomDotPan pan in live.LastPans)
-                    Row((pan.Direction > 0 ? "→ " : "← ") + Number(pan.Seconds, "F1", " s"),
-                        Number(pan.MeanHeadSpeed, "F2", " °/s head (top ") + Number(pan.PeakHeadSpeed, "F1", "), ") +
-                        Number(pan.MeanImageSpeed, "F1", " °/s dots"));
-            }
         }
 
         // Klappt mit beiden Fixation Monitoren, weil beide dieselbe Basisklasse

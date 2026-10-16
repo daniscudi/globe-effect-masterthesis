@@ -120,11 +120,6 @@ namespace GlobeEffect.VRCheckerboard.Tests
                     "In Training/Messung muss allein die vom Manager berechnete Geschwindigkeit gelten.");
                 field.SessionRunning = false;
                 Assert.That(field.SweepSpeedDegreesPerSecond, Is.EqualTo(5f / 40f).Within(1e-5f));
-                settings.Update();
-                settings.FindProperty("previewSpeedReference").intValue =
-                    (int)GlobeEffect.VRCheckerboard.RandomDots.RandomDotSweepSpeedReference.ObjectAngle;
-                settings.ApplyModifiedPropertiesWithoutUndo();
-                Assert.That(field.SweepSpeedDegreesPerSecond, Is.EqualTo(0.6f));
             }
             finally
             {

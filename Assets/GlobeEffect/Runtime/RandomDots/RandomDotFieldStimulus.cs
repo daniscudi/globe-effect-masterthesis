@@ -176,11 +176,6 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             "starts.")]
         private float simulatedYawAmplitudeDegrees = 2f;
 
-        [SerializeField]
-        [Tooltip("Preview only. Image Center: dots in the middle move equally fast at every magnification. " +
-            "Object Angle: the binoculars turn equally fast.")]
-        private RandomDotSweepSpeedReference previewSpeedReference = RandomDotSweepSpeedReference.ImageCenter;
-
         [SerializeField, Range(0.5f, 120f)]
         [Tooltip("Preview only: speed of the dots in the image center (degrees per second).")]
         private float previewImageCenterSpeed = 12f;
@@ -273,8 +268,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public float SweepAmplitudeDegrees => simulatedYawAmplitudeDegrees;
         public float SweepSpeedDegreesPerSecond => SessionRunning
             ? simulatedYawSpeedDegreesPerSecond
-            : RandomDotSimulatedSweep.ObjectSpeed(previewSpeedReference, simulatedYawSpeedDegreesPerSecond,
-                previewImageCenterSpeed, instrumentMagnificationM, contentZoom);
+            : RandomDotSimulatedSweep.ObjectSpeed(previewImageCenterSpeed, instrumentMagnificationM, contentZoom);
         public bool IsVisible => isVisible;
 
         // Setzt der Experiment Manager, solange eine Sitzung läuft. Dann gibt es
@@ -1010,15 +1004,5 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     {
         Horizontal = 0,
         Vertical = 1
-    }
-
-    // Worauf sich die Geschwindigkeit des simulierten Schwenks bezieht.
-    public enum RandomDotSweepSpeedReference
-    {
-        [InspectorName("Object Angle: Binoculars Turn Equally Fast")]
-        ObjectAngle = 0,
-
-        [InspectorName("Image Center: Dots Move Equally Fast")]
-        ImageCenter = 1
     }
 }

@@ -88,34 +88,13 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [Test]
-        public void ProfileEvaluator_SeparatesMatchedMovementFromStationaryHead()
-        {
-            var matched = new RandomDotSweepProfileEvaluator(2f, 1.2f, Right);
-            var stationary = new RandomDotSweepProfileEvaluator(2f, 1.2f, Right);
-
-            for (int frame = 1; frame <= 300; frame++)
-            {
-                double elapsed = frame / 60d;
-                matched.AddSample(elapsed, BackAndForth(elapsed, Right, 2f, 1.2f), 1f / 60f);
-                stationary.AddSample(elapsed, 0f, 1f / 60f);
-            }
-
-            Assert.That(matched.RootMeanSquareErrorDegrees, Is.LessThan(0.0001f));
-            Assert.That(matched.FirstExtremeErrorDegrees, Is.LessThan(0.0001f));
-            Assert.That(matched.SecondExtremeErrorDegrees, Is.LessThan(0.0001f));
-            Assert.That(stationary.RootMeanSquareErrorDegrees, Is.GreaterThan(1f));
-            Assert.That(stationary.SecondExtremeErrorDegrees, Is.EqualTo(2f).Within(0.0001f));
-        }
-
-        [Test]
         public void ImageCenterReference_GivesTheSameImageSpeedAtEveryMagnification()
         {
             // Gewünscht: 12 Grad pro Sekunde in der Bildmitte. Das Instrument muss
             // dafür bei großem m langsamer über die Außenwelt schwenken.
             foreach (float m in new[] { 1f, 5f, 10f, 14f, 20f })
             {
-                float objectSpeed = Sweep.ObjectSpeed(
-                    RandomDotSweepSpeedReference.ImageCenter, 1.2f, 12f, m, contentZoom: 1f);
+                float objectSpeed = Sweep.ObjectSpeed(12f, m, contentZoom: 1f);
                 Assert.That(objectSpeed, Is.EqualTo(12f / m).Within(0.0001f));
                 Assert.That(Sweep.ImageCenterSpeed(objectSpeed, m, 1f), Is.EqualTo(12f).Within(0.0001f));
             }
@@ -127,29 +106,15 @@ namespace GlobeEffect.VRCheckerboard.Tests
             // Bisher: m = 10 und 1,2 Grad pro Sekunde. Das sind 12 Grad pro Sekunde
             // in der Bildmitte; mit der Voreinstellung ändert sich dort also nichts.
             Assert.That(
-                Sweep.ObjectSpeed(RandomDotSweepSpeedReference.ImageCenter, 1.2f, 12f, 10f, 1f),
+                Sweep.ObjectSpeed(12f, 10f, 1f),
                 Is.EqualTo(1.2f).Within(0.0001f));
-        }
-
-        [Test]
-        public void ObjectAngleReference_KeepsTheOldDefinition()
-        {
-            // Das Instrument schwenkt bei jedem m gleich schnell. Die Punkte laufen
-            // dann in der Bildmitte m-mal so schnell.
-            foreach (float m in new[] { 5f, 20f })
-            {
-                float objectSpeed = Sweep.ObjectSpeed(
-                    RandomDotSweepSpeedReference.ObjectAngle, 1.2f, 12f, m, contentZoom: 1f);
-                Assert.That(objectSpeed, Is.EqualTo(1.2f));
-                Assert.That(Sweep.ImageCenterSpeed(objectSpeed, m, 1f), Is.EqualTo(1.2f * m).Within(0.0001f));
-            }
         }
 
         [Test]
         public void ContentZoom_CountsLikeExtraMagnificationForTheImageSpeed()
         {
             Assert.That(
-                Sweep.ObjectSpeed(RandomDotSweepSpeedReference.ImageCenter, 1.2f, 12f, 5f, contentZoom: 2f),
+                Sweep.ObjectSpeed(12f, 5f, contentZoom: 2f),
                 Is.EqualTo(1.2f).Within(0.0001f));
         }
 

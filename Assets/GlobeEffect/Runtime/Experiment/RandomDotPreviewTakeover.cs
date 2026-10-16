@@ -29,13 +29,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             plan.contentZoomValues = new List<float> { preview.contentZoom };
             plan.sessionMotionMode = preview.motionMode;
             plan.simulatedSweepAxis = preview.sweepAxis;
-            plan.simulatedSpeedReference = preview.previewSpeedReference;
-            // Nur der Geschwindigkeitswert der gewählten Definition wird übernommen.
-            // Sweep Speed gilt am Manager auch für Kopftraining und geführte Trials.
-            if (preview.previewSpeedReference == RandomDotSweepSpeedReference.ImageCenter)
-                plan.simulatedImageCenterSpeed = Mathf.Clamp(preview.previewImageCenterSpeed, 0.5f, 120f);
-            else
-                plan.sweepSpeed = Mathf.Clamp(preview.simulatedYawSpeedDegreesPerSecond, 0.1f, 60f);
+            plan.simulatedImageCenterSpeed = Mathf.Clamp(preview.previewImageCenterSpeed, 0.5f, 120f);
 
             JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(plan), manager);
         }
@@ -72,9 +66,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             public List<float> contentZoomValues = new();
             public RandomDotMotionMode sessionMotionMode;
             public RandomDotSweepAxis simulatedSweepAxis;
-            public RandomDotSweepSpeedReference simulatedSpeedReference;
             public float simulatedImageCenterSpeed;
-            public float sweepSpeed;
         }
 
         // Feldnamen = RandomDotFieldStimulus, Vorschauwerte.
@@ -87,9 +79,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             public CheckerboardEyePresentation eyePresentation;
             public RandomDotMotionMode motionMode;
             public RandomDotSweepAxis sweepAxis;
-            public RandomDotSweepSpeedReference previewSpeedReference;
             public float previewImageCenterSpeed;
-            public float simulatedYawSpeedDegreesPerSecond;
         }
 
         // Feldnamen = RandomDotFieldStimulus, Punktbild. Diese Werte setzt der

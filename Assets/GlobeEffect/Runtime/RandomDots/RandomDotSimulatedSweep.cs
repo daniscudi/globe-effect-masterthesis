@@ -9,10 +9,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     /// Es gibt zwei Bahnen:
     /// - Einseitig: Im SimulatedYaw-Block schwenkt das Feld einmal mit fester
     ///   Geschwindigkeit von der einen Seite zur anderen und kehrt nicht um.
-    /// - Hin und her: Im HeadTracked-Block folgt die Person mit dem Kopf einer
-    ///   Sinusbahn. Die startet in der Mitte, erreicht nach einem Viertel der
-    ///   Periode eine Seite und nach drei Vierteln die Gegenseite. An beiden
-    ///   Umkehrpunkten ist die Geschwindigkeit null.
+    /// - Hin und her: Die Natural-Scene-Vorschau schwenkt auf einer Sinusbahn.
+    ///   Die startet in der Mitte, erreicht nach einem Viertel der Periode eine
+    ///   Seite und nach drei Vierteln die Gegenseite.
     ///
     /// Hier steht nur Mathematik drin und nichts von Unity. Deshalb kann man das
     /// ohne Headset testen.
@@ -45,10 +44,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             return direction == RandomDotSweepDirection.LeftFirst ? -angle : angle;
         }
 
-        /// <summary>
-        /// Die Sinusbahn hin und her, der die Person im HeadTracked-Block mit dem
-        /// Kopf folgt.
-        /// </summary>
+        /// <summary>Die Sinusbahn hin und her (Natural-Scene-Vorschau).</summary>
         public static float EvaluateBackAndForthDegrees(
             double elapsedSeconds, float amplitudeDegrees, float speedDegreesPerSecond,
             RandomDotSweepDirection direction)
@@ -59,8 +55,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             }
 
             // In einer Periode werden vier Amplituden zurückgelegt. Der Speed-
-            // Parameter bezeichnet die mittlere absolute Geschwindigkeit und
-            // bleibt dadurch mit der bisherigen Einstellung vergleichbar.
+            // Parameter bezeichnet die mittlere absolute Geschwindigkeit.
             double phase =
                 elapsedSeconds * Math.PI * speedDegreesPerSecond / (2.0 * amplitudeDegrees);
             float angle = amplitudeDegrees * (float)Math.Sin(phase);
@@ -83,18 +78,15 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         ///   gleich dem Bildwinkel, zum Rand hin wächst sie zusätzlich mit
         ///   1 / cos².
         ///
-        /// ImageCenter rechnet die gewünschte sichtbare Geschwindigkeit der
-        /// Bildmitte auf den Objektwinkel zurück. Dadurch laufen die Punkte in der
-        /// Bildmitte bei jedem m gleich schnell, und das Verhältnis zwischen Mitte
-        /// und Rand bleibt unberührt.
+        /// Eingestellt wird die gewünschte Geschwindigkeit in der Bildmitte; hier
+        /// wird sie auf den Objektwinkel zurückgerechnet. Dadurch laufen die Punkte
+        /// in der Bildmitte bei jedem m gleich schnell, und das Verhältnis zwischen
+        /// Mitte und Rand bleibt unberührt.
         /// </summary>
         public static float ObjectSpeed(
-            RandomDotSweepSpeedReference reference, float objectSpeedDegreesPerSecond,
             float imageCenterSpeedDegreesPerSecond, float magnificationM, float contentZoom)
         {
-            return reference == RandomDotSweepSpeedReference.ImageCenter
-                ? imageCenterSpeedDegreesPerSecond / (magnificationM * contentZoom)
-                : objectSpeedDegreesPerSecond;
+            return imageCenterSpeedDegreesPerSecond / (magnificationM * contentZoom);
         }
 
         /// <summary>
@@ -111,8 +103,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             RandomDotMotionMode mode, RandomDotSweepAxis axis, RandomDotSweepDirection direction)
         {
             // Der simulierte Schwenk geht nur in eine Richtung, deshalb heißt er
-            // einfach "Right" oder "Up". Der Kopfschwenk geht hin und her, da
-            // zählt, wohin es zuerst geht: "RightFirst" oder "LeftFirst".
+            // einfach "Right" oder "Up". Für aktive Trials steht hier nur die geplante
+            // Richtung; die tatsächliche steht in der CSV-Spalte head_direction.
             bool positive = direction == RandomDotSweepDirection.RightFirst;
             string side = axis == RandomDotSweepAxis.Vertical
                 ? positive ? "Up" : "Down"

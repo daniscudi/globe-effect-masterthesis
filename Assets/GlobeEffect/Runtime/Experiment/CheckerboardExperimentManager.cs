@@ -79,7 +79,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// </summary>
     [DisallowMultipleComponent]
     [DefaultExecutionOrder(20)]
-    public sealed class CheckerboardExperimentManager : MonoBehaviour, IPreviewTakeoverManager
+    public sealed class CheckerboardExperimentManager : ExperimentManagerBase, IPreviewTakeoverManager
     {
         // Hier läuft alles zusammen. Der Weg durch die Datei ist ungefähr dieser:
         //
@@ -99,91 +99,22 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private CheckerboardKeyboardController keyboardController;
 
         [SerializeField]
-        private EyeTrackingToolbox eyeTrackingToolbox;
-
-        [SerializeField]
         private CheckerboardFixationMonitor fixationMonitor;
 
         [Header("Session")]
         [SerializeField]
-        [Tooltip("Code for the participant, e.g. pilot_001. Do not enter real names.")]
-        private string participantId = "pilot_001";
-
-        [SerializeField]
         private string sessionLabel = "checkerboard_pilot";
 
-        [SerializeField]
-        [Tooltip("Same number and same settings = exactly the same trial order again.")]
-        private int randomSeed = 20260901;
-
-        [SerializeField]
-        [Tooltip("Folder for the data files. Leave empty to save into the measurements folder of the " +
-            "project.")]
-        private string outputRoot = string.Empty;
-
-        [SerializeField]
-        private bool autoStartOnPlay;
-
         [Header("Trial Plan")]
-        [FormerlySerializedAs("angularDiametersDegrees")]
-        [SerializeField]
-        [Tooltip("Size of the round window in degrees. With several values, each size is tested.")]
-        private List<float> fieldOfViewValues = new() { 90f };
-
-        [SerializeField]
-        [Tooltip("Which eyes see the image: both, only left or only right.")]
-        private List<CheckerboardEyePresentation> eyePresentations = new()
-        {
-            CheckerboardEyePresentation.BothEyes
-        };
-
         [SerializeField]
         [Tooltip("All grid distortions (l) that are tested. l = 1 is a straight grid, l = 0.5 is the " +
             "Helmholtz point.")]
         private List<float> visualSpaceLValues = new() { 1.2f, 1f, 0.8f, 0.6f, 0.5f, 0.4f, 0.2f };
 
-        [FormerlySerializedAs("repetitionsPerCondition")]
-        [SerializeField, Min(1)]
-        [Tooltip("How often each combination is shown, if an l value has no own number below.")]
-        private int repeatsPerCondition = 3;
-
         [SerializeField]
         [Tooltip("How often each l value is shown, in the same order as the l list. Missing entries use " +
             "Repeats Per Condition.")]
         private List<int> repeatsPerLValue = new();
-
-        [SerializeField, Range(1, 10)]
-        [Tooltip("Splits the session into parts with a break in between. 4 = breaks after 25, 50 and 75 % " +
-            "of the trials (red cross, continue with F5). 1 = no breaks.")]
-        private int blocksPerSession = 4;
-
-        [Header("Gaze Check")]
-        [SerializeField]
-        [Tooltip("The checkerboard only appears when the participant looks steadily at the cross. Must be " +
-            "on for real measurements.")]
-        private bool requireFixation = true;
-
-        [FormerlySerializedAs("maximumOffTargetSeconds")]
-        [SerializeField, Min(0f)]
-        [Tooltip("How long the participant may look away from the cross before the trial is repeated later " +
-            "(s).")]
-        private float maxLookAwaySeconds = 0.15f;
-
-        [FormerlySerializedAs("maximumInvalidGazeSeconds")]
-        [SerializeField, Min(0f)]
-        [Tooltip("How long the eye tracker may give no gaze data, e.g. when blinking, before the trial is " +
-            "repeated later (s).")]
-        private float maxNoDataSeconds = 0.2f;
-
-        [FormerlySerializedAs("maximumGazeSampleAgeSeconds")]
-        [SerializeField, Min(0.01f)]
-        [Tooltip("Gaze data older than this counts as missing (s).")]
-        private float maxSampleAgeSeconds = 0.1f;
-
-        [FormerlySerializedAs("maximumAttemptsPerTrial")]
-        [SerializeField, Min(0)]
-        [Tooltip("How often one trial may be tried in total. 0 = until it works.")]
-        private int maxRepeatsPerTrial;
 
         [Header("Timing")]
         [SerializeField]
@@ -238,14 +169,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         [Header("Practice")]
         [SerializeField]
-        [Tooltip("Key that starts the practice from the start screen.")]
-        private Key trainingKey = Key.T;
-
-        [SerializeField]
-        [Tooltip("Turns the preview on or off. Nothing is recorded.")]
-        private Key previewKey = Key.P;
-
-        [SerializeField]
         [Tooltip("Off = preview shows the checkerboard. On = preview shows the noise. Can be switched " +
             "while the preview runs.")]
         private bool previewShowsNoise;
@@ -266,11 +189,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [SerializeField, Range(0.1f, 10f)]
         [Tooltip("Afterimage test: how long the grey screen is shown at the end (s).")]
         private float maskDemoGraySeconds = 3f;
-
-        // Stand vor dem ersten "Vorschau-Werte übernehmen". Leer heißt: es wurde
-        // nichts übernommen. "Originalwerte wiederherstellen" holt ihn zurück.
-        [SerializeField, HideInInspector]
-        private string valuesBeforePreviewTakeover = string.Empty;
 
         [SerializeField]
         [Tooltip("Key to go to the next step in the practice. It also starts the first trial.")]
@@ -320,41 +238,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "larger than Time Before Checkerboard.")]
         private float trainingFixationSeconds = 0.5f;
 
-        [Header("Keys")]
-        [SerializeField]
-        private Key startSessionKey = Key.F5;
-
-        [SerializeField]
-        private Key abortSessionKey = Key.F6;
-
         [Header("Current Status")]
         [SerializeField]
         private CheckerboardSessionState sessionState = CheckerboardSessionState.Idle;
 
-        [SerializeField]
-        private int currentTrialNumber;
-
-        [SerializeField]
-        private int totalTrials;
-
-        [SerializeField]
-        private int validTrialsCompleted;
-
-        [SerializeField]
-        private int presentationCount;
-
-        [SerializeField]
-        private string activeSessionFolder = string.Empty;
-
-        private readonly LookAwayTimer lookAway = new();
         private IReadOnlyList<CheckerboardTrial> trialPlan;
         private CheckerboardTrialQueue trialQueue;
-        private int pausesTaken;
         private CheckerboardTrial currentTrial;
         private CheckerboardExperimentFiles experimentFiles;
-        private DateTime trialStartUtc;
-        private double trialStartUnitySeconds;
-        private double stimulusEndUnitySeconds;
         private double responseWindowStartUnitySeconds;
         private double preStimulusEndUnitySeconds;
         private Coroutine presentationCoroutine;
@@ -363,9 +254,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private bool trainingCompleted;
         private bool trainingAdvanceRequested;
         private bool trainingResponseReceived;
-        private bool previewActive;
-        private string settingsBeforePreview;
-        private string lookToKeepAfterPreview;
         private bool previewShowingNoise;
         private Coroutine maskDemoCoroutine;
 
@@ -379,24 +267,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private int lastFixationCheckFrame = -1;
 
         public CheckerboardSessionState SessionState => sessionState;
-        public int CurrentTrialNumber => currentTrialNumber;
-        public int TotalTrials => totalTrials;
-        public int ValidTrialsCompleted => validTrialsCompleted;
-        public int PresentationCount => presentationCount;
-        public bool RequireFixation => requireFixation;
         public bool TrainingCompleted => trainingCompleted;
-        public bool IsPreviewActive => previewActive;
         public VrCheckerboardStimulus Stimulus => stimulus;
         UnityEngine.Object IPreviewTakeoverManager.PreviewStimulus => stimulus;
 
-        // Für die Editor-Übergabe aus dem Play Mode in die Szene.
-        public string ValuesBeforePreviewTakeover
-        {
-            get => valuesBeforePreviewTakeover;
-            set => valuesBeforePreviewTakeover = value ?? string.Empty;
-        }
-
-        public bool HasValuesBeforePreviewTakeover => !string.IsNullOrEmpty(valuesBeforePreviewTakeover);
         public CheckerboardTrialSequence TrialSequence => trialSequence;
         public bool ResponseKeysSwapped => keyboardController != null && keyboardController.SwapResponseKeys;
         public string ConvexResponseKeyName => ResponseKeyName(CheckerboardCurvatureResponse.Convex);
@@ -1372,16 +1246,27 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 ? responseWindowStartUnitySeconds
                 : stimulusEnd;
 
-            return new CheckerboardTrialResult(
-                currentTrial, presentationCount, trialStartUtc,
-                trialStartUnitySeconds, stimulusEnd, responseWindowStart, resultEndTime,
-                stimulus.ApertureEdgeSoftnessDegrees, stimulus.UseCircularAperture,
-                stimulus.GridLineSpacingDegrees, stimulus.GridLineSpacingUv,
-                response, validForAnalysis,
-                gaze.SampleValid, gaze.OnTarget, gaze.AngleDegrees,
-                gaze.SteadySeconds, gaze.ValidSampleFraction,
-                lookAway.LongestLookAwaySeconds, lookAway.LongestNoDataSeconds,
-                status, trialSequence);
+            return new CheckerboardTrialResult
+            {
+                Trial = currentTrial,
+                PresentationIndex = presentationCount,
+                TrialStartUtc = trialStartUtc,
+                TrialStartUnitySeconds = trialStartUnitySeconds,
+                StimulusEndUnitySeconds = stimulusEnd,
+                ResponseWindowStartUnitySeconds = responseWindowStart,
+                TrialEndUnitySeconds = resultEndTime,
+                ApertureEdgeSoftnessDegrees = stimulus.ApertureEdgeSoftnessDegrees,
+                CircularApertureEnabled = stimulus.UseCircularAperture,
+                GridLineSpacingDegrees = stimulus.GridLineSpacingDegrees,
+                GridLineSpacingUv = stimulus.GridLineSpacingUv,
+                Response = response,
+                ValidForAnalysis = validForAnalysis,
+                Gaze = gaze,
+                LongestOffTargetSeconds = lookAway.LongestLookAwaySeconds,
+                LongestInvalidGazeSeconds = lookAway.LongestNoDataSeconds,
+                Status = status,
+                TrialSequence = trialSequence
+            };
         }
 
         private FixationSnapshot TakeFixationSnapshot()
@@ -1452,7 +1337,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             BeginNextAttempt();
         }
 
-        public int PausesTaken => pausesTaken;
 
         private string BuildBlockPausePrompt()
         {
@@ -1650,40 +1534,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             return false;
         }
 
-        // Hält eine laufende Coroutine an und merkt sich, dass keine mehr läuft.
-        private void StopAndClear(ref Coroutine coroutine)
-        {
-            if (coroutine != null)
-            {
-                StopCoroutine(coroutine);
-                coroutine = null;
-            }
-        }
-
-        private void StopEyeTrackingRecording()
-        {
-            if (eyeTrackingToolbox != null && eyeTrackingToolbox.IsRecording)
-            {
-                eyeTrackingToolbox.StopRecording();
-            }
-        }
-
-        private void WriteMarker(string message)
-        {
-            if (eyeTrackingToolbox != null)
-            {
-                eyeTrackingToolbox.WriteMessage(message);
-            }
-        }
-
-        // Wie string.Format, aber immer mit Punkt als Dezimaltrennzeichen, egal
-        // welche Sprache Windows eingestellt hat. Sonst stünde mal 0,5 und mal 0.5
-        // in der Aufnahme.
-        private void WriteMarker(string format, params object[] values)
-        {
-            WriteMarker(string.Format(CultureInfo.InvariantCulture, format, values));
-        }
-
         private string BuildTrialStartMarker(CheckerboardTrial trial)
         {
             // Ein Marker ist eine kurze Notiz mitten in der Eye-Tracking-Aufnahme.
@@ -1737,9 +1587,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "RESPONSES\n" + BuildResponsePrompt();
         }
 
-        private void OnValidate()
+        protected override void OnValidate()
         {
-            repeatsPerCondition = Mathf.Max(1, repeatsPerCondition);
+            base.OnValidate();
             patternSeconds = Mathf.Max(0.01f, patternSeconds);
             answerTimeoutSeconds = Mathf.Max(0f, answerTimeoutSeconds);
             trainingExampleA = Mathf.Clamp(trainingExampleA, 0f, 1.4f);
@@ -1755,10 +1605,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             trainingFixationSeconds = Mathf.Max(0f, trainingFixationSeconds);
-            maxLookAwaySeconds = Mathf.Max(0f, maxLookAwaySeconds);
-            maxNoDataSeconds = Mathf.Max(0f, maxNoDataSeconds);
-            maxSampleAgeSeconds = Mathf.Max(0.01f, maxSampleAgeSeconds);
-            maxRepeatsPerTrial = Mathf.Max(0, maxRepeatsPerTrial);
             trainingExampleSeconds = Mathf.Max(0.1f, trainingExampleSeconds);
             preStimulusSeconds = Mathf.Max(0f, preStimulusSeconds);
         }

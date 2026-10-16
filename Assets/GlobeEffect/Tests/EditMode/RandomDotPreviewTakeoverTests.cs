@@ -34,9 +34,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             SetFloats(plan, "instrumentDistortionKValues", 1.2f, 1f, 0.5f);
             plan.FindProperty("sessionMotionMode").enumValueIndex = (int)RandomDotMotionMode.SimulatedYaw;
             plan.FindProperty("simulatedSweepAxis").enumValueIndex = (int)RandomDotSweepAxis.Horizontal;
-            plan.FindProperty("simulatedSpeedReference").enumValueIndex = (int)RandomDotSweepSpeedReference.ImageCenter;
             plan.FindProperty("simulatedImageCenterSpeed").floatValue = 12f;
-            plan.FindProperty("sweepSpeed").floatValue = 1.2f;
             plan.ApplyModifiedPropertiesWithoutUndo();
 
             // Das, was man in der Vorschau eingestellt hätte.
@@ -46,9 +44,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             preview.FindProperty("contentZoom").floatValue = 1f;
             preview.FindProperty("motionMode").enumValueIndex = (int)RandomDotMotionMode.HeadTracked;
             preview.FindProperty("sweepAxis").enumValueIndex = (int)RandomDotSweepAxis.Vertical;
-            preview.FindProperty("previewSpeedReference").enumValueIndex = (int)RandomDotSweepSpeedReference.ImageCenter;
             preview.FindProperty("previewImageCenterSpeed").floatValue = 20f;
-            preview.FindProperty("simulatedYawSpeedDegreesPerSecond").floatValue = 5f;
             preview.FindProperty("edgeSoftnessDegrees").floatValue = 2f;
             preview.ApplyModifiedPropertiesWithoutUndo();
         }
@@ -74,8 +70,6 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(plan.FindProperty("simulatedSweepAxis").enumValueIndex,
                 Is.EqualTo((int)RandomDotSweepAxis.Vertical));
             Assert.That(plan.FindProperty("simulatedImageCenterSpeed").floatValue, Is.EqualTo(20f));
-            // Bei "Bildmitte" bleibt Sweep Speed (auch fürs Kopftraining) unverändert.
-            Assert.That(plan.FindProperty("sweepSpeed").floatValue, Is.EqualTo(1.2f));
             Assert.That(manager.HasValuesBeforePreviewTakeover, Is.True);
         }
 
@@ -103,22 +97,6 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 Is.EqualTo(2f));
             Assert.That(manager.HasValuesBeforePreviewTakeover, Is.False);
             Assert.That(manager.RestoreValuesBeforePreviewTakeover(), Is.False);
-        }
-
-        [Test]
-        public void TakeOver_WithObjectAngleCopiesSweepSpeed()
-        {
-            var preview = new SerializedObject(stimulus);
-            preview.FindProperty("previewSpeedReference").enumValueIndex = (int)RandomDotSweepSpeedReference.ObjectAngle;
-            preview.ApplyModifiedPropertiesWithoutUndo();
-
-            manager.TakeOverPreviewValues();
-
-            var plan = new SerializedObject(manager);
-            Assert.That(plan.FindProperty("simulatedSpeedReference").enumValueIndex,
-                Is.EqualTo((int)RandomDotSweepSpeedReference.ObjectAngle));
-            Assert.That(plan.FindProperty("sweepSpeed").floatValue, Is.EqualTo(5f));
-            Assert.That(plan.FindProperty("simulatedImageCenterSpeed").floatValue, Is.EqualTo(12f));
         }
 
         private static void SetFloats(SerializedObject owner, string name, params float[] values)

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using GlobeEffect.VRCheckerboard.Experiment;
+using GlobeEffect.VRCheckerboard.EyeTracking;
 using NUnit.Framework;
 using Sequence = GlobeEffect.VRCheckerboard.Experiment.CheckerboardTrialSequence;
 
@@ -130,16 +131,25 @@ namespace GlobeEffect.VRCheckerboard.Tests
         // Muster von 10,0 bis 10,6 s, Antwort 1,25 s nach Beginn der Antwortphase.
         private static CheckerboardTrialResult CreateResult(Sequence sequence)
         {
-            return new CheckerboardTrialResult(
-                CreateTrial(), presentationIndex: 1, DateTime.UtcNow,
-                trialStartUnitySeconds: 10d, stimulusEndUnitySeconds: 10.6d,
-                responseWindowStartUnitySeconds: 10.6d, trialEndUnitySeconds: 11.85d,
-                apertureEdgeSoftnessDegrees: 1f, circularApertureEnabled: true,
-                gridLineSpacingDegrees: 10f, gridLineSpacingUv: 0.3f,
-                CheckerboardCurvatureResponse.Convex, validForAnalysis: true,
-                fixationSampleValid: true, fixationInsideTolerance: true, fixationAngleDegrees: 0.5f,
-                continuousFixationSeconds: 1f, fixationValidSampleFraction: 1f,
-                longestOffTargetSeconds: 0f, longestInvalidGazeSeconds: 0f, "valid", sequence);
+            return new CheckerboardTrialResult
+            {
+                Trial = CreateTrial(),
+                PresentationIndex = 1,
+                TrialStartUtc = DateTime.UtcNow,
+                TrialStartUnitySeconds = 10d,
+                StimulusEndUnitySeconds = 10.6d,
+                ResponseWindowStartUnitySeconds = 10.6d,
+                TrialEndUnitySeconds = 11.85d,
+                ApertureEdgeSoftnessDegrees = 1f,
+                CircularApertureEnabled = true,
+                GridLineSpacingDegrees = 10f,
+                GridLineSpacingUv = 0.3f,
+                Response = CheckerboardCurvatureResponse.Convex,
+                ValidForAnalysis = true,
+                Gaze = new FixationSnapshot(true, true, 0.5f, 1f, 1f),
+                Status = "valid",
+                TrialSequence = sequence
+            };
         }
     }
 }

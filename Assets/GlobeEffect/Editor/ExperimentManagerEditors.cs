@@ -57,14 +57,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
             ["contentZoomValues"] = "Extra Zoom Values",
             ["sessionMotionMode"] = "Movement Type",
             ["simulatedSweepSeconds"] = "Dots Shown (s)",
-            ["simulatedSpeedReference"] = "Speed Measured At",
             ["simulatedImageCenterSpeed"] = "Dot Speed In Image Center (deg/s)",
-            ["sweepSpeed"] = "Turn Speed (deg/s)",
             ["pauseSeconds"] = "Grey Pause Between Trials (s)",
-            ["headTrackedSeconds"] = "Dots Shown (s)",
             ["headTurnSafetyDegrees"] = "Head Turn Range (degrees)",
-            ["openEndedActiveTrials"] = "No Time Limit",
-            ["useVelocityGate"] = "Dots Only While Head Turns Steadily",
             ["velocityGateAxis"] = "Head Turn Direction",
             ["velocityChangeTolerance"] = "Allowed Speed Change (±)",
             ["alternateSweepDirection"] = "One Sweep Per Trial, Alternating",
@@ -93,12 +88,6 @@ namespace GlobeEffect.VRCheckerboard.Editor
             ["naturalHeadSpeedMin"] = "Natural Head Speed From (°/s)",
             ["naturalHeadSpeedMax"] = "Natural Head Speed Up To (°/s)",
             ["velocitySmoothingSeconds"] = "Speed Smoothing (s)",
-            ["checkHeadMotion"] = "Repeat Bad Head Movements",
-            ["maximumProfileErrorDegrees"] = "Max Path Error (degrees)",
-            ["maximumTrainingEndpointErrorDegrees"] = "Max Turning Point Error (degrees)",
-            ["turnaroundDegrees"] = "Turn Counts From (degrees)",
-            ["requiredSweeps"] = "Min Left-Right Turns",
-            ["requiredGoodTrainingSweeps"] = "Good Practice Turns Needed",
             // Random Dots: Training
             ["showSimulatedExamples"] = "Show Labelled Examples",
             ["exampleConvexK"] = "Convex Example (k)",
@@ -118,13 +107,9 @@ namespace GlobeEffect.VRCheckerboard.Editor
             ["dotDensity"] = "Dots Per Square Degree",
             ["motionMode"] = "Movement Type",
             ["simulatedYawAmplitudeDegrees"] = "Movement Range (degrees)",
-            ["previewSpeedReference"] = "Speed Measured At",
             ["previewImageCenterSpeed"] = "Dot Speed In Image Center (deg/s)",
             ["simulatedYawSpeedDegreesPerSecond"] = "Binocular Turn Speed (deg/s)",
             ["loopSweepInPreview"] = "Repeat Movement",
-            ["saveHeadSpeedKey"] = "Save Natural Speed Key",
-            ["headSpeedReadoutKey"] = "Show Speed In Headset Key",
-            ["showHeadSpeedInHeadset"] = "Show Speed In Headset",
             ["worldCoverageDegrees"] = "Dot Field Size (degrees)",
             ["fieldRadiusMeters"] = "Technical: Field Radius (m)",
         };
@@ -454,40 +439,17 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
             if (Section("Simulated Movement"))
             {
-                Fields(serializedObject, "simulatedSweepAxis", "simulatedSweepSeconds", "simulatedSpeedReference",
-                    "simulatedImageCenterSpeed", "sweepSpeed", "pauseSeconds", "dotsFadeInSeconds");
-                bool centerSpeed = serializedObject.FindProperty("simulatedSpeedReference").enumValueIndex == 1;
-                EditorGUILayout.HelpBox(centerSpeed
-                    ? "Image Center: the dots in the middle move equally fast at every magnification."
-                    : "Object Angle: the binoculars turn equally fast, so the dots move faster at higher " +
-                        "magnification.",
-                    centerSpeed ? MessageType.Info : MessageType.Warning);
+                Fields(serializedObject, "simulatedSweepAxis", "simulatedSweepSeconds",
+                    "simulatedImageCenterSpeed", "pauseSeconds", "dotsFadeInSeconds");
+                EditorGUILayout.HelpBox("The dots in the middle of the image move equally fast at every " +
+                    "magnification. Dots Shown, Grey Pause and Fade In also apply to head-tracked trials.",
+                    MessageType.Info);
             }
             if (Section("Head-Tracked Movement"))
             {
-                Fields(serializedObject, "freeHeadMovement");
-                bool free = serializedObject.FindProperty("freeHeadMovement").boolValue;
-                bool gated = free && serializedObject.FindProperty("useVelocityGate").boolValue;
-                bool openEnded = free && !gated && serializedObject.FindProperty("openEndedActiveTrials").boolValue;
-                if (free) Fields(serializedObject, "useVelocityGate");
-                if (gated) VelocityGateSettings();
-                if (free && !gated) Fields(serializedObject, "openEndedActiveTrials");
-                if (!openEnded && !gated) Fields(serializedObject, "headTrackedSeconds");
+                HeadSpeedSettings();
                 Fields(serializedObject, "headTurnSafetyDegrees");
                 HeadTurnReachInfo();
-                // Bei Geschwindigkeitserkennung steht die Erklärung schon bei deren Einstellungen.
-                if (!gated)
-                    EditorGUILayout.HelpBox(openEnded
-                        ? "NO TIME LIMIT: the dots stay until the participant answers. The head may move " +
-                            "freely in any direction. Then a grey pause and the next trial."
-                        : free
-                            ? "FREE: the head may move in any direction at any speed. The gaze check stays on."
-                            : "GUIDED: the participant follows a left-right path. Trials with a bad head " +
-                                "movement are repeated if Repeat Bad Head Movements is on.", MessageType.Info);
-                if (!free)
-                    Fields(serializedObject, "checkHeadMotion", "sweepAmplitudeDegrees", "sweepSpeed",
-                        "maximumProfileErrorDegrees", "turnaroundDegrees", "requiredSweeps",
-                        "maxHeadTurnDegrees", "minMeanHeadSpeed", "maxPeakHeadSpeed");
             }
             if (Section("Practice", false))
             {
@@ -499,16 +461,12 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "feedbackConcaveMaxK", "feedbackConvexMinK", "feedbackSeconds",
                     "trainActivePanning", "showActiveSpeedExample", "activePracticeKValues",
                     "activePracticeGoodTrials", "activePracticeMaxTrials", "activePracticeSpeedHint",
-                    "naturalHeadSpeedMin", "naturalHeadSpeedMax", "trainHeadMovement",
-                    "requiredGoodTrainingSweeps", "sweepAmplitudeDegrees", "sweepSpeed",
-                    "maximumProfileErrorDegrees", "maximumTrainingEndpointErrorDegrees", "turnaroundDegrees",
-                    "requiredSweeps", "maxHeadTurnDegrees", "minMeanHeadSpeed", "maxPeakHeadSpeed");
+                    "naturalHeadSpeedMin", "naturalHeadSpeedMax");
                 EditorGUILayout.HelpBox("T starts a practice of the chosen movement type without saving data. " +
-                    "In a session the practice matching the movement type is used. Head-tracked trials with " +
-                    "\"Dots Only While Head Turns Steadily\" use the Active Practice with the real dots: first a " +
-                    "calm speed shown by the computer, then practice trials with a short note after each " +
-                    "(dots stopped early, quite fast, quite slow or good). Otherwise the guided head movement " +
-                    "practice is used.", MessageType.Info);
+                    "In a session the practice matching the movement type is used. The head-tracked practice " +
+                    "uses the real dots: first a calm speed shown by the computer, then practice trials with a " +
+                    "short note after each (dots stopped early, quite fast, quite slow or good).",
+                    MessageType.Info);
             }
             FixationSettings();
             if (Section("Answers And Keys"))
@@ -531,18 +489,11 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "Change the settings below and see the result right away. The straight reference grid is " +
                     "only for comparing and is never shown in practice or measurement.",
                     MessageType.Info);
-                Fields(serializedObject, "saveHeadSpeedKey", "headSpeedReadoutKey", "showHeadSpeedInHeadset");
-                EditorGUILayout.HelpBox("Finding a natural head speed: set Movement Type below to Head-Tracked, " +
-                    "put on the headset and turn your head slowly left and right, as when looking around with " +
-                    "binoculars. When it feels natural, press Space or a controller button (you hear a beep). " +
-                    "The saved speeds and your last turns are shown in the Experiment Monitor.",
-                    MessageType.Info);
                 LinkedFields("stimulus", "fieldOfViewDegrees", "edgeSoftnessDegrees", "dotDensity",
                     "dotSizeDegrees", "darkColor", "lightColor", "backgroundColor", "fieldBackgroundColor",
                     "instrumentDistortionK",
                     "instrumentMagnificationM", "contentZoom", "eyePresentation", "motionMode", "sweepAxis",
-                    "simulatedYawAmplitudeDegrees", "previewSpeedReference", "previewImageCenterSpeed",
-                    "simulatedYawSpeedDegreesPerSecond", "sweepDirection",
+                    "simulatedYawAmplitudeDegrees", "previewImageCenterSpeed", "sweepDirection",
                     "loopSweepInPreview", "worldCoverageDegrees", "showReferenceGrid",
                     "referenceGridSpacingDegrees", "referenceGridWidthPixels", "referenceGridColor");
                 EditorGUILayout.HelpBox("When the preview ends, all changes are undone – unless you press " +
@@ -567,7 +518,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 "presentationCount", "sessionMotionMode", "activeSessionFolder");
         }
 
-        private void VelocityGateSettings()
+        private void HeadSpeedSettings()
         {
             Fields(serializedObject, "velocityGateAxis", "alternateSweepDirection", "velocityChangeTolerance",
                 "minimumMovingHeadSpeed", "minimumTurnBeforeDotsDegrees",
@@ -587,7 +538,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 $"{seconds:0.##} s. If the speed changes by more than ±{change * 100f:0} % from the speed just " +
                 "before the dots, they disappear and the trial is repeated later. All head speeds are saved for " +
                 "every trial.", MessageType.Info);
-            EditorGUILayout.LabelField($"For comparison: the simulated movement equals {manager.VelocityGateTargetSpeedPreview:0.##} " +
+            EditorGUILayout.LabelField($"For comparison: the simulated movement equals {manager.SimulatedHeadSpeedPreview:0.##} " +
                 "°/s of head speed.", EditorStyles.wordWrappedMiniLabel);
         }
 
@@ -597,8 +548,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             // Gerechnet wie vor dem Sitzungsstart: ungünstigstes FOV, Zoom und k.
             var stimulus = serializedObject.FindProperty("stimulus").objectReferenceValue as RandomDotFieldStimulus;
             if (stimulus == null) return;
-            float reach = Mathf.Max(serializedObject.FindProperty("sweepAmplitudeDegrees").floatValue,
-                serializedObject.FindProperty("headTurnSafetyDegrees").floatValue);
+            float reach = serializedObject.FindProperty("headTurnSafetyDegrees").floatValue;
             SerializedProperty fovs = serializedObject.FindProperty("fieldOfViewValues");
             SerializedProperty ms = serializedObject.FindProperty("instrumentMagnificationMValues");
             SerializedProperty zooms = serializedObject.FindProperty("contentZoomValues");

@@ -1,36 +1,34 @@
 using System;
 using System.Collections.Generic;
+using GlobeEffect.VRCheckerboard.EyeTracking;
 
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
     /// <summary>
     /// Was bei einem gezeigten Durchgang herausgekommen ist: die Antwort, die
     /// Zeiten und die Werte dazu, wie gut die Person auf das Kreuz geschaut hat.
+    /// Eine Zeile der CSV; der Experiment Manager füllt die Felder direkt aus.
     /// </summary>
     public sealed class CheckerboardTrialResult
     {
-        public CheckerboardTrial Trial { get; }
-        public int PresentationIndex { get; }
-        public DateTime TrialStartUtc { get; }
-        public double TrialStartUnitySeconds { get; }
-        public double StimulusEndUnitySeconds { get; }
-        public double ResponseWindowStartUnitySeconds { get; }
-        public double TrialEndUnitySeconds { get; }
-        public float ApertureEdgeSoftnessDegrees { get; }
-        public bool CircularApertureEnabled { get; }
-        public float GridLineSpacingDegrees { get; }
-        public float GridLineSpacingUv { get; }
-        public CheckerboardCurvatureResponse Response { get; }
-        public bool ValidForAnalysis { get; }
-        public bool FixationSampleValid { get; }
-        public bool FixationInsideTolerance { get; }
-        public float FixationAngleDegrees { get; }
-        public float ContinuousFixationSeconds { get; }
-        public float FixationValidSampleFraction { get; }
-        public float LongestOffTargetSeconds { get; }
-        public float LongestInvalidGazeSeconds { get; }
-        public string Status { get; }
-        public CheckerboardTrialSequence TrialSequence { get; }
+        public CheckerboardTrial Trial;
+        public int PresentationIndex;
+        public DateTime TrialStartUtc;
+        public double TrialStartUnitySeconds;
+        public double StimulusEndUnitySeconds;
+        public double ResponseWindowStartUnitySeconds;
+        public double TrialEndUnitySeconds;
+        public float ApertureEdgeSoftnessDegrees;
+        public bool CircularApertureEnabled;
+        public float GridLineSpacingDegrees;
+        public float GridLineSpacingUv;
+        public CheckerboardCurvatureResponse Response;
+        public bool ValidForAnalysis;
+        public FixationSnapshot Gaze = FixationSnapshot.None;
+        public float LongestOffTargetSeconds;
+        public float LongestInvalidGazeSeconds;
+        public string Status = string.Empty;
+        public CheckerboardTrialSequence TrialSequence;
 
         public double StimulusDurationSeconds =>
             Math.Max(0d, StimulusEndUnitySeconds - TrialStartUnitySeconds);
@@ -42,54 +40,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public double ResponseTimeSeconds =>
             Math.Max(0d, TrialEndUnitySeconds - ResponseWindowStartUnitySeconds);
-
-        public CheckerboardTrialResult(
-            CheckerboardTrial trial,
-            int presentationIndex,
-            DateTime trialStartUtc,
-            double trialStartUnitySeconds,
-            double stimulusEndUnitySeconds,
-            double responseWindowStartUnitySeconds,
-            double trialEndUnitySeconds,
-            float apertureEdgeSoftnessDegrees,
-            bool circularApertureEnabled,
-            float gridLineSpacingDegrees,
-            float gridLineSpacingUv,
-            CheckerboardCurvatureResponse response,
-            bool validForAnalysis,
-            bool fixationSampleValid,
-            bool fixationInsideTolerance,
-            float fixationAngleDegrees,
-            float continuousFixationSeconds,
-            float fixationValidSampleFraction,
-            float longestOffTargetSeconds,
-            float longestInvalidGazeSeconds,
-            string status,
-            CheckerboardTrialSequence trialSequence)
-        {
-            Trial = trial ?? throw new ArgumentNullException(nameof(trial));
-            PresentationIndex = presentationIndex;
-            TrialStartUtc = trialStartUtc;
-            TrialStartUnitySeconds = trialStartUnitySeconds;
-            StimulusEndUnitySeconds = stimulusEndUnitySeconds;
-            ResponseWindowStartUnitySeconds = responseWindowStartUnitySeconds;
-            TrialEndUnitySeconds = trialEndUnitySeconds;
-            ApertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees;
-            CircularApertureEnabled = circularApertureEnabled;
-            GridLineSpacingDegrees = gridLineSpacingDegrees;
-            GridLineSpacingUv = gridLineSpacingUv;
-            Response = response;
-            ValidForAnalysis = validForAnalysis;
-            FixationSampleValid = fixationSampleValid;
-            FixationInsideTolerance = fixationInsideTolerance;
-            FixationAngleDegrees = fixationAngleDegrees;
-            ContinuousFixationSeconds = continuousFixationSeconds;
-            FixationValidSampleFraction = fixationValidSampleFraction;
-            LongestOffTargetSeconds = longestOffTargetSeconds;
-            LongestInvalidGazeSeconds = longestInvalidGazeSeconds;
-            Status = status ?? string.Empty;
-            TrialSequence = trialSequence;
-        }
     }
 
     /// <summary>
@@ -187,9 +137,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 .Add(trial.VisualSpaceL)
                 .Add(VisualSpaceRadialMapping.OomesEndpointEquivalent(trial.VisualSpaceL))
                 .Add(result.Response.ToString()).Add(result.ValidForAnalysis)
-                .Add(result.FixationSampleValid).Add(result.FixationInsideTolerance)
-                .Add(result.FixationAngleDegrees).Add(result.ContinuousFixationSeconds)
-                .Add(result.FixationValidSampleFraction).Add(result.LongestOffTargetSeconds)
+                .Add(result.Gaze.SampleValid).Add(result.Gaze.OnTarget)
+                .Add(result.Gaze.AngleDegrees).Add(result.Gaze.SteadySeconds)
+                .Add(result.Gaze.ValidSampleFraction).Add(result.LongestOffTargetSeconds)
                 .Add(result.LongestInvalidGazeSeconds).Add(result.Status)
                 .Add(result.TrialSequence.ToString()));
         }

@@ -245,100 +245,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
             config.FindProperty("sessionMotionMode").intValue = (int)RandomDotMotionMode.HeadTracked;
             config.ApplyModifiedPropertiesWithoutUndo();
             Assert.That(manager.StartTraining(), Is.True);
-            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.HeadTrainingInstructions));
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.ActivePracticeInstructions));
             manager.StopTrainingAndReturnToWelcome();
             Assert.That(manager.IsTrainingActive, Is.False);
             AssertNoSessionFiles(manager);
-            yield return new ExitPlayMode();
-        }
-
-        [UnityTest]
-        public IEnumerator RandomDotFreeHeadTrial_AcceptsPitchAndYawWithoutASineOrSpeedRequirement()
-        {
-            PrepareRandomDotScene();
-            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
-            config.FindProperty("sessionMotionMode").intValue =
-                (int)RandomDotMotionMode.HeadTracked;
-            SetFloats(config.FindProperty("instrumentMagnificationMValues"), 5f);
-            config.FindProperty("headTrackedSeconds").floatValue = 0.2f;
-            config.FindProperty("freeHeadMovement").boolValue = true;
-            config.FindProperty("openEndedActiveTrials").boolValue = false;
-            config.FindProperty("checkHeadMotion").boolValue = true;
-            config.ApplyModifiedPropertiesWithoutUndo();
-            yield return new EnterPlayMode();
-            yield return null;
-            var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
-            var stimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
-            Assert.That(manager.StartSession(), Is.True, "Freie Trials brauchen keine Sinus-Mindestdauer.");
-            manager.ConfirmResponseInstructions();
-            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.ActiveMotionInstructions));
-            manager.ConfirmActiveMotionInstructions();
-            Quaternion startRotation = stimulus.Observer.rotation;
-            for (int frame = 0; frame < 4; frame++)
-            {
-                stimulus.Observer.rotation = startRotation * Quaternion.Euler(frame * 2f, frame * 2f, 0f);
-                yield return null;
-            }
-            yield return WaitForState(manager, RandomDotSessionState.WaitingForResponse);
-            Object.FindAnyObjectByType<RandomDotKeyboardController>().SubmitResponse(Response.Convex);
-            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.Completed));
-            List<Dictionary<string, string>> rows = ReadTrialRows(manager);
-            Assert.That(rows.Count, Is.EqualTo(1));
-            Assert.That(rows[0]["valid_for_analysis"], Is.EqualTo("1"));
-            Assert.That(rows[0]["head_motion_constraint"], Is.EqualTo("free"));
-            Assert.That(float.IsNaN(ParseFloat(rows[0]["profile_rmse_deg"])), Is.True);
-            Assert.That(float.IsNaN(ParseFloat(rows[0]["image_center_speed_deg_per_s"])), Is.True);
-            yield return new ExitPlayMode();
-        }
-
-        [UnityTest]
-        public IEnumerator RandomDotOpenEndedActiveTrial_StaysVisibleUntilTheAnswer()
-        {
-            PrepareRandomDotScene();
-            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
-            config.FindProperty("sessionMotionMode").intValue = (int)RandomDotMotionMode.HeadTracked;
-            SetFloats(config.FindProperty("instrumentMagnificationMValues"), 5f);
-            config.FindProperty("repeatsPerCondition").intValue = 2;
-            config.FindProperty("headTrackedSeconds").floatValue = 0.1f;
-            config.FindProperty("freeHeadMovement").boolValue = true;
-            config.FindProperty("openEndedActiveTrials").boolValue = true;
-            config.FindProperty("trainHeadMovement").boolValue = false;
-            config.FindProperty("pauseSeconds").floatValue = 0.2f;
-            config.ApplyModifiedPropertiesWithoutUndo();
-            yield return new EnterPlayMode();
-            yield return null;
-            var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
-            var controller = Object.FindAnyObjectByType<RandomDotKeyboardController>();
-            Assert.That(manager.StartSession(), Is.True);
-            manager.ConfirmResponseInstructions();
-            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.ActiveMotionInstructions),
-                "Ohne Kopftraining direkt zur Anleitung für die aktiven Trials.");
-            manager.ConfirmActiveMotionInstructions();
-
-            // Deutlich länger als Head Tracked Seconds: kein Zeitlimit.
-            double waitUntil = Time.realtimeSinceStartupAsDouble + 0.4d;
-            while (Time.realtimeSinceStartupAsDouble < waitUntil) yield return null;
-            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.PresentingMotion));
-
-            controller.SubmitResponse(Response.Convex);
-            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.InterTrial),
-                "Nach der Antwort kommt das graue Feld, dann der nächste Trial.");
-            Assert.That(manager.ValidTrialsCompleted, Is.EqualTo(1));
-            yield return WaitForState(manager, RandomDotSessionState.PresentingMotion);
-            controller.SubmitResponse(Response.Concave);
-            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.Completed));
-
-            List<Dictionary<string, string>> rows = ReadTrialRows(manager);
-            Assert.That(rows.Count, Is.EqualTo(2));
-            Assert.That(rows[0]["valid_for_analysis"], Is.EqualTo("1"));
-            Assert.That(rows[0]["response"], Is.EqualTo("Convex"));
-            Assert.That(ParseFloat(rows[0]["stimulus_duration_s"]), Is.GreaterThanOrEqualTo(0.35f));
-            Assert.That(ParseFloat(rows[0]["response_time_s"]), Is.EqualTo(0f).Within(0.001f));
-            Assert.That(rows[1]["response"], Is.EqualTo("Concave"));
-            // Bildzeiten der Darbietung stehen pro Trial in der CSV.
-            Assert.That(int.Parse(rows[0]["frames_presented"]), Is.GreaterThan(1));
-            Assert.That(int.Parse(rows[0]["slow_frames"]), Is.GreaterThanOrEqualTo(0));
-            Assert.That(ParseFloat(rows[0]["max_frame_ms"]), Is.GreaterThan(0f));
             yield return new ExitPlayMode();
         }
 
@@ -356,35 +266,6 @@ namespace GlobeEffect.VRCheckerboard.Tests
             manager.ConfirmResponseInstructions();
             Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.SimulatedTrainingInstructions));
             Assert.That(manager.ValidTrialsCompleted, Is.Zero);
-            manager.AbortSession();
-            yield return new ExitPlayMode();
-        }
-
-        [UnityTest]
-        public IEnumerator RandomDotGuidedHeadTrial_KeepsTheOldDurationGuardAndHeadTraining()
-        {
-            PrepareRandomDotScene();
-            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
-            config.FindProperty("sessionMotionMode").intValue =
-                (int)RandomDotMotionMode.HeadTracked;
-            config.FindProperty("headTrackedSeconds").floatValue = 0.2f;
-            config.FindProperty("freeHeadMovement").boolValue = false;
-            config.FindProperty("checkHeadMotion").boolValue = true;
-            config.FindProperty("trainHeadMovement").boolValue = true;
-            config.ApplyModifiedPropertiesWithoutUndo();
-            yield return new EnterPlayMode();
-            yield return null;
-            var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
-            LogAssert.Expect(LogType.Error, "Die HeadTracked-Dauer muss lang genug sein, damit der Sinus " +
-                "beide Umkehrpunkte erreicht (mindestens 3 * Amplitude / mittlere Geschwindigkeit).");
-            Assert.That(manager.StartSession(), Is.False);
-            AssertNoSessionFiles(manager);
-            config = new SerializedObject(manager);
-            config.FindProperty("headTrackedSeconds").floatValue = 5f;
-            config.ApplyModifiedPropertiesWithoutUndo();
-            Assert.That(manager.StartSession(), Is.True);
-            manager.ConfirmResponseInstructions();
-            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.HeadTrainingInstructions));
             manager.AbortSession();
             yield return new ExitPlayMode();
         }
@@ -429,11 +310,12 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(manager.ValidTrialsCompleted, Is.Zero);
             manager.ConfirmResponseInstructions();
             manager.ConfirmActiveMotionInstructions();
-            // Aktive Trials sind standardmäßig offen: Antwort während die Punkte sichtbar sind.
-            yield return WaitForState(manager, RandomDotSessionState.PresentingMotion);
-            controller.SubmitResponse(Response.Convex);
-            Assert.That(ReadTrialRows(manager)[0]["motion_mode"], Is.EqualTo("HeadTracked"));
+            // Aktive Trials: die Punkte kommen erst beim gleichmäßigen Schwenk.
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.WaitingForHeadMotion));
+            yield return SweepHead(Object.FindAnyObjectByType<RandomDotFieldStimulus>(), 2.5f, manager,
+                RandomDotSessionState.PresentingMotion);
             manager.AbortSession();
+            Assert.That(ReadTrialRows(manager)[0]["motion_mode"], Is.EqualTo("HeadTracked"));
             yield return new ExitPlayMode();
         }
 
@@ -515,7 +397,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             yield return null;
             RandomDotExperimentManager manager = StartVelocityGatedSession();
             var stimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
-            float target = manager.VelocityGateTargetSpeedPreview;
+            float target = manager.SimulatedHeadSpeedPreview;
 
             // Kopf still: Die Punkte dürfen nicht erscheinen.
             double waitUntil = Time.realtimeSinceStartupAsDouble + 0.6d;
@@ -550,6 +432,11 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(ParseFloat(row["head_offaxis_max_deviation_deg"]), Is.EqualTo(0f).Within(0.05f));
             Assert.That(ParseFloat(row["head_roll_max_deviation_deg"]), Is.EqualTo(0f).Within(0.05f));
             Assert.That(ParseFloat(row["stimulus_duration_s"]), Is.EqualTo(SimulatedSweepSeconds).Within(0.1f));
+            Assert.That(row["head_motion_constraint"], Is.EqualTo("free"));
+            // Bildzeiten der Darbietung stehen pro Trial in der CSV.
+            Assert.That(int.Parse(row["frames_presented"]), Is.GreaterThan(1));
+            Assert.That(int.Parse(row["slow_frames"]), Is.GreaterThanOrEqualTo(0));
+            Assert.That(ParseFloat(row["max_frame_ms"]), Is.GreaterThan(0f));
             yield return new ExitPlayMode();
         }
 
@@ -564,7 +451,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             var stimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
 
             // Schwenken, bis die Punkte da sind, dann anhalten.
-            yield return SweepHead(stimulus, manager.VelocityGateTargetSpeedPreview, manager,
+            yield return SweepHead(stimulus, manager.SimulatedHeadSpeedPreview, manager,
                 RandomDotSessionState.PresentingMotion);
             yield return WaitForState(manager, RandomDotSessionState.WaitingForHeadMotion);
 
@@ -591,7 +478,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             // Dreimal so schnell wie der simulierte Schwenk: Es gibt kein Zieltempo,
             // gleichmäßig reicht. Danach 40 % schneller: Das ist mehr als ±25 % vom
             // Tempo vor den Punkten, also Abbruch und später wiederholen.
-            float speed = 3f * manager.VelocityGateTargetSpeedPreview;
+            float speed = 3f * manager.SimulatedHeadSpeedPreview;
             yield return SweepHead(stimulus, speed, manager, RandomDotSessionState.PresentingMotion);
             yield return SweepHead(stimulus, 1.4f * speed, manager, RandomDotSessionState.WaitingForHeadMotion);
 
@@ -763,8 +650,6 @@ namespace GlobeEffect.VRCheckerboard.Tests
             var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
             config.FindProperty("sessionMotionMode").intValue = (int)RandomDotMotionMode.HeadTracked;
             SetFloats(config.FindProperty("instrumentMagnificationMValues"), 5f);
-            config.FindProperty("freeHeadMovement").boolValue = true;
-            config.FindProperty("useVelocityGate").boolValue = true;
             config.FindProperty("velocityChangeTolerance").floatValue = 0.25f;
             config.FindProperty("minimumMovingHeadSpeed").floatValue = 0.5f;
             config.FindProperty("velocityHoldSeconds").floatValue = 0.15f;
@@ -1097,13 +982,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
             manager.FindProperty("sessionMotionMode").intValue = (int)RandomDotMotionMode.SimulatedYaw;
             SetFloats(manager.FindProperty("instrumentMagnificationMValues"), 1f, 5f, 20f);
             SetFloats(manager.FindProperty("instrumentDistortionKValues"), 0.5f);
-            manager.FindProperty("simulatedSpeedReference").intValue =
-                (int)RandomDotSweepSpeedReference.ImageCenter;
             manager.FindProperty("simulatedImageCenterSpeed").floatValue = ImageCenterSpeed;
             manager.FindProperty("simulatedSweepSeconds").floatValue = SimulatedSweepSeconds;
             manager.FindProperty("pauseSeconds").floatValue = 0f;
             manager.FindProperty("trainSimulatedMotion").boolValue = false;
-            manager.FindProperty("trainHeadMovement").boolValue = false;
             manager.FindProperty("trainActivePanning").boolValue = false;
             manager.FindProperty("practiceTextsWaitForPress").boolValue = false;
             manager.FindProperty("repeatsPerCondition").intValue = 1;
@@ -1186,10 +1068,6 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 if (list != null) list.arraySize = 0;
             }
             manager.FindProperty("blocksPerSession").intValue = 1;
-            // Die älteren aktiven Ablauftests prüfen "offen" bzw. "mit Zeitlimit".
-            // Die Geschwindigkeitserkennung hat eigene Tests.
-            SerializedProperty velocityGate = manager.FindProperty("useVelocityGate");
-            if (velocityGate != null) velocityGate.boolValue = false;
             manager.ApplyModifiedPropertiesWithoutUndo();
 
             // Der Dummy wird hier ausdrücklich gewählt. So hängt der Test nicht

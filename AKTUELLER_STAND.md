@@ -1,3 +1,6 @@
+> Historischer Zwischenstand von Anfang Oktober 2026. Der aktuelle Stand steht in
+> der [README](README.md); manche hier beschriebenen Varianten gibt es nicht mehr.
+
 
 ## Worum geht es
 

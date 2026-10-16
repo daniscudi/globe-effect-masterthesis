@@ -1,167 +1,71 @@
 using System;
 using System.Collections.Generic;
+using GlobeEffect.VRCheckerboard.EyeTracking;
 using GlobeEffect.VRCheckerboard.RandomDots;
 
 namespace GlobeEffect.VRCheckerboard.Experiment
 {
     /// <summary>
-    /// Was bei einem gezeigten Durchgang herausgekommen ist.
+    /// Was bei einem gezeigten Durchgang herausgekommen ist: eine Zeile der CSV.
     ///
     /// Auch schiefgegangene Versuche landen hier und kommen in die CSV. Sonst
     /// könnte man später nicht mehr nachvollziehen, warum eine Bedingung noch
-    /// einmal gezeigt wurde.
+    /// einmal gezeigt wurde. Der Experiment Manager füllt die Felder direkt aus.
     /// </summary>
     public sealed class RandomDotTrialResult
     {
-        public RandomDotTrial Trial { get; }
-        public int PresentationIndex { get; }
-        public DateTime TrialStartUtc { get; }
-        public double TrialStartUnitySeconds { get; }
-        public double StimulusEndUnitySeconds { get; }
-        public double ResponseUnitySeconds { get; }
-        public CheckerboardCurvatureResponse Response { get; }
-        public bool ValidForAnalysis { get; }
-        public int CompletedHalfSweeps { get; }
-        public float MinimumYawDegrees { get; }
-        public float MaximumYawDegrees { get; }
-        public float MaximumAbsoluteYawDegrees { get; }
-        public float MeanAbsoluteYawSpeedDegreesPerSecond { get; }
-        public float PeakAbsoluteYawSpeedDegreesPerSecond { get; }
-        public float ProfileErrorDegrees { get; }
-        public float FirstExtremeErrorDegrees { get; }
-        public float SecondExtremeErrorDegrees { get; }
-        public float SweepAmplitudeDegrees { get; }
-        public float SweepSpeedDegreesPerSecond { get; }
-        public float ApertureEdgeSoftnessDegrees { get; }
-        public bool FixationSampleValid { get; }
-        public bool FixationInsideTolerance { get; }
-        public float FixationAngleDegrees { get; }
-        public float ContinuousFixationSeconds { get; }
-        public float FixationValidSampleFraction { get; }
-        public float LongestOffTargetSeconds { get; }
-        public float LongestInvalidGazeSeconds { get; }
-        public int DotCount { get; }
-        public float WorldCoverageDiameterDegrees { get; }
-        public float CarrierRadiusMeters { get; }
-        public string Status { get; }
-        public bool FreeHeadMovement { get; }
-        public FrameTimingTracker FrameTiming { get; }
-        public HeadVelocitySummary HeadVelocity { get; }
+        public RandomDotTrial Trial;
+        public int PresentationIndex;
+        public DateTime TrialStartUtc;
+        public double TrialStartUnitySeconds;
+        public double StimulusEndUnitySeconds;
+        public double ResponseUnitySeconds;
+        public CheckerboardCurvatureResponse Response;
+        public bool ValidForAnalysis;
+        public string Status = string.Empty;
 
-        /// <summary>
-        /// Gleichmäßiges Kopftempo direkt vor den Punkten, der Maßstab während der Punkte
-        /// (°/s). NaN, wenn der Trial keine Geschwindigkeitserkennung hatte.
-        /// </summary>
-        public float HeadSpeedReference { get; }
+        // Bewegung: bei Simulated der programmierte Schwenk, bei Active der echte Kopf.
+        public float MinimumYawDegrees;
+        public float MaximumYawDegrees;
+        public float MaximumAbsoluteYawDegrees;
+        public float MeanAbsoluteYawSpeedDegreesPerSecond;
+        public float PeakAbsoluteYawSpeedDegreesPerSecond;
+        public float SweepAmplitudeDegrees = float.NaN;
+        public float SweepSpeedDegreesPerSecond = float.NaN;
 
-        /// <summary>Tatsächliche Schwenkrichtung bei aktiven Trials (Right/Left bzw. Up/Down), sonst leer.</summary>
-        public string HeadDirection { get; }
+        // Punktfeld und Blick.
+        public float ApertureEdgeSoftnessDegrees;
+        public int DotCount;
+        public float WorldCoverageDiameterDegrees;
+        public float CarrierRadiusMeters;
+        public FixationSnapshot Gaze = FixationSnapshot.None;
+        public float LongestOffTargetSeconds;
+        public float LongestInvalidGazeSeconds;
+        public FrameTimingTracker FrameTiming = new();
 
+        // Nur aktive Trials (Kopftempo-Erkennung); bei Simulated NaN bzw. leer.
+        public HeadVelocitySummary HeadVelocity = HeadVelocitySummary.None;
+        /// <summary>Tempo direkt vor den Punkten, der Maßstab während der Punkte (°/s).</summary>
+        public float HeadSpeedReference = float.NaN;
+        /// <summary>Tatsächliche Schwenkrichtung (Right/Left bzw. Up/Down).</summary>
+        public string HeadDirection = string.Empty;
         /// <summary>Mittleres Tempo neben der Schwenkachse während der Punkte (°/s).</summary>
-        public float HeadOffAxisSpeed { get; }
-
+        public float HeadOffAxisSpeed = float.NaN;
         /// <summary>Größte Abweichung neben der Schwenkachse während der Punkte (°).</summary>
-        public float HeadOffAxisDeviation { get; }
-
+        public float HeadOffAxisDeviation = float.NaN;
         /// <summary>Größtes seitliches Kippen des Kopfes während der Punkte (°).</summary>
-        public float HeadRollDeviation { get; }
-
+        public float HeadRollDeviation = float.NaN;
         /// <summary>Wie weit der Kopf im Schwenk schon gedreht hatte, als die Punkte kamen (°).</summary>
-        public float HeadTurnBeforeDots { get; }
-        public string MotionConstraint => Trial.MotionMode == RandomDotMotionMode.SimulatedYaw
-            ? "simulated" : FreeHeadMovement ? "free" : "guided";
+        public float HeadTurnBeforeDots = float.NaN;
+
+        public string MotionConstraint =>
+            Trial.MotionMode == RandomDotMotionMode.SimulatedYaw ? "simulated" : "free";
 
         public double StimulusDurationSeconds =>
             Math.Max(0d, StimulusEndUnitySeconds - TrialStartUnitySeconds);
 
         public double ResponseTimeSeconds =>
             Math.Max(0d, ResponseUnitySeconds - StimulusEndUnitySeconds);
-
-        public RandomDotTrialResult(
-            RandomDotTrial trial,
-            int presentationIndex,
-            DateTime trialStartUtc,
-            double trialStartUnitySeconds,
-            double stimulusEndUnitySeconds,
-            double responseUnitySeconds,
-            CheckerboardCurvatureResponse response,
-            bool validForAnalysis,
-            int completedHalfSweeps,
-            float minimumYawDegrees,
-            float maximumYawDegrees,
-            float maximumAbsoluteYawDegrees,
-            float meanAbsoluteYawSpeedDegreesPerSecond,
-            float peakAbsoluteYawSpeedDegreesPerSecond,
-            float profileErrorDegrees,
-            float firstExtremeErrorDegrees,
-            float secondExtremeErrorDegrees,
-            float sweepAmplitudeDegrees,
-            float sweepSpeedDegreesPerSecond,
-            float apertureEdgeSoftnessDegrees,
-            bool fixationSampleValid,
-            bool fixationInsideTolerance,
-            float fixationAngleDegrees,
-            float continuousFixationSeconds,
-            float fixationValidSampleFraction,
-            float longestOffTargetSeconds,
-            float longestInvalidGazeSeconds,
-            int dotCount,
-            float worldCoverageDiameterDegrees,
-            float carrierRadiusMeters,
-            string status,
-            bool freeHeadMovement = false,
-            FrameTimingTracker frameTiming = null,
-            HeadVelocitySummary? headVelocity = null,
-            float headSpeedReference = float.NaN,
-            string headDirection = "",
-            float offAxisSpeed = float.NaN,
-            float offAxisDeviation = float.NaN,
-            float rollDeviation = float.NaN,
-            float turnBeforeDots = float.NaN)
-        {
-            Trial = trial ?? throw new ArgumentNullException(nameof(trial));
-            PresentationIndex = presentationIndex;
-            TrialStartUtc = trialStartUtc;
-            TrialStartUnitySeconds = trialStartUnitySeconds;
-            StimulusEndUnitySeconds = stimulusEndUnitySeconds;
-            ResponseUnitySeconds = responseUnitySeconds;
-            Response = response;
-            ValidForAnalysis = validForAnalysis;
-            CompletedHalfSweeps = completedHalfSweeps;
-            MinimumYawDegrees = minimumYawDegrees;
-            MaximumYawDegrees = maximumYawDegrees;
-            MaximumAbsoluteYawDegrees = maximumAbsoluteYawDegrees;
-            MeanAbsoluteYawSpeedDegreesPerSecond = meanAbsoluteYawSpeedDegreesPerSecond;
-            PeakAbsoluteYawSpeedDegreesPerSecond = peakAbsoluteYawSpeedDegreesPerSecond;
-            ProfileErrorDegrees = profileErrorDegrees;
-            FirstExtremeErrorDegrees = firstExtremeErrorDegrees;
-            SecondExtremeErrorDegrees = secondExtremeErrorDegrees;
-            SweepAmplitudeDegrees = sweepAmplitudeDegrees;
-            SweepSpeedDegreesPerSecond = sweepSpeedDegreesPerSecond;
-            ApertureEdgeSoftnessDegrees = apertureEdgeSoftnessDegrees;
-            FixationSampleValid = fixationSampleValid;
-            FixationInsideTolerance = fixationInsideTolerance;
-            FixationAngleDegrees = fixationAngleDegrees;
-            ContinuousFixationSeconds = continuousFixationSeconds;
-            FixationValidSampleFraction = fixationValidSampleFraction;
-            LongestOffTargetSeconds = longestOffTargetSeconds;
-            LongestInvalidGazeSeconds = longestInvalidGazeSeconds;
-            DotCount = dotCount;
-            WorldCoverageDiameterDegrees = worldCoverageDiameterDegrees;
-            CarrierRadiusMeters = carrierRadiusMeters;
-            Status = status ?? string.Empty;
-            FreeHeadMovement = freeHeadMovement;
-            // Kopie: der Manager setzt seinen Zähler für den nächsten Trial zurück.
-            FrameTiming = new FrameTimingTracker();
-            if (frameTiming != null) FrameTiming.CopyFrom(frameTiming);
-            HeadVelocity = headVelocity ?? HeadVelocitySummary.None;
-            HeadSpeedReference = headSpeedReference;
-            HeadDirection = headDirection ?? string.Empty;
-            HeadOffAxisSpeed = offAxisSpeed;
-            HeadOffAxisDeviation = offAxisDeviation;
-            HeadRollDeviation = rollDeviation;
-            HeadTurnBeforeDots = turnBeforeDots;
-        }
     }
 
     /// <summary>
@@ -170,7 +74,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// </summary>
     public sealed class RandomDotExperimentFiles : ExperimentFilesBase
     {
-        public const string MappingVersion = "merlitz-instrument-k-m-free-or-guided-head-aperture-halfmax-v9";
+        public const string MappingVersion = "merlitz-instrument-k-m-free-head-aperture-halfmax-v10";
 
         private const string PlanHeader = SessionColumns +
             "sequence_index,total_planned_trials,condition_index,repetition,motion_block_index," +
@@ -187,9 +91,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "response_time_s,eye_presentation,angular_diameter_deg,aperture_edge_softness_deg," +
             "instrument_distortion_k,instrument_magnification_m,content_zoom,motion_mode," +
             "sweep_axis,sweep_direction,sweep_amplitude_deg,sweep_speed_deg_per_s," +
-            "completed_half_sweeps,min_sweep_deg,max_sweep_deg,max_abs_sweep_deg," +
-            "mean_abs_sweep_speed_deg_per_s,peak_abs_sweep_speed_deg_per_s,profile_rmse_deg," +
-            "first_turn_error_deg,second_turn_error_deg,dot_seed,dot_count," +
+            "min_sweep_deg,max_sweep_deg,max_abs_sweep_deg," +
+            "mean_abs_sweep_speed_deg_per_s,peak_abs_sweep_speed_deg_per_s,dot_seed,dot_count," +
             "world_coverage_diameter_deg,carrier_radius_m,response,valid_for_analysis," +
             "fixation_sample_valid,fixation_inside_tolerance,fixation_angle_deg," +
             "continuous_fixation_s,fixation_valid_sample_fraction,longest_off_target_s," +
@@ -235,6 +138,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // TrialHeader passen, sonst stehen die Zahlen später in den
             // falschen Spalten.
             RandomDotTrial trial = result.Trial;
+            FixationSnapshot gaze = result.Gaze;
             AppendResultRow(StartRow()
                 .Add(result.PresentationIndex).Add(trial.SequenceIndex).Add(plannedTrials)
                 .Add(trial.ConditionIndex).Add(trial.Repetition).Add(trial.AttemptNumber)
@@ -247,16 +151,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 .Add(trial.ContentZoom).Add(trial.MotionMode.ToString())
                 .Add(trial.SweepAxis.ToString()).Add(trial.DirectionLabel)
                 .Add(result.SweepAmplitudeDegrees).Add(result.SweepSpeedDegreesPerSecond)
-                .Add(result.CompletedHalfSweeps).Add(result.MinimumYawDegrees)
-                .Add(result.MaximumYawDegrees).Add(result.MaximumAbsoluteYawDegrees)
-                .Add(result.MeanAbsoluteYawSpeedDegreesPerSecond)
-                .Add(result.PeakAbsoluteYawSpeedDegreesPerSecond).Add(result.ProfileErrorDegrees)
-                .Add(result.FirstExtremeErrorDegrees).Add(result.SecondExtremeErrorDegrees)
+                .Add(result.MinimumYawDegrees).Add(result.MaximumYawDegrees)
+                .Add(result.MaximumAbsoluteYawDegrees).Add(result.MeanAbsoluteYawSpeedDegreesPerSecond)
+                .Add(result.PeakAbsoluteYawSpeedDegreesPerSecond)
                 .Add(trial.DotSeed).Add(result.DotCount).Add(result.WorldCoverageDiameterDegrees)
                 .Add(result.CarrierRadiusMeters).Add(result.Response.ToString())
-                .Add(result.ValidForAnalysis).Add(result.FixationSampleValid)
-                .Add(result.FixationInsideTolerance).Add(result.FixationAngleDegrees)
-                .Add(result.ContinuousFixationSeconds).Add(result.FixationValidSampleFraction)
+                .Add(result.ValidForAnalysis).Add(gaze.SampleValid)
+                .Add(gaze.OnTarget).Add(gaze.AngleDegrees)
+                .Add(gaze.SteadySeconds).Add(gaze.ValidSampleFraction)
                 .Add(result.LongestOffTargetSeconds).Add(result.LongestInvalidGazeSeconds)
                 .Add(result.Status)
                 // sweep_speed_deg_per_s ist der Objektwinkel. Hier steht zusätzlich,
@@ -271,7 +173,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 .Add(result.HeadVelocity.TargetSpeed).Add(result.HeadVelocity.OnsetSpeed)
                 .Add(result.HeadVelocity.MeanSpeed).Add(result.HeadVelocity.MinSpeed)
                 .Add(result.HeadVelocity.MaxSpeed).Add(result.HeadVelocity.WaitSeconds)
-                // Maßstab während der Punkte: gleichmäßiges Tempo direkt davor.
+                // Maßstab während der Punkte: Tempo direkt davor.
                 .Add(result.HeadSpeedReference)
                 // Aktive Trials: echte Richtung und Bewegung neben der Schwenkachse.
                 .Add(result.HeadDirection).Add(result.HeadOffAxisSpeed)

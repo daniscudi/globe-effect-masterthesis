@@ -168,8 +168,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             bool restartMotion = nextMotion != motionSettings;
             motionSettings = nextMotion;
             ClearMarkers();
-            objectSpeed = RandomDotSimulatedSweep.ObjectSpeed(RandomDotSweepSpeedReference.ImageCenter,
-                1f, imageCenterSpeed, magnification, 1f);
+            objectSpeed = RandomDotSimulatedSweep.ObjectSpeed(imageCenterSpeed, magnification, 1f);
             amplitude = objectSpeed * durationSeconds * 0.5f;
             field.SetInstrumentDistortionK(distortionK);
             field.SetInstrumentMagnification(magnification);

@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using UnityEngine.Serialization;
 
@@ -7,17 +6,15 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     /// <summary>
     /// Schreibt mit, wie die Links-Rechts-Bewegung im Durchgang verlaufen ist.
     ///
-    /// Im normalen Modus "SimulatedYaw" läuft die Bewegung automatisch im Shader.
-    /// Dann wird einfach dieser Wert mitgeschrieben.
-    ///
-    /// Es gibt auch noch den Modus "HeadTracked". Da dreht die Person den Kopf
-    /// selbst, und gemessen wird, wie weit sie sich vom Startpunkt weggedreht hat.
+    /// Im Modus "SimulatedYaw" läuft die Bewegung automatisch im Shader. Dann wird
+    /// einfach dieser Wert mitgeschrieben. Im Modus "HeadTracked" dreht die Person
+    /// den Kopf selbst, und gemessen wird, wie weit sie sich vom Startpunkt
+    /// weggedreht hat. Die Werte landen in der CSV (min/max Winkel, Tempo).
     /// </summary>
     [DisallowMultipleComponent]
     public sealed class RandomDotHeadSweepMonitor : MonoBehaviour
     {
-        // Dieses Skript bewegt selbst gar nichts. Es schaut nur zu und zählt,
-        // wie oft der linke und der rechte Rand abwechselnd erreicht wurden.
+        // Dieses Skript bewegt selbst gar nichts. Es schaut nur zu.
         [Header("References")]
         [SerializeField]
         private Transform observer;
@@ -25,22 +22,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         [SerializeField]
         private RandomDotFieldStimulus stimulus;
 
-        [Header("Motion Log")]
-        [FormerlySerializedAs("yawThresholdDegrees")]
-        [SerializeField, Range(0.5f, 45f)]
-        [Tooltip("How far the head must turn to each side before it counts as a turn, in degrees.")]
-        private float turnaroundDegrees = 1.5f;
-
-        [SerializeField, Range(1, 20)]
-        [Tooltip("Minimum number of full left-right turns.")]
-        private int requiredHalfSweeps = 1;
-
         [Header("Current Status")]
         [SerializeField]
         private float currentYawDegrees;
-
-        [SerializeField]
-        private int completedHalfSweeps;
 
         [FormerlySerializedAs("maximumAbsoluteYawDegrees")]
         [SerializeField]
@@ -56,38 +40,22 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
 
         // Die Richtung, in die der Kopf am Anfang des Durchgangs geschaut hat.
         private Vector3 startDirection = Vector3.forward;
-        private AlternatingHeadSweepCounter counter;
+        private float minimumYawDegrees;
+        private float maximumYawDegrees;
         private float previousYawDegrees;
         private double previousSampleTime;
         private float accumulatedAbsoluteYawDegrees;
         private float accumulatedMeasurementSeconds;
         private float smoothedAbsoluteYawSpeedDegreesPerSecond;
         private bool hasPreviousYawSample;
-        private RandomDotSweepProfileEvaluator profileEvaluator;
-        private double profileStartSeconds;
-        private double previousProfileElapsedSeconds;
-        private bool hasPreviousProfileSample;
-        private bool trackingProfile;
         private bool trackingYaw;
 
-        public event Action<int, float> HalfSweepCompleted;
-
         public float CurrentYawDegrees => currentYawDegrees;
-        public int CompletedHalfSweeps => completedHalfSweeps;
-        public int RequiredHalfSweeps => requiredHalfSweeps;
-        public float YawThresholdDegrees => turnaroundDegrees;
         public float MaximumAbsoluteYawDegrees => maxHeadTurnDegrees;
         public float MeanAbsoluteYawSpeedDegreesPerSecond => meanHeadSpeed;
         public float PeakAbsoluteYawSpeedDegreesPerSecond => peakHeadSpeed;
-        public float MinimumYawDegrees => counter?.MinimumYawDegrees ?? 0f;
-        public float MaximumYawDegrees => counter?.MaximumYawDegrees ?? 0f;
-        public bool RequirementMet => completedHalfSweeps >= requiredHalfSweeps;
-        public float ProfileErrorDegrees =>
-            profileEvaluator?.RootMeanSquareErrorDegrees ?? float.PositiveInfinity;
-        public float FirstExtremeErrorDegrees =>
-            profileEvaluator?.FirstExtremeErrorDegrees ?? float.PositiveInfinity;
-        public float SecondExtremeErrorDegrees =>
-            profileEvaluator?.SecondExtremeErrorDegrees ?? float.PositiveInfinity;
+        public float MinimumYawDegrees => minimumYawDegrees;
+        public float MaximumYawDegrees => maximumYawDegrees;
 
         private void Awake()
         {
@@ -104,37 +72,14 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             }
 
             // Im simulierten Modus ist dies der programmierte Winkel der gewählten
-            // Achse (Yaw oder Pitch). HeadTracked misst weiterhin echten Yaw.
+            // Achse (Yaw oder Pitch). HeadTracked misst echten Yaw.
             currentYawDegrees = stimulus.MotionMode == RandomDotMotionMode.SimulatedYaw
                 ? stimulus.CurrentSimulatedSweepDegrees
                 : MeasureRealHeadYaw();
             UpdateYawSpeed(currentYawDegrees);
-
-            if (trackingProfile && profileEvaluator != null)
-            {
-                double elapsed = Time.realtimeSinceStartupAsDouble - profileStartSeconds;
-                float deltaSeconds =
-                    hasPreviousProfileSample ? (float)(elapsed - previousProfileElapsedSeconds) : 0f;
-                profileEvaluator.AddSample(elapsed, currentYawDegrees, deltaSeconds);
-                previousProfileElapsedSeconds = elapsed;
-                hasPreviousProfileSample = true;
-            }
-
-            counter ??= new AlternatingHeadSweepCounter(turnaroundDegrees);
-            bool sweepCompleted = counter.Update(currentYawDegrees);
-            maxHeadTurnDegrees = counter.MaximumAbsoluteYawDegrees;
-            if (sweepCompleted)
-            {
-                completedHalfSweeps = counter.CompletedHalfSweeps;
-                HalfSweepCompleted?.Invoke(completedHalfSweeps, currentYawDegrees);
-            }
-        }
-
-        public void ConfigureCriterion(float thresholdDegrees, int halfSweeps)
-        {
-            turnaroundDegrees = Mathf.Clamp(thresholdDegrees, 0.5f, 45f);
-            requiredHalfSweeps = Mathf.Clamp(halfSweeps, 1, 20);
-            ResetForTrial();
+            minimumYawDegrees = Mathf.Min(minimumYawDegrees, currentYawDegrees);
+            maximumYawDegrees = Mathf.Max(maximumYawDegrees, currentYawDegrees);
+            maxHeadTurnDegrees = Mathf.Max(maxHeadTurnDegrees, Mathf.Abs(currentYawDegrees));
         }
 
         public void ResetForTrial()
@@ -143,9 +88,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             // Alles danach wird als Abweichung von dieser Richtung gemessen.
             FindReferences();
             startDirection = RemoveUpDownTilt(observer != null ? observer.forward : Vector3.forward);
-            counter = new AlternatingHeadSweepCounter(turnaroundDegrees);
             currentYawDegrees = 0f;
-            completedHalfSweeps = 0;
+            minimumYawDegrees = 0f;
+            maximumYawDegrees = 0f;
             maxHeadTurnDegrees = 0f;
             meanHeadSpeed = 0f;
             peakHeadSpeed = 0f;
@@ -155,29 +100,15 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             accumulatedMeasurementSeconds = 0f;
             smoothedAbsoluteYawSpeedDegreesPerSecond = 0f;
             hasPreviousYawSample = false;
-            profileEvaluator = null;
-            trackingProfile = false;
             trackingYaw = true;
-            hasPreviousProfileSample = false;
-            previousProfileElapsedSeconds = 0d;
         }
 
-        public void StartProfileTracking(
-            float amplitudeDegrees, float speedDegreesPerSecond, RandomDotSweepDirection direction)
+        /// <summary>
+        /// Nach dem Ausblenden der Punkte bleibt der graue Kreis sichtbar. Antworten
+        /// und Pausen dürfen die Bewegungskennwerte nicht mehr ändern.
+        /// </summary>
+        public void StopTracking()
         {
-            profileEvaluator =
-                new RandomDotSweepProfileEvaluator(amplitudeDegrees, speedDegreesPerSecond, direction);
-            profileStartSeconds = Time.realtimeSinceStartupAsDouble;
-            previousProfileElapsedSeconds = 0d;
-            hasPreviousProfileSample = false;
-            trackingProfile = true;
-        }
-
-        public void StopProfileTracking()
-        {
-            trackingProfile = false;
-            // Nach Ausblenden der Punkte bleibt der graue Kreis sichtbar.
-            // Antworten und Pausen dürfen die Bewegungskennwerte nicht ändern.
             trackingYaw = false;
         }
 
@@ -226,18 +157,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 return 0f;
             }
 
-            return YawFromStart(startDirection, observer);
-        }
-
-        /// <summary>
-        /// Wie weit ist der Kopf seit der Startrichtung nach links oder rechts
-        /// gedreht, in Grad? Das Kopftraining im Experiment Manager nutzt das auch.
-        /// </summary>
-        public static float YawFromStart(Vector3 startDirection, Transform head)
-        {
-            // SignedAngle gibt links und rechts mit unterschiedlichem Vorzeichen
-            // zurück. Genau das brauchen wir hier.
-            Vector3 currentForward = RemoveUpDownTilt(head.forward);
+            // SignedAngle gibt links und rechts mit unterschiedlichem Vorzeichen zurück.
+            Vector3 currentForward = RemoveUpDownTilt(observer.forward);
             return Vector3.SignedAngle(startDirection, currentForward, Vector3.up);
         }
 
@@ -263,19 +184,13 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             }
         }
 
-        public static Vector3 RemoveUpDownTilt(Vector3 direction)
+        private static Vector3 RemoveUpDownTilt(Vector3 direction)
         {
             // Ob der Kopf nach oben oder unten geneigt ist, interessiert hier nicht.
             // Uns interessiert nur das Drehen nach links und rechts. Deshalb wird
             // der Höhenanteil einfach auf null gesetzt.
             direction.y = 0f;
             return direction.sqrMagnitude > 1e-8f ? direction.normalized : Vector3.forward;
-        }
-
-        private void OnValidate()
-        {
-            turnaroundDegrees = Mathf.Clamp(turnaroundDegrees, 0.5f, 45f);
-            requiredHalfSweeps = Mathf.Clamp(requiredHalfSweeps, 1, 20);
         }
     }
 }
