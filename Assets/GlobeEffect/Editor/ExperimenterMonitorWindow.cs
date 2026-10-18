@@ -228,7 +228,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     : "gaze check is off");
                 // Abbruchquote: Sind die Einstellungen zu streng, wird fast jeder Trial wiederholt.
                 Row("Stopped Trials", hasSession ? StoppedText(session) : Missing);
-                Row("  Speed Changed", hasSession ? Number(session.SpeedChangedAttempts) : Missing);
+                Row("  Head Stopped", hasSession ? Number(session.HeadStoppedAttempts) : Missing);
                 Row("Next Sweep", hasSession ? session.NextSweepDirection : Missing);
                 if (hasSession && session.ActivePracticeAttempts > 0)
                     Row("Last Active Practice", Number(session.ActivePracticeGoodTrials) + " good of " +
@@ -249,7 +249,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
         }
 
         // Live-Kopftempo für den Pilot: Wie schnell dreht der Kopf, wie schnell laufen
-        // die Punkte dabei, und dreht der Kopf gleichmäßig genug, dass sie jetzt erscheinen würden?
+        // die Punkte dabei, und dreht der Kopf schnell genug, dass sie jetzt erscheinen würden?
         private static void DrawLiveHeadSpeed(RandomDotExperimentManager session, RandomDotFieldStimulus stimulus)
         {
             RandomDotLiveHeadSpeed live = session.LiveHeadSpeed;
@@ -265,7 +265,6 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
                 Row("Head Speed Now", Number(live.HeadSpeed, "F2", " °/s"));
                 Row("Head Speed (1 s Average)", Number(live.AverageHeadSpeed, "F2", " °/s"));
-                Row("Steady For", Number(live.SteadySeconds, "F2", " s"));
                 Row("Simulated Equals", Number(live.SimulatedHeadSpeed, "F2", " °/s head (for comparison)"));
                 Row("Dot Speed In Image Center", Number(live.ImageCenterSpeed, "F1", " °/s") +
                     "  (1 s average " + Number(live.AverageImageCenterSpeed, "F1", " °/s)"));
@@ -273,10 +272,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 Row("Dot Jump Per Frame", Number(live.ImageStepPerFrameDegrees, "F2", "°") + dotSize);
                 Row("Frames Per Second", Number(live.FramesPerSecond, "F0"));
 
-                string state = live.WouldShowDots ? "YES"
-                    : !live.IsMoving ? "NO – head is still"
-                    : "NOT YET – keep turning steadily";
-                Row("Dots Would Appear", state);
+                Row("Dots Would Appear", live.WouldShowDots ? "YES (if the direction is right)"
+                    : "NO – head is still");
 
                 if (stimulus != null && stimulus.DotSizeDegrees > 0f
                     && live.ImageStepPerFrameDegrees > stimulus.DotSizeDegrees)

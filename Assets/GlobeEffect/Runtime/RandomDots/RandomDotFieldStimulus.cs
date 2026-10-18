@@ -226,11 +226,17 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         private MaterialPropertyBlock propertyBlock;
         private bool isVisible = true;
         private bool pointsVisible = true;
+        // Kreuz an/aus (in der Antwortphase nur die graue Fläche).
+        private bool crossVisible = true;
         // Einblenden der Punkte: ab wann und wie lange (0 = sofort voll da).
         private double dotsShownAtSeconds;
         private float dotsFadeInSeconds;
-        // Farbsignal am Kreuz; Alpha ist die Deckkraft, 0 = normales Kreuz.
-        private Color fixationSignalColor = Color.clear;
+        // Ausblenden der Punkte (Active Practice 1): läuft gerade, ab wann und wie lange.
+        private bool dotsFadingOut;
+        private double dotsFadeOutAtSeconds;
+        private float dotsFadeOutSeconds;
+        // Flash über die graue Fläche; Alpha ist die Deckkraft, 0 = kein Flash.
+        private Color fieldFlashColor = Color.clear;
         private bool meshRebuildPending;
         private RandomDotMotionMode lastPreviewMotionMode;
 
@@ -382,6 +388,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             // Kopfposition und Schwenkwinkel ändern sich dauernd. Beide werden
             // deshalb in jedem Frame neu weitergegeben.
             FollowHeadDuringSimulatedSweep();
+            FinishFadeOutIfDone();
             SendFrameValuesToShader();
         }
 
@@ -600,6 +607,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             // nur die Punkte eingeblendet; Kreuz und graue Fläche sind sofort da.
             isVisible = true;
             pointsVisible = true;
+            crossVisible = true;
+            dotsFadingOut = false;
             dotsShownAtSeconds = Time.realtimeSinceStartupAsDouble;
             dotsFadeInSeconds = Mathf.Max(0f, fadeInSeconds);
             SendValuesToShader();
@@ -610,33 +619,80 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public static float FadeInOpacity(double secondsSinceShown, float fadeInSeconds) =>
             fadeInSeconds <= 0f ? 1f : Mathf.Clamp01((float)(secondsSinceShown / fadeInSeconds));
 
+        /// <summary>Deckkraft beim Ausblenden: fällt in fadeOutSeconds von 1 auf 0.</summary>
+        public static float FadeOutOpacity(double secondsSinceFadeStart, float fadeOutSeconds) =>
+            fadeOutSeconds <= 0f ? 0f : 1f - Mathf.Clamp01((float)(secondsSinceFadeStart / fadeOutSeconds));
+
         /// <summary>
-        /// Färbt das Kreuz als Signal ein (zum Beispiel "jetzt antworten"), halb
-        /// durchsichtig mit der angegebenen Deckkraft. Die Punkte bleiben unverändert.
+        /// Blendet die Punkte aus; Kreuz und graue Fläche bleiben. Bis das Ausblenden
+        /// fertig ist, gilt PointsVisible noch als true.
         /// </summary>
-        public void SetFixationSignal(Color color, float opacity)
+        public void FadeOutDots(float seconds)
+        {
+            if (!pointsVisible || dotsFadingOut) return;
+            if (seconds <= 0f)
+            {
+                pointsVisible = false;
+                SendValuesToShader();
+                return;
+            }
+
+            dotsFadingOut = true;
+            dotsFadeOutAtSeconds = Time.realtimeSinceStartupAsDouble;
+            dotsFadeOutSeconds = seconds;
+        }
+
+        /// <summary>Werden die Punkte gerade ausgeblendet?</summary>
+        public bool DotsFadingOut => dotsFadingOut;
+
+        private void FinishFadeOutIfDone()
+        {
+            if (!dotsFadingOut
+                || Time.realtimeSinceStartupAsDouble - dotsFadeOutAtSeconds < dotsFadeOutSeconds) return;
+            dotsFadingOut = false;
+            pointsVisible = false;
+            SendValuesToShader();
+        }
+
+        /// <summary>
+        /// Färbt die graue Fläche kurz ein (Flash nach der Antwort), mit der
+        /// angegebenen Deckkraft. Kreuz und Punkte bleiben unverändert.
+        /// </summary>
+        public void SetFieldFlash(Color color, float opacity)
         {
             color.a = Mathf.Clamp01(opacity);
-            fixationSignalColor = color;
+            fieldFlashColor = color;
             SendValuesToShader();
         }
 
-        public void ClearFixationSignal()
+        public void ClearFieldFlash()
         {
-            if (fixationSignalColor.a <= 0f) return;
-            fixationSignalColor = Color.clear;
+            if (fieldFlashColor.a <= 0f) return;
+            fieldFlashColor = Color.clear;
             SendValuesToShader();
         }
 
-        /// <summary>Aktuelles Signal am Kreuz; Alpha 0 heißt kein Signal.</summary>
-        public Color FixationSignal => fixationSignalColor;
+        /// <summary>Aktueller Flash über der grauen Fläche; Alpha 0 heißt kein Flash.</summary>
+        public Color FieldFlash => fieldFlashColor;
 
         /// <summary>Sind die Punkte gerade an (nicht nur Kreuz und graue Fläche)?</summary>
         public bool PointsVisible => isVisible && pointsVisible;
 
+        /// <summary>Ist das Fixationskreuz gerade zu sehen?</summary>
+        public bool CrossVisible => isVisible && crossVisible && showFixationTarget;
+
         /// <summary>Wie weit die Punkte gerade eingeblendet sind (0 bis 1).</summary>
-        public float DotsOpacity =>
-            FadeInOpacity(Time.realtimeSinceStartupAsDouble - dotsShownAtSeconds, dotsFadeInSeconds);
+        public float DotsOpacity
+        {
+            get
+            {
+                double now = Time.realtimeSinceStartupAsDouble;
+                float opacity = FadeInOpacity(now - dotsShownAtSeconds, dotsFadeInSeconds);
+                return dotsFadingOut
+                    ? opacity * FadeOutOpacity(now - dotsFadeOutAtSeconds, dotsFadeOutSeconds)
+                    : opacity;
+            }
+        }
 
         /// <summary>
         /// Zeigt vor dem Durchgang nur das Kreuz in der Mitte. Die Punkte bleiben
@@ -646,6 +702,19 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         {
             isVisible = true;
             pointsVisible = false;
+            crossVisible = true;
+            dotsFadingOut = false;
+            SendValuesToShader();
+            ShowOrHideRenderer();
+        }
+
+        /// <summary>Nur die graue Fläche, ohne Punkte und ohne Kreuz (Antwortphase).</summary>
+        public void ShowEmptyField()
+        {
+            isVisible = true;
+            pointsVisible = false;
+            crossVisible = false;
+            dotsFadingOut = false;
             SendValuesToShader();
             ShowOrHideRenderer();
         }
@@ -888,7 +957,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             propertyBlock.SetFloat("_ContentZoom", contentZoom);
             propertyBlock.SetFloat("_EyeMode", (float)eyePresentation);
             propertyBlock.SetFloat("_DotsEnabled", pointsVisible ? 1f : 0f);
-            propertyBlock.SetColor("_FixationSignalColor", fixationSignalColor);
+            propertyBlock.SetFloat("_FixationVisible", crossVisible ? 1f : 0f);
+            propertyBlock.SetColor("_FieldFlashColor", fieldFlashColor);
             propertyBlock.SetFloat("_DotHalfSizeRad", 0.5f * dotSizeDegrees * Mathf.Deg2Rad);
             // Nur eine unverzerrte Messlatte vor dem Kopf, nie Teil eines Trials.
             propertyBlock.SetFloat("_ReferenceGridEnabled", showReferenceGrid && !SessionRunning ? 1f : 0f);

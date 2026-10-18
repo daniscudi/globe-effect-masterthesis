@@ -45,8 +45,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         // Nur aktive Trials (Kopftempo-Erkennung); bei Simulated NaN bzw. leer.
         public HeadVelocitySummary HeadVelocity = HeadVelocitySummary.None;
-        /// <summary>Tempo direkt vor den Punkten, der Maßstab während der Punkte (°/s).</summary>
-        public float HeadSpeedReference = float.NaN;
         /// <summary>Tatsächliche Schwenkrichtung (Right/Left bzw. Up/Down).</summary>
         public string HeadDirection = string.Empty;
         /// <summary>Mittleres Tempo neben der Schwenkachse während der Punkte (°/s).</summary>
@@ -55,8 +53,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public float HeadOffAxisDeviation = float.NaN;
         /// <summary>Größtes seitliches Kippen des Kopfes während der Punkte (°).</summary>
         public float HeadRollDeviation = float.NaN;
-        /// <summary>Wie weit der Kopf im Schwenk schon gedreht hatte, als die Punkte kamen (°).</summary>
-        public float HeadTurnBeforeDots = float.NaN;
 
         public string MotionConstraint =>
             Trial.MotionMode == RandomDotMotionMode.SimulatedYaw ? "simulated" : "free";
@@ -100,8 +96,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "frames_presented,slow_frames,max_frame_ms,expected_frame_ms," +
             "velocity_gate_target_deg_per_s,head_speed_onset_deg_per_s,head_speed_mean_deg_per_s," +
             "head_speed_min_deg_per_s,head_speed_max_deg_per_s,head_motion_wait_s," +
-            "head_speed_reference_deg_per_s,head_direction,head_offaxis_speed_mean_deg_per_s," +
-            "head_offaxis_max_deviation_deg,head_roll_max_deviation_deg,head_turn_before_dots_deg";
+            "head_direction,head_offaxis_speed_mean_deg_per_s," +
+            "head_offaxis_max_deviation_deg,head_roll_max_deviation_deg";
 
         public RandomDotExperimentFiles(
             string outputRoot,
@@ -173,12 +169,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 .Add(result.HeadVelocity.TargetSpeed).Add(result.HeadVelocity.OnsetSpeed)
                 .Add(result.HeadVelocity.MeanSpeed).Add(result.HeadVelocity.MinSpeed)
                 .Add(result.HeadVelocity.MaxSpeed).Add(result.HeadVelocity.WaitSeconds)
-                // Maßstab während der Punkte: Tempo direkt davor.
-                .Add(result.HeadSpeedReference)
                 // Aktive Trials: echte Richtung und Bewegung neben der Schwenkachse.
                 .Add(result.HeadDirection).Add(result.HeadOffAxisSpeed)
-                .Add(result.HeadOffAxisDeviation).Add(result.HeadRollDeviation)
-                .Add(result.HeadTurnBeforeDots));
+                .Add(result.HeadOffAxisDeviation).Add(result.HeadRollDeviation));
         }
     }
 }

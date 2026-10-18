@@ -108,79 +108,64 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         public void ShowActiveMotionInstructions(string responseLines, string startKey, HeadVelocityAxis axis,
             bool alternate)
         {
+            Show("ACTIVE HEAD MOVEMENT\n\n" + ActiveTrialRules(axis, alternate),
+                responseLines + "\n\n" + startKey + " = START TRIALS");
+        }
+
+        // Die Regel der aktiven Trials, gleich in der Anleitung und vor Practice 2.
+        private static string ActiveTrialRules(HeadVelocityAxis axis, bool alternate)
+        {
+            string stopRule = "If you stop or turn back too early, the dots vanish.\n" +
+                "Answer anyway. The trial comes again later.";
             if (alternate)
             {
                 // Ein Schwenk pro Trial, abwechselnd: hin, antworten, zurück, antworten.
                 string sides = axis == HeadVelocityAxis.Horizontal ? "to one side" : "up or down";
                 string back = axis == HeadVelocityAxis.Horizontal ? "back to the other side" : "back the other way";
-                Show("ACTIVE HEAD MOVEMENT\n\n" +
-                    "Keep looking at the cross. Each trial is one calm sweep:\n" +
-                    "turn your head steadily " + sides + ", at a natural speed.\n" +
-                    "The dots appear on the way. Keep the same speed until they disappear.\n" +
-                    "Then stop and answer. Next trial: sweep " + back + ".",
-                    responseLines + "\n\n" + startKey + " = START TRIALS");
-                return;
+                return "Keep looking at the cross. Each trial is one sweep:\n" +
+                    "turn your head " + sides + ", at a natural speed.\n" +
+                    "The dots appear while you turn. Keep turning until they disappear.\n" +
+                    "Then stop and answer. Next trial: sweep " + back + ".\n" + stopRule;
             }
 
-            // Punkte erscheinen bei gleichmäßigem Schwenk in beliebigem Tempo und
-            // verschwinden früh, wenn sich das Tempo ändert.
             string direction = axis == HeadVelocityAxis.Horizontal ? "left or right" : "up or down";
-            Show("ACTIVE HEAD MOVEMENT\n\n" +
-                "Keep looking at the cross and turn your head\n" +
-                "steadily " + direction + ", at a speed that feels natural.\n" +
-                "The dots appear while you move.\n" +
-                "Keep the same speed until they disappear.\n" +
-                "If you change speed, they vanish early and come again later.\n" +
-                "Answer after they disappear.",
-                responseLines + "\n\n" + startKey + " = START TRIALS");
+            return "Keep looking at the cross and turn your head\n" +
+                direction + ", at a speed that feels natural.\n" +
+                "The dots appear while you turn. Keep turning until they disappear.\n" +
+                "Then answer.\n" + stopRule;
         }
 
-        public void ShowActivePracticeInstructions(string responseLines, string startKey, HeadVelocityAxis axis,
-            bool speedExample, bool alternate)
+        public void ShowActivePracticeInstructions(string responseLines, string startKey, bool speedExample,
+            bool freeMovement)
         {
-            string direction = axis == HeadVelocityAxis.Horizontal ? "left and right" : "up and down";
-            Show("ACTIVE HEAD MOVEMENT PRACTICE\n\n" +
-                (speedExample ? "First the computer shows you a calm speed.\nKeep your head still for that.\n\n" : "") +
-                "Then keep looking at the cross and turn your head\n" +
-                "steadily " + direction + ", like looking around with binoculars.\n" +
-                "The dots appear while you move.\n" +
-                "Keep the same speed until they disappear." +
-                (alternate ? "\nOne sweep per trial: stop, answer, then sweep back." : ""),
-                "After the dots, answer with:\n" + responseLines + "\n\n" + startKey + " = START PRACTICE");
+            string steps = (speedExample ? "- An example of a calm speed. Keep your head still for it.\n" : "") +
+                (freeMovement ? "- Practice 1: turn your head freely and get a feel for the dots.\n" : "") +
+                "- Practice 2: trials like in the test.";
+            Show("ACTIVE HEAD MOVEMENT PRACTICE\n\n" + steps,
+                "In practice 2, answer after the dots with:\n" + responseLines + "\n\n" +
+                startKey + " = START PRACTICE");
         }
 
         public void ShowActiveSpeedExample()
         {
-            Show("THIS IS A CALM SPEED\n\nKeep your head still and look at the cross.\n" +
+            Show("AN EXAMPLE OF A CALM SPEED\n\nKeep your head still and look at the cross.\n" +
                 "The computer moves the dots.", string.Empty);
         }
 
-        public void ShowActivePracticeTurn(int attempt, int goodTrials, int requiredGoodTrials, HeadVelocityAxis axis,
-            int requiredSign)
+        public void ShowFreeMovementPracticeStart(HeadVelocityAxis axis)
         {
-            // Mit abwechselnder Richtung steht da, wohin es diesmal geht.
-            string direction = requiredSign == 0
-                ? (axis == HeadVelocityAxis.Horizontal ? "left or right" : "up or down")
-                : axis == HeadVelocityAxis.Horizontal
-                    ? (requiredSign > 0 ? "to the RIGHT" : "to the LEFT")
-                    : (requiredSign > 0 ? "UP" : "DOWN");
-            Show("PRACTICE " + attempt + "\n\nTurn your head steadily " + direction + ".",
-                GoodTrialsText(goodTrials, requiredGoodTrials));
+            string direction = axis == HeadVelocityAxis.Horizontal ? "left and right" : "up and down";
+            Show("PRACTICE 1: FREE HEAD MOVEMENT\n\n" +
+                "Look at the cross and turn your head " + direction + ",\n" +
+                "like looking around with binoculars.\n" +
+                "The dots stay while your head moves\nand fade out when it stops.\n" +
+                "No answers. The experimenter ends this part.", string.Empty);
         }
 
-        public void ShowActivePracticeResponse(string responseLines)
+        public void ShowTrialPracticeStart(string responseLines, HeadVelocityAxis axis, bool alternate)
         {
-            Show("OUTWARD OR INWARD?", responseLines);
-        }
-
-        public void ShowActivePracticeFeedback(string message, int goodTrials, int requiredGoodTrials)
-        {
-            Show(message, GoodTrialsText(goodTrials, requiredGoodTrials));
-        }
-
-        private static string GoodTrialsText(int goodTrials, int requiredGoodTrials)
-        {
-            return "Good trials: " + goodTrials + " / " + requiredGoodTrials;
+            Show("PRACTICE 2: TRIALS LIKE IN THE TEST\n\n" + ActiveTrialRules(axis, alternate),
+                "Answer with:\n" + responseLines);
         }
 
         /// <summary>Hängt eine Zeile unten an, zum Beispiel "press trackpad to continue".</summary>

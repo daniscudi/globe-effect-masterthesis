@@ -30,16 +30,17 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [Test]
-        public void SteadySweep_IsMeasuredAndCountsAsInRange()
+        public void SteadySweep_IsMeasuredWithSign()
         {
             var gate = new RandomDotHeadVelocityGate();
             gate.Reset();
-            Feed(gate, degreesPerSecond: 2f, seconds: 1f, minimum: 1f, maximum: 3f);
-
+            Feed(gate, degreesPerSecond: 2f, seconds: 1f);
             Assert.That(gate.SignedSpeedDegreesPerSecond, Is.EqualTo(2f).Within(0.05f));
-            // Die Glättung braucht kurz zum Einschwingen, danach liegt alles im Bereich.
-            Assert.That(gate.SecondsInRange, Is.GreaterThan(0.85f));
-            Assert.That(gate.SecondsOutOfRange, Is.Zero);
+
+            gate.Reset();
+            Feed(gate, degreesPerSecond: -2f, seconds: 1f);
+            Assert.That(gate.SignedSpeedDegreesPerSecond, Is.EqualTo(-2f).Within(0.05f));
+            Assert.That(gate.SpeedDegreesPerSecond, Is.EqualTo(2f).Within(0.05f));
         }
 
         [Test]
@@ -54,11 +55,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
             {
                 float yaw = frame % 2 == 0 ? 0.05f : 0f;
                 gate.AddSample(Quaternion.Euler(0f, yaw, 0f) * forward, FrameSeconds,
-                    HeadVelocityAxis.Horizontal, 0.1f, 1f, 3f);
+                    HeadVelocityAxis.Horizontal, 0.1f);
             }
 
             Assert.That(gate.SpeedDegreesPerSecond, Is.LessThan(1f));
-            Assert.That(gate.SecondsInRange, Is.Zero);
         }
 
         [Test]
@@ -66,9 +66,9 @@ namespace GlobeEffect.VRCheckerboard.Tests
         {
             var gate = new RandomDotHeadVelocityGate();
             gate.Reset();
-            Feed(gate, degreesPerSecond: 2f, seconds: 0.5f, minimum: 1f, maximum: 3f);
+            Feed(gate, degreesPerSecond: 2f, seconds: 0.5f);
             gate.BeginPresentation();
-            Feed(gate, degreesPerSecond: 2f, seconds: 0.8f, minimum: 1f, maximum: 3f, startYaw: 1f, firstFrame: 1);
+            Feed(gate, degreesPerSecond: 2f, seconds: 0.8f, startYaw: 1f, firstFrame: 1);
 
             HeadVelocitySummary summary = gate.Summarize(targetSpeed: 2f);
             Assert.That(summary.TargetSpeed, Is.EqualTo(2f));
@@ -84,14 +84,14 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         private static void Feed(RandomDotHeadVelocityGate gate, float degreesPerSecond, float seconds,
-            float minimum, float maximum, float startYaw = 0f, int firstFrame = 0)
+            float startYaw = 0f, int firstFrame = 0)
         {
             int frames = Mathf.RoundToInt(seconds / FrameSeconds);
             for (int frame = firstFrame; frame <= frames; frame++)
             {
                 float yaw = startYaw + degreesPerSecond * frame * FrameSeconds;
                 gate.AddSample(Quaternion.Euler(0f, yaw, 0f) * Vector3.forward, FrameSeconds,
-                    HeadVelocityAxis.Horizontal, 0.1f, minimum, maximum);
+                    HeadVelocityAxis.Horizontal, 0.1f);
             }
         }
     }

@@ -594,88 +594,92 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   Sinusbahn mit Kopftraining, feste Dauer, "No Time Limit") wurden am 2026-10-16
   entfernt; aktive Trials laufen immer mit der Geschwindigkeitserkennung.
 
-* Geschwindigkeitserkennung (Regel in `RandomDotActiveSweepRule`, gleich für
-  Trials und Active Practice): Im aktiven Trial sind zuerst
-  nur graue Fläche und Kreuz zu sehen. `RandomDotHeadVelocityGate` misst jeden
-  Frame die Kopfdrehung (`Velocity Gate Axis`: horizontal = Yaw, optional vertikal
-  = Pitch), geglättet (`Velocity Smoothing Seconds`). **Es gibt kein Zieltempo**:
-  Die Person schwenkt so schnell, wie es sich natürlich anfühlt (Absprache mit dem
-  Betreuer, 2026-10-15). `RandomDotSteadyHeadDetector` prüft nur, ob der Kopf
-  gleichmäßig dreht: schneller als `Minimum Moving Head Speed` (0,5 °/s) und seit
-  `Velocity Hold Seconds` (0,3 s) ohne Tempowechsel über ± `Velocity Change
-  Tolerance` (±25 %). Zusätzlich muss seit Beginn des Wartens (also nach jedem
-  Trial, auch nach einem Abbruch) `Minimum Wait Before Dots Seconds` (1 s)
-  vergangen sein. Dann erscheinen die Punkte für `Simulated Sweep Seconds` (wie
-  Simulated), danach Antwort. Maßstab während der Punkte ist das geglättete
-  Tempo direkt davor: Weicht der Kopf länger als
-  `Velocity Grace Seconds` um mehr als ± `Velocity Change Tolerance` davon ab,
-  verschwinden die Punkte, der Trial ist ungültig (`invalid:head_speed_changed`)
-  und wird später wiederholt. Die Person soll so selbst merken, wenn ihr Tempo
-  unnatürlich war. CSV-Spalten: `velocity_gate_target_deg_per_s` (Kopftempo des
-  simulierten Schwenks, nur zum Vergleich), `head_speed_onset/mean/min/max_deg_per_s`,
-  `head_motion_wait_s`, `head_speed_reference_deg_per_s` (Maßstab während der
-  Punkte), `head_direction` (tatsächliche Schwenkrichtung Right/Left bzw. Up/Down),
-  `head_offaxis_speed_mean_deg_per_s` und `head_offaxis_max_deviation_deg`
-  (Bewegung neben der Schwenkachse während der Punkte, bei horizontalem Schwenk also
-  Nicken), `head_roll_max_deviation_deg` (seitliches Kippen); bei Simulated
-  NaN bzw. leer. Damit lässt sich prüfen, ob aktive Trials so sauber waagerecht
-  waren wie Simulated (nur Messung, kein Abbruch). Der Experiment Monitor zeigt die
-  Abbruchquote ("Stopped Trials: 12 of 80 shown (15 %)", davon "Speed Changed").
-  Marker `WaitingForHeadMotion`.
+* Kopftempo-Regel (in `RandomDotActiveSweepRule`, gleich für die aktiven Trials
+  und Active Practice 2; am 2026-10-18 mit dem Betreuer bewusst vereinfacht, damit
+  sie sich in der Thesis in einem Satz beschreiben lässt): Im aktiven Trial sind
+  zuerst nur graue Fläche und Kreuz zu sehen. `RandomDotHeadVelocityGate` misst
+  jeden Frame die Kopfdrehung mit Vorzeichen (`Velocity Gate Axis`: horizontal =
+  Yaw, optional vertikal = Pitch), geglättet (`Velocity Smoothing Seconds`, 0,1 s).
+  Es gibt **einen** Schwellwert, `Minimum Moving Head Speed` ("Head Counts As
+  Still Below", Standard 1 °/s): Darunter gilt der Kopf als still.
+  - Die Punkte erscheinen, sobald das Tempo in der erlaubten Richtung darüber
+    liegt. Wie schnell, spielt keine Rolle; kein Zieltempo, keine Haltezeit,
+    keine Toleranz in Prozent, keine Mindeststrecke, keine Wartezeit.
+  - Sie bleiben `Simulated Sweep Seconds` (0,8 s, wie Simulated, ab Beginn des
+    Einblendens).
+  - Fällt das Tempo **in Schwenkrichtung** (Richtung beim Einblenden) unter den
+    Schwellwert, bricht der Trial sofort ab; die Glättung ist der einzige Puffer.
+    Das gilt beim Stehenbleiben und beim Zurückdrehen: Dreht der Kopf ruckartig
+    zurück, ist das Tempo in Schwenkrichtung negativ. Mit dem Betrag würde das
+    geglättete Tempo bei einem Ruck den Bereich um 0 in einem Frame überspringen.
+  - Nach einem Abbruch verschwinden Punkte und Kreuz, die Person antwortet
+    trotzdem. Die Zeile wird mit Antwort als `invalid:head_stopped` gespeichert
+    und der Trial später wiederholt. Wegschauen (`Require Fixation`) bricht genauso
+    ab (`invalid:off_target` bzw. `invalid:invalid_gaze_data`), auch bei Simulated.
+
+  CSV-Spalten: `velocity_gate_target_deg_per_s` (Kopftempo des simulierten
+  Schwenks, nur zum Vergleich), `head_speed_onset/mean/min/max_deg_per_s`,
+  `head_motion_wait_s`, `head_direction` (tatsächliche Schwenkrichtung Right/Left
+  bzw. Up/Down), `head_offaxis_speed_mean_deg_per_s` und
+  `head_offaxis_max_deviation_deg` (Bewegung neben der Schwenkachse während der
+  Punkte, bei horizontalem Schwenk also Nicken), `head_roll_max_deviation_deg`
+  (seitliches Kippen); bei Simulated NaN bzw. leer. Nur Messung, kein Abbruch.
+  `head_speed_reference_deg_per_s` und `head_turn_before_dots_deg` gibt es seit
+  der Vereinfachung nicht mehr. Der Experiment Monitor zeigt die Abbruchquote
+  ("Stopped Trials: 12 of 80 shown (15 %)", davon "Head Stopped"). Marker
+  `WaitingForHeadMotion`, `TrialStopped`, `TrialInvalid` (mit Antwort).
 
 * Ein Schwenk pro Trial, abwechselnd (`Alternate Sweep Direction`, Standard an):
   Die Punkte erscheinen nur, wenn der Kopf entgegengesetzt zum letzten Trial
   schwenkt (rechts, antworten, links, antworten, ...). Ein Schwenk in dieselbe
   Richtung zählt wie Stillhalten. Auch ein abgebrochener Schwenk zählt als letzte
-  Richtung. `Minimum Turn Before Dots Degrees` (Standard 3°, 0 = aus) verlangt
-  zusätzlich, dass der Kopf im laufenden Schwenk schon so weit gedreht hat; erst
-  wenn alle Bedingungen gleichzeitig erfüllt sind (Wartezeit, Richtung,
-  gleichmäßig, Strecke), kommen die Punkte. Stillhalten oder Umkehren beginnt einen
-  neuen Schwenk. CSV-Spalte `head_turn_before_dots_deg`.
-  Das gibt einen ruhigen Rhythmus mit einer Pause bei jeder Antwort und
+  Richtung. Das gibt einen ruhigen Rhythmus mit einer Pause bei jeder Antwort und
   gleicht links/rechts aus. Der erste Trial einer Sitzung (und der Übung) darf in
-  beide Richtungen gehen. Der Experiment Monitor zeigt "Next Sweep"; in der
-  Active Practice steht die Richtung im Headset.
+  beide Richtungen gehen. Aus = jede Richtung. Der Experiment Monitor zeigt
+  "Next Sweep".
 
-* Einblenden (`Dots Fade In Seconds`, Standard 0,05 s, etwa 4–5 Frames bei 90 Hz;
-  0 = kein Einblenden): Die Punkte erscheinen nicht schlagartig, sondern werden
-  über diese Zeit eingeblendet (Shader-Wert `_DotsOpacity`). Gilt für alle Trials,
-  Beispiele und Übungstrials, Simulated wie Active, damit sich die Bedingungen
-  darin nicht unterscheiden. Die Darbietungszeit zählt ab Beginn des Einblendens.
-  Die Vorschau blendet nicht ein.
+* Einblenden (`Dots Fade In Seconds`, Standard 0,2 s; 0 = kein Einblenden): Die
+  Punkte erscheinen nicht schlagartig, sondern werden über diese Zeit eingeblendet
+  (Shader-Wert `_DotsOpacity`). Gilt für alle Trials, Beispiele und Übungstrials,
+  Simulated wie Active, damit sich die Bedingungen darin nicht unterscheiden. Die
+  Darbietungszeit zählt ab Beginn des Einblendens. In Active Practice 1 werden die
+  Punkte genauso schnell wieder ausgeblendet. Die Vorschau blendet nicht ein.
 
-* Farbsignale am Kreuz (`Show Cross Signals`, Standard an, keine Töne, jeweils nur
-  kurz): Sind die Punkte normal vorbei und die Person kann antworten, blitzt das
-  Kreuz für `Answer Signal Seconds` (0,3 s) cyan auf (`Answer Signal Color`).
-  Bricht ein Trial ab (Tempo geändert oder weggeschaut), blitzt es für `Stopped
-  Signal Seconds` (0,5 s) magenta (`Stopped Signal Color`). Ist die Antwort
-  angenommen, blitzt es für `Answered Signal Seconds` (0,3 s) grün (`Answered
-  Signal Color`), bewusst eine andere Farbe als Cyan, damit eine schnelle Antwort
-  nicht im ersten Blitz untergeht. Alle Farben halb durchsichtig über der grauen
-  Fläche (`Cross Signal Opacity`, 0,6). Gilt für Simulated, Active und die Übungen; die
-  Anleitungen im Headset erklären die Farben in einem Satz. Rot bleibt das normale
-  Kreuz (und die Blockpause).
+* Antwortphase und Flash (keine Töne): Nach den Punkten ist nur die graue Fläche
+  zu sehen, ohne Kreuz. Nach der Antwort färbt ein schwacher Flash den ganzen
+  grauen Kreis kurz ein (`Answer Flash Color` cyan, `Answer Flash Opacity` 0,1,
+  `Answer Flash Seconds` 0,2 s; 0 = kein Flash), auch nach einem Abbruch. Danach
+  (nach dem Flash bzw. `Pause Seconds`, was länger ist) kommt das Kreuz wieder,
+  und der Kopf darf sich wieder bewegen. Gilt für Simulated, Active und die
+  Übungen. Die früheren Farbsignale am Kreuz (cyan, grün, magenta) gibt es nicht
+  mehr: Sie waren kaum zu sehen, und Magenta hätte nach "falsch" ausgesehen.
 
 * Active Practice (`Train Active Panning`, Standard an): kommt in der Sitzung
   nach der Tastenbelegung und vor
   der Anleitung der echten aktiven Trials, oder allein mit `T` im Head-Tracked-
   Modus. Nichts wird gespeichert (nur Marker und Konsole). Ablauf:
-  1. Optional (`Show Active Speed Example`): Der Computer schwenkt die Punkte einmal
-     mit dem Simulated-Tempo (k = 1, `Example Long Seconds`), der Kopf bleibt still.
-     So sieht die Person ein ruhiges Tempo.
-  2. Übungstrials genau wie die echten aktiven Trials (gleichmäßig schwenken,
-     Punkte, Abbruch bei Tempowechsel, Antwort), mit k aus `Active Practice K
-     Values` (Standard 0,2 und 1,8, also eindeutige Formen).
-  3. Nach jedem Übungstrial eine kurze Rückmeldung: "dots stopped early" (Tempo
-     geändert), "quite fast" / "quite slow" (Tempo außerhalb `Natural Head Speed
-     Min`–`Max`, Standard 1,5–4 °/s; abschaltbar mit `Active Practice Speed Hint`)
-     oder "good".
-  4. Ende nach `Active Practice Good Trials` guten Übungstrials (Standard 6) oder
-     spätestens nach `Active Practice Max Trials` (Standard 20).
+  1. Optional (`Show Active Speed Example`): "An example of a calm speed". Der
+     Computer schwenkt die Punkte einmal mit dem Simulated-Tempo (k = 1,
+     `Example Long Seconds`), der Kopf bleibt still.
+  2. Practice 1 (`Free Movement Practice`, Standard an): Bewegungsgefühl mit k = 1,
+     ohne Antworten. Die Punkte sind da, solange der Kopf schneller als der
+     Schwellwert dreht (Richtung egal, Tempo egal, keine Zeitgrenze), und werden
+     ausgeblendet, sobald er darunter fällt. Mit `Require Fixation` auch, wenn die
+     Person länger als `Max Look Away Seconds` außerhalb der Toleranz um das Kreuz
+     schaut; ohne passiert dabei nichts. Kurz vor dem Rand der Punktwelt (`Head
+     Turn Safety Degrees`) werden die Punkte ebenfalls ausgeblendet und beim
+     nächsten Einblenden neu um den Kopf gelegt. Ende mit `Practice Continue Key`
+     (Leertaste) durch den Versuchsleiter, nicht mit dem Trackpad.
+  3. Practice 2: Trials genau wie im Test (Regel oben, 0,8 s, Antwort ohne Kreuz,
+     Flash, Abbruch mit Antwort), ohne Texte zwischen den Trials, mit k aus
+     `Active Practice K Values` (Standard 0,2 und 1,8). Ende nach `Active Practice
+     Good Trials` guten Trials (nicht abgebrochen, Standard 6) oder spätestens nach
+     `Active Practice Max Trials` (Standard 20).
+  Vor Practice 1 und Practice 2 steht je ein kurzer Text zum Weiterklicken.
 
 * Übungstexte zum Weiterklicken (`Practice Texts Wait For Press`, Standard an):
   In allen Übungen (Simulated-Beispiele, "Now practise", Rückmeldungen, ruhiges
-  Tempo, Active-Practice-Rückmeldungen) bleibt der Text stehen, unten steht
+  Tempo, Texte vor Active Practice 1 und 2) bleibt der Text stehen, unten steht
   "PRESS TRACKPAD TO CONTINUE". Weiter mit Trackpad-Klick am Controller oder, für
   den Versuchsleiter, mit `Practice Continue Key` (Leertaste). Ein Druck, der noch
   zur Antwort gehörte, zählt nicht. Aus = die Texte laufen wie früher nach fester
@@ -748,11 +752,11 @@ Vor den ersten aktiven Trials einer Sitzung kommt die Active Practice (falls
 eingeschaltet), danach die Anleitung für die echten Trials im Headset; `F5`
 startet die Trials.
 
-Nach einer Bewegungsphase verschwinden nur die Punkte. Der neutrale graue Kreis
-und das Fixationskreuz bleiben während der Antwort, zwischen den Trials und in
-den Blockpausen sichtbar. Dadurch entsteht kein Wechsel vom helleren Punktfeld
-auf einen vollständig schwarzen Bildschirm. Außerhalb der Kreisöffnung bleibt
-der Hintergrund in allen Phasen unverändert schwarz.
+Nach einer Bewegungsphase verschwinden die Punkte, und während der Antwort ist
+nur der neutrale graue Kreis zu sehen (ohne Kreuz). Zwischen den Trials und in
+den Blockpausen ist das Kreuz wieder da. Dadurch entsteht kein Wechsel vom
+helleren Punktfeld auf einen vollständig schwarzen Bildschirm. Außerhalb der
+Kreisöffnung bleibt der Hintergrund in allen Phasen unverändert schwarz.
 
 Das sichtbare Feld hat innen einen neutralgrauen Hintergrund für symmetrischen
 Kontrast der schwarzen und weißen Punkte. Außerhalb der kreisförmigen Feldblende

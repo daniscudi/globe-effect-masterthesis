@@ -61,32 +61,20 @@ namespace GlobeEffect.VRCheckerboard.Editor
             ["pauseSeconds"] = "Grey Pause Between Trials (s)",
             ["headTurnSafetyDegrees"] = "Head Turn Range (degrees)",
             ["velocityGateAxis"] = "Head Turn Direction",
-            ["velocityChangeTolerance"] = "Allowed Speed Change (±)",
             ["alternateSweepDirection"] = "One Sweep Per Trial, Alternating",
-            ["minimumTurnBeforeDotsDegrees"] = "Min Turn Before Dots (°)",
             ["minimumMovingHeadSpeed"] = "Head Counts As Still Below (°/s)",
-            ["velocityHoldSeconds"] = "Steady Time Before Dots (s)",
-            ["minimumWaitBeforeDotsSeconds"] = "Wait Before Next Dots (s)",
-            ["velocityGraceSeconds"] = "Max Time At Changed Speed (s)",
             ["dotsFadeInSeconds"] = "Dots Fade In (s)",
-            ["showCrossSignals"] = "Colour Signals At The Cross",
-            ["answerSignalColor"] = "Colour: Answer Now",
-            ["stoppedSignalColor"] = "Colour: Trial Stopped",
-            ["crossSignalOpacity"] = "Signal Strength",
-            ["stoppedSignalSeconds"] = "Stopped Colour Shown (s)",
-            ["answerSignalSeconds"] = "Answer Colour Shown (s)",
-            ["answeredSignalColor"] = "Colour: Answer Taken",
-            ["answeredSignalSeconds"] = "Answer Taken Colour Shown (s)",
+            ["answerFlashColor"] = "Flash Colour After Answer",
+            ["answerFlashOpacity"] = "Flash Strength",
+            ["answerFlashSeconds"] = "Flash Shown (s)",
             ["practiceTextsWaitForPress"] = "Practice Texts Wait For Trackpad",
             ["practiceContinueKey"] = "Continue Key (Experimenter)",
             ["trainActivePanning"] = "Practise Head-Tracked Trials",
             ["showActiveSpeedExample"] = "Show Calm Speed First",
-            ["activePracticeKValues"] = "Practice k Values",
-            ["activePracticeGoodTrials"] = "Good Practice Trials Needed",
-            ["activePracticeMaxTrials"] = "Max Practice Trials",
-            ["activePracticeSpeedHint"] = "Say If Too Fast Or Too Slow",
-            ["naturalHeadSpeedMin"] = "Natural Head Speed From (°/s)",
-            ["naturalHeadSpeedMax"] = "Natural Head Speed Up To (°/s)",
+            ["freeMovementPractice"] = "Practice 1: Free Head Movement",
+            ["activePracticeKValues"] = "Practice 2: k Values",
+            ["activePracticeGoodTrials"] = "Practice 2: Good Trials Needed",
+            ["activePracticeMaxTrials"] = "Practice 2: Max Trials",
             ["velocitySmoothingSeconds"] = "Speed Smoothing (s)",
             // Random Dots: Training
             ["showSimulatedExamples"] = "Show Labelled Examples",
@@ -442,7 +430,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 Fields(serializedObject, "simulatedSweepAxis", "simulatedSweepSeconds",
                     "simulatedImageCenterSpeed", "pauseSeconds", "dotsFadeInSeconds");
                 EditorGUILayout.HelpBox("The dots in the middle of the image move equally fast at every " +
-                    "magnification. Dots Shown, Grey Pause and Fade In also apply to head-tracked trials.",
+                    "magnification. Dots Shown, Grey Pause and Fade In also apply to head-tracked trials. " +
+                    "Dots Shown starts with the fade in.",
                     MessageType.Info);
             }
             if (Section("Head-Tracked Movement"))
@@ -459,13 +448,13 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "exampleTextSeconds",
                     "simulatedTrainingKValues", "simulatedTrainingRepeatsPerValue", "simulatedTrainingFeedback",
                     "feedbackConcaveMaxK", "feedbackConvexMinK", "feedbackSeconds",
-                    "trainActivePanning", "showActiveSpeedExample", "activePracticeKValues",
-                    "activePracticeGoodTrials", "activePracticeMaxTrials", "activePracticeSpeedHint",
-                    "naturalHeadSpeedMin", "naturalHeadSpeedMax");
+                    "trainActivePanning", "showActiveSpeedExample", "freeMovementPractice", "activePracticeKValues",
+                    "activePracticeGoodTrials", "activePracticeMaxTrials");
                 EditorGUILayout.HelpBox("T starts a practice of the chosen movement type without saving data. " +
                     "In a session the practice matching the movement type is used. The head-tracked practice " +
-                    "uses the real dots: first a calm speed shown by the computer, then practice trials with a " +
-                    "short note after each (dots stopped early, quite fast, quite slow or good).",
+                    "uses the real dots: first an example of a calm speed shown by the computer, then practice 1 " +
+                    "(free head movement with k = 1, no answers, ended with the Continue Key), then practice 2 " +
+                    "(trials exactly like in the test, no texts in between).",
                     MessageType.Info);
             }
             FixationSettings();
@@ -474,9 +463,10 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 LinkedFields("keyboardController", "concaveKey", "convexKey", "swapResponseKeys",
                     "useVrControllerButtons", "vrControllerMapping", "logResponses");
                 Fields(serializedObject, "startSessionKey", "startOtherMotionSessionKey", "abortSessionKey");
-                Fields(serializedObject, "showCrossSignals", "answerSignalColor", "answerSignalSeconds",
-                    "answeredSignalColor", "answeredSignalSeconds", "stoppedSignalColor",
-                    "crossSignalOpacity", "stoppedSignalSeconds");
+                Fields(serializedObject, "answerFlashColor", "answerFlashOpacity", "answerFlashSeconds");
+                EditorGUILayout.HelpBox("While the participant answers, only the grey circle is shown (no cross). " +
+                    "After each answer the grey circle flashes briefly, then the cross comes back.",
+                    MessageType.Info);
             }
             if (Section("Dot Field And Cross", false))
                 LinkedFields("stimulus", "dotDensity", "dotSizeDegrees", "darkColor", "lightColor",
@@ -520,24 +510,19 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private void HeadSpeedSettings()
         {
-            Fields(serializedObject, "velocityGateAxis", "alternateSweepDirection", "velocityChangeTolerance",
-                "minimumMovingHeadSpeed", "minimumTurnBeforeDotsDegrees",
-                "velocityHoldSeconds", "minimumWaitBeforeDotsSeconds", "velocityGraceSeconds",
+            Fields(serializedObject, "velocityGateAxis", "alternateSweepDirection", "minimumMovingHeadSpeed",
                 "velocitySmoothingSeconds");
             var manager = (RandomDotExperimentManager)target;
-            float change = serializedObject.FindProperty("velocityChangeTolerance").floatValue;
-            float hold = serializedObject.FindProperty("velocityHoldSeconds").floatValue;
-            float turn = serializedObject.FindProperty("minimumTurnBeforeDotsDegrees").floatValue;
-            float wait = serializedObject.FindProperty("minimumWaitBeforeDotsSeconds").floatValue;
+            float still = serializedObject.FindProperty("minimumMovingHeadSpeed").floatValue;
             float seconds = serializedObject.FindProperty("simulatedSweepSeconds").floatValue;
+            bool alternate = serializedObject.FindProperty("alternateSweepDirection").boolValue;
             EditorGUILayout.HelpBox(
-                "No fixed speed: the participant turns the head as fast as feels natural. " +
-                $"The dots appear when the head has turned steadily for {hold:0.##} s (speed changes less than " +
-                $"±{change * 100f:0} %), has already turned at least {turn:0.#}° in this sweep, and at least " +
-                $"{wait:0.##} s have passed since the last trial. All must be true at once. They stay " +
-                $"{seconds:0.##} s. If the speed changes by more than ±{change * 100f:0} % from the speed just " +
-                "before the dots, they disappear and the trial is repeated later. All head speeds are saved for " +
-                "every trial.", MessageType.Info);
+                $"One rule: below {still:0.##} °/s the head counts as still. The dots appear as soon as the head " +
+                $"turns faster than this{(alternate ? " in the other direction than in the last trial" : "")}, " +
+                $"at any speed, and stay {seconds:0.##} s. If the head gets slower than this in the sweep " +
+                "direction (stops or turns back), the dots and the cross disappear right away. The participant " +
+                "still answers, and the trial is repeated later. Only the speed smoothing softens short dips. " +
+                "All head speeds are saved for every trial.", MessageType.Info);
             EditorGUILayout.LabelField($"For comparison: the simulated movement equals {manager.SimulatedHeadSpeedPreview:0.##} " +
                 "°/s of head speed.", EditorStyles.wordWrappedMiniLabel);
         }

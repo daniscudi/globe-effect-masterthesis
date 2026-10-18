@@ -389,7 +389,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [UnityTest]
-        public IEnumerator RandomDotVelocityGate_ShowsDotsOnlyDuringASteadyHeadSweep()
+        public IEnumerator RandomDotVelocityGate_ShowsDotsAsSoonAsTheHeadTurns()
         {
             // EnterPlayMode muss direkt in der Testmethode stehen, nicht verschachtelt.
             PrepareVelocityGatedScene();
@@ -403,36 +403,33 @@ namespace GlobeEffect.VRCheckerboard.Tests
             double waitUntil = Time.realtimeSinceStartupAsDouble + 0.6d;
             while (Time.realtimeSinceStartupAsDouble < waitUntil) yield return null;
             Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.WaitingForHeadMotion));
+            Assert.That(stimulus.CrossVisible, Is.True);
 
-            // Gleichmäßiger Schwenk: Punkte erscheinen, nach 0,8 s Antwort.
+            // Schwenk über dem Schwellwert: Punkte erscheinen, nach der Darbietung Antwort.
             // Keine Lambdas in diesen Tests: Sie überleben den Domain Reload beim
             // Wechsel in den Play Mode nicht (eingefangene Variablen werden null).
             yield return SweepHead(stimulus, target, manager, RandomDotSessionState.PresentingMotion);
             yield return SweepHead(stimulus, target, manager, RandomDotSessionState.WaitingForResponse);
-            // Antwortphase: Kreuz in der Antwortfarbe, halb durchsichtig.
-            Assert.That(stimulus.FixationSignal.a, Is.GreaterThan(0f));
-            Assert.That(stimulus.FixationSignal.g, Is.EqualTo(1f), "cyan");
+            // Antwortphase: nur die graue Fläche, ohne Punkte und ohne Kreuz.
+            Assert.That(stimulus.PointsVisible, Is.False);
+            Assert.That(stimulus.CrossVisible, Is.False);
             Object.FindAnyObjectByType<RandomDotKeyboardController>().SubmitResponse(Response.Convex);
             Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.Completed));
-            // Letzter Trial: Sitzung vorbei, Punktfeld aus, kein Signal mehr.
-            Assert.That(stimulus.FixationSignal.a, Is.Zero);
 
             Dictionary<string, string> row = ReadTrialRows(manager)[0];
             Assert.That(row["status"], Is.EqualTo("valid"));
             Assert.That(ParseFloat(row["velocity_gate_target_deg_per_s"]), Is.EqualTo(target).Within(0.001f));
             Assert.That(ParseFloat(row["head_speed_mean_deg_per_s"]), Is.EqualTo(target).Within(0.3f * target));
-            // Pflicht-Wartezeit (0,3 s) vor den ersten Punkten.
-            Assert.That(ParseFloat(row["head_motion_wait_s"]), Is.GreaterThanOrEqualTo(0.3f));
-            // Maßstab während der Punkte: das gleichmäßige Tempo davor.
-            Assert.That(ParseFloat(row["head_speed_reference_deg_per_s"]), Is.EqualTo(target).Within(0.2f * target));
+            Assert.That(ParseFloat(row["head_motion_wait_s"]), Is.GreaterThan(0f));
             // Der Test dreht den Kopf sauber nach rechts: Richtung gespeichert, nichts daneben.
             Assert.That(row["head_direction"], Is.EqualTo("Right"));
-            // Punkte erst nach mindestens 3° Schwenk.
-            Assert.That(ParseFloat(row["head_turn_before_dots_deg"]), Is.GreaterThanOrEqualTo(3f));
             Assert.That(ParseFloat(row["head_offaxis_max_deviation_deg"]), Is.EqualTo(0f).Within(0.05f));
             Assert.That(ParseFloat(row["head_roll_max_deviation_deg"]), Is.EqualTo(0f).Within(0.05f));
             Assert.That(ParseFloat(row["stimulus_duration_s"]), Is.EqualTo(SimulatedSweepSeconds).Within(0.1f));
             Assert.That(row["head_motion_constraint"], Is.EqualTo("free"));
+            // Die alte Regel (Bezugstempo, Mindeststrecke) gibt es nicht mehr.
+            Assert.That(row.ContainsKey("head_speed_reference_deg_per_s"), Is.False);
+            Assert.That(row.ContainsKey("head_turn_before_dots_deg"), Is.False);
             // Bildzeiten der Darbietung stehen pro Trial in der CSV.
             Assert.That(int.Parse(row["frames_presented"]), Is.GreaterThan(1));
             Assert.That(int.Parse(row["slow_frames"]), Is.GreaterThanOrEqualTo(0));
@@ -441,32 +438,53 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [UnityTest]
-        public IEnumerator RandomDotVelocityGate_StoppingDuringTheDotsMakesTheTrialInvalid()
+        public IEnumerator RandomDotVelocityGate_StoppingDuringTheDots_AnswerAnywayThenRepeated()
         {
             // EnterPlayMode muss direkt in der Testmethode stehen, nicht verschachtelt.
             PrepareVelocityGatedScene();
+            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
+            config.FindProperty("simulatedSweepSeconds").floatValue = 0.8f;
+            config.FindProperty("answerFlashOpacity").floatValue = 0.1f;
+            config.FindProperty("answerFlashSeconds").floatValue = 0.2f;
+            config.ApplyModifiedPropertiesWithoutUndo();
             yield return new EnterPlayMode();
             yield return null;
             RandomDotExperimentManager manager = StartVelocityGatedSession();
             var stimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
 
-            // Schwenken, bis die Punkte da sind, dann anhalten.
+            // Schwenken, bis die Punkte da sind, dann anhalten: Punkte und Kreuz weg.
             yield return SweepHead(stimulus, manager.SimulatedHeadSpeedPreview, manager,
                 RandomDotSessionState.PresentingMotion);
-            yield return WaitForState(manager, RandomDotSessionState.WaitingForHeadMotion);
+            yield return WaitForState(manager, RandomDotSessionState.WaitingForResponse);
+            Assert.That(stimulus.PointsVisible, Is.False);
+            Assert.That(stimulus.CrossVisible, Is.False);
+            Assert.That(manager.HeadStoppedAttempts, Is.EqualTo(1));
 
-            Assert.That(ReadTrialRows(manager)[0]["status"], Is.EqualTo("invalid:head_speed_changed"));
+            // Trotzdem antworten: dann der Cyan-Flash auf der grauen Fläche, noch ohne Kreuz.
+            Object.FindAnyObjectByType<RandomDotKeyboardController>().SubmitResponse(Response.Concave);
+            Assert.That(stimulus.FieldFlash.a, Is.EqualTo(0.1f).Within(0.001f));
+            Assert.That(stimulus.FieldFlash.r, Is.Zero, "cyan");
+            Assert.That(stimulus.FieldFlash.g, Is.EqualTo(1f), "cyan");
+            Assert.That(stimulus.CrossVisible, Is.False);
+
+            // Nach dem Flash ist das Kreuz wieder da, und der Trial kommt noch einmal.
+            yield return WaitForState(manager, RandomDotSessionState.WaitingForHeadMotion);
+            Assert.That(stimulus.CrossVisible, Is.True);
+            Dictionary<string, string> row = ReadTrialRows(manager)[0];
+            Assert.That(row["status"], Is.EqualTo("invalid:head_stopped"));
+            Assert.That(row["response"], Is.EqualTo("Concave"), "Die Antwort wird mitgespeichert.");
+            Assert.That(row["valid_for_analysis"], Is.EqualTo("0"));
+            Assert.That(ParseFloat(row["stimulus_duration_s"]), Is.LessThan(0.7f), "Früh abgebrochen.");
             Assert.That(manager.ValidTrialsCompleted, Is.Zero, "Der Trial wird später wiederholt.");
             manager.AbortSession();
             yield return new ExitPlayMode();
         }
 
         [UnityTest]
-        public IEnumerator RandomDotVelocityGate_AnySteadySpeedStartsButChangingItStopsTheTrial()
+        public IEnumerator RandomDotVelocityGate_AnySpeedStartsButTurningBackStopsTheTrial()
         {
             // EnterPlayMode muss direkt in der Testmethode stehen, nicht verschachtelt.
             PrepareVelocityGatedScene();
-            // Echte Darbietungsdauer: In 0,2 s reichen Glättung plus Toleranzzeit knapp nicht.
             var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
             config.FindProperty("simulatedSweepSeconds").floatValue = 0.8f;
             config.ApplyModifiedPropertiesWithoutUndo();
@@ -475,56 +493,60 @@ namespace GlobeEffect.VRCheckerboard.Tests
             RandomDotExperimentManager manager = StartVelocityGatedSession();
             var stimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
 
-            // Dreimal so schnell wie der simulierte Schwenk: Es gibt kein Zieltempo,
-            // gleichmäßig reicht. Danach 40 % schneller: Das ist mehr als ±25 % vom
-            // Tempo vor den Punkten, also Abbruch und später wiederholen.
-            float speed = 3f * manager.SimulatedHeadSpeedPreview;
+            // Viermal so schnell wie der simulierte Schwenk: Es gibt kein Zieltempo.
+            // Dann ruckartig zurück: Das Tempo in Schwenkrichtung fällt unter den
+            // Schwellwert, also Abbruch, obwohl der Kopf schnell dreht.
+            float speed = 4f * manager.SimulatedHeadSpeedPreview;
             yield return SweepHead(stimulus, speed, manager, RandomDotSessionState.PresentingMotion);
-            yield return SweepHead(stimulus, 1.4f * speed, manager, RandomDotSessionState.WaitingForHeadMotion);
+            yield return SweepHead(stimulus, -speed, manager, RandomDotSessionState.WaitingForResponse);
+            Object.FindAnyObjectByType<RandomDotKeyboardController>().SubmitResponse(Response.Convex);
 
-            // Abbruch: kurz die Abbruchfarbe (Magenta) am Kreuz.
-            Assert.That(stimulus.FixationSignal.a, Is.GreaterThan(0f));
-            Assert.That(stimulus.FixationSignal.g, Is.Zero, "magenta");
             Dictionary<string, string> row = ReadTrialRows(manager)[0];
-            Assert.That(row["status"], Is.EqualTo("invalid:head_speed_changed"));
-            Assert.That(ParseFloat(row["head_speed_reference_deg_per_s"]), Is.EqualTo(speed).Within(0.2f * speed));
+            Assert.That(row["status"], Is.EqualTo("invalid:head_stopped"));
+            Assert.That(row["head_direction"], Is.EqualTo("Right"));
+            Assert.That(ParseFloat(row["stimulus_duration_s"]), Is.LessThan(0.7f));
             Assert.That(manager.ValidTrialsCompleted, Is.Zero);
             manager.AbortSession();
             yield return new ExitPlayMode();
         }
 
         [UnityTest]
-        public IEnumerator RandomDotActivePractice_StandaloneUsesTheRealDotsAndReturnsToWelcome()
+        public IEnumerator RandomDotActivePractice_StandaloneRunsBothPracticesAndReturnsToWelcome()
         {
             // EnterPlayMode muss direkt in der Testmethode stehen, nicht verschachtelt.
-            PrepareActivePracticeScene(goodTrials: 1, maxTrials: 3, waitForPress: true);
+            PrepareActivePracticeScene(goodTrials: 1, maxTrials: 3, freeMovement: true);
             yield return new EnterPlayMode();
             yield return null;
             var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
             var stimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
 
-            // T im Head-Tracked-Modus: Active Practice statt geführtem Kopftraining.
+            // T im Head-Tracked-Modus: Active Practice.
             Assert.That(manager.StartTraining(), Is.True);
             Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.ActivePracticeInstructions));
             manager.ConfirmTrainingInstructions();
 
-            // Gleichmäßig in natürlichem Tempo (2,5 °/s): Punkte, dann Antwort.
+            // Practice 1: k = 1, Punkte nur solange der Kopf dreht.
+            yield return WaitForState(manager, RandomDotSessionState.FreeMovementPractice);
+            Assert.That(stimulus.InstrumentDistortionK, Is.EqualTo(1f));
+            double waitUntil = Time.realtimeSinceStartupAsDouble + 0.3d;
+            while (Time.realtimeSinceStartupAsDouble < waitUntil) yield return null;
+            Assert.That(stimulus.PointsVisible, Is.False, "Kopf still: keine Punkte.");
+            yield return SweepHeadUntilDots(stimulus, 2.5f);
+            yield return SweepHeadFor(stimulus, 2.5f, 1f);
+            Assert.That(stimulus.PointsVisible, Is.True, "Ohne Zeitgrenze, solange der Kopf dreht.");
+            yield return WaitUntilDotsGone(stimulus);
+            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.FreeMovementPractice),
+                "Practice 1 endet erst mit der Taste des Versuchsleiters.");
+            manager.ContinuePractice();
+
+            // Practice 2: wie im Test. Antwortphase ohne Kreuz.
             yield return SweepHead(stimulus, 2.5f, manager, RandomDotSessionState.ActivePracticeResponse);
+            Assert.That(stimulus.CrossVisible, Is.False);
             Object.FindAnyObjectByType<RandomDotKeyboardController>().SubmitResponse(Response.Convex);
             yield return null;
             yield return null;
-            // Antwort angenommen: kurz grün (nicht cyan).
-            Assert.That(stimulus.FixationSignal.g, Is.EqualTo(1f));
-            Assert.That(stimulus.FixationSignal.b, Is.Zero);
             Assert.That(manager.LastActivePracticeResult, Is.EqualTo("good"));
             Assert.That(manager.ActivePracticeGoodTrials, Is.EqualTo(1));
-
-            // Der Rückmeldetext bleibt stehen, bis weitergeklickt wird.
-            double waitUntil = Time.realtimeSinceStartupAsDouble + 0.5d;
-            while (Time.realtimeSinceStartupAsDouble < waitUntil) yield return null;
-            Assert.That(manager.IsWaitingForPracticeContinue, Is.True);
-            Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.ActivePracticeMotion));
-            manager.ContinuePractice();
 
             // Ein guter Trial reicht hier: zurück zum Startbildschirm, ohne Messdateien.
             yield return WaitForState(manager, RandomDotSessionState.Idle);
@@ -533,10 +555,13 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [UnityTest]
-        public IEnumerator RandomDotActivePractice_ChangingSpeedStopsTheDotsBeforeTheSessionTrials()
+        public IEnumerator RandomDotActivePractice_StoppingEarlyStillNeedsAnAnswerBeforeTheSessionTrials()
         {
             // EnterPlayMode muss direkt in der Testmethode stehen, nicht verschachtelt.
-            PrepareActivePracticeScene(goodTrials: 1, maxTrials: 1);
+            PrepareActivePracticeScene(goodTrials: 1, maxTrials: 1, freeMovement: false);
+            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
+            config.FindProperty("simulatedSweepSeconds").floatValue = 0.8f;
+            config.ApplyModifiedPropertiesWithoutUndo();
             yield return new EnterPlayMode();
             yield return null;
             var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
@@ -548,10 +573,13 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(manager.SessionState, Is.EqualTo(RandomDotSessionState.ActivePracticeInstructions));
             manager.ConfirmTrainingInstructions();
 
-            // Erst gleichmäßig, bis die Punkte da sind, dann deutlich schneller.
+            // Schwenken, bis die Punkte da sind, dann anhalten: Abbruch, aber Antwort wie im Test.
             yield return SweepHeadUntilDots(stimulus, 2.5f);
-            yield return SweepHeadFor(stimulus, 5f, 1f);
-            Assert.That(manager.LastActivePracticeResult, Is.EqualTo("changed"));
+            yield return WaitForState(manager, RandomDotSessionState.ActivePracticeResponse);
+            Assert.That(stimulus.CrossVisible, Is.False);
+            Object.FindAnyObjectByType<RandomDotKeyboardController>().SubmitResponse(Response.Convex);
+            yield return null;
+            Assert.That(manager.LastActivePracticeResult, Is.EqualTo("stopped"));
             Assert.That(manager.ActivePracticeGoodTrials, Is.Zero);
 
             // Höchstzahl erreicht: weiter zur Anleitung der echten aktiven Trials.
@@ -601,47 +629,45 @@ namespace GlobeEffect.VRCheckerboard.Tests
             yield return new ExitPlayMode();
         }
 
-        private static void PrepareActivePracticeScene(int goodTrials, int maxTrials, bool waitForPress = false)
+        private static void PrepareActivePracticeScene(int goodTrials, int maxTrials, bool freeMovement)
         {
             PrepareVelocityGatedScene();
             var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
             config.FindProperty("trainActivePanning").boolValue = true;
             config.FindProperty("showActiveSpeedExample").boolValue = false;
+            config.FindProperty("freeMovementPractice").boolValue = freeMovement;
             config.FindProperty("activePracticeGoodTrials").intValue = goodTrials;
             config.FindProperty("activePracticeMaxTrials").intValue = maxTrials;
-            config.FindProperty("activePracticeSpeedHint").boolValue = true;
-            config.FindProperty("naturalHeadSpeedMin").floatValue = 1.5f;
-            config.FindProperty("naturalHeadSpeedMax").floatValue = 4f;
-            config.FindProperty("feedbackSeconds").floatValue = 0.2f;
-            config.FindProperty("practiceTextsWaitForPress").boolValue = waitForPress;
+            config.FindProperty("exampleTextSeconds").floatValue = 0.2f;
+            config.FindProperty("practiceTextsWaitForPress").boolValue = false;
             config.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private static IEnumerator SweepHeadUntilDots(RandomDotFieldStimulus stimulus, float degreesPerSecond)
         {
             // Dreht die Kopfkamera gleichmäßig nach rechts, bis die Punkte erscheinen.
-            Quaternion start = stimulus.Observer.rotation;
+            TestHeadMover.Turn(stimulus.Observer, degreesPerSecond);
             double startTime = Time.realtimeSinceStartupAsDouble;
-            while (!stimulus.PointsVisible && Time.realtimeSinceStartupAsDouble - startTime < 5d)
-            {
-                float elapsed = (float)(Time.realtimeSinceStartupAsDouble - startTime);
-                stimulus.Observer.rotation = start * Quaternion.Euler(0f, degreesPerSecond * elapsed, 0f);
-                yield return null;
-            }
+            while (!stimulus.PointsVisible && Time.realtimeSinceStartupAsDouble - startTime < 5d) yield return null;
+            TestHeadMover.Turn(stimulus.Observer, 0f);
             Assert.That(stimulus.PointsVisible, Is.True, "Die Punkte sind nicht erschienen.");
+        }
+
+        private static IEnumerator WaitUntilDotsGone(RandomDotFieldStimulus stimulus)
+        {
+            // Kopf still halten, bis die Punkte ausgeblendet sind.
+            double startTime = Time.realtimeSinceStartupAsDouble;
+            while (stimulus.PointsVisible && Time.realtimeSinceStartupAsDouble - startTime < 2d) yield return null;
+            Assert.That(stimulus.PointsVisible, Is.False, "Die Punkte sind nicht verschwunden.");
         }
 
         private static IEnumerator SweepHeadFor(RandomDotFieldStimulus stimulus, float degreesPerSecond, float seconds)
         {
             // Dreht die Kopfkamera eine feste Zeit lang gleichmäßig nach rechts.
-            Quaternion start = stimulus.Observer.rotation;
+            TestHeadMover.Turn(stimulus.Observer, degreesPerSecond);
             double startTime = Time.realtimeSinceStartupAsDouble;
-            while (Time.realtimeSinceStartupAsDouble - startTime < seconds)
-            {
-                float elapsed = (float)(Time.realtimeSinceStartupAsDouble - startTime);
-                stimulus.Observer.rotation = start * Quaternion.Euler(0f, degreesPerSecond * elapsed, 0f);
-                yield return null;
-            }
+            while (Time.realtimeSinceStartupAsDouble - startTime < seconds) yield return null;
+            TestHeadMover.Turn(stimulus.Observer, 0f);
         }
 
         private static void PrepareVelocityGatedScene()
@@ -650,12 +676,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
             config.FindProperty("sessionMotionMode").intValue = (int)RandomDotMotionMode.HeadTracked;
             SetFloats(config.FindProperty("instrumentMagnificationMValues"), 5f);
-            config.FindProperty("velocityChangeTolerance").floatValue = 0.25f;
-            config.FindProperty("minimumMovingHeadSpeed").floatValue = 0.5f;
-            config.FindProperty("velocityHoldSeconds").floatValue = 0.15f;
-            config.FindProperty("minimumWaitBeforeDotsSeconds").floatValue = 0.3f;
-            config.FindProperty("minimumTurnBeforeDotsDegrees").floatValue = 3f;
-            config.FindProperty("velocityGraceSeconds").floatValue = 0.1f;
+            config.FindProperty("minimumMovingHeadSpeed").floatValue = 1f;
             config.ApplyModifiedPropertiesWithoutUndo();
         }
 
@@ -674,15 +695,11 @@ namespace GlobeEffect.VRCheckerboard.Tests
             RandomDotExperimentManager manager, RandomDotSessionState until)
         {
             // Dreht die Kopfkamera gleichmäßig nach rechts, bis der Zustand erreicht ist.
-            Quaternion start = stimulus.Observer.rotation;
-            double startTime = Time.realtimeSinceStartupAsDouble;
-            double deadline = startTime + 5d;
-            while (manager.SessionState != until && Time.realtimeSinceStartupAsDouble < deadline)
-            {
-                float elapsed = (float)(Time.realtimeSinceStartupAsDouble - startTime);
-                stimulus.Observer.rotation = start * Quaternion.Euler(0f, degreesPerSecond * elapsed, 0f);
-                yield return null;
-            }
+            // Folgt direkt der nächste Schwenk, dreht der Kopf ohne Pause weiter.
+            TestHeadMover.Turn(stimulus.Observer, degreesPerSecond);
+            double deadline = Time.realtimeSinceStartupAsDouble + 5d;
+            while (manager.SessionState != until && Time.realtimeSinceStartupAsDouble < deadline) yield return null;
+            TestHeadMover.Turn(stimulus.Observer, 0f);
             Assert.That(manager.SessionState, Is.EqualTo(until));
         }
 
@@ -988,6 +1005,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
             manager.FindProperty("trainSimulatedMotion").boolValue = false;
             manager.FindProperty("trainActivePanning").boolValue = false;
             manager.FindProperty("practiceTextsWaitForPress").boolValue = false;
+            // Ohne Flash geht es nach der Antwort sofort weiter; der Flash hat einen eigenen Test.
+            manager.FindProperty("answerFlashOpacity").floatValue = 0f;
             manager.FindProperty("repeatsPerCondition").intValue = 1;
             ApplySharedTestSettings(manager);
 

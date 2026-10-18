@@ -13,8 +13,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     }
     
     /// <summary>
-    /// Misst, wie schnell der Kopf sich aktuell bewegt und zählt mit wie lange das Tempo im erlaubten
-    /// Bereich liegt bzw. außerhalb davon
+    /// Misst, wie schnell der Kopf sich aktuell bewegt (geglättet, mit Vorzeichen),
+    /// und sammelt die Werte während der Punkte für die CSV.
     /// Kein MonoBehaviour: der manager füttert die Klasse jden Frame
     /// </summary>
     public sealed class RandomDotHeadVelocityGate
@@ -26,14 +26,8 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         // psoitiv = nach rechts bzw nach oben
         public float SignedSpeedDegreesPerSecond { get; private set; }
 
-        // dasselbe ohne Vorzeichen: für den Bereich zählt nur, wie schnell
+        // dasselbe ohne Vorzeichen
         public float SpeedDegreesPerSecond => Mathf.Abs(SignedSpeedDegreesPerSecond);
-
-        //wie lange das Tempo schon ununterbrochen im Bereich liegt
-        public float SecondsInRange { get; private set; }
-
-        // wie lange es schon ununterbrochen außerhalb liegt
-        public float SecondsOutOfRange { get; private set; }
 
         // Statistik für die CSV. Gilt ab BeginPresentation(), also ab dem Einblenden.
         public float OnsetSpeedDegreesPerSecond { get; private set; } = float.NaN;
@@ -51,8 +45,6 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
         {
             hasLastSample = false;
             SignedSpeedDegreesPerSecond = 0f;
-            SecondsInRange = 0f;
-            SecondsOutOfRange = 0f;
             OnsetSpeedDegreesPerSecond = float.NaN;
             PresentationMinSpeed = float.NaN;
             PresentationMaxSpeed = float.NaN;
@@ -77,7 +69,7 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             new(targetSpeed, OnsetSpeedDegreesPerSecond, PresentationMeanSpeed,
                 PresentationMinSpeed, PresentationMaxSpeed, WaitSeconds);
 
-        public void AddSample(Vector3 headForward, float deltaSeconds, HeadVelocityAxis axis, float smoothingSeconds, float minimumSpeed, float maximumSpeed)
+        public void AddSample(Vector3 headForward, float deltaSeconds, HeadVelocityAxis axis, float smoothingSeconds)
         {
             // beim allerersten Wert gibt es noch kein Vergleich 
             if (!hasLastSample || deltaSeconds <= 0f)
@@ -94,18 +86,6 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
             // smoothingSeconds ist die Zeitkonstante (zB 0,1s)
             float blend = 1f - Mathf.Exp(-deltaSeconds / Mathf.Max(0.001f, smoothingSeconds));
             SignedSpeedDegreesPerSecond = Mathf.Lerp(SignedSpeedDegreesPerSecond, speed, blend);
-
-            bool inRange = SpeedDegreesPerSecond >= minimumSpeed && SpeedDegreesPerSecond <= maximumSpeed;
-            if (inRange)
-            {
-                SecondsInRange += deltaSeconds;
-                SecondsOutOfRange = 0f;
-            }
-            else
-            {
-                SecondsOutOfRange += deltaSeconds;
-                SecondsInRange = 0f;
-            }
 
             if (presenting)
             {

@@ -15,7 +15,8 @@ Shader "GlobeEffect/Visual Space Random Dots"
         _EyeMode ("Eye Mode", Float) = 0
         _DotsEnabled ("Dots Enabled", Float) = 1
         _DotsOpacity ("Dots Opacity (fade in)", Float) = 1
-        _FixationSignalColor ("Cross signal color (a = opacity, 0 = off)", Color) = (0, 0, 0, 0)
+        _FixationVisible ("Fixation cross visible", Float) = 1
+        _FieldFlashColor ("Flash over the grey field (a = opacity, 0 = off)", Color) = (0, 0, 0, 0)
         _DotHalfSizeRad ("Dot Half Size [rad]", Float) = 0.00191986
         _ReferenceGridEnabled ("Preview reference grid", Float) = 0
         _ReferenceGridSpacingUv ("Reference grid spacing [u,v]", Float) = 0.087489
@@ -75,7 +76,8 @@ Shader "GlobeEffect/Visual Space Random Dots"
             float _EyeMode;
             float _DotsEnabled;
             float _DotsOpacity;
-            float4 _FixationSignalColor;
+            float _FixationVisible;
+            float4 _FieldFlashColor;
             float _DotHalfSizeRad;
             float _ReferenceGridEnabled;
             float _ReferenceGridSpacingUv;
@@ -355,6 +357,8 @@ Shader "GlobeEffect/Visual Space Random Dots"
                         background = lerp(background, _ReferenceGridColor.rgb,
                             lineAlpha * _ReferenceGridColor.a);
                     }
+                    // Flash nach der Antwort: die ganze graue Fläche leicht eingefärbt.
+                    background = lerp(background, _FieldFlashColor.rgb, _FieldFlashColor.a);
                     return float4(
                         background,
                         _FieldBackgroundColor.a * apertureAlpha);
@@ -362,14 +366,12 @@ Shader "GlobeEffect/Visual Space Random Dots"
 
                 if (input.isFixationTarget > 0.5)
                 {
+                    // In der Antwortphase ist das Kreuz aus.
+                    clip(_FixationVisible - 0.5);
                     // Zwei schmale Rechtecke ergeben zusammen das Fixationskreuz.
                     float vertical = step(abs(input.dotUv.x), 0.18);
                     float horizontal = step(abs(input.dotUv.y), 0.18);
                     clip(saturate(vertical + horizontal) - 0.5);
-                    // Signal (jetzt antworten / Trial abgebrochen): das Kreuz in der
-                    // Signalfarbe, halb durchsichtig über der grauen Fläche.
-                    if (_FixationSignalColor.a > 0.001)
-                        return _FixationSignalColor;
                     return input.color;
                 }
 

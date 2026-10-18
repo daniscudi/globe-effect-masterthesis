@@ -17,7 +17,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         Idle,
         InterTrial,
         WaitingForFixation,
-        WaitingForHeadMotion, // Active: Kreuz sichtbar, wartet auf einen gleichmäßigen Schwenk
+        WaitingForHeadMotion, // Active: Kreuz sichtbar, wartet, bis der Kopf dreht
         PresentingMotion,
         WaitingForResponse,
         PausedBetweenMiniBlocks, // Pause zwischen Viertelblöcken; der Versuchsleiter setzt mit F5 fort.
@@ -30,7 +30,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         SimulatedTrainingResponse,
         ActivePracticeInstructions, // Active Practice: Anleitung, Start mit F5
         ActivePracticeMotion, // Active Practice: warten, Punkte oder Rückmeldung
-        ActivePracticeResponse // Active Practice: Antwort nach den Punkten
+        ActivePracticeResponse, // Active Practice: Antwort nach den Punkten
+        FreeMovementPractice // Active Practice 1: freies Schwenken, Ende mit der Continue Key
     }
 
     /// <summary>
@@ -39,15 +40,15 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// So läuft ein Durchgang ab: Die Person schaut auf das Kreuz. Liegt der Blick
     /// ruhig genug, kommen die Punkte. Im SimulatedYaw-Block schwenken sie kurz in
     /// eine Richtung. Im HeadTracked-Block (Active) dreht die Person den Kopf selbst;
-    /// die Punkte kommen erst, wenn sie gleichmäßig schwenkt, und verschwinden früh,
-    /// wenn sich ihr Tempo ändert. Erst wenn die Bewegung vorbei ist, antwortet die
-    /// Person konkav oder konvex, mit den Pfeiltasten oder mit Trigger und
-    /// Trackpad-Klick am VR-Controller. Welche Taste was bedeutet, liest sie vor dem
-    /// ersten Durchgang im Headset.
+    /// die Punkte kommen, sobald der Kopf schneller als der Still-Schwellwert dreht,
+    /// und verschwinden früh, wenn er stehen bleibt oder zurückdreht. Danach ist nur
+    /// die graue Fläche zu sehen, und die Person antwortet konkav oder konvex, mit den
+    /// Pfeiltasten oder mit Trigger und Trackpad-Klick am VR-Controller. Nach der
+    /// Antwort blinkt die graue Fläche kurz, dann kommt das Kreuz wieder.
     ///
-    /// Welche Instrumentenwerte k und m gezeigt werden, steht vorher fest. Schaut
-    /// die Person zwischendurch zu lange weg, zählt der Durchgang nicht und kommt
-    /// später noch einmal dran.
+    /// Welche Instrumentenwerte k und m gezeigt werden, steht vorher fest. Wurde ein
+    /// Durchgang abgebrochen (weggeschaut, Kopf gestoppt), antwortet die Person
+    /// trotzdem; der Durchgang zählt dann nicht und kommt später noch einmal dran.
     /// </summary>
     [DisallowMultipleComponent]
     [DefaultExecutionOrder(20)]
@@ -135,44 +136,20 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [Tooltip("Which head turn counts. Horizontal = left or right, like the simulated movement.")]
         private HeadVelocityAxis velocityGateAxis = HeadVelocityAxis.Horizontal;
 
-        [SerializeField, Range(0.05f, 1f)]
-        [Tooltip("How much the head speed may change and still count as steady. Before the dots: to start " +
-            "them. While the dots are shown: compared with the speed just before they appeared. " +
-            "0.25 = ±25 %.")]
-        private float velocityChangeTolerance = 0.25f;
-
         [SerializeField]
         [Tooltip("One sweep per trial, alternating: the dots only appear while the head turns the other way " +
-            "than in the last trial (right, answer, left, answer, ...). Gives a calm rhythm with a rest at each " +
-            "answer and balances left and right.")]
+            "than in the last trial (right, answer, left, answer, ...). Off = any direction.")]
         private bool alternateSweepDirection = true;
 
-        [SerializeField, Range(0f, 2f)]
-        [Tooltip("Slower than this the head counts as still, and no dots appear (degrees per second).")]
-        private float minimumMovingHeadSpeed = 0.5f;
-
-        [SerializeField, Range(0f, 20f)]
-        [Tooltip("The dots appear only after the head has already turned this far in the current sweep " +
-            "(degrees), in addition to all other conditions. Stopping or turning around starts a new sweep. " +
-            "0 = off.")]
-        private float minimumTurnBeforeDotsDegrees = 3f;
-
-        [SerializeField, Range(0f, 1f)]
-        [Tooltip("How long the head must turn steadily before the dots appear (s).")]
-        private float velocityHoldSeconds = 0.3f;
-
-        [SerializeField, Range(0f, 5f)]
-        [Tooltip("After each trial the dots can appear again only after this time, even if the head " +
-            "already turns steadily (s). Also after a stopped trial.")]
-        private float minimumWaitBeforeDotsSeconds = 1f;
-
-        [SerializeField, Range(0f, 0.5f)]
-        [Tooltip("How long the head speed may differ from the speed before the dots while they are shown. " +
-            "Longer, and the dots disappear and the trial is repeated later (s).")]
-        private float velocityGraceSeconds = 0.1f;
+        [SerializeField, Range(0.1f, 5f)]
+        [Tooltip("Slower than this the head counts as still (degrees per second). Faster: the dots appear, " +
+            "at any speed. If the head gets slower than this while the dots are shown, or turns back, the " +
+            "trial stops: the participant still answers and the trial is repeated later.")]
+        private float minimumMovingHeadSpeed = 1f;
 
         [SerializeField, Range(0.02f, 0.5f)]
-        [Tooltip("Smooths the measured head speed so small shakes do not count (s).")]
+        [Tooltip("Smooths the measured head speed so small shakes do not count (s). Used for the still rule " +
+            "and for the saved head speeds.")]
         private float velocitySmoothingSeconds = 0.1f;
 
         [Header("Active Practice")]
@@ -183,34 +160,26 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         [SerializeField]
         [Tooltip("Before the practice, the computer moves the dots once at the simulated speed while the head " +
-            "stays still, so the participant sees what a calm speed looks like.")]
+            "stays still, so the participant sees an example of a calm speed.")]
         private bool showActiveSpeedExample = true;
 
         [SerializeField]
-        [Tooltip("k values used in the practice. Clear values make it easier to focus on the head movement.")]
+        [Tooltip("Practice 1: the participant turns the head freely with k = 1. The dots are shown while the " +
+            "head moves and fade out when it stops. No answers. The experimenter ends it with the Continue Key.")]
+        private bool freeMovementPractice = true;
+
+        [SerializeField]
+        [Tooltip("k values used in practice 2 (trials like in the test). Clear values make it easier to focus " +
+            "on the head movement.")]
         private List<float> activePracticeKValues = new() { 0.2f, 1.8f };
 
         [SerializeField, Range(1, 20)]
-        [Tooltip("The practice ends after this many good practice trials. Good = the dots did not stop early " +
-            "and, with the speed hint on, the speed was in the natural range.")]
+        [Tooltip("Practice 2 ends after this many good trials. Good = the dots did not stop early.")]
         private int activePracticeGoodTrials = 6;
 
         [SerializeField, Range(1, 60)]
-        [Tooltip("The practice ends after this many tries, even if not enough were good.")]
+        [Tooltip("Practice 2 ends after this many tries, even if not enough were good.")]
         private int activePracticeMaxTrials = 20;
-
-        [SerializeField]
-        [Tooltip("After each practice trial, tell the participant if the head turn was quite fast or quite slow " +
-            "(range below). Never in the real test.")]
-        private bool activePracticeSpeedHint = true;
-
-        [SerializeField, Range(0.5f, 10f)]
-        [Tooltip("Practice hint: a head turn slower than this counts as quite slow (degrees per second).")]
-        private float naturalHeadSpeedMin = 1.5f;
-
-        [SerializeField, Range(0.5f, 20f)]
-        [Tooltip("Practice hint: a head turn faster than this counts as quite fast (degrees per second).")]
-        private float naturalHeadSpeedMax = 4f;
 
         [Header("Practice")]
         [SerializeField]
@@ -277,46 +246,24 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private float pauseSeconds = 0.25f;
 
         [SerializeField, Range(0f, 0.3f)]
-        [Tooltip("The dots fade in over this time instead of popping up (s). 0 = no fade. 0.05 s is about " +
-            "4-5 frames at 90 Hz. Used in all trials and practice, simulated and head-tracked.")]
-        private float dotsFadeInSeconds = 0.05f;
+        [Tooltip("The dots fade in over this time instead of popping up (s). 0 = no fade. Used in all trials " +
+            "and practice, simulated and head-tracked. In active practice 1 the dots also fade out this fast.")]
+        private float dotsFadeInSeconds = 0.2f;
 
-        [Header("Signals At The Cross")]
+        [Header("Flash After The Answer")]
         [SerializeField]
-        [Tooltip("The cross briefly flashes a colour: one when the participant can answer, another when a " +
-            "trial stopped early. No sounds.")]
-        private bool showCrossSignals = true;
+        [Tooltip("Colour that briefly tints the whole grey circle after each answer, also after a stopped " +
+            "trial. Then the cross comes back. No sounds.")]
+        private Color answerFlashColor = Color.cyan;
 
-        [SerializeField]
-        [Tooltip("Colour that flashes briefly at the cross when the dots are over and the participant can " +
-            "answer.")]
-        private Color answerSignalColor = Color.cyan;
+        [SerializeField, Range(0f, 0.5f)]
+        [Tooltip("How strong the flash is. Keep it low so it does not dazzle. 0 = no flash.")]
+        private float answerFlashOpacity = 0.1f;
 
-        [SerializeField, Range(0.05f, 2f)]
-        [Tooltip("How long the answer colour flashes (s).")]
-        private float answerSignalSeconds = 0.3f;
-
-        [SerializeField]
-        [Tooltip("Colour that flashes briefly at the cross when the answer was taken. A different colour " +
-            "than Answer Now, so a quick answer does not blend into the first flash.")]
-        private Color answeredSignalColor = Color.green;
-
-        [SerializeField, Range(0.05f, 2f)]
-        [Tooltip("How long the answer-taken colour flashes (s).")]
-        private float answeredSignalSeconds = 0.3f;
-
-        [SerializeField]
-        [Tooltip("Colour of the cross for a moment when a trial stopped early (head speed changed or looked " +
-            "away). No answer is needed then.")]
-        private Color stoppedSignalColor = Color.magenta;
-
-        [SerializeField, Range(0.1f, 1f)]
-        [Tooltip("How strong the signal colour is. Lower = more see-through over the grey background.")]
-        private float crossSignalOpacity = 0.6f;
-
-        [SerializeField, Range(0.1f, 2f)]
-        [Tooltip("How long the cross shows the stopped colour (s).")]
-        private float stoppedSignalSeconds = 0.5f;
+        [SerializeField, Range(0.05f, 1f)]
+        [Tooltip("How long the flash lasts (s). The cross comes back after the flash or after the Grey Pause " +
+            "Between Trials, whichever is longer.")]
+        private float answerFlashSeconds = 0.2f;
 
         [Header("Keys")]
         [SerializeField]
@@ -341,7 +288,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private int frameTimingStartFrame;
         private int trialsWithSlowFrames;
         private int repeatedAttempts;
-        private int speedChangedAttempts;
+        private int headStoppedAttempts;
+        // Grund, warum die laufende Darbietung abgebrochen wurde; null = nicht abgebrochen.
+        private string stoppedReason;
         private bool eventsSubscribed;
 
         // Übungen und Anleitungen: in einer Sitzung jeweils nur einmal.
@@ -362,9 +311,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         // ---- Laufzeit: Kopftempo bei Active ----
         private readonly RandomDotActiveSweepRule activeSweep = new();
         private readonly RandomDotLiveHeadSpeed liveHeadSpeed = new();
+        // Active Practice 1: eigene Messung, Richtung egal.
+        private readonly RandomDotHeadVelocityGate freeMovementSpeed = new();
 
-        // Farbsignal am Kreuz: bis wann es noch zu sehen ist.
-        private float crossSignalUntil;
+        // Flash nach der Antwort: bis wann er noch zu sehen ist.
+        private float answerFlashUntil;
+
+        private const string HeadStoppedReason = "head_stopped";
 
         public RandomDotSessionState SessionState => sessionState;
         public RandomDotMotionMode SessionMotionMode => sessionMotionMode;
@@ -378,8 +331,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         /// <summary>Ungültige Durchgänge dieser Sitzung (werden hinten wiederholt).</summary>
         public int RepeatedAttempts => repeatedAttempts;
 
-        /// <summary>Davon abgebrochen, weil sich das Kopftempo während der Punkte geändert hat.</summary>
-        public int SpeedChangedAttempts => speedChangedAttempts;
+        /// <summary>Davon abgebrochen, weil der Kopf während der Punkte stehen blieb oder zurückdrehte.</summary>
+        public int HeadStoppedAttempts => headStoppedAttempts;
 
         /// <summary>Wie viele beschriftete Beispiele im laufenden Training schon gezeigt wurden.</summary>
         public int TrainingExamplesShown { get; private set; }
@@ -387,13 +340,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         /// <summary>Ergebnis der letzten Übungsrückmeldung; null = keine Rückmeldung (k nicht eindeutig).</summary>
         public bool? LastTrainingAnswerCorrect { get; private set; }
 
-        /// <summary>Gute Übungstrials im laufenden oder letzten Active Practice.</summary>
+        /// <summary>Gute Übungstrials in der laufenden oder letzten Active Practice 2.</summary>
         public int ActivePracticeGoodTrials { get; private set; }
 
-        /// <summary>Alle Übungstrials im laufenden oder letzten Active Practice.</summary>
+        /// <summary>Alle Übungstrials in der laufenden oder letzten Active Practice 2.</summary>
         public int ActivePracticeAttempts { get; private set; }
 
-        /// <summary>Ergebnis des letzten Übungstrials: good, fast, slow oder changed.</summary>
+        /// <summary>Ergebnis des letzten Übungstrials: good oder stopped.</summary>
         public string LastActivePracticeResult { get; private set; } = string.Empty;
 
         /// <summary>Wartet gerade ein Übungstext auf einen Tastendruck?</summary>
@@ -403,7 +356,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public bool IsTrainingActive => sessionState is State.SimulatedTrainingInstructions
             or State.SimulatedTrainingMotion or State.SimulatedTrainingResponse
-            or State.ActivePracticeInstructions or State.ActivePracticeMotion or State.ActivePracticeResponse;
+            or State.ActivePracticeInstructions or State.ActivePracticeMotion or State.ActivePracticeResponse
+            or State.FreeMovementPractice;
 
         // Aktiv ist alles außer: noch nicht gestartet, fertig oder abgebrochen.
         public bool IsSessionActive => !standaloneTraining
@@ -455,7 +409,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // geprüft, ob der Blick noch auf dem Kreuz liegt.
             if (previewActive) KeepPreviewPointWorldLikeSession();
             UpdateLiveHeadSpeed();
-            if (crossSignalUntil > 0f && Time.unscaledTime >= crossSignalUntil) ClearCrossSignal();
+            if (answerFlashUntil > 0f && Time.unscaledTime >= answerFlashUntil) ClearAnswerFlash();
 
             // Bildzeiten nur während der Darbietung zählen, ab dem Frame nach dem Start.
             if (sessionState == State.PresentingMotion && Time.frameCount > frameTimingStartFrame)
@@ -553,7 +507,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             if (stimulus == null || stimulus.Observer == null) return;
             stimulus.SessionRunning = false;
             stimulus.ShowFixationOnly();
-            ClearCrossSignal();
+            ClearAnswerFlash();
             ShowWelcomeText(completed: false);
         }
 
@@ -773,7 +727,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             validTrialsCompleted = 0;
             presentationCount = 0;
             repeatedAttempts = 0;
-            speedChangedAttempts = 0;
+            headStoppedAttempts = 0;
             trialsWithSlowFrames = 0;
             pausesTaken = 0;
             currentMotionBlock = 0;
@@ -810,7 +764,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulus.ShowFixationOnly();
             sessionState = State.ResponseInstructions;
             headsetText.ShowResponseInstructions(
-                ResponseLinesWithSignalNote(), ResponseInputController.GetReadableKeyName(startSessionKey));
+                ResponseLinesWithFlashNote(), ResponseInputController.GetReadableKeyName(startSessionKey));
             WriteMarker("ResponseInstructionsShown;task=random_dot_instrument");
         }
 
@@ -838,12 +792,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "CONVEX (curves outward)", "CONCAVE (curves inward)");
         }
 
-        // Für die Anleitungen: Tastenbelegung plus ein Satz zu den Farbsignalen am Kreuz.
-        private string ResponseLinesWithSignalNote()
+        // Für die Anleitungen: Tastenbelegung plus ein Satz zum Flash nach der Antwort.
+        private string ResponseLinesWithFlashNote()
         {
-            return BuildResponseLines() + (showCrossSignals
-                ? "\n\nThe cross flashes one colour when you can answer,\n" +
-                    "and another colour if the trial stopped early."
+            return BuildResponseLines() + (answerFlashOpacity > 0f
+                ? "\n\nAfter each answer the grey field flashes briefly."
                 : string.Empty);
         }
 
@@ -1017,7 +970,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             EnsureHeadsetText();
             stimulus.ShowFixationOnly();
             sessionState = State.SimulatedTrainingInstructions;
-            headsetText.ShowSimulatedInstructions(ResponseLinesWithSignalNote(),
+            headsetText.ShowSimulatedInstructions(ResponseLinesWithFlashNote(),
                 ResponseInputController.GetReadableKeyName(startSessionKey), simulatedTrainingFeedback,
                 showSimulatedExamples);
         }
@@ -1136,23 +1089,28 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             return BuildPracticePlan(activePracticeKValues, RandomDotMotionMode.HeadTracked, repeats, 70000);
         }
 
+        // Active Practice 1: ein Trial mit k = 1 (gerade), damit es nur um die Bewegung geht.
+        private RandomDotTrial BuildFreeMovementTrial() =>
+            BuildPracticePlan(new[] { 1f }, RandomDotMotionMode.HeadTracked, 1, 72000)[0];
+
         private void ShowActivePracticeInstructions()
         {
-            if (!PracticePlanFits(BuildActivePracticePlan(), "Active Practice")) return;
+            var plan = new List<RandomDotTrial>(BuildActivePracticePlan()) { BuildFreeMovementTrial() };
+            if (!PracticePlanFits(plan, "Active Practice")) return;
             EnsureHeadsetText();
             stimulus.ShowFixationOnly();
             sessionState = State.ActivePracticeInstructions;
-            headsetText.ShowActivePracticeInstructions(ResponseLinesWithSignalNote(),
-                ResponseInputController.GetReadableKeyName(startSessionKey), velocityGateAxis, showActiveSpeedExample,
-                alternateSweepDirection);
+            headsetText.ShowActivePracticeInstructions(ResponseLinesWithFlashNote(),
+                ResponseInputController.GetReadableKeyName(startSessionKey), showActiveSpeedExample,
+                freeMovementPractice);
             WriteMarker("ActivePracticeInstructions;task=random_dot_instrument");
         }
 
         private IEnumerator RunActivePractice()
         {
-            // Übt genau den Ablauf der aktiven Trials (gleichmäßig schwenken, Punkte,
-            // Antwort), ohne Daten zu speichern. Danach eine kurze Rückmeldung zur
-            // Bewegung, damit die Person ein natürliches Tempo findet.
+            // Erst ein Beispiel für ein ruhiges Tempo, dann Practice 1 (frei schwenken,
+            // ohne Antworten) und Practice 2: Trials genau wie im Test, ohne Texte
+            // dazwischen und ohne Daten zu speichern.
             sessionState = State.ActivePracticeMotion;
             ActivePracticeGoodTrials = 0;
             ActivePracticeAttempts = 0;
@@ -1170,6 +1128,18 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 yield return PresentSimulatedExample(speedExample, exampleLongSeconds);
             }
 
+            if (freeMovementPractice)
+            {
+                headsetText.ShowFreeMovementPracticeStart(velocityGateAxis);
+                yield return PracticeTextPause(exampleTextSeconds);
+                yield return RunFreeMovementPractice();
+                sessionState = State.ActivePracticeMotion;
+            }
+
+            headsetText.ShowTrialPracticeStart(BuildResponseLines(), velocityGateAxis, alternateSweepDirection);
+            yield return PracticeTextPause(exampleTextSeconds);
+            headsetText.Hide();
+
             IReadOnlyList<RandomDotTrial> practice = BuildActivePracticePlan();
             while (ActivePracticeGoodTrials < activePracticeGoodTrials && ActivePracticeAttempts < activePracticeMaxTrials)
             {
@@ -1178,63 +1148,47 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 ConfigureStimulus(trial);
                 stimulus.ShowFixationOnly();
                 sessionState = State.ActivePracticeMotion;
-                headsetText.ShowActivePracticeTurn(ActivePracticeAttempts, ActivePracticeGoodTrials,
-                    activePracticeGoodTrials, velocityGateAxis, activeSweep.RequiredSign);
+                ResetFixationChecks();
 
-                // Warten, bis der Kopf gleichmäßig dreht (wie im echten Trial).
+                // Wie im echten Trial: erst ruhiger Blick (falls verlangt), dann warten,
+                // bis der Kopf in der erlaubten Richtung dreht.
+                while (!GazeReadyForDots()) yield return null;
                 BeginActiveSweepWait();
                 while (true)
                 {
                     SampleActiveSweep(presenting: false);
-                    if (activeSweep.ReadyForDots(Time.realtimeSinceStartupAsDouble)) break;
+                    if (activeSweep.ReadyForDots) break;
                     yield return null;
                 }
 
                 activeSweep.BeginPresentation(stimulus.Observer.forward, stimulus.Observer.up);
-                headsetText.Hide();
+                ResetFixationChecks();
                 stimulus.PlaceAroundObserver();
                 stimulus.RestartMotionPhase();
                 stimulus.Show(dotsFadeInSeconds);
-                bool stopped = false;
+                string stopped = null;
                 double shownAt = Time.realtimeSinceStartupAsDouble;
                 while (Time.realtimeSinceStartupAsDouble - shownAt < simulatedSweepSeconds)
                 {
                     yield return null;
                     SampleActiveSweep(presenting: true);
-                    if (activeSweep.SpeedChangedTooLong)
-                    {
-                        ShowStoppedSignal();
-                        stopped = true;
-                        break;
-                    }
-                }
-                stimulus.ShowFixationOnly();
-
-                if (!stopped)
-                {
-                    headsetText.ShowActivePracticeResponse(BuildResponseLines());
-                    yield return WaitForPracticeAnswer(State.ActivePracticeResponse);
+                    stopped = activeSweep.HeadStopped ? HeadStoppedReason
+                        : requireFixation ? CheckGazeDuringDots() : null;
+                    if (stopped != null) break;
                 }
 
-                float speed = activeSweep.ReferenceSpeed;
-                LastActivePracticeResult = stopped ? "changed"
-                    : !activePracticeSpeedHint ? "good"
-                    : speed > naturalHeadSpeedMax ? "fast"
-                    : speed < naturalHeadSpeedMin ? "slow"
-                    : "good";
-                if (LastActivePracticeResult == "good") ActivePracticeGoodTrials++;
+                // Wie im Test: Punkte und Kreuz weg, antworten (auch nach einem Abbruch), Flash.
+                yield return WaitForPracticeAnswer(State.ActivePracticeResponse);
+
+                LastActivePracticeResult = stopped == null ? "good" : "stopped";
+                if (stopped == null) ActivePracticeGoodTrials++;
                 Debug.Log(string.Format(CultureInfo.InvariantCulture,
-                    "Active Practice {0}: {1}, Kopftempo vor den Punkten {2:F2} °/s ({3}/{4} gut).",
-                    ActivePracticeAttempts, LastActivePracticeResult, speed, ActivePracticeGoodTrials,
-                    activePracticeGoodTrials), this);
-                WriteMarker("ActivePracticeTrial;task=random_dot_instrument;attempt={0};result={1};" +
-                    "reference_speed_deg_s={2:F3};good={3}", ActivePracticeAttempts, LastActivePracticeResult,
-                    speed, ActivePracticeGoodTrials);
-
-                sessionState = State.ActivePracticeMotion;
-                headsetText.ShowActivePracticeFeedback(ActivePracticeFeedbackText(LastActivePracticeResult),
-                    ActivePracticeGoodTrials, activePracticeGoodTrials);
-                yield return PracticeTextPause(Mathf.Max(1.5f, feedbackSeconds));
+                    "Active Practice 2, Trial {0}: {1}{2} ({3}/{4} gut).",
+                    ActivePracticeAttempts, LastActivePracticeResult, stopped != null ? " (" + stopped + ")" : "",
+                    ActivePracticeGoodTrials, activePracticeGoodTrials), this);
+                WriteMarker("ActivePracticeTrial;task=random_dot_instrument;attempt={0};result={1};reason={2};" +
+                    "good={3}", ActivePracticeAttempts, LastActivePracticeResult, stopped ?? "none",
+                    ActivePracticeGoodTrials);
             }
 
             WriteMarker("ActivePracticeCompleted;task=random_dot_instrument;attempts={0};good={1}",
@@ -1244,25 +1198,84 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             FinishPractice();
         }
 
-        private static string ActivePracticeFeedbackText(string result) => result switch
+        // Active Practice 1: freies Schwenken mit k = 1, ohne Antworten. Die Punkte sind
+        // da, solange der Kopf schneller als der Still-Schwellwert dreht (Richtung egal),
+        // und werden ausgeblendet, wenn er langsamer wird. Mit Require Fixation auch,
+        // wenn die Person zu lange vom Kreuz wegschaut. Der Versuchsleiter beendet die
+        // Übung mit der Continue Key.
+        private IEnumerator RunFreeMovementPractice()
         {
-            "changed" => "THE DOTS STOPPED EARLY\n\nYou changed your speed while they were visible.\n" +
-                "Keep the same speed until they disappear.",
-            "fast" => "QUITE FAST\n\nThe dots moved very fast.\nTry a calmer head turn.",
-            "slow" => "QUITE SLOW\n\nTry a slightly quicker, natural head turn.",
-            _ => "GOOD\n\nKeep turning like this."
-        };
+            ConfigureStimulus(BuildFreeMovementTrial());
+            stimulus.ShowFixationOnly();
+            headsetText.Hide();
+            sessionState = State.FreeMovementPractice;
+            freeMovementSpeed.Reset();
+            ResetFixationChecks();
+            WriteMarker("FreeMovementPracticeStarted;task=random_dot_instrument");
+
+            bool dotsOn = false;
+            Vector3 placedForward = stimulus.Observer.forward;
+            // Ein Druck aus dem Frame davor (der Text davor) zählt nicht.
+            yield return null;
+            practiceContinueRequested = false;
+            while (!ExperimenterContinuePressed())
+            {
+                Transform head = stimulus.Observer;
+                freeMovementSpeed.AddSample(head.forward, Time.unscaledDeltaTime, velocityGateAxis,
+                    velocitySmoothingSeconds);
+                float speed = freeMovementSpeed.SpeedDegreesPerSecond;
+                bool moving = speed >= minimumMovingHeadSpeed;
+                if (dotsOn)
+                {
+                    // Kurz vor dem Rand der Punktwelt ausblenden. Beim nächsten Einblenden
+                    // wird sie neu um den Kopf gelegt.
+                    bool nearEdge = Vector3.Angle(placedForward, head.forward) + speed * dotsFadeInSeconds
+                        >= headTurnSafetyDegrees;
+                    if (!moving || nearEdge || (requireFixation && CheckGazeDuringDots() != null))
+                    {
+                        stimulus.FadeOutDots(dotsFadeInSeconds);
+                        dotsOn = false;
+                    }
+                }
+                else if (moving && !stimulus.PointsVisible && GazeReadyForDots())
+                {
+                    // Erst wieder einblenden, wenn das Ausblenden fertig ist.
+                    stimulus.PlaceAroundObserver();
+                    stimulus.RestartMotionPhase();
+                    stimulus.Show(dotsFadeInSeconds);
+                    placedForward = head.forward;
+                    ResetFixationChecks();
+                    dotsOn = true;
+                }
+                yield return null;
+            }
+
+            practiceContinueRequested = false;
+            stimulus.ShowFixationOnly();
+            WriteMarker("FreeMovementPracticeEnded;task=random_dot_instrument");
+        }
+
+        // Nur die Taste des Versuchsleiters (oder ContinuePractice), nicht das Trackpad.
+        private bool ExperimenterContinuePressed()
+        {
+            Keyboard keyboard = Keyboard.current;
+            return practiceContinueRequested
+                || (keyboard != null && keyboard[practiceContinueKey].wasPressedThisFrame);
+        }
 
         // ---- Gemeinsam für beide Übungen ----
 
-        // Wartet auf die Antwort im Übungstrial, mit den Farbsignalen wie in der Messung.
+        // Wartet auf die Antwort im Übungstrial, wie in der Messung: nur die graue
+        // Fläche, nach der Antwort der Flash, danach kommt das Kreuz wieder.
         private IEnumerator WaitForPracticeAnswer(State responseState)
         {
+            stimulus.ShowEmptyField();
             trainingResponseReceived = false;
             sessionState = responseState;
-            ShowAnswerSignal();
             while (!trainingResponseReceived) yield return null;
-            ShowAnsweredSignal();
+            ShowAnswerFlash();
+            float wait = SecondsAfterAnswer;
+            if (wait > 0f) yield return new WaitForSecondsRealtime(wait);
         }
 
         /// <summary>
@@ -1317,6 +1330,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             presentationCount++;
             currentTrialNumber = validTrialsCompleted + 1;
+            stoppedReason = null;
             currentMotionBlock = currentTrial.MotionBlockIndex;
             currentMiniBlock = currentTrial.MiniBlockIndex;
             ConfigureStimulus(currentTrial);
@@ -1380,7 +1394,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             ResetFixationChecks();
-            ClearCrossSignal();
+            ClearAnswerFlash();
+            stoppedReason = null;
             // Die aktive Punktwelt wird erst jetzt am aktuellen Kopf ausgerichtet.
             // Zwischen Fixationsbeginn und Trialstart kann sich der Kopf bewegen.
             stimulus.PlaceAroundObserver();
@@ -1427,15 +1442,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             sweepMonitor.StopTracking();
             stimulusEndUnitySeconds = Time.realtimeSinceStartupAsDouble;
-            // Nur die Punkte ausblenden. Der graue Kreis und das Fixationskreuz
-            // bleiben stehen, damit der Wechsel zur Antwortphase keinen globalen
-            // Helligkeitssprung im Headset erzeugt.
-            stimulus.ShowFixationOnly();
+            // Punkte und Kreuz aus, nur der graue Kreis bleibt. So gibt es beim
+            // Wechsel zur Antwortphase keinen globalen Helligkeitssprung im Headset.
+            stimulus.ShowEmptyField();
             sessionState = State.WaitingForResponse;
-            ShowAnswerSignal();
-            WriteMarker("StimulusEnded;task=random_dot_instrument;sequence={0};attempt={1};duration_s={2:F4}",
-                currentTrial.SequenceIndex, currentTrial.AttemptNumber,
-                stimulusEndUnitySeconds - trialStartUnitySeconds);
+            WriteMarker("StimulusEnded;task=random_dot_instrument;sequence={0};attempt={1};duration_s={2:F4};" +
+                "stopped={3}", currentTrial.SequenceIndex, currentTrial.AttemptNumber,
+                stimulusEndUnitySeconds - trialStartUnitySeconds, stoppedReason ?? "none");
         }
 
         private void HandleResponseSubmitted(CheckerboardCurvatureResponse response)
@@ -1462,13 +1475,20 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return;
             }
 
+            // Abgebrochene Darbietung: Antwort speichern, aber als ungültig.
+            if (stoppedReason != null)
+            {
+                RecordStoppedAttempt(response);
+                return;
+            }
+
             RandomDotTrialResult result = CaptureCurrentResult(response, validForAnalysis: true, "valid");
             if (!TryAppendResult(result))
             {
                 return;
             }
 
-            ShowAnsweredSignal();
+            ShowAnswerFlash();
             validTrialsCompleted++;
             WriteMarker(
                 "TrialResponse;task=random_dot_instrument;sequence={0};attempt={1};" +
@@ -1485,52 +1505,67 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // Getrennt deshalb, weil ein Blinzeln etwas anderes ist als wegschauen.
             // Wird eine der beiden Zeiten am Stück überschritten, zählt nur dieser
             // eine Durchgang nicht. Die Sitzung läuft normal weiter.
-            if (fixationMonitor == null)
-            {
-                InvalidateCurrentTrial("missing_fixation_monitor");
-                return;
-            }
-
-            bool sampleUsable =
-                fixationMonitor.HasRecentSample(maxSampleAgeSeconds) && fixationMonitor.CurrentSampleValid;
-            lookAway.Add(Time.unscaledDeltaTime, sampleUsable, fixationMonitor.IsInsideTolerance);
-            string problem = lookAway.FindProblem(maxLookAwaySeconds, maxNoDataSeconds);
+            string problem = CheckGazeDuringDots();
             if (problem != null)
             {
-                InvalidateCurrentTrial(problem);
+                StopCurrentPresentation(problem);
             }
         }
 
-        private void InvalidateCurrentTrial(string reason)
+        // Ein Frame Blickkontrolle während der Punkte: Grund für einen Abbruch oder null.
+        private string CheckGazeDuringDots()
         {
-            // Bewegung stoppen, den misslungenen Versuch trotzdem speichern und
-            // denselben Durchgang mit höherer Versuchsnummer ganz hinten wieder
-            // in die Warteschlange hängen.
+            if (fixationMonitor == null) return "missing_fixation_monitor";
+            bool sampleUsable =
+                fixationMonitor.HasRecentSample(maxSampleAgeSeconds) && fixationMonitor.CurrentSampleValid;
+            lookAway.Add(Time.unscaledDeltaTime, sampleUsable, fixationMonitor.IsInsideTolerance);
+            return lookAway.FindProblem(maxLookAwaySeconds, maxNoDataSeconds);
+        }
+
+        // Darf es mit den Punkten losgehen? Ohne Require Fixation immer.
+        private bool GazeReadyForDots() => !requireFixation
+            || (fixationMonitor != null && fixationMonitor.IsReadyForPresentation(maxSampleAgeSeconds));
+
+        private void StopCurrentPresentation(string reason)
+        {
+            // Punkte und Kreuz sofort weg, dann die normale Antwortphase. Gespeichert
+            // wird erst mit der Antwort (als ungültig), danach kommt der Durchgang
+            // ganz hinten noch einmal dran.
             if (sessionState != State.PresentingMotion || currentTrial == null)
             {
                 return;
             }
 
             StopAndClear(ref motionCoroutine);
-            ShowStoppedSignal();
+            stoppedReason = reason;
             repeatedAttempts++;
-            if (reason == "head_speed_changed") speedChangedAttempts++;
-            sweepMonitor.StopTracking();
-            stimulusEndUnitySeconds = Time.realtimeSinceStartupAsDouble;
+            if (reason == HeadStoppedReason) headStoppedAttempts++;
+            WriteMarker("TrialStopped;task=random_dot_instrument;sequence={0};attempt={1};reason={2}",
+                currentTrial.SequenceIndex, currentTrial.AttemptNumber, reason);
+            EndMotionPresentation();
+        }
+
+        private void RecordStoppedAttempt(CheckerboardCurvatureResponse response)
+        {
+            // Der abgebrochene Versuch wird mit Antwort gespeichert, zählt aber nicht.
+            // Derselbe Durchgang kommt mit höherer Versuchsnummer ganz hinten wieder
+            // in die Warteschlange.
+            string reason = stoppedReason;
             RandomDotTrial invalidTrial = currentTrial;
             RandomDotTrialResult result = CaptureCurrentResult(
-                CheckerboardCurvatureResponse.None, validForAnalysis: false, "invalid:" + reason);
+                response, validForAnalysis: false, "invalid:" + reason);
             if (!TryAppendResult(result))
             {
                 return;
             }
 
+            ShowAnswerFlash();
             WriteMarker(
                 "TrialInvalid;task=random_dot_instrument;sequence={0};attempt={1};reason={2};" +
-                "off_target_s={3:F4};invalid_gaze_s={4:F4};mean_yaw_speed_deg_s={5:F4};" +
-                "peak_yaw_speed_deg_s={6:F4};max_abs_yaw_deg={7:F4}",
-                invalidTrial.SequenceIndex, invalidTrial.AttemptNumber, reason,
-                lookAway.LongestLookAwaySeconds, lookAway.LongestNoDataSeconds,
+                "response={3};response_s={4:F4};off_target_s={5:F4};invalid_gaze_s={6:F4};" +
+                "mean_yaw_speed_deg_s={7:F4};peak_yaw_speed_deg_s={8:F4};max_abs_yaw_deg={9:F4}",
+                invalidTrial.SequenceIndex, invalidTrial.AttemptNumber, reason, response,
+                result.ResponseTimeSeconds, lookAway.LongestLookAwaySeconds, lookAway.LongestNoDataSeconds,
                 sweepMonitor.MeanAbsoluteYawSpeedDegreesPerSecond,
                 sweepMonitor.PeakAbsoluteYawSpeedDegreesPerSecond,
                 sweepMonitor.MaximumAbsoluteYawDegrees);
@@ -1598,14 +1633,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 return result;
             }
 
-            // Active: Kopftempo-Erkennung, Richtung und Bewegung neben der Schwenkachse.
+            // Active: Kopftempo, Richtung und Bewegung neben der Schwenkachse.
             result.HeadVelocity = activeSweep.Summarize(SimulatedHeadSpeed(currentTrial));
-            result.HeadSpeedReference = activeSweep.ReferenceSpeed;
             result.HeadDirection = activeSweep.Direction;
             result.HeadOffAxisSpeed = activeSweep.OffAxis.MeanOffAxisSpeed;
             result.HeadOffAxisDeviation = activeSweep.OffAxis.MaxOffAxisDeviationDegrees;
             result.HeadRollDeviation = activeSweep.OffAxis.MaxRollDeviationDegrees;
-            result.HeadTurnBeforeDots = activeSweep.TurnBeforeDots;
             return result;
         }
 
@@ -1629,12 +1662,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void FinishAttemptAndScheduleNext()
         {
-            // Punkte ausblenden, kurz warten und dann den nächsten Durchgang holen.
-            // Der neutrale graue Kreis bleibt durchgehend sichtbar. So wechseln
-            // weder mittlere Helligkeit noch Größe der kreisförmigen Öffnung.
+            // Nach der Antwort: Flash auf der grauen Fläche, kurz warten, dann den
+            // nächsten Durchgang holen (erst dann ist das Kreuz wieder da). Der
+            // neutrale graue Kreis bleibt durchgehend sichtbar. So wechseln weder
+            // mittlere Helligkeit noch Größe der kreisförmigen Öffnung.
             StopAndClear(ref motionCoroutine);
-            stimulus.ShowFixationOnly();
+            stimulus.ShowEmptyField();
             currentTrial = null;
+            stoppedReason = null;
 
             if (trialQueue == null || !trialQueue.TryPeekNext(out _))
             {
@@ -1648,7 +1683,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             sessionState = State.InterTrial;
-            if (pauseSeconds <= 0f)
+            if (SecondsAfterAnswer <= 0f)
             {
                 BeginNextAttempt();
             }
@@ -1658,9 +1693,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
         }
 
+        // Nach der Antwort bis zum Kreuz: Grey Pause oder Flash, was länger ist.
+        private float SecondsAfterAnswer =>
+            Mathf.Max(pauseSeconds, answerFlashOpacity > 0f ? answerFlashSeconds : 0f);
+
         private IEnumerator BeginNextAttemptAfterDelay()
         {
-            yield return new WaitForSecondsRealtime(pauseSeconds);
+            yield return new WaitForSecondsRealtime(SecondsAfterAnswer);
             BeginNextAttempt();
         }
 
@@ -1725,7 +1764,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         // Das brauchen Abbrechen, Fertigwerden und Schreibfehler gleichermaßen.
         private void EndSession(State endState)
         {
-            ClearCrossSignal();
+            ClearAnswerFlash();
+            stoppedReason = null;
             if (stimulus != null)
             {
                 stimulus.Hide();
@@ -1745,30 +1785,29 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void BeginWaitingForHeadMotion()
         {
-            // Graue Fläche und Kreuz, noch keine Punkte. Die Messung beginnt neu, und
-            // ab jetzt läuft die Pflicht-Wartezeit (auch nach einem Abbruch).
+            // Graue Fläche und Kreuz, noch keine Punkte. Die Messung beginnt neu.
             BeginActiveSweepWait();
             stimulus.ShowFixationOnly();
             sessionState = State.WaitingForHeadMotion;
             WriteMarker("WaitingForHeadMotion;task=random_dot_instrument;sequence={0};attempt={1};" +
-                "simulated_speed_deg_s={2:F3};min_wait_s={3:F3}", currentTrial.SequenceIndex,
-                currentTrial.AttemptNumber, SimulatedHeadSpeed(currentTrial), minimumWaitBeforeDotsSeconds);
+                "simulated_speed_deg_s={2:F3};still_below_deg_s={3:F3};next_direction={4}",
+                currentTrial.SequenceIndex, currentTrial.AttemptNumber, SimulatedHeadSpeed(currentTrial),
+                minimumMovingHeadSpeed, activeSweep.NextDirection);
         }
 
         private void UpdateVelocityGate()
         {
             bool presenting = sessionState == State.PresentingMotion;
             SampleActiveSweep(presenting);
-            if (sessionState == State.WaitingForHeadMotion
-                && activeSweep.ReadyForDots(Time.realtimeSinceStartupAsDouble))
+            if (sessionState == State.WaitingForHeadMotion && activeSweep.ReadyForDots)
             {
                 activeSweep.BeginPresentation(stimulus.Observer.forward, stimulus.Observer.up);
                 PresentCurrentTrial();
             }
-            else if (presenting && activeSweep.SpeedChangedTooLong)
+            else if (presenting && activeSweep.HeadStopped)
             {
-                // Tempo hat sich während der Punkte zu stark geändert: abbrechen, später wiederholen.
-                InvalidateCurrentTrial("head_speed_changed");
+                // Kopf bleibt stehen oder dreht zurück: abbrechen, antworten, später wiederholen.
+                StopCurrentPresentation(HeadStoppedReason);
             }
         }
 
@@ -1776,15 +1815,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private void BeginActiveSweepWait()
         {
             activeSweep.Axis = velocityGateAxis;
-            activeSweep.ChangeTolerance = velocityChangeTolerance;
-            activeSweep.MinimumMovingSpeed = minimumMovingHeadSpeed;
-            activeSweep.MinimumTurnDegrees = minimumTurnBeforeDotsDegrees;
-            activeSweep.HoldSeconds = velocityHoldSeconds;
-            activeSweep.MinimumWaitSeconds = minimumWaitBeforeDotsSeconds;
-            activeSweep.GraceSeconds = velocityGraceSeconds;
+            activeSweep.StillBelow = minimumMovingHeadSpeed;
             activeSweep.SmoothingSeconds = velocitySmoothingSeconds;
             activeSweep.AlternateDirection = alternateSweepDirection;
-            activeSweep.BeginWait(Time.realtimeSinceStartupAsDouble);
+            activeSweep.BeginWait();
         }
 
         // Einmal pro Frame aufrufen.
@@ -1793,8 +1827,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             activeSweep.Sample(stimulus.Observer.forward, stimulus.Observer.up, Time.unscaledDeltaTime, presenting);
         }
 
-        // Live-Anzeige für den Experiment Monitor: dieselbe Erkennung "gleichmäßig"
-        // wie im Trial, für das m und den Zoom, die gerade am Punktfeld stehen (in der
+        // Live-Anzeige für den Experiment Monitor: derselbe Still-Schwellwert wie im
+        // Trial, für das m und den Zoom, die gerade am Punktfeld stehen (in der
         // Vorschau also die Vorschauwerte, in der Sitzung die des laufenden Trials).
         // Das Kopftempo des simulierten Schwenks steht nur zum Vergleich daneben.
         private void UpdateLiveHeadSpeed()
@@ -1809,32 +1843,26 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             float zoom = stimulus.ContentZoom;
             liveHeadSpeed.AddSample(observer.forward, Time.unscaledDeltaTime, velocityGateAxis,
                 velocitySmoothingSeconds, RandomDotSimulatedSweep.ObjectSpeed(simulatedImageCenterSpeed, m, zoom),
-                velocityChangeTolerance, minimumMovingHeadSpeed, velocityHoldSeconds, m * zoom);
+                minimumMovingHeadSpeed, m * zoom);
         }
 
         // =====================================================================
-        // Farbsignale am Kreuz
+        // Flash nach der Antwort
         // =====================================================================
 
-        // Ohne Töne, jeweils nur kurz: "jetzt antworten", "Antwort angenommen" und
-        // "abgebrochen". Gleich in Simulated, Active und in den Übungen.
-        private void ShowAnswerSignal() => FlashCrossSignal(answerSignalColor, answerSignalSeconds);
-
-        private void ShowAnsweredSignal() => FlashCrossSignal(answeredSignalColor, answeredSignalSeconds);
-
-        private void ShowStoppedSignal() => FlashCrossSignal(stoppedSignalColor, stoppedSignalSeconds);
-
-        private void FlashCrossSignal(Color color, float seconds)
+        // Ohne Töne, nur kurz und schwach über die ganze graue Fläche. Nach jeder
+        // Antwort, auch nach einem Abbruch. Gleich in Simulated, Active und in den Übungen.
+        private void ShowAnswerFlash()
         {
-            if (!showCrossSignals || stimulus == null) return;
-            stimulus.SetFixationSignal(color, crossSignalOpacity);
-            crossSignalUntil = Time.unscaledTime + seconds;
+            if (answerFlashOpacity <= 0f || stimulus == null) return;
+            stimulus.SetFieldFlash(answerFlashColor, answerFlashOpacity);
+            answerFlashUntil = Time.unscaledTime + answerFlashSeconds;
         }
 
-        private void ClearCrossSignal()
+        private void ClearAnswerFlash()
         {
-            crossSignalUntil = 0f;
-            if (stimulus != null) stimulus.ClearFixationSignal();
+            answerFlashUntil = 0f;
+            if (stimulus != null) stimulus.ClearFieldFlash();
         }
 
         // =====================================================================
