@@ -14,7 +14,26 @@ run('D:/Tolga/Globe-Effect-Master/VRCheckerboard/analysis/checkerboard_pse_analy
 Oder das Skript ohne `csv_path` starten und die CSV im Dateidialog auswählen.
 `psignifit_path` kann bei Bedarf ebenfalls im Workspace gesetzt werden.
 
-Checkerboard: x-Achse `l`, Ergebnis `pse_visual_space_l`.
+Neues Checkerboard (ab Umstellung 18. Oktober): x-Achse `k`, festes `m`,
+Ergebnis `pse_instrument_distortion_k`. Erkennung über `stimulus_task=Checkerboard`
+und die Mappingkennung; ein k-Feld allein bedeutet nicht mehr Random Dots.
+Ausgaben beginnen mit `checkerboard_instrument`, damit historische Ergebnisse
+nicht überschrieben werden. Verschiedene m werden getrennt gefittet.
+
+Ab 19. Oktober tragen Checkerboard-CSVs die Kennung
+`merlitz-instrument-checkerboard-fixed-source-grid-v2` und die letzte Spalte
+`checkerboard_inverted` (0/1, schwarze und weiße Felder vertauscht; nur mit der
+Option `Invert Checkerboard Each Trial` auch 1). Mit ausgeschalteter Option ist das
+Bild identisch zu v1. Die Fits ignorieren die Spalte und poolen beide Polaritäten.
+Einen Fit je Polarität liefert der vorhandene Filter, z. B.
+`condition_filter = struct('checkerboard_inverted', 0);`. v1- und v2-Sitzungen sind
+verschiedene Sitzungen und werden deshalb ohnehin getrennt ausgewertet.
+
+Historisches Checkerboard: x-Achse `l`, Ergebnis `pse_visual_space_l`.
+Das betrifft insbesondere Yannicks alten `pilot_ys` (PSE ca. 0,872).
+Keine automatische Umrechnung und keine Zusammenfassung alter/neuer Abbildungen.
+Gemischte `mapping_version` werden als Fehler zurückgewiesen.
+
 Random Dots: x-Achse `k`, Ergebnis `pse_instrument_distortion_k`.
 Fit: Wahrscheinlichkeit einer Convex-Antwort, PSE bei 50 %, 95%-Credible-Intervall.
 `k = 1` ist die Tangensbedingung des Instruments, kein vorausgesetzter

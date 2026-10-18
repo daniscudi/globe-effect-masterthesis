@@ -1,8 +1,9 @@
 % Single cumulative Gaussian fit for checkerboard OR random-dot trials
 % using psignifit 4.
 %
-% We fit P(response = Convex) against visual_space_l (checkerboard)
-% or instrument_distortion_k (random dots). These are NOT equated or converted.
+% New checkerboard and random-dot data use instrument_distortion_k and m.
+% Historical checkerboard data use visual_space_l and stay on the OLD scale.
+% No automatic l-to-k conversion; never pool mapping versions.
 % The PSE is the stimulus value with 50% Convex responses.
 
 % Optional: set csv_path in the workspace before running this script.
@@ -76,14 +77,32 @@ has_k = ismember('instrument_distortion_k', T.Properties.VariableNames);
 if has_l == has_k
     error('CSV must contain exactly one stimulus column: visual_space_l or instrument_distortion_k.');
 end
-if has_k
-    % sweep_axis is optional: the earliest pilot CSVs had horizontal sweeps only.
+% The presence of k alone no longer identifies random dots.
+is_random_dot = has_k && ismember('motion_mode', T.Properties.VariableNames);
+if is_random_dot
     random_dot_columns = {'motion_mode', 'instrument_magnification_m', 'content_zoom'};
     if ~all(ismember(random_dot_columns, T.Properties.VariableNames))
-        error('Random-dot CSV is missing motion/magnification/zoom columns needed to separate conditions.');
+        error('Random-dot CSV is missing motion/magnification/zoom columns.');
     end
     task_name = 'Random-dot';
     output_prefix = 'random_dot';
+else
+    task_name = 'Checkerboard';
+    output_prefix = 'checkerboard';
+    if has_k
+        needed = {'stimulus_task', 'instrument_magnification_m', 'mapping_version', ...
+            'grid_line_spacing_deg'};
+        if ~all(ismember(needed, T.Properties.VariableNames)) || ...
+                ~all(strcmpi(string(T.stimulus_task), "Checkerboard"))
+            error('Instrument checkerboard CSV is missing its task/mapping/magnification metadata.');
+        end
+        if ~all(startsWith(string(T.mapping_version), "merlitz-instrument-checkerboard-"))
+            error('Unexpected checkerboard mapping version; do not reinterpret old pilot l as k.');
+        end
+        output_prefix = 'checkerboard_instrument';
+    end
+end
+if has_k
     stimulus_name = 'k';
     stimulus_column = 'instrument_distortion_k';
     x_label = 'Instrument distortion parameter k';
@@ -92,11 +111,11 @@ if has_k
     jnd_column = 'jnd_k';
     reference_column = 'pse_minus_tangent_k1';
 else
-    task_name = 'Checkerboard';
-    output_prefix = 'checkerboard';
+    warning(['Historical checkerboard visual-space l mapping: this PSE must not be ', ...
+        'renamed or pooled with the new instrument k-PSE.']);
     stimulus_name = 'l';
     stimulus_column = 'visual_space_l';
-    x_label = 'Visual-space parameter l';
+    x_label = 'Legacy stimulus parameter l';
     reference_label = 'l = 1 (geometrically straight)';
     pse_column = 'pse_visual_space_l';
     jnd_column = 'jnd_l';
@@ -144,13 +163,16 @@ condition_columns = {'participant_id', 'session_start_utc', 'eye_presentation', 
     'angular_diameter_deg', 'mapping_version', 'trial_sequence', ...
     'grid_line_spacing_deg', 'aperture_edge_softness_deg', 'circular_aperture_enabled'};
 split_columns = {};
-if has_k
+if is_random_dot
     condition_columns = [condition_columns, {'motion_mode', 'instrument_magnification_m', ...
         'content_zoom', 'sweep_axis', 'sweep_speed_deg_per_s', ...
         'image_center_speed_deg_per_s', 'head_motion_constraint', 'carrier_radius_m'}];
     % Older random-dot sessions stored SimulatedYaw AND HeadTracked in one CSV.
     % These are different tasks and are always fitted separately.
     split_columns = {'motion_mode'};
+elseif has_k
+    condition_columns = [condition_columns, {'stimulus_task', 'instrument_magnification_m'}];
+    split_columns = {'instrument_magnification_m'};
 end
 [group_keys, group_id] = conditionGroups(T, split_columns);
 
@@ -158,7 +180,7 @@ end
 % setting changed during a session (FOV, m, speed, edge softness, ... e.g.
 % while testing a pilot) is pooled into one fit with a warning; the result
 % file lists the values and their trial counts.
-strict_columns = {'participant_id', 'session_start_utc'};
+strict_columns = {'participant_id', 'session_start_utc', 'mapping_version'};
 pooled_columns = {};
 for column = condition_columns
     name = column{1};
@@ -202,7 +224,7 @@ for g = 1:numel(group_keys)
     fprintf('  [%d] %s  (%d valid trials)\n', g, group_keys(g), sum(group_id == g));
 end
 
-task = struct('csv_path', csv_path, 'has_k', has_k, 'task_name', task_name, ...
+task = struct('csv_path', csv_path, 'has_k', has_k, 'is_random_dot', is_random_dot, 'task_name', task_name, ...
     'output_prefix', output_prefix, 'stimulus_name', stimulus_name, ...
     'stimulus_column', stimulus_column, 'x_label', x_label, ...
     'reference_label', reference_label, 'pse_column', pse_column, ...
@@ -369,7 +391,7 @@ function result_table = fitOneCondition(T, task)
     data_folder = fileparts(task.csv_path);
     % Include the selected condition so two fits of one old mixed CSV cannot overwrite each other.
     condition_suffix = '';
-    if task.has_k
+    if task.is_random_dot
         suffix_columns = {'motion_mode', 'mode'; 'angular_diameter_deg', 'fov'; ...
             'instrument_magnification_m', 'm'; 'content_zoom', 'zoom'; ...
             'sweep_axis', 'axis'; 'image_center_speed_deg_per_s', 'speed'; ...
@@ -393,6 +415,10 @@ function result_table = fitOneCondition(T, task)
         if strlength(longest_path) > 250
             condition_suffix = ['_mode', regexprep(char(string(T.motion_mode(1))), '[^A-Za-z0-9_-]', '_')];
         end
+    end
+    if task.has_k && ~task.is_random_dot
+        condition_suffix = ['_m', regexprep(char(string(T.instrument_magnification_m(1))), ...
+            '[^A-Za-z0-9_-]', '_')];
     end
     result_file = fullfile(data_folder, [task.output_prefix, '_pse_result_psignifit', condition_suffix, '.xlsx']);
     writetable(result_table, result_file);
@@ -422,9 +448,14 @@ function result_table = fitOneCondition(T, task)
         'HandleVisibility', 'off');
 
     plot_subtitle = participant_id;
-    if task.has_k
+    if task.is_random_dot
         plot_subtitle = sprintf('%s | %s | m = %s | FOV = %s deg', participant_id, ...
             string(T.motion_mode(1)), plotValue(T, 'instrument_magnification_m', task), ...
+            plotValue(T, 'angular_diameter_deg', task));
+    end
+    if task.has_k && ~task.is_random_dot
+        plot_subtitle = sprintf('%s | m = %s | FOV = %s deg', participant_id, ...
+            plotValue(T, 'instrument_magnification_m', task), ...
             plotValue(T, 'angular_diameter_deg', task));
     end
     title({[task.task_name, ' psychometric function (psignifit)'], ...

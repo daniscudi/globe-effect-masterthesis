@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Globalization;
 using GlobeEffect.VRCheckerboard.Experiment;
 using GlobeEffect.VRCheckerboard.EyeTracking;
@@ -39,6 +40,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
         private GUIStyle statusStyle;
         private GUIStyle centeredLabelStyle;
         private Vector2 scrollPosition;
+        private readonly List<PracticeAnswer> practiceAnswersShown = new();
+        private List<string> practiceSummaryShown = new();
 
         internal static bool AutoOpenEnabled => EditorPrefs.GetBool(AutoOpenPreference, true);
 
@@ -165,9 +168,13 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     hasSession ? FormatTrial(session.CurrentTrialNumber, session.TotalTrials) : Missing);
                 Row("Valid Trials Done", hasSession ? Number(session.ValidTrialsCompleted) : Missing);
                 Row("Trials Shown (With Repeats)", hasSession ? Number(session.PresentationCount) : Missing);
-                Row("Grid Distortion l", hasStimulus ? Number(stimulus.VisualSpaceL, "F3") : Missing);
+                Row("Instrument k", hasStimulus ? Number(stimulus.InstrumentDistortionK, "F3") : Missing);
+                Row("Magnification m", hasStimulus ? Number(stimulus.InstrumentMagnificationM, "F2", "x") : Missing);
                 Row("FOV", hasStimulus ? Number(stimulus.AngularDiameterDegrees, "F1", "°") : Missing);
                 Row("Eyes", hasStimulus ? stimulus.EyePresentation.ToString() : Missing);
+                Row("Black/White Swapped", !hasSession || !hasStimulus ? Missing
+                    : !session.InvertCheckerboardEachTrial ? "off"
+                    : stimulus.CheckerboardInverted ? "yes (this trial)" : "no (this trial)");
                 // Konvex ist Category A, konkav Category B.
                 Row("Trial Order", hasSession ? session.TrialSequence.ToString() : Missing);
                 Row("Controller Answers", hasSession ? session.ControllerSummary : Missing);
@@ -178,6 +185,72 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 Row("Looking Away", hasSession && session.RequireFixation
                     ? "trial is repeated later"
                     : "gaze check is off");
+            }
+
+            if (checkerboardSession != null) DrawPracticeAnswers(checkerboardSession.PracticeLog);
+        }
+
+        // Übungsantworten, live und nur hier am PC. Kein Richtig/Falsch: "Closer To" sagt
+        // nur, welchem Beispiel k näher liegt. So sieht man, ob jemand konvex und konkav
+        // verstanden hat, und kann noch einmal erklären.
+        private void DrawPracticeAnswers(PracticeAnswerLog log)
+        {
+            // Layout und Repaint müssen dieselben Zeilen zeichnen. Kommt dazwischen
+            // eine neue Antwort, erscheint sie erst beim nächsten Durchgang.
+            if (Event.current.type == EventType.Layout)
+            {
+                practiceAnswersShown.Clear();
+                if (log != null) practiceAnswersShown.AddRange(log.Answers);
+                practiceSummaryShown = log != null ? log.SummaryByK() : new List<string>();
+            }
+
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField("Practice Answers (Only You See This)", EditorStyles.boldLabel);
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                if (practiceAnswersShown.Count == 0)
+                {
+                    EditorGUILayout.LabelField("No practice answers yet. The list starts empty with each practice.",
+                        EditorStyles.wordWrappedLabel);
+                    return;
+                }
+
+                EditorGUILayout.LabelField("Closer To = which example k is closer to. It is not right or wrong.",
+                    EditorStyles.wordWrappedMiniLabel);
+                PracticeRow(true, "#", "Part", "k", "Answer", "Time", "Closer To", "Note");
+                foreach (PracticeAnswer answer in practiceAnswersShown)
+                {
+                    PracticeRow(false, Number(answer.Number), answer.Part, Number(answer.K, "F2"),
+                        answer.Response == CheckerboardCurvatureResponse.None ? Missing : answer.Response.ToString(),
+                        double.IsNaN(answer.ResponseTimeSeconds)
+                            ? Missing : Number((float)answer.ResponseTimeSeconds, "F2", " s"),
+                        answer.CloserToExample == CheckerboardCurvatureResponse.None
+                            ? string.Empty : answer.CloserToExample.ToString(),
+                        answer.Note);
+                }
+
+                EditorGUILayout.Space(4f);
+                EditorGUILayout.LabelField("Answers Per k", EditorStyles.miniBoldLabel);
+                foreach (string line in practiceSummaryShown)
+                {
+                    EditorGUILayout.LabelField(line);
+                }
+            }
+        }
+
+        private static void PracticeRow(bool header, params string[] cells)
+        {
+            float[] widths = { 26f, 72f, 40f, 62f, 56f, 70f };
+            GUIStyle style = header ? EditorStyles.miniBoldLabel : EditorStyles.label;
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                for (int index = 0; index < cells.Length; index++)
+                {
+                    if (index < widths.Length)
+                        EditorGUILayout.LabelField(cells[index], style, GUILayout.Width(widths[index]));
+                    else
+                        EditorGUILayout.LabelField(cells[index], style, GUILayout.MinWidth(40f));
+                }
             }
         }
 
@@ -236,6 +309,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
 
             if (randomDotSession != null) DrawLiveHeadSpeed(randomDotSession, randomDotStimulus);
+            if (randomDotSession != null) DrawPracticeAnswers(randomDotSession.PracticeLog);
         }
 
         // "12 of 80 shown (15 %)": abgebrochene Darbietungen im Verhältnis zu allen gezeigten.

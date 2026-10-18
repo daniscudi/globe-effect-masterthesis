@@ -7,8 +7,8 @@ namespace GlobeEffect.VRCheckerboard
     ///
     /// Der Random-Dot-Versuch benutzt dieselbe Gleichung im Shader. Diese C#-
     /// Fassung bleibt die prüfbare Referenz für Vorwärts- und Rückrechnungen.
-    /// Das statische Checkerboard arbeitet weiterhin mit seiner normierten
-    /// Visual-Space-Abbildung.
+    /// Das statische Checkerboard benutzt die Umkehrung derselben Gleichung in
+    /// CheckerboardInstrumentMapping, ohne zusätzliche Wahrnehmungsabbildung l.
     ///
     /// Die Gleichung steht bei Merlitz (JOSA A 27, 50-57, 2010):
     ///

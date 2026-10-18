@@ -3,7 +3,10 @@ using System;
 namespace GlobeEffect.VRCheckerboard
 {
     /// <summary>
-    /// Die Formel, mit der das Gitter beim statischen Checkerboard verzogen wird.
+    /// Historische l-Abbildung des Checkerboards vor dem 18. Oktober 2026.
+    /// SourceRadius und MappingVersion bleiben für alte Pilotdaten/Rechentests
+    /// erhalten; der aktive Shader verwendet CheckerboardInstrumentMapping.
+    /// Nur die unabhängigen Winkel-/Gitterhilfen werden weiterhin wiederverwendet.
     ///
     /// Merlitz beschreibt, wie weit ein Punkt von der Mitte weg zu sein scheint, mit
     ///

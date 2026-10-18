@@ -57,15 +57,22 @@ namespace GlobeEffect.VRCheckerboard
         [Tooltip("Shows the checkerboard in a round window. Turn off to see the whole grid.")]
         private bool useCircularAperture = true;
 
-        [Header("Grid Distortion")]
-        [SerializeField, Range(0f, 1.4f)]
-        [Tooltip("Grid distortion (l). 1 = straight grid, 0.5 = Helmholtz point. Smaller = pincushion, " +
-            "above 1 = barrel.")]
-        private float visualSpaceL = 0.5f;
+        [Header("Instrument Mapping (Merlitz)")]
+        [SerializeField, Range(0f, 2f)]
+        [Tooltip("Merlitz instrument k, as in the random dots: 1 = straight, 0.5 = circle condition, " +
+            "0 = angle condition; above 1 = barrel. Negative values do not extend pincushion.")]
+        [FormerlySerializedAs("visualSpaceL")]
+        private float instrumentDistortionK = 0.5f;
+
+        [SerializeField, Range(1f, 20f)]
+        [Tooltip("Magnification used to compute the STATIC grid through the instrument. Default 10. " +
+            "No zoom animation. m = 1 produces a straight grid for every k.")]
+        private float instrumentMagnificationM = 10f;
 
         [FormerlySerializedAs("gridLineSpacingDegrees")]
         [SerializeField, Range(0.5f, 45f)]
-        [Tooltip("Size of one checkerboard square in degrees.")]
+        [Tooltip("Grid spacing in the straight reference image (k = 1), in degrees near the centre. " +
+            "The same source grid is used for every k; distorted cells need not keep this angular size.")]
         private float gridSpacingDegrees = 10f;
 
         [SerializeField]
@@ -73,6 +80,13 @@ namespace GlobeEffect.VRCheckerboard
 
         [SerializeField]
         private Color lightColor = Color.white;
+
+        // Der Experiment Manager setzt das pro Trial, wenn "Invert Checkerboard
+        // Each Trial" an ist. Hier lässt es sich zum Anschauen in der Vorschau
+        // umschalten. Die Noise-Maske bleibt davon unberührt.
+        [SerializeField]
+        [Tooltip("Swaps the black and white squares. The noise does not change.")]
+        private bool invertCheckerboard;
 
         [Header("Display And Fixation")]
         [SerializeField]
@@ -205,9 +219,11 @@ namespace GlobeEffect.VRCheckerboard
         public float AngularDiameterDegrees => fieldOfViewDegrees;
         public float ApertureEdgeSoftnessDegrees => edgeSoftnessDegrees;
         public bool UseCircularAperture => useCircularAperture;
-        public float VisualSpaceL => visualSpaceL;
+        public float InstrumentDistortionK => instrumentDistortionK;
+        public float InstrumentMagnificationM => instrumentMagnificationM;
         public float GridLineSpacingDegrees => gridSpacingDegrees;
         public float GridLineSpacingUv => DegreesToUv(gridSpacingDegrees);
+        public bool CheckerboardInverted => invertCheckerboard;
         public CheckerboardEyePresentation EyePresentation => eyePresentation;
         public float NoiseRefreshRateHz => noiseRefreshRateHz;
         public Color BackgroundColor => backgroundColor;
@@ -379,11 +395,23 @@ namespace GlobeEffect.VRCheckerboard
             ApplyChange();
         }
 
-        public void SetVisualSpaceL(float value)
+        public void SetInstrumentDistortionK(float value)
         {
-            // l wird hier nicht ausgerechnet. Es wird als Bedingung vorgegeben.
-            // Die Formel dazu läuft danach im Shader für jeden Bildpunkt.
-            visualSpaceL = value;
+            // k wird als Instrumentenbedingung vorgegeben, nicht als Wahrnehmungs-l.
+            instrumentDistortionK = value;
+            ApplyChange();
+        }
+
+        public void SetInstrumentMagnificationM(float value)
+        {
+            instrumentMagnificationM = value;
+            ApplyChange();
+        }
+
+        public void SetCheckerboardInverted(bool value)
+        {
+            // Schwarze und weiße Felder tauschen. Die Abbildung bleibt gleich.
+            invertCheckerboard = value;
             ApplyChange();
         }
 
@@ -473,14 +501,14 @@ namespace GlobeEffect.VRCheckerboard
                 angularDiameterDegrees = fieldOfViewDegrees,
                 apertureEdgeSoftnessDegrees = edgeSoftnessDegrees,
                 useCircularAperture = useCircularAperture,
-                visualSpaceL = visualSpaceL,
-                // Das Schachbrett hat keinen Zoom mehr. Das Feld bleibt nur
-                // stehen, weil die Eye-Tracking-Toolbox aus dem Labor es
-                // ausliest, und steht deshalb fest auf 1.
+                instrumentDistortionK = instrumentDistortionK,
+                instrumentMagnificationM = instrumentMagnificationM,
+                // Kein zusätzlicher Content Zoom; m gehört zur Instrumentengleichung.
                 contentZoom = 1f,
                 gridLineSpacingDegrees = gridSpacingDegrees,
                 gridLineSpacingUv = DegreesToUv(gridSpacingDegrees),
-                eyePresentation = eyePresentation
+                eyePresentation = eyePresentation,
+                checkerboardInverted = invertCheckerboard
             };
         }
 
@@ -554,12 +582,14 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetFloat("_ApparentHalfAngleRad", 0.5f * fieldOfViewDegrees * Mathf.Deg2Rad);
             propertyBlock.SetFloat("_ApertureEdgeSoftnessRad", edgeSoftnessDegrees * Mathf.Deg2Rad);
             propertyBlock.SetFloat("_UseCircularAperture", useCircularAperture ? 1f : 0f);
-            propertyBlock.SetFloat("_VisualSpaceL", visualSpaceL);
+            propertyBlock.SetFloat("_InstrumentDistortionK", instrumentDistortionK);
+            propertyBlock.SetFloat("_InstrumentMagnificationM", instrumentMagnificationM);
             propertyBlock.SetFloat("_GridLineSpacingUv", DegreesToUv(gridSpacingDegrees));
             propertyBlock.SetColor("_DarkColor", darkColor);
             propertyBlock.SetColor("_LightColor", lightColor);
             propertyBlock.SetColor("_FixationBackgroundColor", backgroundColor);
             propertyBlock.SetFloat("_CheckerboardEnabled", checkerboardVisible ? 1f : 0f);
+            propertyBlock.SetFloat("_CheckerboardInverted", invertCheckerboard ? 1f : 0f);
             propertyBlock.SetFloat("_NoiseEnabled", noiseVisible ? 1f : 0f);
             propertyBlock.SetFloat("_NoiseCellSizeUv", DegreesToUv(NoiseDotSizeDegrees));
             propertyBlock.SetFloat("_NoiseType", (float)noiseType);
@@ -661,7 +691,7 @@ namespace GlobeEffect.VRCheckerboard
             // und genauso für die Noise-Kästchen.
             // Beispiel: Bei 90 Grad FOV werden aus 10 Grad ungefähr 0,1763
             // in u/v-Koordinaten.
-            return (float)VisualSpaceRadialMapping.NormalizedGridLineSpacing(
+            return (float)CheckerboardInstrumentMapping.GridLineSpacingUv(
                 fieldOfViewDegrees, degrees);
         }
 
@@ -800,7 +830,8 @@ namespace GlobeEffect.VRCheckerboard
             // das ebenfalls, damit jede Grenze nur an dieser einen Stelle steht.
             fieldOfViewDegrees = Mathf.Clamp(fieldOfViewDegrees, 1f, 170f);
             edgeSoftnessDegrees = Mathf.Clamp(edgeSoftnessDegrees, 0f, 10f);
-            visualSpaceL = Mathf.Clamp(visualSpaceL, 0f, 1.4f);
+            instrumentDistortionK = Mathf.Clamp(instrumentDistortionK, 0f, 2f);
+            instrumentMagnificationM = Mathf.Clamp(instrumentMagnificationM, 1f, 20f);
             gridSpacingDegrees = Mathf.Clamp(gridSpacingDegrees, 0.5f, 45f);
             noiseDotSizeDegrees = Mathf.Clamp(noiseDotSizeDegrees, 0.02f, 10f);
             noiseBroadbandFinestDegrees = Mathf.Clamp(noiseBroadbandFinestDegrees, 0.1f, 10f);
@@ -857,10 +888,12 @@ namespace GlobeEffect.VRCheckerboard
         public float angularDiameterDegrees;
         public float apertureEdgeSoftnessDegrees;
         public bool useCircularAperture;
-        public float visualSpaceL;
+        public float instrumentDistortionK;
+        public float instrumentMagnificationM;
         public float contentZoom;
         public float gridLineSpacingDegrees;
         public float gridLineSpacingUv;
         public CheckerboardEyePresentation eyePresentation;
+        public bool checkerboardInverted;
     }
 }

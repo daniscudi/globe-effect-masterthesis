@@ -72,7 +72,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// ist dabei die Noise-Maske (A) oder die graue Fläche (B) zu sehen; die
     /// andere Darstellung folgt nach der Antwort vor dem nächsten Schachbrett.
     ///
-    /// Welches l gezeigt wird, steht vorher fest. Die Person kann daran nichts
+    /// Welches k gezeigt wird, steht vorher fest. Die Person kann daran nichts
     /// verändern.
     ///
     /// Vor dem richtigen Versuch kann man dieselben Schritte erst einmal üben.
@@ -107,14 +107,30 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         [Header("Trial Plan")]
         [SerializeField]
-        [Tooltip("All grid distortions (l) that are tested. l = 1 is a straight grid, l = 0.5 is the " +
-            "Helmholtz point.")]
-        private List<float> visualSpaceLValues = new() { 1.2f, 1f, 0.8f, 0.6f, 0.5f, 0.4f, 0.2f };
+        [Tooltip("Merlitz instrument k values. 1 = straight, 0.5 = circle condition, 0 = angle condition. " +
+            "Same parameter definition as the random dots; not the old visual-space l mapping.")]
+        [FormerlySerializedAs("visualSpaceLValues")]
+        private List<float> instrumentDistortionKValues = new() { 1.2f, 1f, 0.8f, 0.6f, 0.5f, 0.4f, 0.2f };
+
+        [SerializeField, Range(1f, 20f)]
+        [Tooltip("Fixed magnification used to generate every static checkerboard. Default 10, as in " +
+            "Merlitz's examples. Match the random-dot comparison condition. m = 1 removes k differences.")]
+        private float instrumentMagnificationM = 10f;
 
         [SerializeField]
-        [Tooltip("How often each l value is shown, in the same order as the l list. Missing entries use " +
+        [Tooltip("How often each k value is shown, in the same order as the k list. Missing entries use " +
             "Repeats Per Condition.")]
-        private List<int> repeatsPerLValue = new();
+        [FormerlySerializedAs("repeatsPerLValue")]
+        private List<int> repeatsPerKValue = new();
+
+        // Vorschlag des Betreuers: Abwechselnde Polarität soll Nachbildeffekte
+        // verringern (jede Stelle ist über viele Trials im Mittel grau). Ob das
+        // die Teilnehmer irritiert, ist offen; deshalb nur als Option, Standard aus.
+        [SerializeField]
+        [Tooltip("Black and white squares swap from one trial to the next. The first trial is normal, " +
+            "repeated trials count too. In the practice they swap every two trials; the two examples " +
+            "stay normal. The noise does not change.")]
+        private bool invertCheckerboardEachTrial;
 
         [Header("Timing")]
         [SerializeField]
@@ -199,27 +215,32 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private bool requireTrainingBeforeSession = true;
 
         [FormerlySerializedAs("trainingCategoryAVisualSpaceL")]
-        [SerializeField, Range(0f, 1.4f)]
-        [Tooltip("l value of the clear convex example in the practice. Should be easy to see but inside " +
+        [SerializeField, Range(0f, 2f)]
+        [Tooltip("k value of the convex example in the practice. Should be easy to see but inside " +
             "the tested range.")]
         private float trainingExampleA = 1.2f;
 
         [FormerlySerializedAs("trainingCategoryBVisualSpaceL")]
-        [SerializeField, Range(0f, 1.4f)]
-        [Tooltip("l value of the clear concave example in the practice. Should be easy to see but inside " +
+        [SerializeField, Range(0f, 2f)]
+        [Tooltip("k value of the concave example in the practice. Should be easy to see but inside " +
             "the tested range.")]
         private float trainingExampleB = 0.2f;
 
-        [FormerlySerializedAs("trainingVisualSpaceLValues")]
+        // Zwei feste Übungsteile, nicht gemischt: erst deutlich verschiedene k,
+        // dann k aus dem mittleren Bereich. Niedrig und hoch wechseln sich ab.
+        // Die alten Felder trainingKValues/trainingRepeatsPerValue (gemischt) sind
+        // weggefallen; ihre Werte in alten Szenen werden nicht übernommen.
         [SerializeField]
-        [Tooltip("l values for the practice trials. Each is shown equally often. There is no right/wrong " +
-            "feedback.")]
-        private List<float> trainingLValues = new() { 0.2f, 0.4f, 0.8f, 1.2f };
+        [Tooltip("Practice part 1: k values shown in exactly this order, not shuffled. Use clearly " +
+            "different values, low and high taking turns. No right/wrong feedback.")]
+        private List<float> trainingEasyKValues = new()
+            { 0f, 1.4f, 0.2f, 1.2f, 0f, 1.4f, 0.2f, 1.2f, 0f, 1.4f, 0.2f, 1.2f };
 
-        [FormerlySerializedAs("trainingRepetitionsPerValue")]
-        [SerializeField, Min(1)]
-        [Tooltip("How often each practice l value is shown.")]
-        private int trainingRepeatsPerValue = 3;
+        [SerializeField]
+        [Tooltip("Practice part 2: k values shown in exactly this order, not shuffled. Values from the " +
+            "middle, low and high taking turns. No right/wrong feedback.")]
+        private List<float> trainingHardKValues = new()
+            { 0.4f, 1.0f, 0.5f, 1.2f, 0.6f, 0.9f, 0.4f, 1.1f, 0.5f, 1.0f, 0.6f, 1.2f };
 
         [FormerlySerializedAs("trainingExampleStimulusSeconds")]
         [SerializeField, Min(0.1f)]
@@ -254,6 +275,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private bool trainingCompleted;
         private bool trainingAdvanceRequested;
         private bool trainingResponseReceived;
+        private CheckerboardCurvatureResponse trainingResponse;
+        private double trainingResponseUnitySeconds;
         private bool previewShowingNoise;
         private Coroutine maskDemoCoroutine;
 
@@ -272,6 +295,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         UnityEngine.Object IPreviewTakeoverManager.PreviewStimulus => stimulus;
 
         public CheckerboardTrialSequence TrialSequence => trialSequence;
+        public bool InvertCheckerboardEachTrial => invertCheckerboardEachTrial;
         public bool ResponseKeysSwapped => keyboardController != null && keyboardController.SwapResponseKeys;
         public string ConvexResponseKeyName => ResponseKeyName(CheckerboardCurvatureResponse.Convex);
         public string ConcaveResponseKeyName => ResponseKeyName(CheckerboardCurvatureResponse.Concave);
@@ -449,6 +473,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             ApplyResponseKeySettings();
+            ResetCheckerboardPolarity();
             sessionState = State.Welcome;
             stimulus.ShowResponsePrompt(BuildWelcomePrompt(notice));
         }
@@ -480,6 +505,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             if (!previewActive) return;
             StopAndClear(ref maskDemoCoroutine);
+            // Mit "Invert Checkerboard Each Trial" wechselt jeder Druck die
+            // Polarität, wie von Trial zu Trial. Nach der Vorschau wird sie
+            // zusammen mit allen anderen Werten zurückgesetzt.
+            if (invertCheckerboardEachTrial)
+                stimulus.SetCheckerboardInverted(!stimulus.CheckerboardInverted);
             maskDemoCoroutine = StartCoroutine(RunMaskDemo());
         }
 
@@ -523,9 +553,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         }
 
         /// <summary>
-        /// Übernimmt FOV und Augenmodus der Vorschau in den Versuchsplan (Listen werden
+        /// Übernimmt FOV, Augenmodus und festes m der Vorschau in den Versuchsplan (Listen werden
         /// ersetzt) und behält die Darstellung (Edge Softness, Kreisblende, Gitterabstand,
-        /// Farben, Fixationskreuz, Noise). Die l-Liste bleibt unverändert. Beim ersten Mal
+        /// Farben, Fixationskreuz, Noise). Die k-Liste bleibt unverändert. Beim ersten Mal
         /// wird der bisherige Stand als Original gesichert.
         /// </summary>
         public bool TakeOverPreviewValues()
@@ -588,6 +618,25 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             StopPreview();
             if (!CheckSceneSetup()) return false;
 
+            try
+            {
+                float fov = fieldOfViewValues != null && fieldOfViewValues.Count > 0
+                    ? fieldOfViewValues[0] : stimulus.AngularDiameterDegrees;
+                var values = new List<float>();
+                if (trainingEasyKValues != null) values.AddRange(trainingEasyKValues);
+                if (trainingHardKValues != null) values.AddRange(trainingHardKValues);
+                values.Add(trainingExampleA);
+                values.Add(trainingExampleB);
+                foreach (float k in values)
+                    CheckerboardInstrumentMapping.ValidateParameters(fov, instrumentMagnificationM, k,
+                        stimulus.ApertureEdgeSoftnessDegrees, stimulus.UseCircularAperture);
+            }
+            catch (ArgumentException exception)
+            {
+                Debug.LogError("Checkerboard-Training: " + exception.Message, this);
+                return false;
+            }
+
             ApplyResponseKeySettings();
             StopAndClear(ref trainingCoroutine);
             StopAndClear(ref presentationCoroutine);
@@ -595,8 +644,18 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             trainingAdvanceRequested = false;
             trainingResponseReceived = false;
             currentTrial = null;
+            practiceLog.Clear();
             trainingCoroutine = StartCoroutine(RunTrainingSequence());
             return true;
+        }
+
+        /// <summary>
+        /// Weiter im Training, wie die Continue-Taste. Für Tests und falls der
+        /// Versuchsleiter es von außen auslösen möchte.
+        /// </summary>
+        public void ContinueTraining()
+        {
+            if (IsTrainingActive) trainingAdvanceRequested = true;
         }
 
         public void StopTrainingAndReturnToWelcome()
@@ -625,9 +684,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // Zuerst kommen zwei ganz deutliche Beispiele. Die zeigen der Person,
             // was mit Category A und was mit Category B gemeint ist.
             //
-            // Danach folgen die gemischten Übungsdurchgänge, und da steht dann kein
-            // Hinweis mehr dabei. Es gibt auch keine Rückmeldung, ob eine Antwort
-            // richtig war. Das ist Absicht, sonst würde man das Ergebnis verfälschen.
+            // Danach folgen zwei Übungsteile in fester Reihenfolge, ohne Hinweis
+            // und ohne Rückmeldung, ob eine Antwort richtig war. Das ist Absicht,
+            // sonst würde man das Ergebnis verfälschen. Die Antworten sieht nur
+            // der Versuchsleiter im Experiment Monitor.
+            //
+            // Beide Beispiele haben dieselbe (normale) Polarität. Sonst würde die
+            // Polarität die Kategorie verraten.
             var examples = new[]
             {
                 CheckerboardCurvatureResponse.Convex,
@@ -641,10 +704,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 yield return WaitForTrainingAdvance();
 
                 presentationIndex++;
-                float exampleL =
+                float exampleK =
                     example == CheckerboardCurvatureResponse.Convex ? trainingExampleA : trainingExampleB;
-                yield return ShowTrainingPattern(exampleL, unchecked(randomSeed + 50000 + presentationIndex),
-                    waitForResponse: false, patternDurationSeconds: trainingExampleSeconds);
+                yield return ShowTrainingPattern(exampleK, unchecked(randomSeed + 50000 + presentationIndex),
+                    waitForResponse: false, patternDurationSeconds: trainingExampleSeconds, inverted: false);
                 if (!IsTrainingActive)
                 {
                     yield break;
@@ -656,41 +719,62 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 yield return WaitForTrainingAdvance();
             }
 
-            sessionState = State.TrainingInstructions;
-            stimulus.ShowResponsePrompt(string.Format(
-                CultureInfo.InvariantCulture,
-                "PRACTICE TRIALS\n\n" +
-                "Each pattern lasts {0:0} ms.\n" +
-                "Answer while the {1} is visible.\n" +
-                "Keep looking at the cross.\n\n" +
-                "{2}\n\n" +
-                "{3} = CONTINUE",
-                patternSeconds * 1000f,
-                trialSequence.ShowsNoiseDuringResponse() ? "noise" : "grey screen",
-                BuildResponsePrompt(),
-                ContinueKeyName));
-            yield return WaitForTrainingAdvance();
-
-            foreach (float practiceL in BuildTrainingLOrder(unchecked(randomSeed ^ 0x51F15EED)))
+            // Teil 1 leicht, Teil 2 schwerer. Jeder Teil in der eingetragenen
+            // Reihenfolge, nicht gemischt. Vor jedem Teil steht ein kurzer Text;
+            // dort kann der Versuchsleiter nach einem Blick auf den Monitor noch
+            // einmal erklären. Der Hinweis "näher am konvexen/konkaven Beispiel"
+            // steht nur bei Teil 1.
+            var parts = new[]
             {
-                presentationIndex++;
-                yield return ShowTrainingPattern(practiceL, unchecked(randomSeed + 60000 + presentationIndex),
-                    waitForResponse: true, patternDurationSeconds: patternSeconds);
-                if (!IsTrainingActive)
+                (number: 1, values: CopyKValues(trainingEasyKValues), closerHint: true),
+                (number: 2, values: CopyKValues(trainingHardKValues), closerHint: false)
+            };
+            int practiceIndex = 0;
+            foreach (var part in parts)
+            {
+                if (part.values.Count == 0)
                 {
-                    yield break;
+                    continue;
                 }
 
-                // Warten, bis geantwortet wurde oder die Antwortzeit um ist.
-                trainingResponseReceived = false;
-                sessionState = State.TrainingWaitingForResponse;
-                double responseDeadline = answerTimeoutSeconds > 0f
-                    ? Time.realtimeSinceStartupAsDouble + answerTimeoutSeconds
-                    : double.PositiveInfinity;
-                while (IsTrainingActive && !trainingResponseReceived
-                    && Time.realtimeSinceStartupAsDouble < responseDeadline)
+                sessionState = State.TrainingInstructions;
+                stimulus.ShowResponsePrompt(BuildPracticePartPrompt(part.number));
+                yield return WaitForTrainingAdvance();
+
+                foreach (float practiceK in part.values)
                 {
-                    yield return null;
+                    presentationIndex++;
+                    practiceIndex++;
+                    bool inverted = CheckerboardPolarity.InvertedForPractice(
+                        invertCheckerboardEachTrial, practiceIndex);
+                    yield return ShowTrainingPattern(practiceK,
+                        unchecked(randomSeed + 60000 + presentationIndex),
+                        waitForResponse: true, patternDurationSeconds: patternSeconds, inverted: inverted);
+                    if (!IsTrainingActive)
+                    {
+                        yield break;
+                    }
+
+                    // Warten, bis geantwortet wurde oder die Antwortzeit um ist.
+                    trainingResponseReceived = false;
+                    trainingResponse = CheckerboardCurvatureResponse.None;
+                    sessionState = State.TrainingWaitingForResponse;
+                    double responseStart = Time.realtimeSinceStartupAsDouble;
+                    double responseDeadline = answerTimeoutSeconds > 0f
+                        ? responseStart + answerTimeoutSeconds
+                        : double.PositiveInfinity;
+                    while (IsTrainingActive && !trainingResponseReceived
+                        && Time.realtimeSinceStartupAsDouble < responseDeadline)
+                    {
+                        yield return null;
+                    }
+
+                    if (!IsTrainingActive)
+                    {
+                        yield break;
+                    }
+
+                    LogPracticeAnswer(part.number, practiceK, part.closerHint, inverted, responseStart);
                 }
             }
 
@@ -704,12 +788,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         }
 
         private IEnumerator ShowTrainingPattern(
-            float visualSpaceL, int noiseSeed, bool waitForResponse, float patternDurationSeconds)
+            float instrumentDistortionK, int noiseSeed, bool waitForResponse, float patternDurationSeconds,
+            bool inverted)
         {
             // Ein Übungsdurchgang läuft genauso ab wie im Versuch: Phase vor dem
             // Muster -> Muster -> Antwortphase. Welche der beiden Phasen die
             // Noise-Maske zeigt und welche die graue Fläche, hängt vom Ablauf ab.
-            PrepareTrainingCondition(visualSpaceL);
+            PrepareTrainingCondition(instrumentDistortionK, inverted);
             if (fixationMonitor != null)
             {
                 fixationMonitor.ResetFixationWindow();
@@ -768,11 +853,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
         }
 
-        private void PrepareTrainingCondition(float visualSpaceL)
+        private void PrepareTrainingCondition(float instrumentDistortionK, bool inverted)
         {
             // Im Training soll alles genauso aussehen wie später im Versuch.
             // Deshalb werden FOV, Augenmodus und Zoom aus der ersten echten
-            // Bedingung übernommen. Nur l wird durch den Übungswert ersetzt.
+            // Bedingung übernommen. Nur k wird durch den Übungswert ersetzt.
             if (fieldOfViewValues != null && fieldOfViewValues.Count > 0)
             {
                 stimulus.SetAngularDiameter(fieldOfViewValues[0]);
@@ -783,27 +868,69 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 stimulus.SetEyePresentation(eyePresentations[0]);
             }
 
-            stimulus.SetVisualSpaceL(visualSpaceL);
+            CheckerboardInstrumentMapping.ValidateParameters(stimulus.AngularDiameterDegrees,
+                instrumentMagnificationM, instrumentDistortionK, stimulus.ApertureEdgeSoftnessDegrees,
+                stimulus.UseCircularAperture);
+            stimulus.SetInstrumentMagnificationM(instrumentMagnificationM);
+            stimulus.SetInstrumentDistortionK(instrumentDistortionK);
+            stimulus.SetCheckerboardInverted(inverted);
         }
 
-        private List<float> BuildTrainingLOrder(int seed)
+        // Kopie der Übungsliste in der eingetragenen Reihenfolge, nicht gemischt.
+        private static List<float> CopyKValues(List<float> values)
         {
-            // Jeder Übungswert kommt gleich oft vor. Danach wird die Liste gemischt,
-            // genauso wie der Plan für den richtigen Versuch.
-            var order = new List<float>();
-            if (trainingLValues != null)
+            var copy = new List<float>();
+            if (values != null)
             {
-                for (int repetition = 0; repetition < Mathf.Max(1, trainingRepeatsPerValue); repetition++)
+                foreach (float value in values)
                 {
-                    foreach (float value in trainingLValues)
-                    {
-                        order.Add(Mathf.Clamp(value, 0f, 1.4f));
-                    }
+                    copy.Add(Mathf.Clamp(value, 0f, 2f));
                 }
             }
 
-            PlannerTools.Shuffle(order, seed);
-            return order;
+            return copy;
+        }
+
+        private string BuildPracticePartPrompt(int part)
+        {
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "PRACTICE PART {0}\n\n" +
+                "Each pattern lasts {1:0} ms.\n" +
+                "Answer while the {2} is visible.\n" +
+                "Keep looking at the cross.\n\n" +
+                "{3}\n\n" +
+                "{4} = CONTINUE",
+                part,
+                patternSeconds * 1000f,
+                trialSequence.ShowsNoiseDuringResponse() ? "noise" : "grey screen",
+                BuildResponsePrompt(),
+                ContinueKeyName);
+        }
+
+        // Eine Zeile im Experiment Monitor. Nur der Versuchsleiter sieht sie;
+        // gespeichert wird nichts.
+        private void LogPracticeAnswer(int part, float k, bool closerHint, bool inverted, double responseStart)
+        {
+            CheckerboardCurvatureResponse closer = closerHint
+                ? PracticeAnswerLog.CloserToExample(k, trainingExampleA, trainingExampleB)
+                : CheckerboardCurvatureResponse.None;
+            var notes = new List<string>();
+            if (!trainingResponseReceived) notes.Add("no answer");
+            if (inverted) notes.Add("inverted");
+            practiceLog.Add("Part " + part, k,
+                trainingResponseReceived ? trainingResponse : CheckerboardCurvatureResponse.None,
+                trainingResponseUnitySeconds - responseStart, closer, string.Join(", ", notes));
+        }
+
+        // Nach Training und Sitzung wieder normale Polarität, damit eine spätere
+        // Vorschau nicht zufällig das invertierte Muster des letzten Trials zeigt.
+        private void ResetCheckerboardPolarity()
+        {
+            if (stimulus != null && stimulus.CheckerboardInverted)
+            {
+                stimulus.SetCheckerboardInverted(false);
+            }
         }
 
         private string BuildTrainingCategoryIntroduction(CheckerboardCurvatureResponse response)
@@ -871,8 +998,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             try
             {
                 trialPlan = CheckerboardTrialPlanner.CreateRandomizedPlan(
-                    fieldOfViewValues, eyePresentations, visualSpaceLValues, repeatsPerCondition, randomSeed,
-                    repeatsPerLValue);
+                    fieldOfViewValues, eyePresentations, instrumentDistortionKValues, repeatsPerCondition, randomSeed,
+                    repeatsPerKValue, instrumentMagnificationM);
+                foreach (CheckerboardTrial planned in trialPlan)
+                    CheckerboardInstrumentMapping.ValidateParameters(planned.AngularDiameterDegrees,
+                        planned.InstrumentMagnificationM, planned.InstrumentDistortionK,
+                        stimulus.ApertureEdgeSoftnessDegrees, stimulus.UseCircularAperture);
                 trialQueue = new CheckerboardTrialQueue(trialPlan);
 
                 DateTime sessionStartUtc = DateTime.UtcNow;
@@ -882,7 +1013,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 experimentFiles.WritePlan(
                     trialPlan, stimulus.GridLineSpacingDegrees, patternSeconds, trialSequence,
                     preStimulusSeconds, answerTimeoutSeconds, ConvexResponseKeyName,
-                    ConcaveResponseKeyName, ResponseKeysSwapped, controllerMapping);
+                    ConcaveResponseKeyName, ResponseKeysSwapped, controllerMapping,
+                    invertCheckerboardEachTrial);
                 activeSessionFolder = experimentFiles.SessionFolder;
                 StartEyeTracking(sessionStartUtc);
                 experimentFiles.WriteSessionSettings(ExperimentSessionSettings.Capture(
@@ -971,7 +1103,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulus.Hide();
             stimulus.SetAngularDiameter(currentTrial.AngularDiameterDegrees);
             stimulus.SetEyePresentation(currentTrial.EyePresentation);
-            stimulus.SetVisualSpaceL(currentTrial.VisualSpaceL);
+            stimulus.SetInstrumentMagnificationM(currentTrial.InstrumentMagnificationM);
+            stimulus.SetInstrumentDistortionK(currentTrial.InstrumentDistortionK);
+            // Abwechselnd pro gezeigtem Trial; Wiederholungen zählen mit.
+            stimulus.SetCheckerboardInverted(CheckerboardPolarity.InvertedForPresentation(
+                invertCheckerboardEachTrial, presentationCount));
 
             ResetFixationChecks();
             trialStartUnitySeconds = 0d;
@@ -1054,10 +1190,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             Debug.Log(string.Format(
                 CultureInfo.InvariantCulture,
-                "Trial {0}/{1}, Präsentation {2}: {3}, FOV={4:F1}°, l={5:F3}, " +
+                "Trial {0}/{1}, Präsentation {2}: {3}, FOV={4:F1}°, k={5:F3}, " +
                 "Versuch {6}. Stimulus={7:F3}s, danach Antwortphase mit {8}.",
                 currentTrialNumber, totalTrials, presentationCount, currentTrial.EyePresentation,
-                currentTrial.AngularDiameterDegrees, currentTrial.VisualSpaceL,
+                currentTrial.AngularDiameterDegrees, currentTrial.InstrumentDistortionK,
                 currentTrial.AttemptNumber, patternSeconds,
                 trialSequence.ShowsNoiseDuringResponse() ? "Noise-Maske" : "grauer Fläche"), this);
         }
@@ -1108,12 +1244,19 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private void HandleResponseSubmitted(CheckerboardCurvatureResponse response)
         {
-            // Im Training zählt der Tastendruck nur als "weiter". Er wird nicht
-            // bewertet und landet auch in keiner Messdatei.
+            // Im Training beendet der Tastendruck die Antwortphase. Er wird nicht
+            // bewertet und landet in keiner Messdatei, nur im Experiment Monitor.
+            // Ein zweiter Druck im selben Frame überschreibt die erste Antwort nicht.
             if (sessionState == State.TrainingWaitingForResponse
                 && response != CheckerboardCurvatureResponse.None)
             {
-                trainingResponseReceived = true;
+                if (!trainingResponseReceived)
+                {
+                    trainingResponse = response;
+                    trainingResponseUnitySeconds = Time.realtimeSinceStartupAsDouble;
+                    trainingResponseReceived = true;
+                }
+
                 return;
             }
 
@@ -1265,7 +1408,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 LongestOffTargetSeconds = lookAway.LongestLookAwaySeconds,
                 LongestInvalidGazeSeconds = lookAway.LongestNoDataSeconds,
                 Status = status,
-                TrialSequence = trialSequence
+                TrialSequence = trialSequence,
+                CheckerboardInverted = stimulus.CheckerboardInverted
             };
         }
 
@@ -1375,6 +1519,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             if (stimulus != null)
             {
+                ResetCheckerboardPolarity();
                 stimulus.Hide();
             }
 
@@ -1404,7 +1549,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 ExperimentFilesBase.SanitizeIdentifier(participantId, "pilot"),
                 ExperimentFilesBase.SanitizeIdentifier(sessionLabel, "session"),
                 randomSeed, trialPlan.Count, sessionStartUtc.ToString("O", CultureInfo.InvariantCulture),
-                VisualSpaceRadialMapping.MappingVersion,
+                CheckerboardInstrumentMapping.MappingVersion,
                 stimulus.NoiseDotSizeDegrees, stimulus.NoiseDotSizePixels, stimulus.NoiseRefreshRateHz,
                 stimulus.BackgroundColor.r, stimulus.BackgroundColor.g, stimulus.BackgroundColor.b,
                 BuildTimingAndResponseFields(), stimulus.NoiseType, stimulus.NoiseBroadbandCoarsestDegrees,
@@ -1419,10 +1564,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 CultureInfo.InvariantCulture,
                 "stimulus_duration_s={0:F4};trial_sequence={1};pre_stimulus_s={2:F4};" +
                 "response_timeout_s={3:F4};category_a_key={4};category_b_key={5};" +
-                "response_keys_swapped={6};controller_mapping={7}",
+                "response_keys_swapped={6};controller_mapping={7};invert_each_trial={8}",
                 patternSeconds, trialSequence, preStimulusSeconds, answerTimeoutSeconds,
                 ConvexResponseKeyName, ConcaveResponseKeyName, ResponseKeysSwapped ? 1 : 0,
-                controllerMapping);
+                controllerMapping, invertCheckerboardEachTrial ? 1 : 0);
         }
 
         // Sucht fehlende Verweise und prüft, ob alles da ist, was Training und
@@ -1544,12 +1689,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "TrialStart;presentation={0};sequence={1};condition={2};repetition={3};" +
                 "attempt={4};eye={5};fov_deg={6:F3};edge_softness_deg={7:F3};" +
                 "circular_aperture={8};grid_spacing_deg={9:F3};" +
-                "grid_spacing_uv={10:F6};visual_space_l={11:F4};{12}",
+                "grid_spacing_uv={10:F6};instrument_distortion_k={11:F4};{12};" +
+                "instrument_magnification_m={13:F3};mapping={14};checkerboard_inverted={15}",
                 presentationCount, trial.SequenceIndex, trial.ConditionIndex, trial.Repetition,
                 trial.AttemptNumber, trial.EyePresentation, trial.AngularDiameterDegrees,
                 stimulus.ApertureEdgeSoftnessDegrees, stimulus.UseCircularAperture,
-                stimulus.GridLineSpacingDegrees, stimulus.GridLineSpacingUv, trial.VisualSpaceL,
-                BuildTimingAndResponseFields());
+                stimulus.GridLineSpacingDegrees, stimulus.GridLineSpacingUv, trial.InstrumentDistortionK,
+                BuildTimingAndResponseFields(), trial.InstrumentMagnificationM,
+                CheckerboardInstrumentMapping.MappingVersion, stimulus.CheckerboardInverted ? 1 : 0);
         }
 
         private string ResponseKeyName(CheckerboardCurvatureResponse response)
@@ -1592,15 +1739,16 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             base.OnValidate();
             patternSeconds = Mathf.Max(0.01f, patternSeconds);
             answerTimeoutSeconds = Mathf.Max(0f, answerTimeoutSeconds);
-            trainingExampleA = Mathf.Clamp(trainingExampleA, 0f, 1.4f);
-            trainingExampleB = Mathf.Clamp(trainingExampleB, 0f, 1.4f);
-            trainingRepeatsPerValue = Mathf.Max(1, trainingRepeatsPerValue);
+            instrumentMagnificationM = Mathf.Clamp(instrumentMagnificationM, 1f, 20f);
+            trainingExampleA = Mathf.Clamp(trainingExampleA, 0f, 2f);
+            trainingExampleB = Mathf.Clamp(trainingExampleB, 0f, 2f);
             trainingNoiseSeconds = Mathf.Max(0f, trainingNoiseSeconds);
-            if (trainingLValues != null)
+            foreach (List<float> values in new[] { trainingEasyKValues, trainingHardKValues })
             {
-                for (int index = 0; index < trainingLValues.Count; index++)
+                if (values == null) continue;
+                for (int index = 0; index < values.Count; index++)
                 {
-                    trainingLValues[index] = Mathf.Clamp(trainingLValues[index], 0f, 1.4f);
+                    values[index] = Mathf.Clamp(values[index], 0f, 2f);
                 }
             }
 

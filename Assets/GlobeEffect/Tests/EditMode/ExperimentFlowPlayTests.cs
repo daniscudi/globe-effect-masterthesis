@@ -109,13 +109,14 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(manager.IsPreviewActive, Is.True);
             Assert.That(manager.IsSessionActive, Is.False);
             Assert.That(stimulus.CaptureSnapshot().checkerboardVisible, Is.True);
-            stimulus.SetVisualSpaceL(0.3f);
+            stimulus.SetInstrumentDistortionK(0.3f);
+            stimulus.SetInstrumentMagnificationM(20f);
             var previewSettings = new SerializedObject(stimulus);
             previewSettings.FindProperty("gridSpacingDegrees").floatValue = 3f;
             previewSettings.FindProperty("darkColor").colorValue = Color.blue;
             previewSettings.FindProperty("showFixationTarget").boolValue = false;
             previewSettings.ApplyModifiedPropertiesWithoutUndo();
-            Assert.That(stimulus.CaptureSnapshot().visualSpaceL, Is.EqualTo(0.3f));
+            Assert.That(stimulus.CaptureSnapshot().instrumentDistortionK, Is.EqualTo(0.3f));
             Object.FindAnyObjectByType<CheckerboardKeyboardController>().SubmitResponse(Response.Convex);
             AssertNoSessionFiles(manager);
             manager.StopPreview();
@@ -127,7 +128,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             // Einstellungen geprüft und die Sitzungsdatei geschrieben werden.
             manager.TogglePreview();
             stimulus.SetAngularDiameter(110f);
-            stimulus.SetVisualSpaceL(0.2f);
+            stimulus.SetInstrumentDistortionK(0.2f);
             previewSettings.Update();
             previewSettings.FindProperty("gridSpacingDegrees").floatValue = 4f;
             previewSettings.ApplyModifiedPropertiesWithoutUndo();
@@ -137,7 +138,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(manager.IsPreviewActive, Is.False, "Keine Vorschau während einer Messung.");
             manager.AbortSession();
             manager.TogglePreview();
-            stimulus.SetVisualSpaceL(0.3f);
+            stimulus.SetInstrumentDistortionK(0.3f);
             Assert.That(manager.StartTraining(), Is.True);
             Assert.That(JsonUtility.ToJson(stimulus), Is.EqualTo(originalSettings));
             manager.StopTrainingAndReturnToWelcome();
@@ -362,7 +363,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         {
             PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
             var config = new SerializedObject(Object.FindAnyObjectByType<CheckerboardExperimentManager>());
-            SetInts(config.FindProperty("repeatsPerLValue"), 1, 1);
+            SetInts(config.FindProperty("repeatsPerKValue"), 1, 1);
             config.FindProperty("blocksPerSession").intValue = 2;
             config.ApplyModifiedPropertiesWithoutUndo();
             yield return new EnterPlayMode();
@@ -631,6 +632,233 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(rows[0]["head_direction"], Is.EqualTo("Right"));
             Assert.That(rows[1]["head_direction"], Is.EqualTo("Left"));
             yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator CheckerboardPractice_FixedOrderPolarityAndAnswersOnlyInTheMonitor()
+        {
+            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            var config = new SerializedObject(Object.FindAnyObjectByType<CheckerboardExperimentManager>());
+            // Die Szene speichert die neuen Listen noch nicht: Es gelten die Standardwerte.
+            Assert.That(ReadFloats(config.FindProperty("trainingEasyKValues")), Is.EqualTo(new[]
+                { 0f, 1.4f, 0.2f, 1.2f, 0f, 1.4f, 0.2f, 1.2f, 0f, 1.4f, 0.2f, 1.2f }));
+            Assert.That(ReadFloats(config.FindProperty("trainingHardKValues")), Is.EqualTo(new[]
+                { 0.4f, 1.0f, 0.5f, 1.2f, 0.6f, 0.9f, 0.4f, 1.1f, 0.5f, 1.0f, 0.6f, 1.2f }));
+            Assert.That(config.FindProperty("invertCheckerboardEachTrial").boolValue, Is.False);
+            // Kürzere Listen, damit der Test schnell bleibt.
+            SetFloats(config.FindProperty("trainingEasyKValues"), 0f, 1.4f, 0.2f, 1.2f);
+            SetFloats(config.FindProperty("trainingHardKValues"), 0.4f, 1.0f, 0.5f, 0.9f);
+            config.FindProperty("trainingExampleA").floatValue = 1.4f;
+            config.FindProperty("trainingExampleB").floatValue = 0f;
+            config.FindProperty("trainingExampleSeconds").floatValue = 0.1f;
+            config.FindProperty("trainingNoiseSeconds").floatValue = 0f;
+            config.FindProperty("trainingFixationSeconds").floatValue = 0f;
+            config.FindProperty("invertCheckerboardEachTrial").boolValue = true;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<CheckerboardExperimentManager>();
+            var stimulus = Object.FindAnyObjectByType<VrCheckerboardStimulus>();
+            var controller = Object.FindAnyObjectByType<CheckerboardKeyboardController>();
+            TextMesh prompt = stimulus.GetComponentInChildren<TextMesh>(includeInactive: true);
+
+            manager.PracticeLog.Add("old", 1f, Response.Convex, 1d, Response.None);
+            Assert.That(manager.StartTraining(), Is.True);
+            Assert.That(manager.PracticeLog.Answers, Is.Empty, "Die Liste beginnt bei jedem Start leer.");
+
+            var shown = new List<(float k, bool inverted)>();
+            var prompts = new List<string>();
+            CheckerboardSessionState lastState = CheckerboardSessionState.Idle;
+            double deadline = Time.realtimeSinceStartupAsDouble + 30d;
+            while (manager.IsTrainingActive && Time.realtimeSinceStartupAsDouble < deadline)
+            {
+                CheckerboardSessionState state = manager.SessionState;
+                if (state != lastState && state == CheckerboardSessionState.TrainingExample)
+                    shown.Add((stimulus.InstrumentDistortionK, stimulus.CheckerboardInverted));
+                if (state is CheckerboardSessionState.TrainingInstructions
+                    or CheckerboardSessionState.TrainingComplete)
+                {
+                    // Mehrere Texte folgen ohne Zustandswechsel aufeinander: jeden neuen Text merken.
+                    if (prompts.Count == 0 || prompts[prompts.Count - 1] != prompt.text) prompts.Add(prompt.text);
+                    manager.ContinueTraining();
+                }
+
+                if (state == CheckerboardSessionState.TrainingWaitingForResponse && state != lastState)
+                {
+                    // Zwei Antworten im selben Frame: Nur die erste zählt.
+                    controller.SubmitResponse(Response.Concave);
+                    controller.SubmitResponse(Response.Convex);
+                }
+
+                lastState = state;
+                yield return null;
+            }
+
+            Assert.That(manager.SessionState, Is.EqualTo(CheckerboardSessionState.Welcome));
+            Assert.That(prompts.Any(text => text.Contains("PRACTICE PART 1")), Is.True);
+            Assert.That(prompts.Any(text => text.Contains("PRACTICE PART 2")), Is.True);
+
+            // Zwei Beispiele (gleiche, normale Polarität), dann 8 Übungstrials in fester
+            // Reihenfolge mit der Polarität N, I, I, N, N, I, I, N.
+            Assert.That(shown.Count, Is.EqualTo(10));
+            Assert.That(shown[0], Is.EqualTo((1.4f, false)));
+            Assert.That(shown[1], Is.EqualTo((0f, false)));
+            float[] order = { 0f, 1.4f, 0.2f, 1.2f, 0.4f, 1.0f, 0.5f, 0.9f };
+            bool[] polarity = { false, true, true, false, false, true, true, false };
+            IReadOnlyList<PracticeAnswer> answers = manager.PracticeLog.Answers;
+            Assert.That(answers.Count, Is.EqualTo(8));
+            Response[] closer =
+            {
+                Response.Concave, Response.Convex, Response.Concave, Response.Convex,
+                Response.None, Response.None, Response.None, Response.None
+            };
+            for (int index = 0; index < order.Length; index++)
+            {
+                Assert.That(shown[index + 2], Is.EqualTo((order[index], polarity[index])), "Trial " + (index + 1));
+                PracticeAnswer answer = answers[index];
+                Assert.That(answer.Number, Is.EqualTo(index + 1));
+                Assert.That(answer.Part, Is.EqualTo(index < 4 ? "Part 1" : "Part 2"));
+                Assert.That(answer.K, Is.EqualTo(order[index]));
+                Assert.That(answer.Response, Is.EqualTo(Response.Concave));
+                Assert.That(answer.ResponseTimeSeconds, Is.GreaterThanOrEqualTo(0d));
+                Assert.That(answer.CloserToExample, Is.EqualTo(closer[index]),
+                    "Hinweis nur im leichten Teil, Trial " + (index + 1));
+                Assert.That(answer.Note.Contains("inverted"), Is.EqualTo(polarity[index]));
+            }
+
+            Assert.That(stimulus.CheckerboardInverted, Is.False, "Nach dem Training wieder normal.");
+            AssertNoSessionFiles(manager);
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator CheckerboardSession_InvertsEveryShownTrialIncludingRepeatsAndSavesIt()
+        {
+            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            var config = new SerializedObject(Object.FindAnyObjectByType<CheckerboardExperimentManager>());
+            config.FindProperty("invertCheckerboardEachTrial").boolValue = true;
+            config.FindProperty("answerTimeoutSeconds").floatValue = 0.2f;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<CheckerboardExperimentManager>();
+            var stimulus = Object.FindAnyObjectByType<VrCheckerboardStimulus>();
+            var controller = Object.FindAnyObjectByType<CheckerboardKeyboardController>();
+            Assert.That(manager.StartSession(), Is.True);
+            manager.ConfirmExperimentReady();
+
+            // 1. Darbietung normal, ohne Antwort: wird hinten wiederholt.
+            yield return WaitForState(manager, CheckerboardSessionState.RunningTrial);
+            Assert.That(stimulus.CaptureSnapshot().checkerboardInverted, Is.False);
+            yield return WaitForState(manager, CheckerboardSessionState.WaitingForResponse);
+            yield return WaitForState(manager, CheckerboardSessionState.RunningTrial);
+            // 2. Darbietung invertiert.
+            Assert.That(stimulus.CheckerboardInverted, Is.True);
+            yield return WaitForState(manager, CheckerboardSessionState.WaitingForResponse);
+            controller.SubmitResponse(Response.Convex);
+            // 3. Darbietung (die Wiederholung) wieder normal.
+            yield return WaitForState(manager, CheckerboardSessionState.RunningTrial);
+            Assert.That(stimulus.CheckerboardInverted, Is.False);
+            yield return WaitForState(manager, CheckerboardSessionState.WaitingForResponse);
+            controller.SubmitResponse(Response.Concave);
+            Assert.That(manager.SessionState, Is.EqualTo(CheckerboardSessionState.Completed));
+
+            List<Dictionary<string, string>> rows = ReadTrialRows(manager);
+            Assert.That(rows.Count, Is.EqualTo(3));
+            Assert.That(rows.Select(row => row["checkerboard_inverted"]), Is.EqualTo(new[] { "0", "1", "0" }));
+            Assert.That(rows.Select(row => row["attempt_number"]), Is.EqualTo(new[] { "1", "1", "2" }));
+            Assert.That(rows[0]["status"], Is.EqualTo("invalid_response:response_timeout"));
+            Assert.That(rows[0]["mapping_version"], Is.EqualTo(CheckerboardInstrumentMapping.MappingVersion));
+            Assert.That(stimulus.CheckerboardInverted, Is.False, "Nach der Sitzung wieder normal.");
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator RandomDotSimulatedPractice_ShowsAnswersLiveWithoutFiles()
+        {
+            PrepareRandomDotScene();
+            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
+            config.FindProperty("simulatedTrainingRepeatsPerValue").intValue = 1;
+            SetFloats(config.FindProperty("simulatedTrainingKValues"), 0.2f, 1.2f);
+            config.FindProperty("simulatedTrainingFeedback").boolValue = false;
+            config.FindProperty("showSimulatedExamples").boolValue = false;
+            config.FindProperty("exampleConvexK").floatValue = 1.2f;
+            config.FindProperty("exampleConcaveK").floatValue = 0.2f;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
+            var stimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
+            var controller = Object.FindAnyObjectByType<RandomDotKeyboardController>();
+            Assert.That(manager.StartTraining(), Is.True);
+            manager.ConfirmTrainingInstructions();
+            var shownK = new List<float>();
+            for (int trial = 0; trial < 2; trial++)
+            {
+                yield return WaitForState(manager, RandomDotSessionState.SimulatedTrainingResponse);
+                shownK.Add(stimulus.InstrumentDistortionK);
+                controller.SubmitResponse(Response.Concave);
+                controller.SubmitResponse(Response.Convex);
+                yield return null;
+            }
+
+            yield return WaitForState(manager, RandomDotSessionState.Idle);
+            IReadOnlyList<PracticeAnswer> answers = manager.PracticeLog.Answers;
+            Assert.That(answers.Count, Is.EqualTo(2));
+            for (int index = 0; index < 2; index++)
+            {
+                Assert.That(answers[index].Part, Is.EqualTo("Simulated"));
+                Assert.That(answers[index].K, Is.EqualTo(shownK[index]));
+                Assert.That(answers[index].Response, Is.EqualTo(Response.Concave));
+                Assert.That(answers[index].ResponseTimeSeconds, Is.GreaterThanOrEqualTo(0d));
+                Assert.That(answers[index].CloserToExample,
+                    Is.EqualTo(shownK[index] < 0.7f ? Response.Concave : Response.Convex));
+            }
+
+            AssertNoSessionFiles(manager);
+            Assert.That(manager.StartTraining(), Is.True);
+            manager.ConfirmTrainingInstructions();
+            Assert.That(manager.PracticeLog.Answers, Is.Empty, "Die Liste beginnt bei jedem Start leer.");
+            manager.StopTrainingAndReturnToWelcome();
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator RandomDotActivePractice_ShowsAnswerAndResultLiveWithoutFiles()
+        {
+            PrepareActivePracticeScene(goodTrials: 1, maxTrials: 1, freeMovement: false);
+            var config = new SerializedObject(Object.FindAnyObjectByType<RandomDotExperimentManager>());
+            config.FindProperty("exampleConvexK").floatValue = 1.2f;
+            config.FindProperty("exampleConcaveK").floatValue = 0.2f;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<RandomDotExperimentManager>();
+            var stimulus = Object.FindAnyObjectByType<RandomDotFieldStimulus>();
+            Assert.That(manager.StartTraining(), Is.True);
+            manager.ConfirmTrainingInstructions();
+            yield return SweepHead(stimulus, 2.5f, manager, RandomDotSessionState.ActivePracticeResponse);
+            float k = stimulus.InstrumentDistortionK;
+            Object.FindAnyObjectByType<RandomDotKeyboardController>().SubmitResponse(Response.Convex);
+            yield return WaitForState(manager, RandomDotSessionState.Idle);
+
+            Assert.That(manager.PracticeLog.Answers.Count, Is.EqualTo(1));
+            PracticeAnswer answer = manager.PracticeLog.Answers[0];
+            Assert.That(answer.Part, Is.EqualTo("Practice 2"));
+            Assert.That(answer.K, Is.EqualTo(k));
+            Assert.That(answer.Response, Is.EqualTo(Response.Convex));
+            Assert.That(answer.Note, Is.EqualTo("good"));
+            Assert.That(answer.CloserToExample, Is.EqualTo(PracticeAnswerLog.CloserToExample(k, 1.2f, 0.2f)));
+            AssertNoSessionFiles(manager);
+            yield return new ExitPlayMode();
+        }
+
+        private static float[] ReadFloats(SerializedProperty list)
+        {
+            var values = new float[list.arraySize];
+            for (int index = 0; index < values.Length; index++)
+                values[index] = list.GetArrayElementAtIndex(index).floatValue;
+            return values;
         }
 
         private static void PrepareActivePracticeScene(int goodTrials, int maxTrials, bool freeMovement)
@@ -990,7 +1218,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             manager.FindProperty("answerTimeoutSeconds").floatValue = 0f;
             manager.FindProperty("requireTrainingBeforeSession").boolValue = false;
             manager.FindProperty("repeatsPerCondition").intValue = 1;
-            SetFloats(manager.FindProperty("visualSpaceLValues"), 0.5f, 1f);
+            SetFloats(manager.FindProperty("instrumentDistortionKValues"), 0.5f, 1f);
             ApplySharedTestSettings(manager);
             // Der gespeicherte Vorschauwert darf statisches Rauschen wählen.
             // Dieser Test prüft ausdrücklich die flimmernde Variante mit 30 Hz.
@@ -1088,7 +1316,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             manager.FindProperty("outputRoot").stringValue = OutputRoot;
             // Die Ablauftests rechnen mit Repeats Per Condition und ohne Pausen.
             // Wiederholungen pro Wert und Viertelpausen haben eigene Tests.
-            foreach (string perValue in new[] { "repeatsPerKValue", "repeatsPerLValue" })
+            foreach (string perValue in new[] { "repeatsPerKValue" })
             {
                 SerializedProperty list = manager.FindProperty(perValue);
                 if (list != null) list.arraySize = 0;

@@ -300,6 +300,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private bool standaloneTraining;
         private bool trainingResponseReceived;
         private CheckerboardCurvatureResponse trainingResponse;
+        // Für die Antwortzeit im Experiment Monitor: Beginn der Antwortphase und Tastendruck.
+        private double practiceAnswerStartUnitySeconds;
+        private double trainingResponseUnitySeconds;
         private bool practiceContinueRequested;
 
         private Coroutine interTrialCoroutine;
@@ -978,6 +981,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private IEnumerator RunSimulatedTraining()
         {
             sessionState = State.SimulatedTrainingMotion;
+            practiceLog.Clear();
             if (showSimulatedExamples)
             {
                 yield return ShowSimulatedExamples();
@@ -997,6 +1001,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 stimulus.ShowFixationOnly();
                 headsetText.ShowSimulatedResponse(index + 1, practice.Count, BuildResponseLines());
                 yield return WaitForPracticeAnswer(State.SimulatedTrainingResponse);
+                LogPracticeAnswer("Simulated", practice[index].InstrumentDistortionK, string.Empty);
 
                 // Subjektives Formurteil: eine "richtige" Antwort gibt es nur bei
                 // eindeutigen Extremwerten. Dort sagt die Rückmeldung, was konvex
@@ -1112,6 +1117,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // ohne Antworten) und Practice 2: Trials genau wie im Test, ohne Texte
             // dazwischen und ohne Daten zu speichern.
             sessionState = State.ActivePracticeMotion;
+            practiceLog.Clear();
             ActivePracticeGoodTrials = 0;
             ActivePracticeAttempts = 0;
             LastActivePracticeResult = string.Empty;
@@ -1182,6 +1188,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
                 LastActivePracticeResult = stopped == null ? "good" : "stopped";
                 if (stopped == null) ActivePracticeGoodTrials++;
+                LogPracticeAnswer("Practice 2", trial.InstrumentDistortionK,
+                    stopped == null ? "good" : "stopped (" + stopped + ")");
                 Debug.Log(string.Format(CultureInfo.InvariantCulture,
                     "Active Practice 2, Trial {0}: {1}{2} ({3}/{4} gut).",
                     ActivePracticeAttempts, LastActivePracticeResult, stopped != null ? " (" + stopped + ")" : "",
@@ -1271,11 +1279,22 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             stimulus.ShowEmptyField();
             trainingResponseReceived = false;
+            practiceAnswerStartUnitySeconds = Time.realtimeSinceStartupAsDouble;
             sessionState = responseState;
             while (!trainingResponseReceived) yield return null;
             ShowAnswerFlash();
             float wait = SecondsAfterAnswer;
             if (wait > 0f) yield return new WaitForSecondsRealtime(wait);
+        }
+
+        // Eine Zeile im Experiment Monitor, nur für den Versuchsleiter, nicht gespeichert.
+        // Der Hinweis "näher am Beispiel" gilt für alle Übungstrials (die Übungslisten
+        // enthalten nur deutliche k); bei gleichem Abstand bleibt er leer.
+        private void LogPracticeAnswer(string part, float k, string note)
+        {
+            practiceLog.Add(part, k, trainingResponse,
+                trainingResponseUnitySeconds - practiceAnswerStartUnitySeconds,
+                PracticeAnswerLog.CloserToExample(k, exampleConvexK, exampleConcaveK), note);
         }
 
         /// <summary>
@@ -1461,6 +1480,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             {
                 trainingResponseReceived = true;
                 trainingResponse = response;
+                trainingResponseUnitySeconds = Time.realtimeSinceStartupAsDouble;
                 sessionState = sessionState == State.SimulatedTrainingResponse
                     ? State.SimulatedTrainingMotion : State.ActivePracticeMotion;
                 return;

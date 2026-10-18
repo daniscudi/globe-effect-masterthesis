@@ -28,7 +28,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             var plan = new SerializedObject(manager);
             plan.FindProperty("stimulus").objectReferenceValue = stimulus;
             SetFloats(plan, "fieldOfViewValues", 90f, 60f);
-            SetFloats(plan, "visualSpaceLValues", 0.2f, 0.7f, 1.2f);
+            SetFloats(plan, "instrumentDistortionKValues", 0.2f, 0.7f, 1.2f);
             SetEyes(plan, CheckerboardEyePresentation.BothEyes);
             plan.ApplyModifiedPropertiesWithoutUndo();
 
@@ -36,7 +36,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
             var preview = new SerializedObject(stimulus);
             preview.FindProperty("fieldOfViewDegrees").floatValue = 70f;
             preview.FindProperty("eyePresentation").enumValueIndex = (int)CheckerboardEyePresentation.LeftEyeOnly;
-            preview.FindProperty("visualSpaceL").floatValue = 0.9f;
+            preview.FindProperty("instrumentDistortionK").floatValue = 0.9f;
+            preview.FindProperty("instrumentMagnificationM").floatValue = 12f;
             preview.FindProperty("edgeSoftnessDegrees").floatValue = 5f;
             preview.FindProperty("gridSpacingDegrees").floatValue = 8f;
             preview.FindProperty("noiseRefreshRateHz").floatValue = 45f;
@@ -51,7 +52,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [Test]
-        public void TakeOver_CopiesFovAndEyeIntoThePlanButKeepsL()
+        public void TakeOver_CopiesFovEyeAndMagnificationIntoThePlanButKeepsKList()
         {
             Assert.That(manager.HasValuesBeforePreviewTakeover, Is.False);
             Assert.That(manager.TakeOverPreviewValues(), Is.True);
@@ -61,7 +62,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(plan.FindProperty("eyePresentations").arraySize, Is.EqualTo(1));
             Assert.That(plan.FindProperty("eyePresentations").GetArrayElementAtIndex(0).enumValueIndex,
                 Is.EqualTo((int)CheckerboardEyePresentation.LeftEyeOnly));
-            Assert.That(Floats(plan, "visualSpaceLValues"), Is.EqualTo(new[] { 0.2f, 0.7f, 1.2f }));
+            Assert.That(Floats(plan, "instrumentDistortionKValues"), Is.EqualTo(new[] { 0.2f, 0.7f, 1.2f }));
+            Assert.That(plan.FindProperty("instrumentMagnificationM").floatValue, Is.EqualTo(12f));
             Assert.That(manager.HasValuesBeforePreviewTakeover, Is.True);
         }
 
@@ -73,6 +75,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             // Zweites Übernehmen mit anderen Werten darf das Original nicht ersetzen.
             var preview = new SerializedObject(stimulus);
             preview.FindProperty("fieldOfViewDegrees").floatValue = 50f;
+            preview.FindProperty("instrumentMagnificationM").floatValue = 20f;
             preview.FindProperty("edgeSoftnessDegrees").floatValue = 9f;
             preview.FindProperty("gridSpacingDegrees").floatValue = 12f;
             preview.ApplyModifiedPropertiesWithoutUndo();
@@ -83,9 +86,11 @@ namespace GlobeEffect.VRCheckerboard.Tests
 
             var plan = new SerializedObject(manager);
             Assert.That(Floats(plan, "fieldOfViewValues"), Is.EqualTo(new[] { 90f, 60f }));
+            Assert.That(plan.FindProperty("instrumentMagnificationM").floatValue, Is.EqualTo(10f));
             Assert.That(plan.FindProperty("eyePresentations").GetArrayElementAtIndex(0).enumValueIndex,
                 Is.EqualTo((int)CheckerboardEyePresentation.BothEyes));
             var look = new SerializedObject(stimulus);
+            Assert.That(look.FindProperty("instrumentMagnificationM").floatValue, Is.EqualTo(12f));
             Assert.That(look.FindProperty("edgeSoftnessDegrees").floatValue, Is.EqualTo(5f));
             Assert.That(look.FindProperty("gridSpacingDegrees").floatValue, Is.EqualTo(8f));
             Assert.That(look.FindProperty("noiseRefreshRateHz").floatValue, Is.EqualTo(45f));

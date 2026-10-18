@@ -30,6 +30,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public string Status = string.Empty;
         public CheckerboardTrialSequence TrialSequence;
 
+        // Schwarze und weiße Felder vertauscht (nur mit "Invert Checkerboard Each Trial").
+        public bool CheckerboardInverted;
+
         public double StimulusDurationSeconds =>
             Math.Max(0d, StimulusEndUnitySeconds - TrialStartUnitySeconds);
 
@@ -48,25 +51,25 @@ namespace GlobeEffect.VRCheckerboard.Experiment
     /// </summary>
     public sealed class CheckerboardExperimentFiles : ExperimentFilesBase
     {
-        private const string PlanHeader = SessionColumns +
+        private const string PlanHeader = SessionColumns + "stimulus_task," +
             "sequence_index,total_planned_trials,condition_index,repetition,eye_presentation," +
-            "angular_diameter_deg,grid_line_spacing_deg,grid_line_spacing_uv,visual_space_l," +
-            "oomes_endpoint_equivalent,stimulus_duration_s,noise_until_response," +
+            "angular_diameter_deg,grid_line_spacing_deg,grid_line_spacing_uv,instrument_distortion_k," +
+            "instrument_magnification_m,stimulus_duration_s,noise_until_response," +
             "post_response_noise_s,response_timeout_s,category_a_key,category_b_key," +
-            "response_keys_swapped,trial_sequence,pre_stimulus_s,controller_mapping";
+            "response_keys_swapped,trial_sequence,pre_stimulus_s,controller_mapping,invert_checkerboard_each_trial";
 
         // Die Kopfzeile der Ergebnisdatei. Sie wird einmal am Anfang geschrieben
         // und muss Spalte für Spalte zu AppendResult passen.
-        private const string TrialHeader = SessionColumns +
+        private const string TrialHeader = SessionColumns + "stimulus_task," +
             "presentation_index,sequence_index,total_planned_trials,condition_index,repetition," +
             "attempt_number,trial_start_utc,trial_start_unity_s,stimulus_end_unity_s," +
             "response_window_start_unity_s,trial_end_unity_s,stimulus_duration_s," +
             "noise_mask_duration_s,response_time_s,eye_presentation,angular_diameter_deg," +
             "aperture_edge_softness_deg,circular_aperture_enabled,grid_line_spacing_deg," +
-            "grid_line_spacing_uv,visual_space_l,oomes_endpoint_equivalent,response," +
+            "grid_line_spacing_uv,instrument_distortion_k,instrument_magnification_m,response," +
             "valid_for_analysis,fixation_sample_valid,fixation_inside_tolerance," +
             "fixation_angle_deg,continuous_fixation_s,fixation_valid_sample_fraction," +
-            "longest_off_target_s,longest_invalid_gaze_s,status,trial_sequence";
+            "longest_off_target_s,longest_invalid_gaze_s,status,trial_sequence,checkerboard_inverted";
 
         public CheckerboardExperimentFiles(
             string outputRoot,
@@ -75,7 +78,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             DateTime sessionStartUtc,
             int randomSeed)
             : base(outputRoot, participantId, sessionLabel, "session", sessionStartUtc, randomSeed,
-                VisualSpaceRadialMapping.MappingVersion)
+                CheckerboardInstrumentMapping.MappingVersion)
         {
         }
 
@@ -89,7 +92,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             string categoryAKey,
             string categoryBKey,
             bool responseKeysSwapped,
-            VrControllerMapping controllerMapping)
+            VrControllerMapping controllerMapping,
+            bool invertCheckerboardEachTrial = false)
         {
             // Die beiden alten Spalten bleiben für bestehende Auswertungen stehen:
             // noise_until_response sagt, ob die Maske in der Antwortphase zu sehen
@@ -100,19 +104,19 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             var rows = new List<CsvRow>();
             foreach (CheckerboardTrial trial in trials)
             {
-                double gridSpacingUv = VisualSpaceRadialMapping.NormalizedGridLineSpacing(
+                double gridSpacingUv = CheckerboardInstrumentMapping.GridLineSpacingUv(
                     trial.AngularDiameterDegrees, gridLineSpacingDegrees);
 
-                rows.Add(StartRow()
+                rows.Add(StartRow().Add("Checkerboard")
                     .Add(trial.SequenceIndex).Add(trials.Count)
                     .Add(trial.ConditionIndex).Add(trial.Repetition)
                     .Add(trial.EyePresentation.ToString()).Add(trial.AngularDiameterDegrees)
-                    .Add(gridLineSpacingDegrees).Add(gridSpacingUv).Add(trial.VisualSpaceL)
-                    .Add(VisualSpaceRadialMapping.OomesEndpointEquivalent(trial.VisualSpaceL))
+                    .Add(gridLineSpacingDegrees).Add(gridSpacingUv).Add(trial.InstrumentDistortionK)
+                    .Add(trial.InstrumentMagnificationM)
                     .Add(stimulusDurationSeconds).Add(noiseDuringResponse).Add(postResponseNoiseSeconds)
                     .Add(responseTimeoutSeconds).Add(categoryAKey).Add(categoryBKey)
                     .Add(responseKeysSwapped).Add(trialSequence.ToString()).Add(preStimulusSeconds)
-                    .Add(controllerMapping.ToString()));
+                    .Add(controllerMapping.ToString()).Add(invertCheckerboardEachTrial));
             }
 
             WritePlanFile(PlanHeader, rows, TrialHeader);
@@ -124,7 +128,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // TrialHeader passen, sonst stehen die Zahlen später in den
             // falschen Spalten.
             CheckerboardTrial trial = result.Trial;
-            AppendResultRow(StartRow()
+            AppendResultRow(StartRow().Add("Checkerboard")
                 .Add(result.PresentationIndex).Add(trial.SequenceIndex).Add(plannedTrials)
                 .Add(trial.ConditionIndex).Add(trial.Repetition).Add(trial.AttemptNumber)
                 .Add(result.TrialStartUtc).Add(result.TrialStartUnitySeconds)
@@ -134,14 +138,14 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 .Add(trial.EyePresentation.ToString()).Add(trial.AngularDiameterDegrees)
                 .Add(result.ApertureEdgeSoftnessDegrees).Add(result.CircularApertureEnabled)
                 .Add(result.GridLineSpacingDegrees).Add(result.GridLineSpacingUv)
-                .Add(trial.VisualSpaceL)
-                .Add(VisualSpaceRadialMapping.OomesEndpointEquivalent(trial.VisualSpaceL))
+                .Add(trial.InstrumentDistortionK)
+                .Add(trial.InstrumentMagnificationM)
                 .Add(result.Response.ToString()).Add(result.ValidForAnalysis)
                 .Add(result.Gaze.SampleValid).Add(result.Gaze.OnTarget)
                 .Add(result.Gaze.AngleDegrees).Add(result.Gaze.SteadySeconds)
                 .Add(result.Gaze.ValidSampleFraction).Add(result.LongestOffTargetSeconds)
                 .Add(result.LongestInvalidGazeSeconds).Add(result.Status)
-                .Add(result.TrialSequence.ToString()));
+                .Add(result.TrialSequence.ToString()).Add(result.CheckerboardInverted));
         }
     }
 }

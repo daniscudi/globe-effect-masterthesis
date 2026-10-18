@@ -136,6 +136,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         protected string settingsBeforePreview;
         protected string lookToKeepAfterPreview;
 
+        // Übungsantworten für das Kontrollfenster des Versuchsleiters. Nur im
+        // Speicher, keine Datei; beginnt bei jedem Übungsstart leer.
+        protected readonly PracticeAnswerLog practiceLog = new();
+
+        public PracticeAnswerLog PracticeLog => practiceLog;
         public int CurrentTrialNumber => currentTrialNumber;
         public int TotalTrials => totalTrials;
         public int ValidTrialsCompleted => validTrialsCompleted;
@@ -198,6 +203,108 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             maxNoDataSeconds = Mathf.Max(0f, maxNoDataSeconds);
             maxSampleAgeSeconds = Mathf.Max(0.01f, maxSampleAgeSeconds);
             maxRepeatsPerTrial = Mathf.Max(0, maxRepeatsPerTrial);
+        }
+    }
+
+    /// <summary>
+    /// Eine Antwort aus einem Übungstrial. Sie erscheint nur im Experiment
+    /// Monitor; die Versuchsperson sieht sie nicht, und sie wird nicht gespeichert.
+    /// </summary>
+    public sealed class PracticeAnswer
+    {
+        public int Number;
+        public string Part = string.Empty;
+        public float K;
+        public CheckerboardCurvatureResponse Response;
+
+        // Ab Beginn der Antwortphase. NaN = keine Antwort.
+        public double ResponseTimeSeconds = double.NaN;
+
+        // Nur ein Hinweis für den Versuchsleiter, keine richtige Antwort:
+        // Welchem Beispiel liegt k näher? None = kein Hinweis (oder genau dazwischen).
+        public CheckerboardCurvatureResponse CloserToExample;
+        public string Note = string.Empty;
+    }
+
+    /// <summary>
+    /// Die Übungsantworten seit dem letzten Übungsstart, für das Kontrollfenster.
+    /// Damit sieht der Versuchsleiter, ob jemand konvex und konkav verstanden hat,
+    /// zum Beispiel wenn bei deutlich konvexem k immer "konkav" kommt. Es gibt
+    /// bewusst kein Richtig/Falsch, weil sich die Wahrnehmung zwischen Personen
+    /// unterscheidet.
+    /// </summary>
+    public sealed class PracticeAnswerLog
+    {
+        private readonly List<PracticeAnswer> answers = new();
+
+        public IReadOnlyList<PracticeAnswer> Answers => answers;
+
+        public void Clear() => answers.Clear();
+
+        public PracticeAnswer Add(string part, float k, CheckerboardCurvatureResponse response,
+            double responseTimeSeconds, CheckerboardCurvatureResponse closerToExample, string note = "")
+        {
+            var answer = new PracticeAnswer
+            {
+                Number = answers.Count + 1,
+                Part = part ?? string.Empty,
+                K = k,
+                Response = response,
+                ResponseTimeSeconds = response == CheckerboardCurvatureResponse.None
+                    ? double.NaN : responseTimeSeconds,
+                CloserToExample = closerToExample,
+                Note = note ?? string.Empty
+            };
+            answers.Add(answer);
+            return answer;
+        }
+
+        /// <summary>
+        /// Welchem Beispiel k näher liegt. Bei (fast) gleichem Abstand None, damit
+        /// in der Mitte kein Hinweis entsteht. Die kleine Toleranz fängt Rundung
+        /// der float-Werte ab (z. B. 0,7 zwischen 0 und 1,4).
+        /// </summary>
+        public static CheckerboardCurvatureResponse CloserToExample(
+            float k, float convexExampleK, float concaveExampleK)
+        {
+            double toConvex = Math.Abs((double)k - convexExampleK);
+            double toConcave = Math.Abs((double)k - concaveExampleK);
+            if (Math.Abs(toConvex - toConcave) < 1e-4) return CheckerboardCurvatureResponse.None;
+            return toConvex < toConcave
+                ? CheckerboardCurvatureResponse.Convex
+                : CheckerboardCurvatureResponse.Concave;
+        }
+
+        /// <summary>
+        /// Eine Zeile pro k, nach k sortiert, zum Beispiel
+        /// "k 1.40: Convex 0, Concave 3, no answer 0".
+        /// </summary>
+        public List<string> SummaryByK()
+        {
+            var counts = new SortedDictionary<double, int[]>();
+            foreach (PracticeAnswer answer in answers)
+            {
+                double key = Math.Round(answer.K, 3);
+                if (!counts.TryGetValue(key, out int[] perResponse))
+                {
+                    perResponse = new int[3];
+                    counts.Add(key, perResponse);
+                }
+
+                perResponse[(int)answer.Response]++;
+            }
+
+            var lines = new List<string>();
+            foreach (KeyValuePair<double, int[]> entry in counts)
+            {
+                lines.Add(string.Format(CultureInfo.InvariantCulture,
+                    "k {0:0.00}: Convex {1}, Concave {2}, no answer {3}", entry.Key,
+                    entry.Value[(int)CheckerboardCurvatureResponse.Convex],
+                    entry.Value[(int)CheckerboardCurvatureResponse.Concave],
+                    entry.Value[(int)CheckerboardCurvatureResponse.None]));
+            }
+
+            return lines;
         }
     }
 }

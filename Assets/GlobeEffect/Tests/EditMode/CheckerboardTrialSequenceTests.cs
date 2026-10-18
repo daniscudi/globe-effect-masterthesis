@@ -92,6 +92,41 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(Column(trialHeader, trialRow, "trial_sequence"), Is.EqualTo(sequence.ToString()));
             Assert.That(Column(trialHeader, trialRow, "response"), Is.EqualTo("Convex"));
             Assert.That(Column(trialHeader, trialRow, "status"), Is.EqualTo("valid"));
+            Assert.That(Column(trialHeader, trialRow, "stimulus_task"), Is.EqualTo("Checkerboard"));
+            Assert.That(Column(trialHeader, trialRow, "mapping_version"),
+                Is.EqualTo(CheckerboardInstrumentMapping.MappingVersion));
+            Assert.That(Column(trialHeader, trialRow, "instrument_distortion_k"), Is.EqualTo("0.5"));
+            Assert.That(Column(trialHeader, trialRow, "instrument_magnification_m"), Is.EqualTo("10"));
+            Assert.That(trialHeader, Does.Not.Contain("visual_space_l"));
+            Assert.That(trialHeader, Does.Not.Contain("oomes_endpoint_equivalent"));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void Files_StorePolarityPerTrialAndTheSettingInThePlan(bool inverted)
+        {
+            var files = new CheckerboardExperimentFiles(
+                outputRoot, "pilot_test", "polarity_test", DateTime.UtcNow, randomSeed: 1);
+            files.WritePlan(new[] { CreateTrial() }, 10f, 0.6f, Sequence.NoiseResponseThenGray,
+                0.4f, 0f, "TRIGGER", "TRACKPAD CLICK", false,
+                VrControllerMapping.TrackpadConcaveTriggerConvex, invertCheckerboardEachTrial: true);
+            CheckerboardTrialResult result = CreateResult(Sequence.NoiseResponseThenGray);
+            result.CheckerboardInverted = inverted;
+            files.AppendResult(result, plannedTrials: 1);
+
+            string[] plan = File.ReadAllLines(files.PlanFile);
+            string[] planHeader = plan[0].Split(',');
+            string[] planRow = plan[1].Split(',');
+            Assert.That(planRow.Length, Is.EqualTo(planHeader.Length));
+            Assert.That(Column(planHeader, planRow, "invert_checkerboard_each_trial"), Is.EqualTo("1"));
+
+            string[] trials = File.ReadAllLines(files.TrialResultsFile);
+            string[] trialHeader = trials[0].Split(',');
+            string[] trialRow = trials[1].Split(',');
+            Assert.That(trialRow.Length, Is.EqualTo(trialHeader.Length));
+            Assert.That(Column(trialHeader, trialRow, "checkerboard_inverted"), Is.EqualTo(inverted ? "1" : "0"));
+            Assert.That(Column(trialHeader, trialRow, "mapping_version"),
+                Is.EqualTo("merlitz-instrument-checkerboard-fixed-source-grid-v2"));
         }
 
         private static string Column(string[] header, string[] row, string name)
@@ -125,7 +160,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         {
             return new CheckerboardTrial(sequenceIndex: 1, conditionIndex: 1, repetition: 1, attemptNumber: 1,
                 angularDiameterDegrees: 60f, eyePresentation: CheckerboardEyePresentation.BothEyes,
-                visualSpaceL: 0.5f);
+                instrumentDistortionK: 0.5f);
         }
 
         // Muster von 10,0 bis 10,6 s, Antwort 1,25 s nach Beginn der Antwortphase.

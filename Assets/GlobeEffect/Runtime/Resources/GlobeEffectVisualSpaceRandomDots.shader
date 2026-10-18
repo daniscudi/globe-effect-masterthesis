@@ -46,6 +46,7 @@ Shader "GlobeEffect/Visual Space Random Dots"
             #pragma multi_compile_instancing
 
             #include "UnityCG.cginc"
+            #include "GlobeEffectMerlitzInstrument.cginc"
 
             struct AppData
             {
@@ -119,10 +120,8 @@ Shader "GlobeEffect/Visual Space Random Dots"
                 validInstrumentDomain = step(
                     scaledObjectAngle,
                     1.560796);
-                return atan(
-                    _InstrumentMagnificationM *
-                    tan(min(scaledObjectAngle, 1.560796))) /
-                    _InstrumentDistortionK;
+                return MerlitzApparentAngle(
+                    objectAngle, _InstrumentMagnificationM, _InstrumentDistortionK);
             }
 
             float CenterInstrumentScale()

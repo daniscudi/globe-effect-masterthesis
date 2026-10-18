@@ -39,11 +39,14 @@ namespace GlobeEffect.VRCheckerboard.Editor
             ["preStimulusSeconds"] = "Time Before Checkerboard (s)",
             ["categoryALabel"] = "Word For Convex Answer",
             ["categoryBLabel"] = "Word For Concave Answer",
-            ["trainingExampleA"] = "Convex Example (l)",
-            ["trainingExampleB"] = "Concave Example (l)",
+            ["trainingExampleA"] = "Convex Example (k)",
+            ["trainingExampleB"] = "Concave Example (k)",
+            ["trainingEasyKValues"] = "Practice Part 1: k Order (Easy)",
+            ["trainingHardKValues"] = "Practice Part 2: k Order (Harder)",
+            ["invertCheckerboardEachTrial"] = "Invert Checkerboard Each Trial",
+            ["invertCheckerboard"] = "Swap Black And White",
             ["trainingNoiseSeconds"] = "Screen After Example (s)",
             ["trainingFixationSeconds"] = "Min Wait Before Practice Image (s)",
-            ["visualSpaceL"] = "Grid Distortion (l)",
             ["gridSpacingDegrees"] = "Square Size (degrees)",
             ["useCircularAperture"] = "Round Window",
             ["textDistanceMeters"] = "Text Size As If At (m)",
@@ -294,10 +297,13 @@ namespace GlobeEffect.VRCheckerboard.Editor
             if (Section("Session And Trial Plan"))
             {
                 Fields(serializedObject, "participantId", "sessionLabel", "randomSeed", "fieldOfViewValues",
-                    "eyePresentations", "repeatsPerCondition");
-                long repetitions = LevelTable("visualSpaceLValues", "repeatsPerLValue", "l");
+                    "eyePresentations", "instrumentMagnificationM", "repeatsPerCondition");
+                long repetitions = LevelTable("instrumentDistortionKValues", "repeatsPerKValue", "k");
+                EditorGUILayout.HelpBox("Merlitz instrument mapping (k, m), not the old visual-space l " +
+                    "mapping. Use new pilot data. Match m to the random-dot condition; m = 1 makes all " +
+                    "k values look straight.", MessageType.Info);
                 long trials = (long)Count("fieldOfViewValues") * Count("eyePresentations") * repetitions;
-                Fields(serializedObject, "blocksPerSession");
+                Fields(serializedObject, "blocksPerSession", "invertCheckerboardEachTrial");
                 EditorGUILayout.HelpBox($"Planned: {trials} valid trials{BlockText(trials)}. " +
                     "Trials that fail (for example looking away) are repeated on top.", MessageType.Info);
             }
@@ -322,7 +328,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             }
             if (Section("Practice", false))
                 Fields(serializedObject, "requireTrainingBeforeSession", "trainingKey", "continueTrainingKey",
-                    "trainingExampleA", "trainingExampleB", "trainingLValues", "trainingRepeatsPerValue",
+                    "trainingExampleA", "trainingExampleB", "trainingEasyKValues", "trainingHardKValues",
                     "trainingExampleSeconds", "trainingNoiseSeconds", "trainingFixationSeconds");
             if (Section("Live Preview (No Recording)"))
             {
@@ -331,14 +337,16 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "Change the settings below and see the result right away. " +
                     "Preview Shows Noise switches between checkerboard and noise.", MessageType.Info);
                 LinkedFields("stimulus", "fieldOfViewDegrees", "edgeSoftnessDegrees", "useCircularAperture",
-                    "visualSpaceL", "gridSpacingDegrees", "eyePresentation", "darkColor", "lightColor",
+                    "instrumentDistortionK", "instrumentMagnificationM", "gridSpacingDegrees",
+                    "eyePresentation", "darkColor", "lightColor", "invertCheckerboard",
                     "backgroundColor", "showFixationTarget", "fixationSizeDegrees", "fixationColor");
                 NoiseFields();
                 Fields(serializedObject, "maskDemoKey", "maskDemoPatternSeconds", "maskDemoMaskSeconds",
                     "maskDemoGraySeconds");
                 EditorGUILayout.HelpBox("Afterimage test: during the preview press M (or the button). It shows " +
                     "the checkerboard, then the noise, then a grey screen. If you still see the checkerboard " +
-                    "on the grey screen, try another noise type.", MessageType.Info);
+                    "on the grey screen, try another noise type. With Invert Checkerboard Each Trial on, each " +
+                    "press swaps black and white.", MessageType.Info);
                 EditorGUILayout.HelpBox("When the preview ends, all changes are undone – unless you press " +
                     "\"Use Preview Values For The Experiment\".", MessageType.Info);
                 var manager = (CheckerboardExperimentManager)target;
@@ -357,7 +365,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 }
                 PreviewTakeoverButtons(manager, "\"Use Preview Values\" puts the preview window size and eyes " +
                     "into the trial plan and keeps the look (edge, grid size, colors, cross, noise). " +
-                    "The l values are not changed.");
+                    "The k list is not changed; the fixed magnification is taken over.");
             }
             if (Section("Pattern, Cross And Noise", false))
             {

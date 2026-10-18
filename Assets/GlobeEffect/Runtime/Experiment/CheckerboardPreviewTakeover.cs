@@ -22,9 +22,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             var plan = new PlanValues();
             JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(manager), plan);
 
-            // l bleibt unverändert: die l-Liste ist das, was gemessen wird.
+            // k-Liste bleibt unverändert; FOV, Augenmodus und festes m übernehmen.
             plan.fieldOfViewValues = new List<float> { preview.fieldOfViewDegrees };
             plan.eyePresentations = new List<CheckerboardEyePresentation> { preview.eyePresentation };
+            plan.instrumentMagnificationM = preview.instrumentMagnificationM;
 
             JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(plan), manager);
         }
@@ -57,6 +58,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             public List<float> fieldOfViewValues = new();
             public List<CheckerboardEyePresentation> eyePresentations = new();
+            public float instrumentMagnificationM = 10f;
         }
 
         // Feldnamen = VrCheckerboardStimulus, Vorschauwerte für den Versuchsplan.
@@ -65,6 +67,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             public float fieldOfViewDegrees;
             public CheckerboardEyePresentation eyePresentation;
+            public float instrumentMagnificationM = 10f;
         }
 
         // Feldnamen = VrCheckerboardStimulus, Darstellung. Diese Werte setzt der
@@ -72,6 +75,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         [Serializable]
         private sealed class LookValues
         {
+            // Auch beim Zurücksetzen/Behalten der Vorschau das sichtbare m mitnehmen.
+            public float instrumentMagnificationM = 10f;
             public float edgeSoftnessDegrees;
             public bool useCircularAperture;
             public float gridSpacingDegrees;

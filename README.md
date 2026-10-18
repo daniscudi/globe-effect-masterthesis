@@ -10,6 +10,114 @@ Die aktuelle Pilot-Checkliste mit Inspector-Zuständigkeiten, vorgefundenen
 Szeneneinstellungen und offenen Protokollentscheidungen steht in
 [CHECKERBOARD_PILOT.md](CHECKERBOARD_PILOT.md).
 
+## Umstellung der Checkerboards am 18. Oktober 2026
+
+Checkerboard und Random Dots verwenden jetzt dieselbe **Instrumentenabbildung**
+nach Merlitz (2010), Gleichungen 4–6, mit dem Stimulusparameter **k** und
+Vergrößerung **m**. Beim Checkerboard ist m pro Sitzung fest (Standard 10);
+bei den Dots ist m ein Trialfaktor. Der frühere Regler `visualSpaceL` ist
+nicht mehr die aktive Checkerboard-Abbildung.
+
+**Yannicks Pilot (`pilot_ys`, 105 Trials, alter l-PSE ca. 0,872;
+95%-Glaubwürdigkeitsintervall ca. 0,810–0,937) gehört zur ALTEN Abbildung.**
+Er bleibt eine technische Voruntersuchung, kein Pilot der neuen k-Version.
+Alte CSVs, Abbildungen und Schätzwerte bleiben unverändert; l nicht in k umbenennen
+und alte/neue Messungen nicht poolen. Vor Beginn der Hauptstudie sind **neue
+Pilotmessungen mit der Instrumentenversion** und die Abnahme am Headset vorgesehen.
+Die früheren Szenenwerte werden über Feldmigration als numerische Startwerte
+erhalten; daraus folgt keine Identität alter und neuer Reize.
+
+Kennung am 18. Oktober: `merlitz-instrument-checkerboard-fixed-source-grid-v1`,
+seit 19. Oktober `…-v2` (Polaritätsoption, siehe nächster Abschnitt).
+Neue Plan-/Trialdateien enthalten `stimulus_task=Checkerboard`,
+`instrument_distortion_k`, `instrument_magnification_m` und `mapping_version`.
+Die Felder `visual_space_l` und `oomes_endpoint_equivalent` werden für neue
+Checkerboard-Sitzungen nicht mehr ausgegeben.
+
+**Automatisch geprüft am 18. Oktober:** 288/288 Unity-Tests bestanden, kein
+übersprungener Test. Darunter gerenderte Checkerboards für k = 0 / 0,5 / 1 /
+1,4 / 2, Vorwärts-/Rückrechnung gegen dieselbe Instrumentengleichung,
+Vorschau-Rücksetzung von k und m, Trialabläufe und CSVs. Testbericht:
+`Logs/checkerboard_instrument_final.xml` (lokal, von Git ignoriert).
+MATLAB wurde mit ausschließlich synthetischen Daten für neue Checkerboard-k-,
+historische l- und Random-Dot-k-CSVs sowie gegen gemischte Mappingkennungen geprüft.
+Diese Software-/GPU-Prüfung ist kein Headset-Abnahmetest und keine Pilotmessung.
+
+## Ergänzung 19. Oktober 2026: Polarität, festes Training, Übungsanzeige
+
+**Neue Kennung `merlitz-instrument-checkerboard-fixed-source-grid-v2`.** Die
+Abbildung (k, m, festes Quellgitter) ist unverändert. Neu ist nur die Option
+`Invert Checkerboard Each Trial` (Standard aus). Ist sie aus, zeichnet v2 Pixel
+für Pixel dasselbe Bild wie v1; das prüft ein Bildtest gegen eine eingefrorene
+Kopie des v1-Shaders (`Tests/EditMode/CheckerboardShaderV1Reference.txt`) für
+k = 0 bis 2, Noise-Maske und graue Fläche.
+
+**Polarität.** Vorschlag des Betreuers, um Nachbildeffekte zu verringern; ob es
+Teilnehmer irritiert, ist offen.
+
+* Mit der Option tauschen schwarze und weiße Felder von einem gezeigten Trial
+  zum nächsten. Der erste Trial ist normal. Wiederholte (ungültige) Trials
+  zählen als Darbietung mit, die Polarität hängt deshalb an der Darbietung,
+  nicht am Plan.
+* Nur das Schachbrett wird invertiert, nicht die Noise-Maske (gleicher Seed,
+  gleiches Rauschbild).
+* Über viele Trials sieht so jede Stelle im Mittel Grau; es baut sich kein
+  Nachbild einer bestimmten Polarität auf. Das negative Nachbild von Trial n
+  hat allerdings dieselbe Polarität wie Trial n+1.
+* `*_trials.csv` hat die neue letzte Spalte `checkerboard_inverted` (0/1),
+  `*_plan.csv` die Spalte `invert_checkerboard_each_trial`; der Marker
+  `TrialStart` enthält `checkerboard_inverted`, beide Marker `invert_each_trial`.
+  Damit lässt sich später auswerten, ob die Polarität die Antworten beeinflusst
+  (zum Beispiel getrennte Fits je Polarität pro k). Die MATLAB-Fits ignorieren
+  die Spalte bisher.
+* Training: Die beiden Beispiele haben immer dieselbe, normale Polarität (sonst
+  würde die Polarität die Kategorie verraten). In den Übungstrials wechselt die
+  Polarität nach dem Muster N, I, I, N. Weil die Übungs-k selbst niedrig/hoch
+  abwechseln, würde ein Wechsel bei jedem Trial „invertiert“ genau mit „hoch“
+  zusammenfallen lassen; so kommt jede Kombination gleich oft vor.
+* Vorschau: `Swap Black And White` am Stimulus zeigt das invertierte Muster.
+  Bei eingeschalteter Option wechselt jeder Druck auf `M` (Nachbildtest) die
+  Polarität. Nach Vorschau, Training und Sitzung ist das Muster wieder normal.
+
+**Training in fester Reihenfolge.** Statt der gemischten Liste gibt es zwei
+Teile, jeweils genau in der eingetragenen Reihenfolge, niedrig und hoch im
+Wechsel. Die zwei Beispiele kommen weiterhin zuerst. Vor jedem Teil steht ein
+neutraler Text („PRACTICE PART 1/2“); dort kann der Versuchsleiter nach einem
+Blick auf den Monitor noch einmal erklären. Standardwerte (im Inspector änderbar):
+
+* Teil 1 (leicht): `0, 1.4, 0.2, 1.2, 0, 1.4, 0.2, 1.2, 0, 1.4, 0.2, 1.2`
+* Teil 2 (schwerer): `0.4, 1.0, 0.5, 1.2, 0.6, 0.9, 0.4, 1.1, 0.5, 1.0, 0.6, 1.2`
+  (0.7 und 0.8 sind absichtlich nicht dabei).
+
+Die alten Felder `Training K Values` und `Training Repetitions Per Value`
+(gemischt) sind entfallen; ihre Werte in alten Szenen werden nicht übernommen.
+
+**Übungsantworten nur im Experiment Monitor.** Checkerboard und Random Dots
+zeigen im Abschnitt „Practice Answers (Only You See This)“ live jede
+Übungsantwort: Nummer, Teil, k, Antwort, Antwortzeit ab Beginn der Antwortphase,
+„Closer To“ und eine Notiz (z. B. „inverted“, „no answer“, bei Active Practice 2
+„good“/„stopped“), darunter eine Zählung pro k. Die Liste beginnt bei jedem
+Übungsstart leer. Es entsteht **keine Datei**; die Versuchsperson sieht nichts.
+
+* „Closer To“ sagt nur, welchem Beispiel k näher liegt (Convex/Concave), bei
+  gleichem Abstand bleibt das Feld leer. Es ist **kein** Richtig/Falsch, weil
+  sich die Wahrnehmung zwischen Personen unterscheidet.
+* Checkerboard: nur in Teil 1 gefüllt, nach `Convex/Concave Example (k)`; in
+  Teil 2 immer leer.
+* Random Dots: bei allen Übungstrials gefüllt, nach `Convex/Concave Example (k)`
+  der Random-Dot-Übung (die Übungslisten dort enthalten nur deutliche k).
+* Zweck: Kommt zum Beispiel bei k = 1.4 durchgehend „Concave“, hat die Person
+  die Kategorien wahrscheinlich vertauscht verstanden, und man erklärt sie neu.
+
+**Automatisch geprüft am 19. Oktober:** 304/304 Unity-Tests bestanden, keiner
+übersprungen (die bisherigen 288 und 16 neue: v1/v2-Pixelgleichheit und
+Gegenprobe des invertierten Musters auf der GPU, Polaritätsregeln, Reihenfolge
+und Polarität im Training als Play-Mode-Lauf, Polarität in der Trial-CSV
+einschließlich Wiederholung, Live-Liste für Checkerboard und beide
+Random-Dot-Übungen, keine Übungsdatei). Testbericht:
+`Logs/polarity_practice_tests_2.xml` (lokal, von Git ignoriert). Kein
+Headset-Abnahmetest.
+
 ## Was der Checkerboard-Test macht
 
 Die Versuchsperson fixiert zuerst das rote Kreuz und sieht danach kurz ein
@@ -34,8 +142,8 @@ Auf der Tastatur gelten zusätzlich Pfeil hoch (Category A) und Pfeil runter
 
 Category A wird dort als nach außen gewölbt und Category B als nach innen
 gewölbt beschrieben. Dazu werden zuerst zwei deutliche Beispiele gezeigt.
-Anschließend folgen zufällig gemischte Übungstrials mit mehreren mittleren
-`l`-Werten. Intern bleiben die Antworten als `Convex` und `Concave` gespeichert,
+Anschließend folgen zwei Übungsteile in fester Reihenfolge, erst deutlich
+verschiedene, dann mittlere `k`-Werte. Intern bleiben die Antworten als `Convex` und `Concave` gespeichert,
 damit die bestehende Auswertung weiter funktioniert.
 
 Aus mehreren Antworten pro Verzerrungsstufe kann später der Wert geschätzt
@@ -70,109 +178,81 @@ ersten Durchgang im Headset; ein weiteres `F5` startet dann den ersten Trial.
 Aus `P(konvex | k, m)` kann später für jede Vergrößerung der Übergang bestimmt
 werden, an dem konkav und konvex gleich häufig geantwortet werden. Dieser
 dynamische Neutralpunkt kann mit dem im statischen Checkerboard geschätzten
-persönlichen `l` verglichen werden.
+statischen k-PSE bei gleicher Vergrößerung verglichen werden.
 
-## l und k
+## Gemeinsame Instrumentenskala k und m
 
-Der Random-Dot-Test benutzt die Instrumentengleichung von Merlitz:
+Beide Aufgaben benutzen Merlitz' Instrumentengleichung:
 
 ```text
 tan(k · a) = m · tan(k · A)
-```
-
-Hier beschreibt `k` die Form der Abbildung eines optischen Instruments. `m` ist
-daneben ein eigener, unabhängiger Parameter. Beide stehen in derselben
-Gleichung, aber `k` wird nicht aus `m` berechnet und verändert sich nicht, wenn
-nur die Vergrößerung geändert wird. Die sichtbare Wirkung eines festen `k` kann
-sich mit `m` trotzdem ändern. Beim statischen Checkerboard ohne simuliertes
-Fernglas sind `m` und diese Instrumentengleichung nicht aktiv.
-
-Merlitz führt zusätzlich den Parameter `l` für eine radiale Abbildung des
-visuellen Raums ein:
-
-```text
-y_l(a) = tan(l · a) / l
-```
-
-In dieser Funktion kommt keine Fernglasvergrößerung vor. Im statischen Test
-werden verschiedene Kandidatenwerte gezeigt; der subjektiv gerade Kandidat
-schätzt das persönliche `l`.
-
-`Content Zoom` bleibt eine zusätzliche Skalierung nach der
-Instrumentenabbildung. Im Random-Dot-Hauptversuch bleibt er auf `1`. Die echte
-paraxiale Fernglasvergrößerung wird getrennt als `m` geführt und zusammen mit
-`k` direkt im Shader ausgewertet.
-
-Die wichtigen Referenzpunkte sind:
-
-* `l = 1`: gnomonische Abbildung und gerades kartesisches Gitter
-
-* `l = 0,5`: stereografische Abbildung und Helmholtz-Endpunkt
-
-* `l → 0`: äquidistanter Grenzfall
-
-* `l > 1`: Fortsetzung in die tonnenförmige Richtung
-
-Beim Random-Dot-Test heißen dieselben dargestellten Kandidatenwerte `k`, weil sie
-die Verzeichnung des simulierten Instruments steuern. Der neutrale `k`-Wert ist
-die dynamische Schätzung, die mit dem statischen `l` verglichen wird.
-
-Im Random-Dot-Shader wird aus dem wirklichen radialen Punktwinkel `A` direkt der
-scheinbare Fernglaswinkel berechnet:
-
-```text
 a = atan(m · tan(k · A)) / k
+k = 0: a = m · A
 ```
 
-Für `k → 0` wird der Grenzfall `a = m · A` verwendet. Erst danach wird der
-optionale `Content Zoom` angewendet. Bei `k = 1` und `Content Zoom = 1` entspricht
-die Abbildung genau der klassischen Tangentenbedingung eines Fernglases.
+A ist der wahre Objektwinkel, a der scheinbare Winkel im Instrument.
+k = 1 ist die Tangentenbedingung (gerade Abbildung), k = 0,5 die Kreisbedingung,
+k = 0 die Winkelbedingung; Werte über 1 setzen dieselbe Formel in die
+Tonnenrichtung fort. Der Bereich 0–2 ist keine Erweiterung zu stärkerer
+Kissenverzeichnung unter null. Negative Werte sind nicht zugelassen.
 
-## Die radiale Abbildung im Checkerboard-Shader
+Der Checkerboard-Manager hat ein festes `Magnification (m)`, Standard 10.
+Dieses m erzeugt ein fertiges statisches Muster, keine Zoomanimation.
+Bei m = 1 ist die reine Instrumentenabbildung für jedes k identisch:
+Es entsteht dann keine k-abhängige Gitterkrümmung.
+Für den ersten direkten Vergleich ist m = 10 in beiden Aufgaben vorgesehen;
+eine abweichende Vergrößerung muss als eigene Bedingung festgelegt werden.
 
-`r` ist der Radius im fertigen sichtbaren Kreis. Die Mitte hat `r = 0`, der
-Blendenrand `r = 1`. `β` ist der halbe Winkeldurchmesser des sichtbaren Feldes.
+Merlitz' persönliches **l** ist dagegen ein theoretischer Wahrnehmungsparameter.
+Er wird nicht auf das dargestellte Bild zusätzlich angewandt. Die Vorhersage,
+dass statischer und dynamischer k-PSE näherungsweise übereinstimmen, wird durch
+die gemeinsame Instrumentenabbildung nicht vorweggenommen. Die gemeinsame Skala
+ist keine exakte Wiederholung seiner Versuchssituation: FOV, VR, Darbietung,
+Fixationskontrolle und Antwortverfahren müssen gesondert berichtet werden.
 
-Zuerst wird aus der ebenen Position der tatsächliche Sehwinkel bestimmt:
+## Die Instrumentenabbildung im Checkerboard-Shader
+
+Der Shader rechnet von jedem dargestellten Bildpixel zurück auf das gerade
+Ausgangsgitter. Mit r als normiertem Bildradius und β = FOV/2:
 
 ```text
-ρ = atan(r · tan(β))
+a = atan(r · tan(β))
+A = atan(tan(k · a) / m) / k
+k = 0: A = a / m
+s = m · tan(A) / tan(β)
 ```
 
-Danach berechnet der Shader, an welcher Stelle des geraden Ausgangsgitters er
-abtasten muss:
+Azimut bleibt erhalten. An der Quellposition s wird das regelmäßige
+kartesische Schwarz-Weiß-Gitter abgelesen. `m*tan(A)` bezeichnet die gerade
+Referenzprojektion (k = 1). Deshalb ist das Bild bei k = 1 für jedes m gerade.
+
+**Keine k-abhängige Randnormierung:** Das gerade Ausgangsgitter bleibt bei
+wechselndem k fest. Die unabhängige Kreisblende schneidet das optisch verzeichnete
+Bild aus. Es wird nicht nach jedem k zusätzlich skaliert, um denselben
+Ausgangsgitterpunkt an den Blendenrand zu setzen. Die Zahl und Winkelbreite der
+sichtbaren Randfelder dürfen sich dadurch ändern.
+Der Rasterabstand wird im unverzeichneten Referenzbild festgelegt; auf der
+gedachten Ausgangsebene entspricht er `tan(Grid Spacing)/m`.
+
+Vor dem Start prüfen Planer/Manager k, m und den eindeutigen Winkelbereich,
+einschließlich Softness und gegebenenfalls quadratischer Ecken.
+Ein großer k-Wert und ein großes FOV können zusammen unzulässig sein
+(z. B. k = 2 und FOV = 90°). Die Vorschau zeichnet außerhalb des gültigen
+Instrumentenbereichs Hintergrund statt umgeschlagener Linien.
+
+### Historische l-Abbildung — nur alte Pilotdaten
+
+Bis zur Umstellung lautete die Rückabbildung:
 
 ```text
-s_l(r) = tan(l · ρ) / tan(l · β)
+s_l(r) = tan(l · a) / tan(l · β)
+l = 0: s_l(r) = a / β
 ```
 
-Für `l → 0` wird der Grenzfall benutzt:
-
-```text
-s_0(r) = ρ / β
-```
-
-Die Division durch den Wert am Blendenrand sorgt dafür, dass für jedes `l`
-weiterhin `s(1) = 1` gilt. `l` verändert also die Linienform, aber nicht den
-eingestellten Winkeldurchmesser.
-
-Der eingestellte `l`-Wert bleibt auch dann gleich, wenn im Inspector nur das FOV
-geändert wird. Die sichtbare Krümmung kann bei einem größeren Sehfeld trotzdem
-deutlicher wirken, weil die Abbildung über einen größeren Winkelbereich gezeigt
-wird.
-
-Sehr große Kombinationen aus FOV und `l` können einen Umkehrpunkt der
-Tangensfunktion erreichen. Der Trialplan prüft deshalb vor dem Start, ob die
-eingestellten Kombinationen noch monoton sind. Die üblichen Pilotwerte bei 70°
-oder 90° liegen deutlich innerhalb des erlaubten Bereichs.
-
-Die Versionskennung dieser Abbildung lautet:
-
-```text
-visual-space-l-tangent-normalized-cartesian-grid-v2
-```
-
-Sie wird in jeder Plan- und Trialdatei mitgeschrieben.
+Die alte Klasse `VisualSpaceRadialMapping` und ihre Tests bleiben als
+Rechenreferenz für historische Daten erhalten. Ihre Abbildungsfunktion wird vom
+aktuellen Checkerboard-Shader nicht mehr benutzt. Es gibt keine automatische
+Umdeutung der alten PSEs in Instrument-k.
 
 ## Winkelabstand der Gitterlinien
 
@@ -192,7 +272,7 @@ Bei 90 Grad FOV und 10 Grad Abstand ergibt das ungefähr `0,176327`. Danach wird
 ein gleichmäßiges kartesisches Gitter mit Linien bei `u = n * 0,176327` und
 `v = n * 0,176327` erzeugt. Die mittlere horizontale und vertikale Linie laufen
 dabei durch das Fixationszeichen. Erst anschließend wird die radiale
-`l`-Abbildung angewendet.
+Instrumentenabbildung mit k und m angewendet.
 
 In der Trialdatei und in den Eye-Tracking-Markern werden sowohl
 `grid_spacing_deg` als auch `grid_spacing_uv` gespeichert. Damit bleibt die
@@ -259,35 +339,14 @@ mitgespeichert.
 
 ## Verhältnis zur α-Skala von Oomes
 
-Oomes et al. verwendeten eine Skala von `α = -0,8` bis `α = 2`. Dabei gilt:
-
-* `α = 0`: gerades Gitter
-
-* `α = 1`: Helmholtz-Muster
-
-Die Veröffentlichung enthält aber keine Formel, mit der die Zwischenwerte
-erzeugt wurden. Deshalb wird `α` nicht mehr als eigentlicher Inspectorparameter
-verwendet.
-
-Zur Orientierung wird in den CSV-Dateien zusätzlich berechnet:
-
-```text
-oomes_endpoint_equivalent = 2 · (1 - l)
-```
-
-Damit stimmen die gemeinsamen Endpunkte überein:
-
-* `l = 1` entspricht `0`
-
-* `l = 0,5` entspricht `1`
-
-* `l = 0` entspricht `2`
-
-* `l = 1,4` entspricht `-0,8`
-
-Diese zusätzliche Zahl ist ausdrücklich keine Rekonstruktion der
-Originalinterpolation von Oomes. Der primär ausgewertete und berichtete
-Stimulusparameter bleibt `l`.
+Oomes' α hat andere Definitionen: α = 0 bezeichnet ein gerades Gitter,
+α = 1 das Helmholtz-Muster, negative Werte die Tonnenrichtung.
+Aus solchen Bezugspunkten folgt keine allgemeine Umrechnung in unser k.
+Die frühere Hilfsspalte `oomes_endpoint_equivalent = 2*(1-l)` belegt weder
+eine Gleichheit der Musterfamilien noch eine Gleichheit ihrer Wertebereiche.
+Sie wird für neue Messungen nicht mehr ausgegeben.
+Oomes ist ein methodischer/theoretischer Bezug, keine behauptete exakte
+α-Replikation.
 
 ## Head-locked und ohne Nahdisparität
 
@@ -347,7 +406,7 @@ Die Schritte im Einzelnen:
    der grauen Fläche, jeweils mit Fixationskreuz.
 4. Die im Training gelernte Antwort wird ohne erneuten Hinweistext gegeben. Die
    Antwortzeit begrenzt `Response Timeout Seconds`; `0` bedeutet ohne Zeitlimit.
-5. Antwort, Reaktionszeit, `l`, FOV, Augenmodus und Fixationswerte werden sofort
+5. Antwort, Reaktionszeit, k, m, FOV, Augenmodus und Fixationswerte werden sofort
    gespeichert. Pro Durchgang zählt nur die erste Antwort; weitere Tastendrücke
    werden bis zur nächsten Antwortphase ignoriert.
 6. Nach der Antwort beginnt sofort die Phase vor dem nächsten Stimulus mit der
@@ -380,7 +439,8 @@ bei 8°. Der Marker `SessionStart` enthält `noise_type`, `noise_broadband_deg`
 Vergleich im Headset: In der Checkerboard-Vorschau (P) spielt `M` bzw. der Knopf
 „Play Afterimage Test“ Schachbrett (2 s) → eingestellte Maske (1 s) → graue
 Fläche (3 s) ab. Bleibt auf der grauen Fläche ein Nachbild des Schachbretts,
-maskiert die Maske zu schwach. `Noise Type` umstellen und wiederholen.
+maskiert die Maske zu schwach. `Noise Type` umstellen und wiederholen. Mit
+`Invert Checkerboard Each Trial` wechselt jeder Druck auf `M` die Polarität.
 
 ## Welcome Screen und Training
 
@@ -393,12 +453,14 @@ Nach dem Start des Play Modes erscheint zunächst ein englischer Welcome Screen:
 * `F6`: laufenden Versuch oder laufendes Training abbrechen
 
 Das Training zeigt zunächst je ein deutliches Beispiel für Category A und B.
-Danach folgen standardmäßig die vier Werte `0,2`, `0,4`, `0,8` und `1,2`, jeweils
-dreimal und in zufälliger Reihenfolge. Es gibt bewusst keine
-Richtig-/Falsch-Rückmeldung. Nach dem Training geht es zurück zum Welcome Screen.
+Danach folgen Teil 1 (12 leichte Trials) und Teil 2 (12 schwierigere Trials),
+jeweils in der eingetragenen Reihenfolge, nicht gemischt (Werte siehe
+„Ergänzung 19. Oktober 2026“). Es gibt bewusst keine Richtig-/Falsch-Rückmeldung.
+Nach dem Training geht es zurück zum Welcome Screen.
 Solange `Require Training Before Session` aktiv ist, startet `F5` erst nach einem
 vollständig durchlaufenen Training. Trainingsdurchgänge werden nicht in den
-Messdateien gespeichert.
+Messdateien gespeichert; k, Antwort und Antwortzeit erscheinen nur live im
+Experiment Monitor.
 
 Wenn die Fixation während der Darbietung zu lange verloren geht:
 
@@ -458,9 +520,9 @@ Die wichtigsten Einstellungen befinden sich am Objekt
 
 * `Eye Presentations`: Both Eyes, Left Eye Only oder Right Eye Only
 
-* `Visual Space L Values`: alle zu präsentierenden Verzerrungswerte
+* `Instrument Distortion K Values`: alle zu präsentierenden Instrumenten-k-Werte
 
-* `Content Zoom Values`: unabhängiger Zoom; `1` lässt die Größe unverändert
+* `Magnification (m)`: feste Instrumentenvergrößerung des Checkerboards; Standard 10
 
 * `Repetitions Per Condition`: Wiederholungen jeder Kombination
 
@@ -488,22 +550,24 @@ Die wichtigsten Einstellungen befinden sich am Objekt
 
 * `Require Training Before Session`: verlangt ein abgeschlossenes Training vor F5
 
-* `Training Category A/B Visual Space L`: deutliche, noch zu pilotierende Beispiele
+* `Convex / Concave Example (k)`: deutliche, noch zu pilotierende Beispiele
 
-* `Training Visual Space L Values`: einstellbare `l`-Werte der Übungstrials
+* `Practice Part 1: k Order (Easy)` und `Practice Part 2: k Order (Harder)`:
+  k-Werte der beiden Übungsteile, genau in dieser Reihenfolge
 
-* `Training Repetitions Per Value`: Wiederholungen jedes Übungswertes
+* `Invert Checkerboard Each Trial`: schwarze und weiße Felder tauschen von Trial
+  zu Trial (Standard aus)
 
 * `Random Seed`: macht die zufällige Reihenfolge reproduzierbar
 
-Die aktuell eingetragenen `l`-Werte und drei Wiederholungen sind nur für einen
+Die aktuell eingetragenen k-Werte und drei Wiederholungen sind nur für einen
 technischen Pilotlauf gedacht. Sie sind noch keine festgelegten Bedingungen der
 Masterarbeit. Die Listen können im Inspector vollständig geändert werden.
 
 Am Objekt `Checkerboard Stimulus` werden Aussehen, Felderzahl, Farben, Größe des
 Fixationskreuzes, die weiche Blendenkante sowie Punktgröße und
 Aktualisierungsrate der Noise-Maske eingestellt. Während einer Sitzung
-setzt der Experiment Manager FOV, `l`, Content Zoom und Augenmodus automatisch.
+setzt der Experiment Manager FOV, k, festes m und Augenmodus automatisch.
 
 Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
 `Random Dot Experiment Manager`:
@@ -591,13 +655,13 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   oder die Szenenänderung verwerfen, sonst gibt es einen Konflikt in der Szene.
 
 * Checkerboard, Vorschau übernehmen (gleiche Bedienung): Die Live-Vorschau
-  zeigt FOV, Edge Softness, Kreisblende, `l`, Gitterabstand, Augenmodus,
+  zeigt FOV, Edge Softness, Kreisblende, k, m, Gitterabstand, Augenmodus,
   Farben (dunkel, hell, Hintergrund), Fixationskreuz und alle Noise-Werte.
   `Preview Shows Noise` schaltet die Vorschau zwischen Schachbrett und
   Noise-Maske um (auch während sie läuft), damit Punktgröße und Flimmerrate
   beurteilt werden können. **Use Preview Values For The Experiment** schreibt
-  FOV und Augenmodus in den Versuchsplan (Listen werden ersetzt) und behält die
-  Darstellung; die `l`-Liste bleibt unverändert. **Restore Original
+  FOV, Augenmodus und festes m in den Versuchsplan (Listen werden ersetzt) und behält die
+  Darstellung; die k-Liste bleibt unverändert. **Restore Original
   Values**, Übernahme aus dem Play Mode in die Szene und der Hinweis
   zum Lab-PC gelten genauso wie bei Random Dots.
 
@@ -881,7 +945,7 @@ Darbietungen betroffen waren.
 Die Eye-Tracking-Toolbox aus dem Lab bleibt die Grundlage der Rohdaten. Ihre
 vorhandenen Blickspalten mit Augenstatus, Pupillendurchmesser, Ursprung und
 Blickrichtung werden weiterhin geschrieben. Im Toolbox-Code wurde für den
-Checkerboard-Test nur der Stimulusmarker um `visual_space_l`, FOV, Augenmodus,
+Checkerboard-Test nur der Stimulusmarker um `instrument_distortion_k`, m, FOV, Augenmodus,
 Winkelabstand der Gitterlinien und die Breite der Blendenkante ergänzt. Der
 Random-Dot-Ablauf schreibt seine Trialmarker über dieselbe vorhandene
 Nachrichtenfunktion.
@@ -905,9 +969,12 @@ In `*_trials.csv` stehen unter anderem:
 
 * ursprüngliche Plannummer und aktuelle Präsentationsnummer
 
-* `visual_space_l`, FOV und Augenmodus
+* `instrument_distortion_k`, `instrument_magnification_m`, FOV und Augenmodus
 
-* `oomes_endpoint_equivalent` als zusätzliche Orientierung
+* `checkerboard_inverted`: ob schwarze und weiße Felder in dieser Darbietung
+  vertauscht waren (0, solange die Option aus ist)
+
+* `stimulus_task = Checkerboard` als eindeutige Aufgabenkennung
 
 * Beginn und Ende des Musters, Beginn der Antwortanzeige sowie die tatsächlich
   gemessenen Stimulus-, Noise- und Reaktionszeiten
@@ -1173,28 +1240,51 @@ Assets/GlobeEffect/
     └── XrLoaderSetupTests.cs
 ```
 
-`VisualSpaceRadialMapping.cs` enthält die C#-Referenzrechnung. Der Shader führt
+`CheckerboardInstrumentMapping.cs` enthält die aktive C#-Referenzrechnung. Der Shader führt
 dieselbe Abbildung für jeden sichtbaren Pixel aus.
 
-## Trennung der beiden Tests
+## Gemeinsame Abbildung, unterschiedliche Aufgaben
 
-Der statische Test verwendet bewusst keine Fernglassimulation. Beim Random-Dot-
-Teil ist die Merlitz-Instrumentenabbildung aktiv. Die Vergrößerung `m` und die
-Instrumentenverzeichnung `k` sind getrennt einstellbare Trialfaktoren. Der
-unabhängige Content Zoom bleibt für technische Vergleiche vorhanden und steht im
-Hauptversuch auf `1`.
-
-Kurz gesagt:
-
-* Statisches Checkerboard: Visual-Space-`l`, feste Reize,
+* Statisches Checkerboard: Instrument-k und festes m, unbewegtes Gitter,
   konkav/konvex und head-locked.
-
-* Random-Dot-Instrumententest: feste Kombinationen aus `k` und `m`, kontrollierte
-  oder kopfgesteuerte Bewegung und konkav/konvex.
+* Random Dots: dieselbe Instrumentengleichung, k/m-Bedingungen,
+  simulierte oder kopfgesteuerte Bewegung und konkav/konvex.
+* Nur die Random Dots besitzen einen zusätzlichen Content Zoom; für direkte
+  Vergleiche bleibt er 1. Punktgröße und Geschwindigkeitssteuerung bleiben
+  separate experimentelle Festlegungen.
 
 ## Noch offen
 
-* Die endgültigen `l`-/`k`-Stufen und die Wiederholungszahl
+* Neue Pilotdaten der k-Version sowie endgültige k-Stufen und die Wiederholungszahl
+
+* Ob `Invert Checkerboard Each Trial` im Hauptversuch an sein soll (Irritation
+  vs. weniger Nachbild), und die genauen Übungswerte der Teile 1 und 2.
+
+* **Offene Entscheidung: Randbehandlung des Checkerboards** (untersucht am
+  19. Oktober, nichts umgesetzt). Szene: FOV 60°, weicher Rand 5°, Gitter 8°,
+  m = 10. Mit dem festen Quellgitter liegen über den Durchmesser (bei FOV/2,
+  50 % Deckkraft) 7,46 Felder bei k = 0, 7,49 bei 0,2, 7,63 bei 0,5, 8,22 bei 1,
+  8,61 bei 1,2 und 9,14 bei 1,4. Innerhalb der Testliste 0,2–1,2 ändert sich die
+  Feldzahl am Rand also um etwa 15 %, ein möglicher Hinweisreiz ohne Bezug zur
+  Form. Die k-Obergrenze hängt vom FOV ab:
+  k_max = (π/2 − 0,01) / ((FOV + Rand)/2 in rad), höchstens 2 (60/5: 2,75 → 2;
+  90/1: 1,97; 100/5: 1,70; 120/5: 1,43).
+  * Option (a): Schalter „gleiche Randnormierung“, S(r) = tan A(r) / tan A(1).
+    Dann stehen am Rand bei jedem k 8,22 Felder, dafür ändert sich die
+    Feldgröße in der Mitte mit k (etwa −9 % bei k = 0,2, +5 % bei 1,2, +11 % bei
+    1,4 gegenüber k = 1). Eigene MappingVersion `…-edge-normalized-…`.
+  * Option (b): eigener Vorschau-Modus für stärkere Kissenverzeichnung jenseits
+    k = 0 über die tanh-Fortsetzung k = iκ: tanh(κa) = m·tanh(κA). Das ist eine
+    eigene Erweiterung, nicht Merlitz. Sie ist für jedes FOV definiert; die
+    Familie hängt glatt von k² ab, κ entspricht k² < 0. Nachgerechnet
+    (m = 10, FOV 70, r = 0,5, Abweichung vom geraden Bild S(r) − r): k = 0 →
+    −0,0189, κ = 1 → −0,0361, κ = 2 → −0,0800. Nur Vorschau; für echte Trials
+    wäre eine eigene MappingVersion `…-tanh-extension-…` nötig.
+  * Wo 0 und 2 fest verdrahtet sind: `CheckerboardInstrumentMapping.ValidateParameters`,
+    `MerlitzBinocularReferenceMath.Minimum/MaximumDistortionK` (auch im
+    Random-Dot-Planer), `Range(0, 2)`/`Clamp` an Stimulus und Managern, die
+    Shader-Properties und die Winkelgrenze 1,560796 im gemeinsamen cginc.
+    Negatives k zeichnet der Shader wie k = 0 (tan(ka)/k ist gerade in k).
 
 * Die Einstellungen der Geschwindigkeitserkennung (Toleranz, Wartezeiten,
   Mindeststrecke) sind Startwerte und mit weiteren Personen zu pilotieren.
@@ -1204,7 +1294,7 @@ Kurz gesagt:
   dynamische PSE.
 
 * Falls die Originalimplementierung von Oomes noch verfügbar wird, kann ihre
-  α-Skala nachträglich mit der hier verwendeten l-Familie verglichen werden.
+  α-Skala nachträglich mit den dargestellten Mustern geometrisch verglichen werden; kein linearer α-k-Umrechnungsanspruch.
 
 ## Separate natürliche Szene
 
@@ -1222,8 +1312,7 @@ Bedienung und Grenzen: [NATURAL_SCENE_PREVIEW.md](NATURAL_SCENE_PREVIEW.md).
 * Helmholtz, H. von: Beschreibung des Checkerboard- bzw.
   Richtungskreis-Phänomens in der physiologischen Optik.
 
-* Merlitz, H. (2010). *Panning Distortion of Binoculars and Its Impact on the
-  Globe Effect.* Journal of the Optical Society of America A, 27, 50–57.
+* Merlitz, H. (2010). *Distortion of binoculars revisited: Does the sweet spot exist?* Journal of the Optical Society of America A, 27, 50–57.
 
 Die aktuelle Umsetzung ist eine VR-Adaption und keine exakte Replikation des
 Versuchsaufbaus von Oomes. Aufgabe, Eye Tracking, Headsetdarstellung und

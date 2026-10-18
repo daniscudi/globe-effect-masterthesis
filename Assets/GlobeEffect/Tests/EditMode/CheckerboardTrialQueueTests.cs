@@ -14,8 +14,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
         [Test]
         public void InvalidTrial_IsAppendedAfterAllStillPendingTrials()
         {
-            CheckerboardTrial first = CreateTrial(sequence: 1, visualSpaceL: 0.5f);
-            CheckerboardTrial second = CreateTrial(sequence: 2, visualSpaceL: 1f);
+            CheckerboardTrial first = CreateTrial(sequence: 1, instrumentDistortionK: 0.5f);
+            CheckerboardTrial second = CreateTrial(sequence: 2, instrumentDistortionK: 1f);
             var queue = new CheckerboardTrialQueue(new[] { first, second });
 
             Assert.That(queue.TryTakeNext(out CheckerboardTrial shown), Is.True);
@@ -29,11 +29,11 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(repeat, Is.SameAs(last));
         }
 
-        private static CheckerboardTrial CreateTrial(int sequence, float visualSpaceL)
+        private static CheckerboardTrial CreateTrial(int sequence, float instrumentDistortionK)
         {
             return new CheckerboardTrial(sequence, conditionIndex: sequence, repetition: 1, attemptNumber: 1,
                 angularDiameterDegrees: 90f, eyePresentation: CheckerboardEyePresentation.BothEyes,
-                visualSpaceL: visualSpaceL);
+                instrumentDistortionK: instrumentDistortionK);
         }
     }
 }

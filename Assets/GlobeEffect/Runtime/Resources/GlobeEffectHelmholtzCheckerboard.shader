@@ -2,7 +2,7 @@
 {
     // Das C#-Skript liefert nur Parameter und eine quadratische Trägerfläche.
     // Dieser Shader berechnet für jeden Bildpunkt das eigentliche Muster:
-    // Bildschirmposition -> Blickwinkel -> radiale l-Abbildung -> lineares u/v-Gitter
+    // Bildschirmposition -> Blickwinkel -> Merlitz-Instrument (k, m) rückwärts -> u/v-Gitter
     // -> Schwarz/Weiß-Farbe -> runde Blende und Fixationskreuz.
     Properties
     {
@@ -13,9 +13,11 @@
         _ApparentHalfAngleRad ("Apparent Half Angle [rad]", Float) = 0.785398
         _ApertureEdgeSoftnessRad ("Aperture Edge Softness [rad]", Float) = 0.0174533
         _UseCircularAperture ("Use Circular Aperture", Float) = 1
-        _VisualSpaceL ("Visual-space l", Range(0, 1.4)) = 0.5
+        _InstrumentDistortionK ("Instrument distortion k", Range(0, 2)) = 0.5
+        _InstrumentMagnificationM ("Instrument magnification m", Range(1, 20)) = 10
         _GridLineSpacingUv ("Grid Line Spacing [u/v]", Float) = 0.176327
         _CheckerboardEnabled ("Checkerboard Enabled", Float) = 1
+        _CheckerboardInverted ("Checkerboard Inverted", Float) = 0
         _NoiseEnabled ("Noise Enabled", Float) = 0
         _NoiseCellSizeUv ("Noise Cell Size [u/v]", Float) = 0.0349
         _NoiseSeed ("Noise Seed", Integer) = 0
@@ -47,6 +49,7 @@
             #pragma multi_compile_instancing
 
             #include "UnityCG.cginc"
+            #include "GlobeEffectMerlitzInstrument.cginc"
 
             struct AppData
             {
@@ -69,9 +72,11 @@
             float _ApparentHalfAngleRad;
             float _ApertureEdgeSoftnessRad;
             float _UseCircularAperture;
-            float _VisualSpaceL;
+            float _InstrumentDistortionK;
+            float _InstrumentMagnificationM;
             float _GridLineSpacingUv;
             float _CheckerboardEnabled;
+            float _CheckerboardInverted;
             float _NoiseEnabled;
             float _NoiseCellSizeUv;
             int _NoiseSeed;
@@ -284,21 +289,13 @@
                 // weil die Kantenglättung (fwidth) weiter unten bei allen
                 // Nachbarpixeln mitrechnen muss.
 
-                float sourceRadius;
-                if (_VisualSpaceL < 1e-6)
-                {
-                    // Grenzfall der Visual-Space-Funktion für l gegen null.
-                    sourceRadius = visualAngle / _ApparentHalfAngleRad;
-                }
-                else
-                {
-                    // Das ist die im Projekt benutzte, am Blendenrand normierte
-                    // Visual-Space-Abbildung:
-                    // s = tan(l * Winkel) / tan(l * halber FOV-Winkel).
-                    // l ist die vorgegebene Bedingung und wird nicht aus Zoom berechnet.
-                    sourceRadius = tan(_VisualSpaceL * visualAngle) /
-                        tan(_VisualSpaceL * _ApparentHalfAngleRad);
-                }
+                // Exakte Umkehrung derselben Instrumentengleichung wie bei den Dots.
+                // m*tan(A) bezeichnet das unverzeichnete Referenzgitter (k = 1).
+                // Keine k-abhängige Randnormierung und keine Wahrnehmungsabbildung l.
+                float validInstrument = step(_InstrumentDistortionK * visualAngle, 1.560796);
+                float objectAngle = MerlitzObjectAngle(
+                    visualAngle, _InstrumentMagnificationM, _InstrumentDistortionK);
+                float sourceRadius = _InstrumentMagnificationM * tan(objectAngle) / tangentAtBoundary;
 
                 float2 radialDirection = displayRadius > 1e-6
                     ? displayPosition / displayRadius
@@ -307,7 +304,7 @@
 
                 // sourcePosition liegt im linearen u/v-Koordinatensystem des
                 // unverzerrten Ausgangsgitters. Die feste Gitterweite wird aus
-                // dem im Inspector eingestellten Winkelabstand berechnet. l
+                // dem im Inspector eingestellten Referenz-Winkelabstand berechnet. k
                 // verändert damit nur die radiale Abtastposition und nicht
                 // zusätzlich den Aufbau des zugrunde liegenden Schachbretts.
                 float2 gridPosition = sourcePosition /
@@ -321,14 +318,19 @@
                     -antialiasWidth,
                     antialiasWidth,
                     checkerSignal);
+                // Invertiert: Schwarze und weiße Felder tauschen. Nur das
+                // Schachbrett, nicht die Maske. Ausgeschaltet bleibt checkerMix
+                // unverändert, das Bild ist dann genau dasselbe wie vorher (v1).
+                checkerMix = _CheckerboardInverted > 0.5 ? 1.0 - checkerMix : checkerMix;
                 fixed4 checkerColor = lerp(
                     _DarkColor,
                     _LightColor,
                     checkerMix);
+                checkerColor = lerp(_FixationBackgroundColor, checkerColor, validInstrument);
 
                 // Für die Maske wird die angezeigte Fläche in kleine Zellen
                 // geteilt. Aus Zellkoordinate und Seed entsteht reproduzierbar ein
-                // schwarzer oder weißer Punkt. Das ist keine weitere l-Verzerrung.
+                // schwarzer oder weißer Punkt. Die Maske wird nicht optisch verzerrt.
                 // Das C#-Skript wechselt den Seed mit der eingestellten Rate; dadurch
                 // flimmert die Maske wie ein Fernseher ohne Empfang.
                 //

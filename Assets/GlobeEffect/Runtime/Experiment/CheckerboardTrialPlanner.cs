@@ -18,39 +18,42 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public static IReadOnlyList<CheckerboardTrial> CreateRandomizedPlan(
             IReadOnlyList<float> angularDiametersDegrees,
             IReadOnlyList<CheckerboardEyePresentation> eyePresentations,
-            IReadOnlyList<float> visualSpaceLValues,
+            IReadOnlyList<float> instrumentDistortionKValues,
             int repetitions,
             int randomSeed,
-            IReadOnlyList<int> repetitionsPerL = null)
+            IReadOnlyList<int> repetitionsPerK = null,
+            float instrumentMagnificationM = 10f)
         {
             // Erst einmal prüfen, ob die Werte überhaupt stimmen. Lieber hier
             // abbrechen, als mitten in der Messung zu merken, dass etwas fehlt.
             ValidateValues(
-                angularDiametersDegrees, eyePresentations, visualSpaceLValues, repetitions);
-            for (int index = 0; index < visualSpaceLValues.Count; index++)
+                angularDiametersDegrees, eyePresentations, instrumentDistortionKValues, repetitions,
+                instrumentMagnificationM);
+            for (int index = 0; index < instrumentDistortionKValues.Count; index++)
             {
-                PlannerTools.RepetitionsFor(repetitionsPerL, index, repetitions);
+                PlannerTools.RepetitionsFor(repetitionsPerK, index, repetitions);
             }
 
             var trials = new List<CheckerboardTrial>();
             int conditionIndex = 0;
 
             // Die ineinander liegenden Schleifen gehen jede Kombination einmal
-            // durch: jedes FOV mit jedem Augenmodus mit jedem l. Jedes l kann eine
+            // durch: jedes FOV mit jedem Augenmodus mit jedem k. Jedes k kann eine
             // eigene Wiederholungszahl haben (z. B. Randwerte seltener als die Mitte).
             foreach (float angularDiameter in angularDiametersDegrees)
             {
                 foreach (CheckerboardEyePresentation eye in eyePresentations)
                 {
-                    for (int lIndex = 0; lIndex < visualSpaceLValues.Count; lIndex++)
+                    for (int kIndex = 0; kIndex < instrumentDistortionKValues.Count; kIndex++)
                     {
-                        float visualSpaceL = visualSpaceLValues[lIndex];
-                        int repetitionsForL = PlannerTools.RepetitionsFor(repetitionsPerL, lIndex, repetitions);
+                        float instrumentDistortionK = instrumentDistortionKValues[kIndex];
+                        int repetitionsForK = PlannerTools.RepetitionsFor(repetitionsPerK, kIndex, repetitions);
                         conditionIndex++;
-                        for (int repetition = 1; repetition <= repetitionsForL; repetition++)
+                        for (int repetition = 1; repetition <= repetitionsForK; repetition++)
                         {
                             trials.Add(new CheckerboardTrial(sequenceIndex: 0, conditionIndex,
-                                repetition, attemptNumber: 1, angularDiameter, eye, visualSpaceL));
+                                repetition, attemptNumber: 1, angularDiameter, eye, instrumentDistortionK,
+                                instrumentMagnificationM));
                         }
                     }
                 }
@@ -72,12 +75,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private static void ValidateValues(
             IReadOnlyList<float> angularDiametersDegrees,
             IReadOnlyList<CheckerboardEyePresentation> eyePresentations,
-            IReadOnlyList<float> visualSpaceLValues,
-            int repetitions)
+            IReadOnlyList<float> instrumentDistortionKValues,
+            int repetitions,
+            float instrumentMagnificationM)
         {
             PlannerTools.RequireNonEmpty(angularDiametersDegrees, nameof(angularDiametersDegrees));
             PlannerTools.RequireNonEmpty(eyePresentations, nameof(eyePresentations));
-            PlannerTools.RequireNonEmpty(visualSpaceLValues, nameof(visualSpaceLValues));
+            PlannerTools.RequireNonEmpty(instrumentDistortionKValues, nameof(instrumentDistortionKValues));
 
             if (repetitions < 1)
             {
@@ -89,22 +93,46 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 VisualSpaceRadialMapping.ValidateAngularDiameter(value);
             }
 
-            foreach (float value in visualSpaceLValues)
-            {
-                VisualSpaceRadialMapping.ValidateVisualSpaceL(value);
-            }
-
             // Jetzt noch die Paare prüfen. Einzeln kann ein großes FOV in Ordnung
-            // sein und ein großes l auch. Zusammen kann es trotzdem nicht gehen,
+            // sein und ein großes k auch. Zusammen kann es trotzdem nicht gehen,
             // weil der Tangens dann umkippt. Deshalb wird hier jede Kombination
             // durchgerechnet, bevor die Sitzung losgeht.
             foreach (float angularDiameter in angularDiametersDegrees)
             {
-                foreach (float visualSpaceL in visualSpaceLValues)
+                foreach (float instrumentDistortionK in instrumentDistortionKValues)
                 {
-                    VisualSpaceRadialMapping.ValidateParameters(angularDiameter, visualSpaceL);
+                    CheckerboardInstrumentMapping.ValidateParameters(
+                        angularDiameter, instrumentMagnificationM, instrumentDistortionK);
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Wann schwarze und weiße Felder vertauscht gezeigt werden ("Invert
+    /// Checkerboard Each Trial"). Die Polarität hängt an der Darbietung, nicht am
+    /// Plan: Wiederholte Trials werden hinten angehängt und zählen mit.
+    /// </summary>
+    public static class CheckerboardPolarity
+    {
+        /// <summary>
+        /// Im Versuch: abwechselnd pro gezeigtem Trial, der erste normal.
+        /// presentationIndex zählt ab 1, einschließlich wiederholter Trials.
+        /// </summary>
+        public static bool InvertedForPresentation(bool enabled, int presentationIndex)
+        {
+            return enabled && presentationIndex % 2 == 0;
+        }
+
+        /// <summary>
+        /// In den Übungstrials: N, I, I, N, N, I, I, N ... (ab 1 gezählt). Die
+        /// Übungs-k wechseln selbst niedrig/hoch ab; ein Wechsel bei jedem Trial
+        /// würde "invertiert" genau mit "hoch" zusammenfallen lassen. So kommt
+        /// jede Kombination gleich oft vor. Die beiden Beispiele bleiben normal.
+        /// </summary>
+        public static bool InvertedForPractice(bool enabled, int practiceIndex)
+        {
+            return enabled && (practiceIndex / 2) % 2 == 1;
         }
     }
 
@@ -128,7 +156,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public int AttemptNumber { get; private set; }
         public float AngularDiameterDegrees { get; }
         public CheckerboardEyePresentation EyePresentation { get; }
-        public float VisualSpaceL { get; }
+        public float InstrumentDistortionK { get; }
+        public float InstrumentMagnificationM { get; }
 
         public CheckerboardTrial(
             int sequenceIndex,
@@ -137,7 +166,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             int attemptNumber,
             float angularDiameterDegrees,
             CheckerboardEyePresentation eyePresentation,
-            float visualSpaceL)
+            float instrumentDistortionK,
+            float instrumentMagnificationM = 10f)
         {
             SequenceIndex = sequenceIndex;
             ConditionIndex = conditionIndex;
@@ -145,7 +175,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             AttemptNumber = attemptNumber;
             AngularDiameterDegrees = angularDiameterDegrees;
             EyePresentation = eyePresentation;
-            VisualSpaceL = visualSpaceL;
+            InstrumentDistortionK = instrumentDistortionK;
+            InstrumentMagnificationM = instrumentMagnificationM;
         }
 
         public CheckerboardTrial CreateRepeatedAttempt()

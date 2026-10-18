@@ -1,5 +1,23 @@
 # Checkerboard: vom Teststand zum Pilotdurchlauf
 
+> **Umstellung 18. Oktober 2026:** Die Angaben unten dokumentieren den historischen
+> l-Piloten. Das aktuelle Checkerboard verwendet Merlitz' Instrumentenabbildung
+> mit k und festem m (Standard 10), nicht mehr die alte l-Abbildung. Yannicks
+> `pilot_ys` (105 Trials, PSE 0,8721, 95%-Glaubwürdigkeitsintervall
+> 0,8100–0,9368) bleibt eine Voruntersuchung der alten Version. Rohdaten nicht
+> umbenennen oder mit der neuen Version poolen. Neue Pilotdaten und Headset-Abnahme
+> sind vor der Hauptmessung nötig. Aktuelle Formeln und CSVs: [README](README.md).
+>
+> **Ergänzung 19. Oktober 2026 (Kennung `…-fixed-source-grid-v2`):** Das Training
+> besteht jetzt aus zwei festen Teilen ohne Mischen (Teil 1 leicht, Teil 2 mittlere k,
+> je 12 Trials, im Manager unter „Practice“ änderbar). Die Übungsantworten (k,
+> Antwort, Antwortzeit, Hinweis „Closer To“ nur in Teil 1) stehen live im Experiment
+> Monitor; gespeichert wird nichts. Neue Option `Invert Checkerboard Each Trial`
+> (Standard aus) tauscht schwarze und weiße Felder von Trial zu Trial und schreibt
+> `checkerboard_inverted` in die Trial-CSV. Zur Abnahme gehört dann: im Training auf
+> den Monitor schauen (kommt bei k = 1.4 „Concave“, neu erklären) und, falls die
+> Option an ist, im Headset prüfen, ob der Wechsel irritiert.
+
 Stand der Codeprüfung: 5. Oktober 2026. Die Präsentation wurde nicht verändert.
 
 Prüfergebnis: 157/157 Unity-Tests bestanden, einschließlich Ablauf- und GPU-Noise-Tests.
@@ -83,6 +101,7 @@ F5 bereitet die Sitzung vor; die Weiter-Taste startet danach den eigentlichen Ve
 Zuerst kurzer Dummy-Durchlauf; das ist ein Funktionstest, kein Nachweis für kontrollierte Fixation.
 
 - Training vollständig durchgehen; Texte und Controller-Zuordnung tatsächlich lesen.
+  Im Experiment Monitor erscheinen dabei unter „Practice Answers“ alle Übungsantworten.
 - Antworten während Muster und Vorphase zählen nicht; nach dem Muster zählt nur die erste Antwort.
 - Beide Controller-Zuordnungen testen. Halten einer Taste darf keinen zweiten Trial beantworten.
 - Gewählten Ablauf, Vorphasendauer und statische/flimmernde Noise im Headset ansehen.
