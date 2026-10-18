@@ -77,6 +77,19 @@ namespace GlobeEffect.VRCheckerboard
         }
 
         /// <summary>
+        /// Wie weit Texte im Headset entfernt stehen: kurz vor der Fernebene der
+        /// Kopfkamera. Die Shader zeichnen Kreuz und Reiz als reine Richtungen, also
+        /// optisch unendlich weit weg. Ein naher Text läge auf einer anderen Tiefe,
+        /// und die Augen müssten beim Wechsel zwischen Text und Kreuz neu einstellen.
+        /// So weit weg ist die Restdisparität kleiner als ein Pixel im Headset.
+        /// </summary>
+        public static float FarTextDistance(Transform head)
+        {
+            Camera headCamera = head != null ? head.GetComponent<Camera>() : null;
+            return headCamera != null ? 0.9f * headCamera.farClipPlane : 90f;
+        }
+
+        /// <summary>
         /// Gibt das eingetragene Objekt zurück. Ist das Feld im Inspector leer,
         /// wird das passende Objekt in der Szene gesucht.
         ///

@@ -46,6 +46,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
             ["visualSpaceL"] = "Grid Distortion (l)",
             ["gridSpacingDegrees"] = "Square Size (degrees)",
             ["useCircularAperture"] = "Round Window",
+            ["textDistanceMeters"] = "Text Size As If At (m)",
             // Blendenrand und Fixation
             ["edgeSoftnessDegrees"] = "Soft Edge Width (degrees)",
             ["maxSampleAgeSeconds"] = "Ignore Gaze Data Older Than (s)",

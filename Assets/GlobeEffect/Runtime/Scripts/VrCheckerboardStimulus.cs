@@ -148,7 +148,8 @@ namespace GlobeEffect.VRCheckerboard
 
         [FormerlySerializedAs("responsePromptDistanceMeters")]
         [SerializeField, Min(0.5f)]
-        [Tooltip("How far away the text is shown (m).")]
+        [Tooltip("The text looks as big as if it stood this far away (m). It is always drawn very far away, " +
+            "at the same depth as the cross, so the eyes do not refocus between text and cross.")]
         private float textDistanceMeters = 10f;
 
         [FormerlySerializedAs("responsePromptCharacterSize")]
@@ -716,12 +717,14 @@ namespace GlobeEffect.VRCheckerboard
             textMesh ??= textObject.GetComponent<TextMesh>();
             textMesh.characterSize = textSize;
             textMesh.color = textColor;
-            // Der Text steht weiter vorne als das Viereck. Deshalb wird der
-            // Abstand des Vierecks hier wieder abgezogen.
-            textObject.transform.localPosition =
-                Vector3.forward * Mathf.Max(0.01f, textDistanceMeters - QuadDistanceMeters);
+            // Der Text steht kurz vor der Fernebene, auf derselben Tiefe wie das Kreuz
+            // (der Shader zeichnet es optisch unendlich weit weg). Er ist so vergrößert,
+            // dass er so groß aussieht wie in textDistanceMeters. Der Abstand des
+            // Vierecks (der Text hängt daran) wird wieder abgezogen.
+            float distance = UnityTools.FarTextDistance(observer);
+            textObject.transform.localPosition = Vector3.forward * (distance - QuadDistanceMeters);
             textObject.transform.localRotation = Quaternion.identity;
-            textObject.transform.localScale = Vector3.one;
+            textObject.transform.localScale = Vector3.one * (distance / textDistanceMeters);
         }
 
         private void SetupMeshAndMaterial()

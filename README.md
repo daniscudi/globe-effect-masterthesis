@@ -310,6 +310,19 @@ keine wahrgenommene Entfernung. Das zentrale Kreuz bleibt unverzerrt und
 unbewegt, während ausschließlich die Punkte durch die simulierte Schwenkung
 laufen.
 
+Die Texte im Headset (Anleitungen, Übungen, Pausen) sind normale Unity-Texte.
+Damit sie auf derselben Tiefe liegen wie das Kreuz, stehen sie in beiden Tests
+kurz vor der Fernebene der Kopfkamera (90 % von `far clip plane`; die Kameras in
+beiden Szenen stehen dafür auf 1000 m, die Texte also bei 900 m) und sind im
+selben Verhältnis vergrößert; Layout und Winkelgröße bleiben gleich. Die
+Restdisparität (rund 0,25 Bogenminuten) ist auch bei der Varjo XR-4 kleiner als
+ein Pixel, die Augen müssen beim Wechsel zwischen Text und Kreuz also nicht neu
+einstellen (Wunsch des Betreuers, 2026-10-18). Alle Reiz-Shader schreiben keine
+Tiefe, die größere Fernebene ändert an ihnen nichts. Vorher standen die
+Texte 1,9 m (Random Dots) bzw. 9 m (Checkerboard) entfernt. Beim Checkerboard
+legt `Text Distance Meters` nur noch die Schriftgröße fest ("so groß wie in
+dieser Entfernung").
+
 ## Ablauf eines Durchgangs
 
 Am `Checkerboard Experiment Manager` wird unter `Trial Sequence` einer von zwei

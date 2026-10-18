@@ -11,6 +11,9 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
     /// </summary>
     public sealed class RandomDotHeadsetText : IDisposable
     {
+        // Für diese Entfernung sind Positionen und Schriftgrößen unten gewählt.
+        private const float LayoutDistanceMeters = 2f;
+
         private readonly GameObject root;
         private readonly TextMesh heading;
         private readonly TextMesh footer;
@@ -24,12 +27,16 @@ namespace GlobeEffect.VRCheckerboard.RandomDots
                 throw new ArgumentNullException(nameof(observer));
             }
 
-            // Der Text hängt am Kopf und steht immer 2 m vor den Augen.
+            // Der Text hängt am Kopf. Das Layout ist für 2 m gebaut; er steht aber
+            // kurz vor der Fernebene und ist im selben Verhältnis größer. So sieht er
+            // gleich groß aus und liegt auf derselben Tiefe wie das Kreuz (unendlich).
+            float distance = UnityTools.FarTextDistance(observer);
             root = new GameObject("Runtime Random Dot Headset Text");
             root.hideFlags = HideFlags.HideAndDontSave;
             root.transform.SetParent(observer, false);
-            root.transform.localPosition = new Vector3(0f, 0f, 2f);
+            root.transform.localPosition = new Vector3(0f, 0f, distance);
             root.transform.localRotation = Quaternion.identity;
+            root.transform.localScale = Vector3.one * (distance / LayoutDistanceMeters);
 
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             heading = CreateText("Heading", font, 0.30f, 0.010f, out headingMaterial);

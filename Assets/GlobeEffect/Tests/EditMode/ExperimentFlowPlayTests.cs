@@ -381,6 +381,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(block.GetFloat("_FixationEnabled"), Is.EqualTo(1f), "Das rote Kreuz bleibt in der Pause.");
             TextMesh prompt = stimulus.GetComponentInChildren<TextMesh>(includeInactive: true);
             Assert.That(prompt.text, Does.Contain("SHORT BREAK"));
+            // Der Text steht auf derselben Tiefe wie das Kreuz: kurz vor der Fernebene.
+            Transform head = Camera.main.transform;
+            Assert.That(Vector3.Distance(prompt.transform.position, head.position),
+                Is.GreaterThan(0.8f * Camera.main.farClipPlane));
             manager.ContinueAfterBlockPause();
             yield return WaitForState(manager, CheckerboardSessionState.WaitingForResponse);
             controller.SubmitResponse(Response.Concave);
@@ -844,6 +848,9 @@ namespace GlobeEffect.VRCheckerboard.Tests
             foreach (TextMesh text in stimulus.Observer.GetComponentsInChildren<TextMesh>())
             {
                 shownText += text.text + "\n";
+                // Texte stehen auf derselben Tiefe wie das Kreuz: kurz vor der Fernebene.
+                Assert.That(Vector3.Distance(text.transform.position, stimulus.Observer.position),
+                    Is.GreaterThan(0.8f * stimulus.Observer.GetComponent<Camera>().farClipPlane));
             }
 
             Assert.That(shownText, Does.Contain(ExpectedResponseLines(
