@@ -51,7 +51,8 @@ fprintf('input file: %s\n', csv_path);
 if ~exist('psignifit_path', 'var')
     psignifit_candidates = [ ...
         "C:\Users\ZVSL-070\Downloads\psignifit-matlab\psignifit-master"   % laptop
-        "D:\TolgaDaniskan\Globe Effect\psignifit-master\psignifit-master" % lab PC
+        "D:\TolgaDaniskan\Globe Effect\psignifit-master\psignifit-master" % lab pc
+        "D:\Tolga\MATLAB_Toolboxes\psignifit-master\psignifit-master" % ML PC
         ];
     psignifit_path = psignifit_candidates(find(isfolder(psignifit_candidates), 1));
     if isempty(psignifit_path)
