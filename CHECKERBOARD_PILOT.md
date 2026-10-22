@@ -1,5 +1,9 @@
 # Checkerboard: vom Teststand zum Pilotdurchlauf
 
+> **20. Oktober 2026:** Variante 2 und Variante 3 können jetzt einzeln oder
+> gemeinsam gemischt gemessen werden. Die aktuelle Bedienung, Trialzahlen und
+> getrennte PSE-Auswertung stehen in [README: Checkerboard-Pilot](README.md#checkerboard-pilot-variante-2-und-3-vergleichen-20-oktober-2026).
+
 > **Umstellung 18. Oktober 2026:** Die Angaben unten dokumentieren den historischen
 > l-Piloten. Das aktuelle Checkerboard verwendet Merlitz' Instrumentenabbildung
 > mit k und festem m (Standard 10), nicht mehr die alte l-Abbildung. Yannicks

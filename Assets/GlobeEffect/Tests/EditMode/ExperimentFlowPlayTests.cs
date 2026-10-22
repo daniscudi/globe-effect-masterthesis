@@ -67,6 +67,85 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [UnityTest]
+        public IEnumerator CheckerboardMixedGridVariants_ReachTheShaderAndAreSavedSeparately()
+        {
+            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            var config = new SerializedObject(Object.FindAnyObjectByType<CheckerboardExperimentManager>());
+            config.FindProperty("testFixedSourceGrid").boolValue = true;
+            config.FindProperty("testEdgeNormalizedGrid").boolValue = true;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<CheckerboardExperimentManager>();
+            var stimulus = Object.FindAnyObjectByType<VrCheckerboardStimulus>();
+            var controller = Object.FindAnyObjectByType<CheckerboardKeyboardController>();
+            Assert.That(manager.StartSession(), Is.True);
+            manager.ConfirmExperimentReady();
+            var shown = new List<CheckerboardGridMapping>();
+            for (int i = 0; i < 4; i++)
+            {
+                yield return WaitForState(manager, CheckerboardSessionState.RunningTrial);
+                shown.Add(stimulus.GridMapping);
+                Assert.That(stimulus.CaptureSnapshot().gridSourceScale,
+                    Is.EqualTo(stimulus.GridSourceScale).Within(1e-6));
+                yield return WaitForState(manager, CheckerboardSessionState.WaitingForResponse);
+                controller.SubmitResponse(Response.Convex);
+                yield return null;
+            }
+            yield return WaitForState(manager, CheckerboardSessionState.Completed);
+            var rows = ReadTrialRows(manager);
+            Assert.That(rows.Count, Is.EqualTo(4));
+            Assert.That(shown.Count(mode => mode == CheckerboardGridMapping.EdgeNormalized), Is.EqualTo(2));
+            for (int i = 0; i < rows.Count; i++)
+            {
+                Assert.That(rows[i]["grid_mapping"], Is.EqualTo(shown[i].ToString()));
+                Assert.That(rows[i]["mapping_version"],
+                    Is.EqualTo(CheckerboardInstrumentMapping.VersionFor(false, shown[i])));
+            }
+            AssertSettingsSaved(manager);
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
+        public IEnumerator CheckerboardMixedVariantPractice_ShowsBothAndLogsTheirAnswers()
+        {
+            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            var config = new SerializedObject(Object.FindAnyObjectByType<CheckerboardExperimentManager>());
+            config.FindProperty("testEdgeNormalizedGrid").boolValue = true;
+            SetFloats(config.FindProperty("trainingEasyKValues"), 0.2f, 1.2f);
+            SetFloats(config.FindProperty("trainingHardKValues"));
+            config.FindProperty("trainingExampleSeconds").floatValue = 0.02f;
+            config.FindProperty("trainingNoiseSeconds").floatValue = 0f;
+            config.FindProperty("trainingFixationSeconds").floatValue = 0f;
+            config.FindProperty("preStimulusSeconds").floatValue = 0f;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<CheckerboardExperimentManager>();
+            var stimulus = Object.FindAnyObjectByType<VrCheckerboardStimulus>();
+            var controller = Object.FindAnyObjectByType<CheckerboardKeyboardController>();
+            Assert.That(manager.StartTraining(), Is.True);
+            var seen = new HashSet<CheckerboardGridMapping>();
+            double deadline = Time.realtimeSinceStartupAsDouble + 15;
+            while (!manager.TrainingCompleted && Time.realtimeSinceStartupAsDouble < deadline)
+            {
+                if (manager.SessionState == CheckerboardSessionState.TrainingInstructions)
+                    manager.ContinueTraining();
+                if (manager.SessionState == CheckerboardSessionState.TrainingWaitingForResponse)
+                {
+                    seen.Add(stimulus.GridMapping);
+                    controller.SubmitResponse(Response.Convex);
+                }
+                yield return null;
+            }
+            Assert.That(manager.TrainingCompleted, Is.True);
+            Assert.That(seen.Count, Is.EqualTo(2));
+            Assert.That(manager.PracticeLog.Answers.Count, Is.EqualTo(4));
+            AssertNoSessionFiles(manager);
+            yield return new ExitPlayMode();
+        }
+
+        [UnityTest]
         public IEnumerator RandomDots_KeepTheImageCenterSpeedAtMagnificationOneFiveAndTwenty()
         {
             PrepareRandomDotScene();
@@ -109,14 +188,16 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(manager.IsPreviewActive, Is.True);
             Assert.That(manager.IsSessionActive, Is.False);
             Assert.That(stimulus.CaptureSnapshot().checkerboardVisible, Is.True);
-            stimulus.SetInstrumentDistortionK(0.3f);
+            stimulus.SetPincushionExtensionEnabled(true);
+            stimulus.SetInstrumentDistortionK(-1f);
             stimulus.SetInstrumentMagnificationM(20f);
+            stimulus.SetGridMapping(CheckerboardGridMapping.EdgeNormalized);
             var previewSettings = new SerializedObject(stimulus);
             previewSettings.FindProperty("gridSpacingDegrees").floatValue = 3f;
             previewSettings.FindProperty("darkColor").colorValue = Color.blue;
             previewSettings.FindProperty("showFixationTarget").boolValue = false;
             previewSettings.ApplyModifiedPropertiesWithoutUndo();
-            Assert.That(stimulus.CaptureSnapshot().instrumentDistortionK, Is.EqualTo(0.3f));
+            Assert.That(stimulus.CaptureSnapshot().instrumentDistortionK, Is.EqualTo(-1f));
             Object.FindAnyObjectByType<CheckerboardKeyboardController>().SubmitResponse(Response.Convex);
             AssertNoSessionFiles(manager);
             manager.StopPreview();
@@ -859,6 +940,107 @@ namespace GlobeEffect.VRCheckerboard.Tests
             for (int index = 0; index < values.Length; index++)
                 values[index] = list.GetArrayElementAtIndex(index).floatValue;
             return values;
+        }
+
+        [UnityTest]
+        public IEnumerator CheckerboardPreviewValues_NeverReachPracticeOrTrials_AndPlanMIsSaved()
+        {
+            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            // m ist einstellbar. Training und Trials verwenden das m des Versuchsplans
+            // (hier 5), weder das m am Stimulus (12) noch ein Vorschau-m (20).
+            var stimulusConfig = new SerializedObject(Object.FindAnyObjectByType<VrCheckerboardStimulus>());
+            stimulusConfig.FindProperty("instrumentMagnificationM").floatValue = 12f;
+            stimulusConfig.ApplyModifiedPropertiesWithoutUndo();
+            var config = new SerializedObject(Object.FindAnyObjectByType<CheckerboardExperimentManager>());
+            config.FindProperty("instrumentMagnificationM").floatValue = 5f;
+            SetFloats(config.FindProperty("trainingEasyKValues"), 0.2f);
+            SetFloats(config.FindProperty("trainingHardKValues"));
+            config.FindProperty("trainingExampleSeconds").floatValue = 0.1f;
+            config.FindProperty("trainingFixationSeconds").floatValue = 0f;
+            config.ApplyModifiedPropertiesWithoutUndo();
+            yield return new EnterPlayMode();
+            yield return null;
+            var manager = Object.FindAnyObjectByType<CheckerboardExperimentManager>();
+            var stimulus = Object.FindAnyObjectByType<VrCheckerboardStimulus>();
+            var controller = Object.FindAnyObjectByType<CheckerboardKeyboardController>();
+            Assert.That(manager.InstrumentMagnificationM, Is.EqualTo(5f));
+
+            // Vorschau zeigt das m des Stimulus; dann alles Mögliche verstellen.
+            manager.TogglePreview();
+            Assert.That(stimulus.InstrumentMagnificationM, Is.EqualTo(12f));
+            Assert.That(stimulus.GridMapping, Is.EqualTo(CheckerboardGridMapping.FixedSourceGrid));
+            stimulus.SetAngularDiameter(80f);
+            stimulus.SetInstrumentMagnificationM(20f);
+            stimulus.SetGridMapping(CheckerboardGridMapping.EdgeNormalized);
+            stimulus.SetPincushionExtensionEnabled(true);
+            stimulus.SetInstrumentDistortionK(-1f);
+            manager.StopPreview();
+            Assert.That(stimulus.InstrumentMagnificationM, Is.EqualTo(12f), "Vorschau zurückgesetzt.");
+            Assert.That(stimulus.AllowPincushionExtension, Is.False);
+
+            // Training: Beispiel und Übungstrial mit dem Plan-m und der Standardvariante.
+            Assert.That(manager.StartTraining(), Is.True);
+            var practiceStates = new List<(float m, CheckerboardGridMapping grid, bool extension, float fov)>();
+            CheckerboardSessionState lastState = CheckerboardSessionState.Idle;
+            double deadline = Time.realtimeSinceStartupAsDouble + 20d;
+            while (manager.IsTrainingActive && Time.realtimeSinceStartupAsDouble < deadline)
+            {
+                CheckerboardSessionState state = manager.SessionState;
+                if (state is CheckerboardSessionState.TrainingInstructions or CheckerboardSessionState.TrainingComplete)
+                    manager.ContinueTraining();
+                if (state == CheckerboardSessionState.TrainingExample && state != lastState)
+                    practiceStates.Add((stimulus.InstrumentMagnificationM, stimulus.GridMapping,
+                        stimulus.AllowPincushionExtension, stimulus.AngularDiameterDegrees));
+                if (state == CheckerboardSessionState.TrainingWaitingForResponse && state != lastState)
+                    controller.SubmitResponse(Response.Convex);
+                lastState = state;
+                yield return null;
+            }
+
+            Assert.That(practiceStates.Count, Is.EqualTo(3), "Zwei Beispiele und ein Übungstrial.");
+            foreach (var shown in practiceStates)
+                Assert.That(shown, Is.EqualTo((5f, CheckerboardGridMapping.FixedSourceGrid, false, 60f)));
+
+            // Echte Trials, auch direkt aus einer Vorschau gestartet.
+            manager.TogglePreview();
+            stimulus.SetInstrumentMagnificationM(20f);
+            stimulus.SetGridMapping(CheckerboardGridMapping.EdgeNormalized);
+            // Nur der ausdrückliche Übernahme-Knopf schreibt das Vorschau-m in den Plan;
+            // "Restore Original Values" holt den Plan-Wert zurück.
+            Assert.That(manager.TakeOverPreviewValues(), Is.True);
+            Assert.That(manager.InstrumentMagnificationM, Is.EqualTo(20f));
+            Assert.That(manager.RestoreValuesBeforePreviewTakeover(), Is.True);
+            Assert.That(manager.InstrumentMagnificationM, Is.EqualTo(5f));
+            Assert.That(manager.StartSession(), Is.True);
+            manager.ConfirmExperimentReady();
+            for (int trial = 0; trial < 2; trial++)
+            {
+                yield return WaitForState(manager, CheckerboardSessionState.RunningTrial);
+                Assert.That(stimulus.InstrumentMagnificationM, Is.EqualTo(5f));
+                Assert.That(stimulus.GridMapping, Is.EqualTo(CheckerboardGridMapping.FixedSourceGrid));
+                Assert.That(stimulus.AllowPincushionExtension, Is.False);
+                Assert.That(stimulus.AngularDiameterDegrees, Is.EqualTo(60f));
+                Assert.That(stimulus.InstrumentDistortionK, Is.EqualTo(0.5f).Or.EqualTo(1f));
+                yield return WaitForState(manager, CheckerboardSessionState.WaitingForResponse);
+                controller.SubmitResponse(Response.Convex);
+            }
+
+            Assert.That(manager.SessionState, Is.EqualTo(CheckerboardSessionState.Completed));
+            foreach (Dictionary<string, string> row in ReadTrialRows(manager))
+            {
+                Assert.That(row["mapping_version"], Is.EqualTo(CheckerboardInstrumentMapping.MappingVersion));
+                Assert.That(row["mapping_version"], Is.EqualTo("merlitz-instrument-checkerboard-fixed-source-grid-v2"));
+                Assert.That(row["instrument_magnification_m"], Is.EqualTo("5"));
+                Assert.That(row["grid_mapping"], Is.EqualTo("FixedSourceGrid"));
+                Assert.That(row["grid_source_scale"], Is.EqualTo("1"));
+                Assert.That(row["mapping_family"], Is.EqualTo("merlitz_tan"));
+                Assert.That(row["allow_pincushion_extension"], Is.EqualTo("0"));
+                Assert.That(row["angular_diameter_deg"], Is.EqualTo("60"));
+                Assert.That(row["aperture_edge_softness_deg"], Is.EqualTo("5"));
+                Assert.That(row["grid_line_spacing_deg"], Is.EqualTo("8"));
+            }
+
+            yield return new ExitPlayMode();
         }
 
         private static void PrepareActivePracticeScene(int goodTrials, int maxTrials, bool freeMovement)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using GlobeEffect.VRCheckerboard.EyeTracking;
 
 namespace GlobeEffect.VRCheckerboard.Experiment
@@ -56,7 +57,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "angular_diameter_deg,grid_line_spacing_deg,grid_line_spacing_uv,instrument_distortion_k," +
             "instrument_magnification_m,stimulus_duration_s,noise_until_response," +
             "post_response_noise_s,response_timeout_s,category_a_key,category_b_key," +
-            "response_keys_swapped,trial_sequence,pre_stimulus_s,controller_mapping,invert_checkerboard_each_trial";
+            "response_keys_swapped,trial_sequence,pre_stimulus_s,controller_mapping,invert_checkerboard_each_trial," +
+            "stimulus_distortion_parameter,mapping_family,extension_kappa,allow_pincushion_extension," +
+            "grid_mapping,grid_source_scale,effective_source_grid_spacing_uv";
 
         // Die Kopfzeile der Ergebnisdatei. Sie wird einmal am Anfang geschrieben
         // und muss Spalte für Spalte zu AppendResult passen.
@@ -69,17 +72,23 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "grid_line_spacing_uv,instrument_distortion_k,instrument_magnification_m,response," +
             "valid_for_analysis,fixation_sample_valid,fixation_inside_tolerance," +
             "fixation_angle_deg,continuous_fixation_s,fixation_valid_sample_fraction," +
-            "longest_off_target_s,longest_invalid_gaze_s,status,trial_sequence,checkerboard_inverted";
+            "longest_off_target_s,longest_invalid_gaze_s,status,trial_sequence,checkerboard_inverted," +
+            "stimulus_distortion_parameter,mapping_family,extension_kappa,allow_pincushion_extension," +
+            "grid_mapping,grid_source_scale,effective_source_grid_spacing_uv";
+
+        private readonly bool allowPincushionExtension;
 
         public CheckerboardExperimentFiles(
             string outputRoot,
             string participantId,
             string sessionLabel,
             DateTime sessionStartUtc,
-            int randomSeed)
+            int randomSeed,
+            bool allowPincushionExtension = false)
             : base(outputRoot, participantId, sessionLabel, "session", sessionStartUtc, randomSeed,
-                CheckerboardInstrumentMapping.MappingVersion)
+                CheckerboardInstrumentMapping.VersionFor(allowPincushionExtension))
         {
+            this.allowPincushionExtension = allowPincushionExtension;
         }
 
         public void WritePlan(
@@ -104,19 +113,25 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             var rows = new List<CsvRow>();
             foreach (CheckerboardTrial trial in trials)
             {
+                ValidateTrialMapping(trial);
                 double gridSpacingUv = CheckerboardInstrumentMapping.GridLineSpacingUv(
                     trial.AngularDiameterDegrees, gridLineSpacingDegrees);
+                double sourceScale = SourceScale(trial);
 
-                rows.Add(StartRow().Add("Checkerboard")
+                rows.Add(StartRow(VersionFor(trial)).Add("Checkerboard")
                     .Add(trial.SequenceIndex).Add(trials.Count)
                     .Add(trial.ConditionIndex).Add(trial.Repetition)
                     .Add(trial.EyePresentation.ToString()).Add(trial.AngularDiameterDegrees)
-                    .Add(gridLineSpacingDegrees).Add(gridSpacingUv).Add(trial.InstrumentDistortionK)
+                    .Add(gridLineSpacingDegrees).Add(gridSpacingUv).Add(InstrumentKValue(trial))
                     .Add(trial.InstrumentMagnificationM)
                     .Add(stimulusDurationSeconds).Add(noiseDuringResponse).Add(postResponseNoiseSeconds)
                     .Add(responseTimeoutSeconds).Add(categoryAKey).Add(categoryBKey)
                     .Add(responseKeysSwapped).Add(trialSequence.ToString()).Add(preStimulusSeconds)
-                    .Add(controllerMapping.ToString()).Add(invertCheckerboardEachTrial));
+                    .Add(controllerMapping.ToString()).Add(invertCheckerboardEachTrial)
+                    .Add(trial.InstrumentDistortionK)
+                    .Add(CheckerboardInstrumentMapping.FamilyFor(trial.InstrumentDistortionK))
+                    .Add(KappaValue(trial)).Add(allowPincushionExtension)
+                    .Add(trial.GridMapping.ToString()).Add(sourceScale).Add(gridSpacingUv / sourceScale));
             }
 
             WritePlanFile(PlanHeader, rows, TrialHeader);
@@ -128,7 +143,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // TrialHeader passen, sonst stehen die Zahlen später in den
             // falschen Spalten.
             CheckerboardTrial trial = result.Trial;
-            AppendResultRow(StartRow().Add("Checkerboard")
+            ValidateTrialMapping(trial);
+            double sourceScale = SourceScale(trial);
+            AppendResultRow(StartRow(VersionFor(trial)).Add("Checkerboard")
                 .Add(result.PresentationIndex).Add(trial.SequenceIndex).Add(plannedTrials)
                 .Add(trial.ConditionIndex).Add(trial.Repetition).Add(trial.AttemptNumber)
                 .Add(result.TrialStartUtc).Add(result.TrialStartUnitySeconds)
@@ -138,14 +155,43 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 .Add(trial.EyePresentation.ToString()).Add(trial.AngularDiameterDegrees)
                 .Add(result.ApertureEdgeSoftnessDegrees).Add(result.CircularApertureEnabled)
                 .Add(result.GridLineSpacingDegrees).Add(result.GridLineSpacingUv)
-                .Add(trial.InstrumentDistortionK)
+                .Add(InstrumentKValue(trial))
                 .Add(trial.InstrumentMagnificationM)
                 .Add(result.Response.ToString()).Add(result.ValidForAnalysis)
                 .Add(result.Gaze.SampleValid).Add(result.Gaze.OnTarget)
                 .Add(result.Gaze.AngleDegrees).Add(result.Gaze.SteadySeconds)
                 .Add(result.Gaze.ValidSampleFraction).Add(result.LongestOffTargetSeconds)
                 .Add(result.LongestInvalidGazeSeconds).Add(result.Status)
-                .Add(result.TrialSequence.ToString()).Add(result.CheckerboardInverted));
+                .Add(result.TrialSequence.ToString()).Add(result.CheckerboardInverted)
+                .Add(trial.InstrumentDistortionK)
+                .Add(CheckerboardInstrumentMapping.FamilyFor(trial.InstrumentDistortionK))
+                .Add(KappaValue(trial)).Add(allowPincushionExtension)
+                .Add(trial.GridMapping.ToString()).Add(sourceScale)
+                .Add(result.GridLineSpacingUv / sourceScale));
         }
+
+        private static string VersionFor(CheckerboardTrial trial) =>
+            CheckerboardInstrumentMapping.VersionFor(trial.AllowPincushionExtension, trial.GridMapping);
+
+        private static double SourceScale(CheckerboardTrial trial) =>
+            CheckerboardInstrumentMapping.GridSourceScale(trial.AngularDiameterDegrees,
+                trial.InstrumentMagnificationM, trial.InstrumentDistortionK,
+                trial.AllowPincushionExtension, trial.GridMapping);
+
+        private void ValidateTrialMapping(CheckerboardTrial trial)
+        {
+            if (trial.AllowPincushionExtension != allowPincushionExtension)
+                throw new ArgumentException("Trial und Sitzung verwenden verschiedene Abbildungsfamilien.");
+            CheckerboardInstrumentMapping.ValidateParameters(trial.AngularDiameterDegrees,
+                trial.InstrumentMagnificationM, trial.InstrumentDistortionK,
+                allowPincushionExtension: allowPincushionExtension);
+        }
+
+        // Negative Einstellungen niemals als negatives Merlitz-k exportieren.
+        private static string InstrumentKValue(CheckerboardTrial trial) => trial.InstrumentDistortionK < 0f
+            ? string.Empty : trial.InstrumentDistortionK.ToString("G9", CultureInfo.InvariantCulture);
+
+        private static string KappaValue(CheckerboardTrial trial) => trial.InstrumentDistortionK < 0f
+            ? (-trial.InstrumentDistortionK).ToString("G9", CultureInfo.InvariantCulture) : string.Empty;
     }
 }

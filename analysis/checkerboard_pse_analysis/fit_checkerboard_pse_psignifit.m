@@ -10,6 +10,7 @@
 % Otherwise choose a trials.csv file. Never silently analyse an old pilot.
 % Older random-dot CSVs (one file with SimulatedYaw AND HeadTracked) are split
 % automatically: each motion mode is fitted separately with its own XLSX/PNG.
+% Mixed checkerboard grid variants are also fitted separately, never pooled.
 % Settings changed during a session (FOV, m, speed, edge softness, ...) are
 % pooled into one fit with a warning that lists the values.
 % Optional condition_filter struct selects one condition from a mixed CSV:
@@ -79,6 +80,7 @@ if has_l == has_k
 end
 % The presence of k alone no longer identifies random dots.
 is_random_dot = has_k && ismember('motion_mode', T.Properties.VariableNames);
+is_extended_checkerboard = false;
 if is_random_dot
     random_dot_columns = {'motion_mode', 'instrument_magnification_m', 'content_zoom'};
     if ~all(ismember(random_dot_columns, T.Properties.VariableNames))
@@ -96,10 +98,44 @@ else
                 ~all(strcmpi(string(T.stimulus_task), "Checkerboard"))
             error('Instrument checkerboard CSV is missing its task/mapping/magnification metadata.');
         end
-        if ~all(startsWith(string(T.mapping_version), "merlitz-instrument-checkerboard-"))
+        is_extended_checkerboard = all(startsWith(string(T.mapping_version), ...
+            "custom-tan-tanh-checkerboard-"));
+        if ~is_extended_checkerboard && ...
+                ~all(startsWith(string(T.mapping_version), "merlitz-instrument-checkerboard-"))
             error('Unexpected checkerboard mapping version; do not reinterpret old pilot l as k.');
         end
         output_prefix = 'checkerboard_instrument';
+        if ismember('grid_mapping', T.Properties.VariableNames)
+            grid_mode = string(T.grid_mapping);
+            edge = grid_mode == "EdgeNormalized";
+            fixed = grid_mode == "FixedSourceGrid";
+            if any(~(edge | fixed)) || ...
+                    any(edge & ~contains(string(T.mapping_version), "-edge-normalized-")) || ...
+                    any(fixed & ~contains(string(T.mapping_version), "-fixed-source-grid-"))
+                error('Inconsistent checkerboard grid_mapping / mapping_version metadata.');
+            end
+        end
+        if is_extended_checkerboard
+            needed_extension = {'stimulus_distortion_parameter', 'mapping_family', ...
+                'extension_kappa', 'allow_pincushion_extension'};
+            if ~all(ismember(needed_extension, T.Properties.VariableNames))
+                error('Custom checkerboard is missing its signed-setting/extension metadata.');
+            end
+            s = T.stimulus_distortion_parameter;
+            negative = s < 0;
+            if any(~isfinite(s) | s < -2 | s > 2) || ...
+                    any(T.allow_pincushion_extension ~= 1) || ...
+                    any(string(T.mapping_family(negative)) ~= "custom_tanh") || ...
+                    any(string(T.mapping_family(~negative)) ~= "merlitz_tan") || ...
+                    any(~isnan(T.instrument_distortion_k(negative))) || ...
+                    any(~isfinite(T.extension_kappa(negative))) || ...
+                    any(abs(T.extension_kappa(negative) + s(negative)) > 1e-6) || ...
+                    any(~isfinite(T.instrument_distortion_k(~negative))) || ...
+                    any(abs(T.instrument_distortion_k(~negative) - s(~negative)) > 1e-6)
+                error('Inconsistent custom checkerboard mapping metadata. Negative settings are NOT Merlitz k.');
+            end
+            output_prefix = 'checkerboard_extended';
+        end
     end
 end
 if has_k
@@ -120,6 +156,17 @@ else
     pse_column = 'pse_visual_space_l';
     jnd_column = 'jnd_l';
     reference_column = 'pse_minus_straight_l1';
+end
+if is_extended_checkerboard
+    warning(['Custom tan/tanh checkerboard: the fitted PSE is a signed stimulus setting, ', ...
+        'NOT an original Merlitz k-PSE. Do not pool it with the unextended family.']);
+    stimulus_name = 'signed setting';
+    stimulus_column = 'stimulus_distortion_parameter';
+    x_label = 'Signed stimulus setting (custom tan/tanh family)';
+    reference_label = 'setting = 1 (straight, Merlitz branch)';
+    pse_column = 'pse_stimulus_distortion_parameter';
+    jnd_column = 'jnd_stimulus_distortion_parameter';
+    reference_column = 'pse_minus_straight_setting1';
 end
 fprintf('detected task: %s; stimulus column: %s\n', task_name, stimulus_column);
 
@@ -171,16 +218,23 @@ if is_random_dot
     % These are different tasks and are always fitted separately.
     split_columns = {'motion_mode'};
 elseif has_k
-    condition_columns = [condition_columns, {'stimulus_task', 'instrument_magnification_m'}];
-    split_columns = {'instrument_magnification_m'};
+    condition_columns = [condition_columns, {'stimulus_task', 'instrument_magnification_m', 'grid_mapping'}];
+    split_columns = {'instrument_magnification_m', 'grid_mapping'};
 end
 [group_keys, group_id] = conditionGroups(T, split_columns);
+% Only the explicitly labelled checkerboard grid variants may carry different
+% mapping versions within one session. Keep the historical rejection elsewhere.
+if ismember('mapping_version', T.Properties.VariableNames) && ...
+        numel(unique(string(T.mapping_version))) > 1 && ...
+        (is_random_dot || ~has_k || ~ismember('grid_mapping', T.Properties.VariableNames))
+    error('Mixed mapping versions. Select one mapping before fitting.');
+end
 
 % Different people or sessions in one fit are always an error. Any other
 % setting changed during a session (FOV, m, speed, edge softness, ... e.g.
 % while testing a pilot) is pooled into one fit with a warning; the result
 % file lists the values and their trial counts.
-strict_columns = {'participant_id', 'session_start_utc', 'mapping_version'};
+strict_columns = {'participant_id', 'session_start_utc'};
 pooled_columns = {};
 for column = condition_columns
     name = column{1};
@@ -196,6 +250,9 @@ for column = condition_columns
     for g = 1:numel(group_keys)
         rows = T(group_id == g, :);
         if numel(unique(conditionValues(rows, name))) > 1
+            if strcmp(name, 'mapping_version')
+                error('Mixed mapping versions within one condition. Select one mapping before fitting.');
+            end
             pooled_columns = union(pooled_columns, {name}, 'stable');
             warning(['Mixed values in column %s (%s): %s. These trials are pooled ', ...
                 'into one fit. Use condition_filter to fit one value only.'], ...
@@ -249,7 +306,7 @@ end
 
 if numel(group_keys) > 1 && ~isempty(all_results)
     fprintf('\n---- summary of all conditions ----\n');
-    summary_columns = intersect({'motion_mode', 'instrument_magnification_m', ...
+    summary_columns = intersect({'motion_mode', 'grid_mapping', 'mapping_version', 'instrument_magnification_m', ...
         'angular_diameter_deg', 'n_trials', pse_column, 'pse_ci95_low', ...
         'pse_ci95_high', jnd_column}, all_results.Properties.VariableNames, 'stable');
     disp(all_results(:, summary_columns));
@@ -419,6 +476,9 @@ function result_table = fitOneCondition(T, task)
     if task.has_k && ~task.is_random_dot
         condition_suffix = ['_m', regexprep(char(string(T.instrument_magnification_m(1))), ...
             '[^A-Za-z0-9_-]', '_')];
+        if ismember('grid_mapping', T.Properties.VariableNames)
+            condition_suffix = [condition_suffix, '_grid', char(string(T.grid_mapping(1)))];
+        end
     end
     result_file = fullfile(data_folder, [task.output_prefix, '_pse_result_psignifit', condition_suffix, '.xlsx']);
     writetable(result_table, result_file);
@@ -457,6 +517,9 @@ function result_table = fitOneCondition(T, task)
         plot_subtitle = sprintf('%s | m = %s | FOV = %s deg', participant_id, ...
             plotValue(T, 'instrument_magnification_m', task), ...
             plotValue(T, 'angular_diameter_deg', task));
+        if ismember('grid_mapping', T.Properties.VariableNames)
+            plot_subtitle = sprintf('%s | %s', plot_subtitle, string(T.grid_mapping(1)));
+        end
     end
     title({[task.task_name, ' psychometric function (psignifit)'], ...
            char(plot_subtitle)}, ...

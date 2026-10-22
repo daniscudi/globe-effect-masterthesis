@@ -10,11 +10,105 @@ Die aktuelle Pilot-Checkliste mit Inspector-Zuständigkeiten, vorgefundenen
 Szeneneinstellungen und offenen Protokollentscheidungen steht in
 [CHECKERBOARD_PILOT.md](CHECKERBOARD_PILOT.md).
 
+## Checkerboard-Standard: Instrumentenabbildung, Standard m = 10 (22. Oktober 2026)
+
+Die frühere Variante beruhte auf Merlitz' Visual-Space-Funktion mit zusätzlicher
+Randnormierung. Die neue Standardvariante verwendet seine Instrumentenabbildung
+bei m = 10 ohne zusätzliche Randnormierung.
+
+* Gleichung: `tan(k·a) = m·tan(k·A)`, im Shader rückwärts
+  `A = atan(tan(k·a)/m)/k`, bei k → 0 der Grenzwert `A = a/m`. Dieselbe Gleichung
+  wie bei den Random Dots (dort vorwärts für die Punktmittelpunkte, hier rückwärts
+  pro Bildpunkt). C#-Referenz: `MerlitzBinocularReferenceMath`,
+  `CheckerboardInstrumentMapping.SourceRadius`; Shader: `GlobeEffectMerlitzInstrument.cginc`
+  (`MerlitzObjectAngle`), Aufruf in `GlobeEffectHelmholtzCheckerboard.shader`.
+* Quellgitter: in perspektivischen Bildkoordinaten `u = x/z`, `v = y/z`,
+  `R = √(u²+v²)`, `a = atan(R)`, abgelesen bei `[m·tan(A)/R]·(u, v)`. Der Shader
+  rechnet dasselbe in Einheiten des Blendenrands (`r = R/tan(FOV/2)`,
+  `s = m·tan(A)/tan(FOV/2)`, Gitterweite `tan(Δ)/tan(FOV/2)`); das Verhältnis zur
+  Gitterweite ist identisch. Es gibt keine Rand- und keine Zentrumskorrektur und keine
+  nachträgliche Größenanpassung. Dass die lokale Vergrößerung in der Mitte bei jedem k
+  gleich m ist, folgt allein aus der Gleichung; endlich große Kästchen in der Mitte
+  sind nicht bei jedem k gleich groß. Am Rand sind je nach k mehr oder weniger Felder
+  sichtbar (Szene: 7,5 bei k = 0,2, 8,6 bei k = 1,2). Das ist gewollt.
+* Blende, FOV und weicher Rand werden in Bildkoordinaten ausgewertet und hängen nicht
+  von k ab.
+* m ist einstellbar (`Magnification (m)`, 1–20), Standard **10**
+  (`CheckerboardInstrumentMapping.DefaultMagnificationM`). Trials, Übung und Beispiele
+  verwenden das m des Versuchsplans. Ein in der Live-Vorschau verstelltes m wird beim
+  Verlassen zurückgesetzt; nur „Use Preview Values For The Experiment“ übernimmt es.
+* Wirkung von m (FOV 60°, Gitter 8°, Felder über den Durchmesser bei k = 0,2 / 1 / 1,2 / 2):
+  m = 1: 8,22 / 8,22 / 8,22 / 8,22 (gerade für jedes k); m = 2: 7,65 / 8,22 / 8,50 / 10,61;
+  m = 5: 7,51 / 8,22 / 8,60 / 11,98; m = 10: 7,49 / 8,22 / 8,61 / 12,23;
+  m = 20: 7,48 / 8,22 / 8,61 / 12,30. Ab etwa m = 5 ändert sich kaum noch etwas: Für
+  m → ∞ geht die Abbildung in s = tan(k·a)/(k·tan(FOV/2)) über, also Merlitz'
+  Visual-Space-Funktion ohne Randnormierung. Nur zwischen m = 1 und etwa 5 ändert m
+  die Verzeichnung deutlich.
+* Ungültige Kombinationen (Tangens-Grenze aus FOV + weichem Rand und k, negative
+  Werte ohne ausdrücklich eingeschaltete tanh-Erweiterung) werden abgewiesen oder in
+  der Vorschau als Fehler gemeldet und dann nicht gezeichnet. Sie werden nicht still
+  auf einen anderen Wert gesetzt.
+* Auswahl: `Variant 2: Fixed Source Grid` ist Standard. Die randnormierte Variante 3
+  und die eigene tanh-Erweiterung bleiben getrennt wählbar und getrennt gekennzeichnet.
+* Daten: Kennung unverändert `merlitz-instrument-checkerboard-fixed-source-grid-v2`
+  (das Bild ist dasselbe wie vorher). Jede Zeile enthält außerdem das verwendete
+  `instrument_magnification_m` (Standard 10), `grid_mapping = FixedSourceGrid`,
+  `grid_source_scale = 1`, FOV, weichen Rand und Gitterabstand. Alte l-Daten und
+  andere Varianten haben eigene Kennungen; die MATLAB-Auswertung poolt sie nicht.
+
+Das ist keine vollständige Replikation von Merlitz' Online-Experiment. Ein PSE in k
+beim Checkerboard und bei den Random Dots hat nicht automatisch dieselbe Bedeutung;
+ob beide übereinstimmen, ist eine zu prüfende Vorhersage.
+
+## Checkerboard-Pilot: Variante 2 und 3 vergleichen (20. Oktober 2026)
+
+Im **Checkerboard Experiment Manager → Session And Trial Plan** gibt es zwei Häkchen:
+
+* **Variant 2: Fixed Source Grid**: bisherige Instrumentenabbildung, unverändertes Quellgitter.
+* **Variant 3: Edge-Normalized Grid**: dieselbe Instrumentengleichung mit
+  `S_norm(r) = S_fixed(r) / S_fixed(1)`. Die Quellgitterweite wird angepasst, damit
+  die Feldspanne am nominalen Kreisrand gleich bleibt. Die zentrale Kästchengröße
+  ändert sich dadurch; es ist keine Skalierung des fertigen Bildes wie in HTML-Variante 5.
+
+Ein Häkchen = nur diese Variante. Beide Häkchen = **eine gemeinsam gemischte Sitzung**,
+nicht zwei aufeinanderfolgende Versuche. Keine Auswahl wird vor dem Start abgewiesen.
+FOV, Augenmodus, m, k-Stufen und Wiederholungen gelten gemeinsam für beide Varianten.
+Der Inspector zeigt Trials pro Variante und insgesamt an. Bestehende Szenen bleiben
+standardmäßig bei Variante 2; Szenen- und Messdateien wurden nicht umgestellt.
+
+Für einen kurzen Pilot z. B. sieben k-Stufen und **10 Wiederholungen neben jeder
+Stufe in der Tabelle** eintragen: bei einem FOV und einem Augenmodus ergeben beide
+Varianten zusammen 140 gültige Trials. Mit 25 Wiederholungen sind es 350 insgesamt.
+`Repeats Per Condition` ist nur der Ersatzwert für fehlende Tabelleneinträge.
+Ungültige Trials behalten ihre Variante und kommen wie bisher hinten wieder dazu.
+Die Reihenfolge wird mit dem Seed reproduzierbar über die ganze Sitzung gemischt;
+einzelne Pausenabschnitte sind nicht zusätzlich exakt ausbalanciert.
+
+Die Übung zeigt jede ausgewählte Variante für die eingetragenen Beispiele und
+Übungs-k-Werte. Sind beide aktiv, wird die Übung entsprechend länger. Die Antworten
+und die Variante stehen im Übungsprotokoll des Versuchsleiters, ohne Richtig/Falsch-Feedback.
+In **Live Preview (No Recording)** lässt sich `Grid Mapping` unabhängig ansehen.
+Normales Verlassen der Vorschau setzt die Werte zurück. Nur der ausdrückliche
+Übernahme-Knopf übernimmt auch die einzelne Vorschauvariante in den Versuchsplan.
+
+CSV: Jede Plan- und Ergebniszeile enthält die tatsächliche `mapping_version`,
+`grid_mapping` (`FixedSourceGrid` oder `EdgeNormalized`), `grid_source_scale`
+und `effective_source_grid_spacing_uv`. `grid_line_spacing_uv` bleibt der
+unveränderte Referenzabstand. Variante 3 hat die eigene Kennung
+`merlitz-instrument-checkerboard-edge-normalized-v1`.
+Die optionale tanh-Erweiterung behält zusätzlich ihre eigene Abbildungsfamilie.
+
+`fit_checkerboard_pse_psignifit.m` liest die gemeinsame Trialdatei und erstellt
+**getrennte PSEs, 95%-Intervalle, XLSX-Dateien und Abbildungen je Gittervariante**
+sowie eine gemeinsame Ergebnistabelle. Die Varianten werden nie zu einem Fit gepoolt.
+Alte CSVs ohne `grid_mapping` bleiben auf ihrer ursprünglichen Skala auswertbar.
+Random-Dot-Reize und -Ablauf sind durch diese Ergänzung unverändert.
+
 ## Umstellung der Checkerboards am 18. Oktober 2026
 
 Checkerboard und Random Dots verwenden jetzt dieselbe **Instrumentenabbildung**
 nach Merlitz (2010), Gleichungen 4–6, mit dem Stimulusparameter **k** und
-Vergrößerung **m**. Beim Checkerboard ist m pro Sitzung fest (Standard 10);
+Vergrößerung **m**. Beim Checkerboard gilt ein m pro Sitzung (Standard 10);
 bei den Dots ist m ein Trialfaktor. Der frühere Regler `visualSpaceL` ist
 nicht mehr die aktive Checkerboard-Abbildung.
 
@@ -196,7 +290,7 @@ k = 0 die Winkelbedingung; Werte über 1 setzen dieselbe Formel in die
 Tonnenrichtung fort. Der Bereich 0–2 ist keine Erweiterung zu stärkerer
 Kissenverzeichnung unter null. Negative Werte sind nicht zugelassen.
 
-Der Checkerboard-Manager hat ein festes `Magnification (m)`, Standard 10.
+Der Checkerboard-Manager hat ein einstellbares `Magnification (m)`, Standard 10.
 Dieses m erzeugt ein fertiges statisches Muster, keine Zoomanimation.
 Bei m = 1 ist die reine Instrumentenabbildung für jedes k identisch:
 Es entsteht dann keine k-abhängige Gitterkrümmung.
@@ -522,7 +616,7 @@ Die wichtigsten Einstellungen befinden sich am Objekt
 
 * `Instrument Distortion K Values`: alle zu präsentierenden Instrumenten-k-Werte
 
-* `Magnification (m)`: feste Instrumentenvergrößerung des Checkerboards; Standard 10
+* `Magnification (m)`: Instrumentenvergrößerung des Checkerboards; Standard 10
 
 * `Repetitions Per Condition`: Wiederholungen jeder Kombination
 
@@ -660,7 +754,7 @@ Für den Bewegungstest liegen die wichtigsten Einstellungen am Objekt
   `Preview Shows Noise` schaltet die Vorschau zwischen Schachbrett und
   Noise-Maske um (auch während sie läuft), damit Punktgröße und Flimmerrate
   beurteilt werden können. **Use Preview Values For The Experiment** schreibt
-  FOV, Augenmodus und festes m in den Versuchsplan (Listen werden ersetzt) und behält die
+  FOV, Augenmodus und m in den Versuchsplan (Listen werden ersetzt) und behält die
   Darstellung; die k-Liste bleibt unverändert. **Restore Original
   Values**, Übernahme aus dem Play Mode in die Szene und der Hinweis
   zum Lab-PC gelten genauso wie bei Random Dots.
@@ -1246,12 +1340,76 @@ dieselbe Abbildung für jeden sichtbaren Pixel aus.
 ## Gemeinsame Abbildung, unterschiedliche Aufgaben
 
 * Statisches Checkerboard: Instrument-k und festes m, unbewegtes Gitter,
-  konkav/konvex und head-locked.
+  konkav/konvex und head-locked. Dies gilt für den nichtnegativen Originalzweig;
+  die unten beschriebene eigene Erweiterung ist eine ausdrücklich getrennte Option.
 * Random Dots: dieselbe Instrumentengleichung, k/m-Bedingungen,
   simulierte oder kopfgesteuerte Bewegung und konkav/konvex.
 * Nur die Random Dots besitzen einen zusätzlichen Content Zoom; für direkte
   Vergleiche bleibt er 1. Punktgröße und Geschwindigkeitssteuerung bleiben
   separate experimentelle Festlegungen.
+
+## Checkerboard: stärkere Kissenverzeichnung (eigene tanh-Erweiterung)
+
+**Stand 19. Oktober 2026.** Im Manager unter `Session And Trial Plan` lässt sich
+`Allow Pincushion Extension` einschalten. Erst dann sind negative Einstellungen
+in der Trialliste und im Training erlaubt. Die Live-Vorschau besitzt denselben
+Schalter separat; Vorschauänderungen werden beim Verlassen zurückgesetzt, sofern
+sie nicht ausdrücklich übernommen wurden. Standard ist **aus**; vorhandene
+Triallisten und Szenen wurden nicht verändert. Random Dots bleiben unverändert.
+
+Der gemeinsame Zahlenregler ist bei aktivierter Erweiterung ein **vorzeichenbehafteter
+Reizparameter s**, nicht durchgehend Merlitz-k:
+
+* `s >= 0`: originales Merlitz-k mit `k = s`, `tan(k*a) = m*tan(k*A)`.
+* `s = 0`: Grenzfall `A = a/m`.
+* `s < 0`: **eigene** tanh-Erweiterung mit `kappa = -s > 0`:
+  `tanh(kappa*a) = m*tanh(kappa*A)`, im Shader invers ausgewertet als
+  `A = atanh(tanh(kappa*a)/m)/kappa`.
+
+`a` ist der scheinbare Bildwinkel, `A` der Objektwinkel (beide in Radiant),
+`m` die Vergrößerung. Danach wird unverändert das feste gerade Quellgitter bei
+`S = m*tan(A)/tan(FOV/2)` abgetastet. Kein pro-k-Randzoom wird hinzugefügt.
+Bei `m > 1` erzeugen stärker negative Werte stärkere Kissenverzeichnung; bei
+`m = 1` ist auch diese Abbildung unverzeichnet. Der Anschluss bei null ist stetig.
+Die Reglergrenze `-2` ist eine Softwareentscheidung, kein Wert aus Merlitz.
+Das ist weder Oomes' alpha noch ein Wahrnehmungsmodell und kein Nachweis für eine
+bestimmte konkave Wahrnehmung.
+
+Die inverse Gleichung ist im zulässigen sichtbaren Winkelbereich verwendbar.
+Die Vorwärtsabbildung `a = atanh(m*tanh(kappa*A))/kappa` besitzt hingegen die
+Grenze `abs(m*tanh(kappa*A)) < 1`; sie ist nicht für beliebige Objektwinkel definiert.
+Die ursprüngliche tan-Gleichung mit negativem k würde keine stärkere Kissenform
+liefern, weil sich die Vorzeichen aufheben. Deshalb gibt es einen eigenen Zweig.
+
+**Nachvollziehbare Daten:** Erweiterungssitzungen tragen
+`custom-tan-tanh-checkerboard-fixed-source-grid-v1`, auch wenn einzelne Trials
+auf dem nichtnegativen Zweig liegen. CSV-Zusätze: `stimulus_distortion_parameter`,
+`mapping_family` (`merlitz_tan`/`custom_tanh`), `extension_kappa` und
+`allow_pincushion_extension`. Für negative Reizwerte bleibt die Spalte
+`instrument_distortion_k` absichtlich leer. Das MATLAB-Skript passt die gesamte
+erweiterte Familie über den vorzeichenbehafteten Reizwert an und schreibt
+`pse_stimulus_distortion_parameter` mit dem Dateipräfix `checkerboard_extended`.
+Dieser PSE darf nicht einfach als ursprünglicher Merlitz-k-PSE bezeichnet oder
+mit nicht erweiterten Sitzungen gepoolt werden. Die Wahl, ob die Erweiterung nur
+im Training oder auch im Hauptversuch verwendet wird, bleibt eine Protokollentscheidung;
+neue Pilotdaten sind weiterhin erforderlich.
+
+**Vorherige Parametrisierung (historisch, z. B. Yannick-Pilot):**
+`S_old = tan(l*a)/tan(l*beta)` mit `a = atan(r*tan(beta))`, `beta = FOV/2`;
+bei `l = 0` gilt `S_old = a/beta`. Das war eine randnormierte Musterfamilie ohne
+Vergrößerungsparameter m, nicht die finite Instrumentenabbildung mit m = 10.
+Der alte Musterwert war außerdem nicht automatisch das persönliche Wahrnehmungs-l.
+Die jetzige positive Abbildung nutzt dagegen `A = atan(tan(k*a)/m)/k` und
+`S = m*tan(A)/tan(beta)`. Ohne zusätzliche Randnormierung kann die Blende bei
+verschiedenem k unterschiedlich viele Felder ausschneiden. Das FOV selbst muss
+deshalb nicht geändert werden; es bleibt eine unabhängig festgelegte Bedingung.
+
+**Automatisch geprüft:** 319 Unity-Tests erfolgreich, ohne Fehler oder übersprungene
+Tests (`Logs/checkerboard_extension_final.xml`). Darunter sind gerenderte negative
+Muster gegen die C#-Referenz, der unveränderte positive Zweig, Vorschau-Rücksetzung
+und CSV-Kennzeichnung. Die MATLAB-Schema-Prüfung mit ausschließlich künstlichen
+Daten ist ebenfalls erfolgreich (`Logs/checkerboard_extension_matlab.log`). Ein
+Headset-Sichttest und neue Pilotmessungen werden dadurch nicht ersetzt.
 
 ## Noch offen
 
@@ -1260,8 +1418,8 @@ dieselbe Abbildung für jeden sichtbaren Pixel aus.
 * Ob `Invert Checkerboard Each Trial` im Hauptversuch an sein soll (Irritation
   vs. weniger Nachbild), und die genauen Übungswerte der Teile 1 und 2.
 
-* **Offene Entscheidung: Randbehandlung des Checkerboards** (untersucht am
-  19. Oktober, nichts umgesetzt). Szene: FOV 60°, weicher Rand 5°, Gitter 8°,
+* **Offene Entscheidung: Randbehandlung des Checkerboards** (Randnormierung
+  untersucht am 19. Oktober, nicht umgesetzt). Szene: FOV 60°, weicher Rand 5°, Gitter 8°,
   m = 10. Mit dem festen Quellgitter liegen über den Durchmesser (bei FOV/2,
   50 % Deckkraft) 7,46 Felder bei k = 0, 7,49 bei 0,2, 7,63 bei 0,5, 8,22 bei 1,
   8,61 bei 1,2 und 9,14 bei 1,4. Innerhalb der Testliste 0,2–1,2 ändert sich die
@@ -1273,18 +1431,15 @@ dieselbe Abbildung für jeden sichtbaren Pixel aus.
     Dann stehen am Rand bei jedem k 8,22 Felder, dafür ändert sich die
     Feldgröße in der Mitte mit k (etwa −9 % bei k = 0,2, +5 % bei 1,2, +11 % bei
     1,4 gegenüber k = 1). Eigene MappingVersion `…-edge-normalized-…`.
-  * Option (b): eigener Vorschau-Modus für stärkere Kissenverzeichnung jenseits
-    k = 0 über die tanh-Fortsetzung k = iκ: tanh(κa) = m·tanh(κA). Das ist eine
-    eigene Erweiterung, nicht Merlitz. Sie ist für jedes FOV definiert; die
-    Familie hängt glatt von k² ab, κ entspricht k² < 0. Nachgerechnet
-    (m = 10, FOV 70, r = 0,5, Abweichung vom geraden Bild S(r) − r): k = 0 →
-    −0,0189, κ = 1 → −0,0361, κ = 2 → −0,0800. Nur Vorschau; für echte Trials
-    wäre eine eigene MappingVersion `…-tanh-extension-…` nötig.
+  * Stärkere Kissenverzeichnung über eine eigene tanh-Erweiterung ist inzwischen
+    optional implementiert (Abschnitt oben). Nachgerechnet (m = 10, FOV 70,
+    r = 0,5, S(r) − r): Einstellung 0 → −0,0189, −1 → −0,0361, −2 → −0,0800.
   * Wo 0 und 2 fest verdrahtet sind: `CheckerboardInstrumentMapping.ValidateParameters`,
     `MerlitzBinocularReferenceMath.Minimum/MaximumDistortionK` (auch im
     Random-Dot-Planer), `Range(0, 2)`/`Clamp` an Stimulus und Managern, die
     Shader-Properties und die Winkelgrenze 1,560796 im gemeinsamen cginc.
-    Negatives k zeichnet der Shader wie k = 0 (tan(ka)/k ist gerade in k).
+    Die Originalfunktionen bleiben auf nichtnegative k beschränkt. Nur das
+    Checkerboard verwendet für negative Einstellungen den getrennten tanh-Zweig.
 
 * Die Einstellungen der Geschwindigkeitserkennung (Toleranz, Wartezeiten,
   Mindeststrecke) sind Startwerte und mit weiteren Personen zu pilotieren.

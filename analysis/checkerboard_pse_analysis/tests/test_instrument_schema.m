@@ -36,6 +36,79 @@ result = readtable(result_path);
 assert(ismember('pse_instrument_distortion_k', result.Properties.VariableNames));
 assert(strcmpi(string(result.task(1)), "Checkerboard"));
 
+% One randomized session contains both grid variants. They must yield two
+% independent fits/files, never one pooled PSE or overwritten result.
+fixed_grid = T;
+fixed_grid.grid_mapping = repmat("FixedSourceGrid", n, 1);
+edge_grid = T;
+edge_grid.sequence_index = edge_grid.sequence_index + n;
+edge_grid.grid_mapping = repmat("EdgeNormalized", n, 1);
+edge_grid.mapping_version(:) = "merlitz-instrument-checkerboard-edge-normalized-v1";
+edge_counts = [0, 0, 1, 4, 12, 22, 25];
+edge_grid.response(:) = "Concave";
+for i = 1:numel(levels)
+    edge_grid.response((i-1)*25 + (1:edge_counts(i))) = "Convex";
+end
+both = [fixed_grid; edge_grid];
+% Deterministic interleaving, so sequence order does not stand for variant.
+both = both(reshape([1:n; n+(1:n)], [], 1), :);
+csv = fullfile(test_root, 'both_grid_variants_trials.csv');
+writetable(both, csv);
+runFit(script_path, csv);
+fixed_result = readtable(fullfile(test_root, ...
+    'checkerboard_instrument_pse_result_psignifit_m10_gridFixedSourceGrid.xlsx'));
+edge_result = readtable(fullfile(test_root, ...
+    'checkerboard_instrument_pse_result_psignifit_m10_gridEdgeNormalized.xlsx'));
+assert(fixed_result.n_trials == n && edge_result.n_trials == n);
+assert(abs(fixed_result.pse_instrument_distortion_k - result.pse_instrument_distortion_k) < 1e-5);
+assert(edge_result.pse_instrument_distortion_k > fixed_result.pse_instrument_distortion_k + 0.05);
+summary = readtable(fullfile(test_root, 'checkerboard_instrument_pse_summary_psignifit.xlsx'));
+assert(height(summary) == 2 && numel(unique(string(summary.grid_mapping))) == 2);
+
+bad_grid = both;
+bad_grid.grid_mapping(:) = "FixedSourceGrid";
+writetable(bad_grid, csv);
+rejected_grid = false;
+try
+    runFit(script_path, csv);
+catch error_info
+    rejected_grid = contains(error_info.message, 'metadata', 'IgnoreCase', true);
+end
+assert(rejected_grid, 'Grid variant and mapping version must agree.');
+
+% The custom family must fit the SIGNED setting, never blank/positive-only k.
+extended = T;
+extended.mapping_version(:) = "custom-tan-tanh-checkerboard-fixed-source-grid-v1";
+extended.stimulus_distortion_parameter = k - 0.6;
+negative = extended.stimulus_distortion_parameter < 0;
+extended.instrument_distortion_k = extended.stimulus_distortion_parameter;
+extended.instrument_distortion_k(negative) = NaN;
+extended.mapping_family = repmat("merlitz_tan", n, 1);
+extended.mapping_family(negative) = "custom_tanh";
+extended.extension_kappa = NaN(n, 1);
+extended.extension_kappa(negative) = -extended.stimulus_distortion_parameter(negative);
+extended.allow_pincushion_extension = ones(n, 1);
+csv = fullfile(test_root, 'extended_trials.csv');
+writetable(extended, csv);
+runFit(script_path, csv);
+custom_result = readtable(fullfile(test_root, ...
+    'checkerboard_extended_pse_result_psignifit_m10.xlsx'));
+assert(ismember('pse_stimulus_distortion_parameter', custom_result.Properties.VariableNames));
+assert(~ismember('pse_instrument_distortion_k', custom_result.Properties.VariableNames));
+% Optimizer/grid rounding can differ slightly after translating the x-axis.
+assert(abs(custom_result.pse_stimulus_distortion_parameter - ...
+    (result.pse_instrument_distortion_k - 0.6)) < 1e-3);
+
+extended.instrument_distortion_k(negative) = extended.stimulus_distortion_parameter(negative);
+writetable(extended, csv);
+rejected = false;
+try
+    runFit(script_path, csv);
+catch error_info
+    rejected = contains(error_info.message, 'metadata', 'IgnoreCase', true);
+end
+assert(rejected, 'Negative custom settings must never be exported as Merlitz k.');
+
 old = removevars(T, {'stimulus_task', 'instrument_magnification_m'});
 old = renamevars(old, 'instrument_distortion_k', 'visual_space_l');
 old.mapping_version(:) = "visual-space-l-tangent-normalized-cartesian-grid-aperture-halfmax-v3";
@@ -66,7 +139,7 @@ catch error_info
     rejected = contains(error_info.message, 'mapping', 'IgnoreCase', true);
 end
 assert(rejected, 'Mixed checkerboard mappings must be rejected.');
-fprintf('\nPASS: instrument checkerboard, historical l, random dots, mixed-mapping rejection.\n');
+fprintf('\nPASS: instrument, separate grid-variant PSEs, custom tan/tanh, historical l, random dots, metadata/mapping rejection.\n');
 end
 
 function runFit(script_path, csv_path)

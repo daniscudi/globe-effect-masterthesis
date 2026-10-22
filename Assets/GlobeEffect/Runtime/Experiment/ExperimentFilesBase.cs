@@ -125,7 +125,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             return string.IsNullOrWhiteSpace(result) ? fallback : result;
         }
 
-        protected CsvRow StartRow()
+        protected CsvRow StartRow(string rowMappingVersion = null)
         {
             // Diese fünf Angaben stehen am Anfang jeder Zeile, in beiden Dateien.
             // Dadurch weiß man bei jeder einzelnen Zeile, aus welcher Sitzung sie
@@ -135,7 +135,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 .Add(sessionLabel)
                 .Add(sessionStartUtc)
                 .Add(randomSeed)
-                .Add(mappingVersion);
+                .Add(rowMappingVersion ?? mappingVersion);
         }
 
         protected void WritePlanFile(

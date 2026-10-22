@@ -58,16 +58,26 @@ namespace GlobeEffect.VRCheckerboard
         private bool useCircularAperture = true;
 
         [Header("Instrument Mapping (Merlitz)")]
-        [SerializeField, Range(0f, 2f)]
-        [Tooltip("Merlitz instrument k, as in the random dots: 1 = straight, 0.5 = circle condition, " +
-            "0 = angle condition; above 1 = barrel. Negative values do not extend pincushion.")]
+        [SerializeField, Range(-2f, 2f)]
+        [Tooltip("Nonnegative = Merlitz k. With Allow Pincushion Extension on: negative = custom " +
+            "tanh strength (-kappa), stronger pincushion. Negative values are NOT Merlitz k.")]
         [FormerlySerializedAs("visualSpaceL")]
         private float instrumentDistortionK = 0.5f;
 
         [SerializeField, Range(1f, 20f)]
-        [Tooltip("Magnification used to compute the STATIC grid through the instrument. Default 10. " +
-            "No zoom animation. m = 1 produces a straight grid for every k.")]
+        [Tooltip("Magnification m of the instrument for the preview. Default 10. Trials use the m of the " +
+            "trial plan. m = 1 makes every k look straight.")]
         private float instrumentMagnificationM = 10f;
+
+        [SerializeField]
+        [Tooltip("Variant 2: fixed source grid. Variant 3: normalize the source grid at the nominal " +
+            "window edge so the field span stays constant. Trials are set by the Experiment Manager.")]
+        private CheckerboardGridMapping gridMapping;
+
+        [SerializeField]
+        [Tooltip("Explicitly allow a custom tanh formula for negative settings (-2 to 0). " +
+            "Not Merlitz's instrument mapping. Applies only to checkerboards.")]
+        private bool allowPincushionExtension;
 
         [FormerlySerializedAs("gridLineSpacingDegrees")]
         [SerializeField, Range(0.5f, 45f)]
@@ -221,6 +231,36 @@ namespace GlobeEffect.VRCheckerboard
         public bool UseCircularAperture => useCircularAperture;
         public float InstrumentDistortionK => instrumentDistortionK;
         public float InstrumentMagnificationM => instrumentMagnificationM;
+        public CheckerboardGridMapping GridMapping => gridMapping;
+        // NaN, wenn die Kombination ungültig ist (dann wird kein Muster gezeigt).
+        public float GridSourceScale => InstrumentMappingProblem != null ? float.NaN
+            : (float)CheckerboardInstrumentMapping.GridSourceScale(fieldOfViewDegrees, instrumentMagnificationM,
+                instrumentDistortionK, allowPincushionExtension, gridMapping);
+        public bool AllowPincushionExtension => allowPincushionExtension;
+
+        /// <summary>
+        /// Warum die eingestellte Kombination nicht gezeichnet werden kann, sonst null.
+        /// Dieselbe Prüfung wie vor Trials und Übungen: FOV samt weichem Rand, k, m und
+        /// die Tangens-Grenze. Ungültige Werte werden nicht still auf einen gültigen
+        /// Wert gesetzt; der Stimulus zeigt dann nur die graue Fläche.
+        /// </summary>
+        public string InstrumentMappingProblem
+        {
+            get
+            {
+                try
+                {
+                    CheckerboardInstrumentMapping.ValidateParameters(fieldOfViewDegrees, instrumentMagnificationM,
+                        instrumentDistortionK, edgeSoftnessDegrees, useCircularAperture, allowPincushionExtension);
+                    CheckerboardInstrumentMapping.ValidateGridMapping(gridMapping);
+                    return null;
+                }
+                catch (ArgumentException exception)
+                {
+                    return exception.Message;
+                }
+            }
+        }
         public float GridLineSpacingDegrees => gridSpacingDegrees;
         public float GridLineSpacingUv => DegreesToUv(gridSpacingDegrees);
         public bool CheckerboardInverted => invertCheckerboard;
@@ -397,14 +437,39 @@ namespace GlobeEffect.VRCheckerboard
 
         public void SetInstrumentDistortionK(float value)
         {
+            // Ungültige Werte werden abgewiesen statt still auf den Rand gesetzt;
+            // sonst würde unbemerkt eine andere Abbildung gezeigt.
+            if (float.IsNaN(value) || value > 2f
+                || value < (allowPincushionExtension ? (float)CheckerboardInstrumentMapping.MinimumExtendedSetting : 0f))
+                throw new ArgumentOutOfRangeException(nameof(value), allowPincushionExtension
+                    ? "Der Reizwert muss zwischen -2 und 2 liegen."
+                    : "Merlitz-k muss zwischen 0 und 2 liegen. Negative Werte nur mit der eigenen tanh-Erweiterung.");
             // k wird als Instrumentenbedingung vorgegeben, nicht als Wahrnehmungs-l.
             instrumentDistortionK = value;
             ApplyChange();
         }
 
+        public void SetPincushionExtensionEnabled(bool enabled)
+        {
+            // Ein negativer Wert wird beim Ausschalten NICHT still zu k = 0. Er bleibt
+            // stehen, das Muster wird nicht gezeigt und InstrumentMappingProblem nennt
+            // den Grund. Trials und Übungen setzen k direkt danach ohnehin neu.
+            allowPincushionExtension = enabled;
+            ApplyChange();
+        }
+
         public void SetInstrumentMagnificationM(float value)
         {
+            if (float.IsNaN(value) || value < 1f || value > 20f)
+                throw new ArgumentOutOfRangeException(nameof(value), "m muss zwischen 1 und 20 liegen.");
             instrumentMagnificationM = value;
+            ApplyChange();
+        }
+
+        public void SetGridMapping(CheckerboardGridMapping value)
+        {
+            CheckerboardInstrumentMapping.ValidateGridMapping(value);
+            gridMapping = value;
             ApplyChange();
         }
 
@@ -424,6 +489,12 @@ namespace GlobeEffect.VRCheckerboard
         /// <summary>Zeigt das ganze Schachbrett mit Fixationskreuz.</summary>
         public void Show()
         {
+            string problem = InstrumentMappingProblem;
+            if (problem != null)
+            {
+                Debug.LogWarning("Checkerboard wird nicht gezeichnet (nur graue Fläche): " + problem, this);
+            }
+
             ShowParts(checkerboard: true, noise: false, fixation: true, prompt: false);
             StimulusPresented?.Invoke(CaptureSnapshot());
         }
@@ -503,6 +574,9 @@ namespace GlobeEffect.VRCheckerboard
                 useCircularAperture = useCircularAperture,
                 instrumentDistortionK = instrumentDistortionK,
                 instrumentMagnificationM = instrumentMagnificationM,
+                allowPincushionExtension = allowPincushionExtension,
+                gridMapping = gridMapping,
+                gridSourceScale = GridSourceScale,
                 // Kein zusätzlicher Content Zoom; m gehört zur Instrumentengleichung.
                 contentZoom = 1f,
                 gridLineSpacingDegrees = gridSpacingDegrees,
@@ -584,11 +658,15 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetFloat("_UseCircularAperture", useCircularAperture ? 1f : 0f);
             propertyBlock.SetFloat("_InstrumentDistortionK", instrumentDistortionK);
             propertyBlock.SetFloat("_InstrumentMagnificationM", instrumentMagnificationM);
+            propertyBlock.SetFloat("_AllowPincushionExtension", allowPincushionExtension ? 1f : 0f);
             propertyBlock.SetFloat("_GridLineSpacingUv", DegreesToUv(gridSpacingDegrees));
+            // Ungültige Kombination: kein Muster statt einer still veränderten Abbildung.
+            bool mappingValid = InstrumentMappingProblem == null;
+            propertyBlock.SetFloat("_GridSourceScale", mappingValid ? GridSourceScale : 1f);
             propertyBlock.SetColor("_DarkColor", darkColor);
             propertyBlock.SetColor("_LightColor", lightColor);
             propertyBlock.SetColor("_FixationBackgroundColor", backgroundColor);
-            propertyBlock.SetFloat("_CheckerboardEnabled", checkerboardVisible ? 1f : 0f);
+            propertyBlock.SetFloat("_CheckerboardEnabled", checkerboardVisible && mappingValid ? 1f : 0f);
             propertyBlock.SetFloat("_CheckerboardInverted", invertCheckerboard ? 1f : 0f);
             propertyBlock.SetFloat("_NoiseEnabled", noiseVisible ? 1f : 0f);
             propertyBlock.SetFloat("_NoiseCellSizeUv", DegreesToUv(NoiseDotSizeDegrees));
@@ -830,7 +908,10 @@ namespace GlobeEffect.VRCheckerboard
             // das ebenfalls, damit jede Grenze nur an dieser einen Stelle steht.
             fieldOfViewDegrees = Mathf.Clamp(fieldOfViewDegrees, 1f, 170f);
             edgeSoftnessDegrees = Mathf.Clamp(edgeSoftnessDegrees, 0f, 10f);
-            instrumentDistortionK = Mathf.Clamp(instrumentDistortionK, 0f, 2f);
+            // Nur der Reglerbereich -2..2. Ein negativer Wert ohne Erweiterung wird
+            // nicht still zu 0, sondern als Problem gemeldet (InstrumentMappingProblem).
+            instrumentDistortionK = Mathf.Clamp(instrumentDistortionK,
+                (float)CheckerboardInstrumentMapping.MinimumExtendedSetting, 2f);
             instrumentMagnificationM = Mathf.Clamp(instrumentMagnificationM, 1f, 20f);
             gridSpacingDegrees = Mathf.Clamp(gridSpacingDegrees, 0.5f, 45f);
             noiseDotSizeDegrees = Mathf.Clamp(noiseDotSizeDegrees, 0.02f, 10f);
@@ -890,6 +971,9 @@ namespace GlobeEffect.VRCheckerboard
         public bool useCircularAperture;
         public float instrumentDistortionK;
         public float instrumentMagnificationM;
+        public bool allowPincushionExtension;
+        public CheckerboardGridMapping gridMapping;
+        public float gridSourceScale;
         public float contentZoom;
         public float gridLineSpacingDegrees;
         public float gridLineSpacingUv;

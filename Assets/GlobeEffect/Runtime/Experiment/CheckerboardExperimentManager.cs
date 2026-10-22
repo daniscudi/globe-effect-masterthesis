@@ -113,9 +113,24 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private List<float> instrumentDistortionKValues = new() { 1.2f, 1f, 0.8f, 0.6f, 0.5f, 0.4f, 0.2f };
 
         [SerializeField, Range(1f, 20f)]
-        [Tooltip("Fixed magnification used to generate every static checkerboard. Default 10, as in " +
-            "Merlitz's examples. Match the random-dot comparison condition. m = 1 removes k differences.")]
-        private float instrumentMagnificationM = 10f;
+        [Tooltip("Magnification m used for every checkerboard in trials, practice and examples. Default 10. " +
+            "Try other values to see how m changes the distortion. m = 1 makes every k look straight.")]
+        private float instrumentMagnificationM = CheckerboardInstrumentMapping.DefaultMagnificationM;
+
+        [SerializeField]
+        [Tooltip("Variant 2 (standard): Merlitz instrument mapping at fixed m = 10 with a fixed source " +
+            "grid. No extra scaling at the window edge, so the number of squares at the edge may change with k.")]
+        private bool testFixedSourceGrid = true;
+
+        [SerializeField]
+        [Tooltip("Variant 3: same instrument mapping, source grid normalized at the window edge. " +
+            "Same k levels/repetitions as variant 2. When both are on their trials are shuffled together.")]
+        private bool testEdgeNormalizedGrid;
+
+        [SerializeField]
+        [Tooltip("Allow negative stimulus settings in practice and trials via the CUSTOM tanh " +
+            "extension. Not Merlitz k. Files and PSEs are explicitly labelled as extended stimuli.")]
+        private bool allowPincushionExtension;
 
         [SerializeField]
         [Tooltip("How often each k value is shown, in the same order as the k list. Missing entries use " +
@@ -215,13 +230,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private bool requireTrainingBeforeSession = true;
 
         [FormerlySerializedAs("trainingCategoryAVisualSpaceL")]
-        [SerializeField, Range(0f, 2f)]
+        [SerializeField, Range(-2f, 2f)]
         [Tooltip("k value of the convex example in the practice. Should be easy to see but inside " +
             "the tested range.")]
         private float trainingExampleA = 1.2f;
 
         [FormerlySerializedAs("trainingCategoryBVisualSpaceL")]
-        [SerializeField, Range(0f, 2f)]
+        [SerializeField, Range(-2f, 2f)]
         [Tooltip("k value of the concave example in the practice. Should be easy to see but inside " +
             "the tested range.")]
         private float trainingExampleB = 0.2f;
@@ -265,6 +280,17 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         private IReadOnlyList<CheckerboardTrial> trialPlan;
         private CheckerboardTrialQueue trialQueue;
+        private CheckerboardGridMapping trainingGridMapping;
+
+        private List<CheckerboardGridMapping> SelectedGridMappings()
+        {
+            var mappings = new List<CheckerboardGridMapping>();
+            if (testFixedSourceGrid) mappings.Add(CheckerboardGridMapping.FixedSourceGrid);
+            if (testEdgeNormalizedGrid) mappings.Add(CheckerboardGridMapping.EdgeNormalized);
+            if (mappings.Count == 0)
+                throw new ArgumentException("Mindestens eine Checkerboard-Variante auswählen.");
+            return mappings;
+        }
         private CheckerboardTrial currentTrial;
         private CheckerboardExperimentFiles experimentFiles;
         private double responseWindowStartUnitySeconds;
@@ -296,6 +322,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
         public CheckerboardTrialSequence TrialSequence => trialSequence;
         public bool InvertCheckerboardEachTrial => invertCheckerboardEachTrial;
+        public float InstrumentMagnificationM => instrumentMagnificationM;
         public bool ResponseKeysSwapped => keyboardController != null && keyboardController.SwapResponseKeys;
         public string ConvexResponseKeyName => ResponseKeyName(CheckerboardCurvatureResponse.Convex);
         public string ConcaveResponseKeyName => ResponseKeyName(CheckerboardCurvatureResponse.Concave);
@@ -620,6 +647,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
             try
             {
+                SelectedGridMappings();
                 float fov = fieldOfViewValues != null && fieldOfViewValues.Count > 0
                     ? fieldOfViewValues[0] : stimulus.AngularDiameterDegrees;
                 var values = new List<float>();
@@ -628,8 +656,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 values.Add(trainingExampleA);
                 values.Add(trainingExampleB);
                 foreach (float k in values)
-                    CheckerboardInstrumentMapping.ValidateParameters(fov, instrumentMagnificationM, k,
-                        stimulus.ApertureEdgeSoftnessDegrees, stimulus.UseCircularAperture);
+                    CheckerboardInstrumentMapping.ValidateParameters(fov,
+                        instrumentMagnificationM, k,
+                        stimulus.ApertureEdgeSoftnessDegrees, stimulus.UseCircularAperture,
+                        allowPincushionExtension);
             }
             catch (ArgumentException exception)
             {
@@ -699,24 +729,28 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             int presentationIndex = 0;
             foreach (CheckerboardCurvatureResponse example in examples)
             {
-                sessionState = State.TrainingInstructions;
-                stimulus.ShowResponsePrompt(BuildTrainingCategoryIntroduction(example));
-                yield return WaitForTrainingAdvance();
-
-                presentationIndex++;
-                float exampleK =
-                    example == CheckerboardCurvatureResponse.Convex ? trainingExampleA : trainingExampleB;
-                yield return ShowTrainingPattern(exampleK, unchecked(randomSeed + 50000 + presentationIndex),
-                    waitForResponse: false, patternDurationSeconds: trainingExampleSeconds, inverted: false);
-                if (!IsTrainingActive)
+                foreach (CheckerboardGridMapping mapping in SelectedGridMappings())
                 {
-                    yield break;
-                }
+                    trainingGridMapping = mapping;
+                    sessionState = State.TrainingInstructions;
+                    stimulus.ShowResponsePrompt(BuildTrainingCategoryIntroduction(example));
+                    yield return WaitForTrainingAdvance();
 
-                sessionState = State.TrainingInstructions;
-                stimulus.ShowResponsePrompt(BuildCategoryText(example) + "\n\n" +
-                    ContinueKeyName + " = CONTINUE");
-                yield return WaitForTrainingAdvance();
+                    presentationIndex++;
+                    float exampleK =
+                        example == CheckerboardCurvatureResponse.Convex ? trainingExampleA : trainingExampleB;
+                    yield return ShowTrainingPattern(exampleK, unchecked(randomSeed + 50000 + presentationIndex),
+                        waitForResponse: false, patternDurationSeconds: trainingExampleSeconds, inverted: false);
+                    if (!IsTrainingActive)
+                    {
+                        yield break;
+                    }
+
+                    sessionState = State.TrainingInstructions;
+                    stimulus.ShowResponsePrompt(BuildCategoryText(example) + "\n\n" +
+                        ContinueKeyName + " = CONTINUE");
+                    yield return WaitForTrainingAdvance();
+                }
             }
 
             // Teil 1 leicht, Teil 2 schwerer. Jeder Teil in der eingetragenen
@@ -743,38 +777,42 @@ namespace GlobeEffect.VRCheckerboard.Experiment
 
                 foreach (float practiceK in part.values)
                 {
-                    presentationIndex++;
                     practiceIndex++;
                     bool inverted = CheckerboardPolarity.InvertedForPractice(
                         invertCheckerboardEachTrial, practiceIndex);
-                    yield return ShowTrainingPattern(practiceK,
-                        unchecked(randomSeed + 60000 + presentationIndex),
-                        waitForResponse: true, patternDurationSeconds: patternSeconds, inverted: inverted);
-                    if (!IsTrainingActive)
+                    foreach (CheckerboardGridMapping mapping in SelectedGridMappings())
                     {
-                        yield break;
-                    }
+                        trainingGridMapping = mapping;
+                        presentationIndex++;
+                        yield return ShowTrainingPattern(practiceK,
+                            unchecked(randomSeed + 60000 + presentationIndex),
+                            waitForResponse: true, patternDurationSeconds: patternSeconds, inverted: inverted);
+                        if (!IsTrainingActive)
+                        {
+                            yield break;
+                        }
 
-                    // Warten, bis geantwortet wurde oder die Antwortzeit um ist.
-                    trainingResponseReceived = false;
-                    trainingResponse = CheckerboardCurvatureResponse.None;
-                    sessionState = State.TrainingWaitingForResponse;
-                    double responseStart = Time.realtimeSinceStartupAsDouble;
-                    double responseDeadline = answerTimeoutSeconds > 0f
-                        ? responseStart + answerTimeoutSeconds
-                        : double.PositiveInfinity;
-                    while (IsTrainingActive && !trainingResponseReceived
-                        && Time.realtimeSinceStartupAsDouble < responseDeadline)
-                    {
-                        yield return null;
-                    }
+                        // Warten, bis geantwortet wurde oder die Antwortzeit um ist.
+                        trainingResponseReceived = false;
+                        trainingResponse = CheckerboardCurvatureResponse.None;
+                        sessionState = State.TrainingWaitingForResponse;
+                        double responseStart = Time.realtimeSinceStartupAsDouble;
+                        double responseDeadline = answerTimeoutSeconds > 0f
+                            ? responseStart + answerTimeoutSeconds
+                            : double.PositiveInfinity;
+                        while (IsTrainingActive && !trainingResponseReceived
+                            && Time.realtimeSinceStartupAsDouble < responseDeadline)
+                        {
+                            yield return null;
+                        }
 
-                    if (!IsTrainingActive)
-                    {
-                        yield break;
-                    }
+                        if (!IsTrainingActive)
+                        {
+                            yield break;
+                        }
 
-                    LogPracticeAnswer(part.number, practiceK, part.closerHint, inverted, responseStart);
+                        LogPracticeAnswer(part.number, practiceK, part.closerHint, inverted, responseStart);
+                    }
                 }
             }
 
@@ -869,10 +907,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             }
 
             CheckerboardInstrumentMapping.ValidateParameters(stimulus.AngularDiameterDegrees,
-                instrumentMagnificationM, instrumentDistortionK, stimulus.ApertureEdgeSoftnessDegrees,
-                stimulus.UseCircularAperture);
+                instrumentMagnificationM, instrumentDistortionK,
+                stimulus.ApertureEdgeSoftnessDegrees, stimulus.UseCircularAperture, allowPincushionExtension);
+            stimulus.SetPincushionExtensionEnabled(allowPincushionExtension);
             stimulus.SetInstrumentMagnificationM(instrumentMagnificationM);
             stimulus.SetInstrumentDistortionK(instrumentDistortionK);
+            stimulus.SetGridMapping(trainingGridMapping);
             stimulus.SetCheckerboardInverted(inverted);
         }
 
@@ -884,7 +924,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             {
                 foreach (float value in values)
                 {
-                    copy.Add(Mathf.Clamp(value, 0f, 2f));
+                    copy.Add(Mathf.Clamp(value, -2f, 2f));
                 }
             }
 
@@ -916,6 +956,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 ? PracticeAnswerLog.CloserToExample(k, trainingExampleA, trainingExampleB)
                 : CheckerboardCurvatureResponse.None;
             var notes = new List<string>();
+            notes.Add(trainingGridMapping.ToString());
             if (!trainingResponseReceived) notes.Add("no answer");
             if (inverted) notes.Add("inverted");
             practiceLog.Add("Part " + part, k,
@@ -999,17 +1040,19 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             {
                 trialPlan = CheckerboardTrialPlanner.CreateRandomizedPlan(
                     fieldOfViewValues, eyePresentations, instrumentDistortionKValues, repeatsPerCondition, randomSeed,
-                    repeatsPerKValue, instrumentMagnificationM);
+                    repeatsPerKValue, instrumentMagnificationM, allowPincushionExtension,
+                    SelectedGridMappings());
                 foreach (CheckerboardTrial planned in trialPlan)
                     CheckerboardInstrumentMapping.ValidateParameters(planned.AngularDiameterDegrees,
                         planned.InstrumentMagnificationM, planned.InstrumentDistortionK,
-                        stimulus.ApertureEdgeSoftnessDegrees, stimulus.UseCircularAperture);
+                        stimulus.ApertureEdgeSoftnessDegrees, stimulus.UseCircularAperture,
+                        planned.AllowPincushionExtension);
                 trialQueue = new CheckerboardTrialQueue(trialPlan);
 
                 DateTime sessionStartUtc = DateTime.UtcNow;
                 experimentFiles = new CheckerboardExperimentFiles(
                     ExperimentOutputPath.Resolve(outputRoot), participantId, sessionLabel,
-                    sessionStartUtc, randomSeed);
+                    sessionStartUtc, randomSeed, allowPincushionExtension);
                 experimentFiles.WritePlan(
                     trialPlan, stimulus.GridLineSpacingDegrees, patternSeconds, trialSequence,
                     preStimulusSeconds, answerTimeoutSeconds, ConvexResponseKeyName,
@@ -1103,8 +1146,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             stimulus.Hide();
             stimulus.SetAngularDiameter(currentTrial.AngularDiameterDegrees);
             stimulus.SetEyePresentation(currentTrial.EyePresentation);
+            stimulus.SetPincushionExtensionEnabled(currentTrial.AllowPincushionExtension);
             stimulus.SetInstrumentMagnificationM(currentTrial.InstrumentMagnificationM);
             stimulus.SetInstrumentDistortionK(currentTrial.InstrumentDistortionK);
+            stimulus.SetGridMapping(currentTrial.GridMapping);
             // Abwechselnd pro gezeigtem Trial; Wiederholungen zählen mit.
             stimulus.SetCheckerboardInverted(CheckerboardPolarity.InvertedForPresentation(
                 invertCheckerboardEachTrial, presentationCount));
@@ -1549,7 +1594,10 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 ExperimentFilesBase.SanitizeIdentifier(participantId, "pilot"),
                 ExperimentFilesBase.SanitizeIdentifier(sessionLabel, "session"),
                 randomSeed, trialPlan.Count, sessionStartUtc.ToString("O", CultureInfo.InvariantCulture),
-                CheckerboardInstrumentMapping.MappingVersion,
+                testFixedSourceGrid && testEdgeNormalizedGrid ? "mixed-instrument-grid-variants"
+                    : CheckerboardInstrumentMapping.VersionFor(allowPincushionExtension,
+                        testEdgeNormalizedGrid ? CheckerboardGridMapping.EdgeNormalized
+                            : CheckerboardGridMapping.FixedSourceGrid),
                 stimulus.NoiseDotSizeDegrees, stimulus.NoiseDotSizePixels, stimulus.NoiseRefreshRateHz,
                 stimulus.BackgroundColor.r, stimulus.BackgroundColor.g, stimulus.BackgroundColor.b,
                 BuildTimingAndResponseFields(), stimulus.NoiseType, stimulus.NoiseBroadbandCoarsestDegrees,
@@ -1689,14 +1737,18 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 "TrialStart;presentation={0};sequence={1};condition={2};repetition={3};" +
                 "attempt={4};eye={5};fov_deg={6:F3};edge_softness_deg={7:F3};" +
                 "circular_aperture={8};grid_spacing_deg={9:F3};" +
-                "grid_spacing_uv={10:F6};instrument_distortion_k={11:F4};{12};" +
-                "instrument_magnification_m={13:F3};mapping={14};checkerboard_inverted={15}",
+                "grid_spacing_uv={10:F6};stimulus_distortion_parameter={11:F4};{12};" +
+                "instrument_magnification_m={13:F3};mapping={14};checkerboard_inverted={15};mapping_family={16};" +
+                "grid_mapping={17};grid_source_scale={18:F6}",
                 presentationCount, trial.SequenceIndex, trial.ConditionIndex, trial.Repetition,
                 trial.AttemptNumber, trial.EyePresentation, trial.AngularDiameterDegrees,
                 stimulus.ApertureEdgeSoftnessDegrees, stimulus.UseCircularAperture,
                 stimulus.GridLineSpacingDegrees, stimulus.GridLineSpacingUv, trial.InstrumentDistortionK,
                 BuildTimingAndResponseFields(), trial.InstrumentMagnificationM,
-                CheckerboardInstrumentMapping.MappingVersion, stimulus.CheckerboardInverted ? 1 : 0);
+                CheckerboardInstrumentMapping.VersionFor(trial.AllowPincushionExtension, trial.GridMapping),
+                stimulus.CheckerboardInverted ? 1 : 0,
+                CheckerboardInstrumentMapping.FamilyFor(trial.InstrumentDistortionK),
+                trial.GridMapping, stimulus.GridSourceScale);
         }
 
         private string ResponseKeyName(CheckerboardCurvatureResponse response)
@@ -1740,15 +1792,15 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             patternSeconds = Mathf.Max(0.01f, patternSeconds);
             answerTimeoutSeconds = Mathf.Max(0f, answerTimeoutSeconds);
             instrumentMagnificationM = Mathf.Clamp(instrumentMagnificationM, 1f, 20f);
-            trainingExampleA = Mathf.Clamp(trainingExampleA, 0f, 2f);
-            trainingExampleB = Mathf.Clamp(trainingExampleB, 0f, 2f);
+            trainingExampleA = Mathf.Clamp(trainingExampleA, -2f, 2f);
+            trainingExampleB = Mathf.Clamp(trainingExampleB, -2f, 2f);
             trainingNoiseSeconds = Mathf.Max(0f, trainingNoiseSeconds);
             foreach (List<float> values in new[] { trainingEasyKValues, trainingHardKValues })
             {
                 if (values == null) continue;
                 for (int index = 0; index < values.Count; index++)
                 {
-                    values[index] = Mathf.Clamp(values[index], 0f, 2f);
+                    values[index] = Mathf.Clamp(values[index], -2f, 2f);
                 }
             }
 

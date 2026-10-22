@@ -42,6 +42,40 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [Test]
+        public void MixedVariants_StorePerTrialMappingVersionsAndSourceScalesInPlanAndResults()
+        {
+            var modes = new[] { CheckerboardGridMapping.FixedSourceGrid, CheckerboardGridMapping.EdgeNormalized };
+            var plan = CheckerboardTrialPlanner.CreateRandomizedPlan(new[] { 60f },
+                new[] { CheckerboardEyePresentation.BothEyes }, new[] { 0.5f }, 1, 1, gridMappings: modes);
+            var files = new CheckerboardExperimentFiles(outputRoot, "mixed", "variants", DateTime.UtcNow, 1);
+            files.WritePlan(plan, 8f, 0.6f, Sequence.NoiseResponseThenGray, 0.4f, 0f,
+                "UP", "DOWN", false, VrControllerMapping.TrackpadConcaveTriggerConvex);
+            foreach (CheckerboardTrial trial in plan)
+                files.AppendResult(new CheckerboardTrialResult
+                {
+                    Trial = trial, GridLineSpacingUv = 0.2f, GridLineSpacingDegrees = 8f,
+                    Response = CheckerboardCurvatureResponse.Convex, ValidForAnalysis = true
+                }, plan.Count);
+            foreach (string path in new[] { files.PlanFile, files.TrialResultsFile })
+            {
+                string[] rows = File.ReadAllLines(path);
+                string[] header = rows[0].Split(',');
+                for (int i = 0; i < plan.Count; i++)
+                {
+                    string[] row = rows[i + 1].Split(',');
+                    Assert.That(row.Length, Is.EqualTo(header.Length));
+                    Assert.That(Column(header, row, "grid_mapping"), Is.EqualTo(plan[i].GridMapping.ToString()));
+                    Assert.That(Column(header, row, "mapping_version"),
+                        Is.EqualTo(CheckerboardInstrumentMapping.VersionFor(false, plan[i].GridMapping)));
+                    double scale = double.Parse(Column(header, row, "grid_source_scale"),
+                        System.Globalization.CultureInfo.InvariantCulture);
+                    Assert.That(scale, plan[i].GridMapping == CheckerboardGridMapping.FixedSourceGrid
+                        ? Is.EqualTo(1) : Is.GreaterThan(1));
+                }
+            }
+        }
+
+        [Test]
         public void SequenceB_ShowsGrayDuringResponseAndNoiseBeforeTheNextPattern()
         {
             Assert.That(Sequence.GrayResponseThenNoise.ShowsNoiseDuringResponse(), Is.False);
@@ -127,6 +161,34 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(Column(trialHeader, trialRow, "checkerboard_inverted"), Is.EqualTo(inverted ? "1" : "0"));
             Assert.That(Column(trialHeader, trialRow, "mapping_version"),
                 Is.EqualTo("merlitz-instrument-checkerboard-fixed-source-grid-v2"));
+        }
+
+        [Test]
+        public void CustomFiles_StoreSignedSettingButNeverPretendNegativeValuesAreMerlitzK()
+        {
+            var files = new CheckerboardExperimentFiles(outputRoot, "synthetic_test", "extension",
+                DateTime.UtcNow, 1, allowPincushionExtension: true);
+            var trial = new CheckerboardTrial(1, 1, 1, 1, 60f,
+                CheckerboardEyePresentation.BothEyes, -1.5f, 10f, allowPincushionExtension: true);
+            files.WritePlan(new[] { trial }, 8f, 0.8f, Sequence.NoiseResponseThenGray,
+                0.4f, 0f, "TRIGGER", "TRACKPAD CLICK", false,
+                VrControllerMapping.TrackpadConcaveTriggerConvex);
+            var result = CreateResult(Sequence.NoiseResponseThenGray);
+            result.Trial = trial;
+            files.AppendResult(result, 1);
+            foreach (string path in new[] { files.PlanFile, files.TrialResultsFile })
+            {
+                string[] lines = File.ReadAllLines(path);
+                string[] header = lines[0].Split(','), row = lines[1].Split(',');
+                Assert.That(row.Length, Is.EqualTo(header.Length));
+                Assert.That(Column(header, row, "mapping_version"),
+                    Is.EqualTo(CheckerboardInstrumentMapping.ExtensionMappingVersion));
+                Assert.That(Column(header, row, "instrument_distortion_k"), Is.Empty);
+                Assert.That(Column(header, row, "stimulus_distortion_parameter"), Is.EqualTo("-1.5"));
+                Assert.That(Column(header, row, "mapping_family"), Is.EqualTo("custom_tanh"));
+                Assert.That(Column(header, row, "extension_kappa"), Is.EqualTo("1.5"));
+                Assert.That(Column(header, row, "allow_pincushion_extension"), Is.EqualTo("1"));
+            }
         }
 
         private static string Column(string[] header, string[] row, string name)

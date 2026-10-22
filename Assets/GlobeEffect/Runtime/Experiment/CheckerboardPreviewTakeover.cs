@@ -22,10 +22,13 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             var plan = new PlanValues();
             JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(manager), plan);
 
-            // k-Liste bleibt unverändert; FOV, Augenmodus und festes m übernehmen.
+            // k-Liste bleibt unverändert; FOV, Augenmodus und m übernehmen.
             plan.fieldOfViewValues = new List<float> { preview.fieldOfViewDegrees };
             plan.eyePresentations = new List<CheckerboardEyePresentation> { preview.eyePresentation };
             plan.instrumentMagnificationM = preview.instrumentMagnificationM;
+            plan.allowPincushionExtension = preview.allowPincushionExtension;
+            plan.testFixedSourceGrid = preview.gridMapping == CheckerboardGridMapping.FixedSourceGrid;
+            plan.testEdgeNormalizedGrid = preview.gridMapping == CheckerboardGridMapping.EdgeNormalized;
 
             JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(plan), manager);
         }
@@ -59,6 +62,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             public List<float> fieldOfViewValues = new();
             public List<CheckerboardEyePresentation> eyePresentations = new();
             public float instrumentMagnificationM = 10f;
+            public bool allowPincushionExtension;
+            public bool testFixedSourceGrid = true;
+            public bool testEdgeNormalizedGrid;
         }
 
         // Feldnamen = VrCheckerboardStimulus, Vorschauwerte für den Versuchsplan.
@@ -68,6 +74,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             public float fieldOfViewDegrees;
             public CheckerboardEyePresentation eyePresentation;
             public float instrumentMagnificationM = 10f;
+            public bool allowPincushionExtension;
+            public CheckerboardGridMapping gridMapping;
         }
 
         // Feldnamen = VrCheckerboardStimulus, Darstellung. Diese Werte setzt der
@@ -77,6 +85,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             // Auch beim Zurücksetzen/Behalten der Vorschau das sichtbare m mitnehmen.
             public float instrumentMagnificationM = 10f;
+            public bool allowPincushionExtension;
+            public CheckerboardGridMapping gridMapping;
             public float edgeSoftnessDegrees;
             public bool useCircularAperture;
             public float gridSpacingDegrees;

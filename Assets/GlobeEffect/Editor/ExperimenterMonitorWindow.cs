@@ -168,8 +168,14 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     hasSession ? FormatTrial(session.CurrentTrialNumber, session.TotalTrials) : Missing);
                 Row("Valid Trials Done", hasSession ? Number(session.ValidTrialsCompleted) : Missing);
                 Row("Trials Shown (With Repeats)", hasSession ? Number(session.PresentationCount) : Missing);
-                Row("Instrument k", hasStimulus ? Number(stimulus.InstrumentDistortionK, "F3") : Missing);
+                Row(hasStimulus && stimulus.InstrumentDistortionK < 0f ? "Custom setting (-κ)" : "Instrument k",
+                    hasStimulus ? Number(stimulus.InstrumentDistortionK, "F3") : Missing);
+                Row("Mapping family", hasStimulus
+                    ? CheckerboardInstrumentMapping.FamilyFor(stimulus.InstrumentDistortionK) : Missing);
                 Row("Magnification m", hasStimulus ? Number(stimulus.InstrumentMagnificationM, "F2", "x") : Missing);
+                Row("Grid Variant", !hasStimulus ? Missing
+                    : stimulus.GridMapping == CheckerboardGridMapping.FixedSourceGrid
+                        ? "2: Fixed Source Grid" : "3: Edge-Normalized Grid");
                 Row("FOV", hasStimulus ? Number(stimulus.AngularDiameterDegrees, "F1", "°") : Missing);
                 Row("Eyes", hasStimulus ? stimulus.EyePresentation.ToString() : Missing);
                 Row("Black/White Swapped", !hasSession || !hasStimulus ? Missing

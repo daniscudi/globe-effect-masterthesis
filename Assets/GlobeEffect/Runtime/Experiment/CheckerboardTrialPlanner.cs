@@ -22,13 +22,24 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             int repetitions,
             int randomSeed,
             IReadOnlyList<int> repetitionsPerK = null,
-            float instrumentMagnificationM = 10f)
+            float instrumentMagnificationM = 10f,
+            bool allowPincushionExtension = false,
+            IReadOnlyList<CheckerboardGridMapping> gridMappings = null)
         {
+            gridMappings ??= new[] { CheckerboardGridMapping.FixedSourceGrid };
+            PlannerTools.RequireNonEmpty(gridMappings, nameof(gridMappings));
+            var selectedMappings = new HashSet<CheckerboardGridMapping>();
+            foreach (CheckerboardGridMapping mapping in gridMappings)
+            {
+                CheckerboardInstrumentMapping.ValidateGridMapping(mapping);
+                if (!selectedMappings.Add(mapping))
+                    throw new ArgumentException("Gittervariante darf nur einmal im Plan stehen.", nameof(gridMappings));
+            }
             // Erst einmal prüfen, ob die Werte überhaupt stimmen. Lieber hier
             // abbrechen, als mitten in der Messung zu merken, dass etwas fehlt.
             ValidateValues(
                 angularDiametersDegrees, eyePresentations, instrumentDistortionKValues, repetitions,
-                instrumentMagnificationM);
+                instrumentMagnificationM, allowPincushionExtension);
             for (int index = 0; index < instrumentDistortionKValues.Count; index++)
             {
                 PlannerTools.RepetitionsFor(repetitionsPerK, index, repetitions);
@@ -37,23 +48,28 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             var trials = new List<CheckerboardTrial>();
             int conditionIndex = 0;
 
-            // Die ineinander liegenden Schleifen gehen jede Kombination einmal
-            // durch: jedes FOV mit jedem Augenmodus mit jedem k. Jedes k kann eine
-            // eigene Wiederholungszahl haben (z. B. Randwerte seltener als die Mitte).
-            foreach (float angularDiameter in angularDiametersDegrees)
+            // Jede gewählte Variante bekommt denselben k-Satz und dieselben
+            // Wiederholungen. Anschließend gemeinsam mischen, nicht als zwei Sitzungen.
+            foreach (CheckerboardGridMapping gridMapping in gridMappings)
             {
-                foreach (CheckerboardEyePresentation eye in eyePresentations)
+                // Die ineinander liegenden Schleifen gehen jede Kombination einmal
+                // durch: jedes FOV mit jedem Augenmodus mit jedem k. Jedes k kann eine
+                // eigene Wiederholungszahl haben (z. B. Randwerte seltener als die Mitte).
+                foreach (float angularDiameter in angularDiametersDegrees)
                 {
-                    for (int kIndex = 0; kIndex < instrumentDistortionKValues.Count; kIndex++)
+                    foreach (CheckerboardEyePresentation eye in eyePresentations)
                     {
-                        float instrumentDistortionK = instrumentDistortionKValues[kIndex];
-                        int repetitionsForK = PlannerTools.RepetitionsFor(repetitionsPerK, kIndex, repetitions);
-                        conditionIndex++;
-                        for (int repetition = 1; repetition <= repetitionsForK; repetition++)
+                        for (int kIndex = 0; kIndex < instrumentDistortionKValues.Count; kIndex++)
                         {
-                            trials.Add(new CheckerboardTrial(sequenceIndex: 0, conditionIndex,
-                                repetition, attemptNumber: 1, angularDiameter, eye, instrumentDistortionK,
-                                instrumentMagnificationM));
+                            float instrumentDistortionK = instrumentDistortionKValues[kIndex];
+                            int repetitionsForK = PlannerTools.RepetitionsFor(repetitionsPerK, kIndex, repetitions);
+                            conditionIndex++;
+                            for (int repetition = 1; repetition <= repetitionsForK; repetition++)
+                            {
+                                trials.Add(new CheckerboardTrial(sequenceIndex: 0, conditionIndex,
+                                    repetition, attemptNumber: 1, angularDiameter, eye, instrumentDistortionK,
+                                    instrumentMagnificationM, allowPincushionExtension, gridMapping));
+                            }
                         }
                     }
                 }
@@ -77,7 +93,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             IReadOnlyList<CheckerboardEyePresentation> eyePresentations,
             IReadOnlyList<float> instrumentDistortionKValues,
             int repetitions,
-            float instrumentMagnificationM)
+            float instrumentMagnificationM,
+            bool allowPincushionExtension)
         {
             PlannerTools.RequireNonEmpty(angularDiametersDegrees, nameof(angularDiametersDegrees));
             PlannerTools.RequireNonEmpty(eyePresentations, nameof(eyePresentations));
@@ -102,7 +119,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 foreach (float instrumentDistortionK in instrumentDistortionKValues)
                 {
                     CheckerboardInstrumentMapping.ValidateParameters(
-                        angularDiameter, instrumentMagnificationM, instrumentDistortionK);
+                        angularDiameter, instrumentMagnificationM, instrumentDistortionK,
+                        allowPincushionExtension: allowPincushionExtension);
                 }
             }
         }
@@ -158,6 +176,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public CheckerboardEyePresentation EyePresentation { get; }
         public float InstrumentDistortionK { get; }
         public float InstrumentMagnificationM { get; }
+        public bool AllowPincushionExtension { get; }
+        public CheckerboardGridMapping GridMapping { get; }
 
         public CheckerboardTrial(
             int sequenceIndex,
@@ -167,8 +187,11 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             float angularDiameterDegrees,
             CheckerboardEyePresentation eyePresentation,
             float instrumentDistortionK,
-            float instrumentMagnificationM = 10f)
+            float instrumentMagnificationM = 10f,
+            bool allowPincushionExtension = false,
+            CheckerboardGridMapping gridMapping = CheckerboardGridMapping.FixedSourceGrid)
         {
+            CheckerboardInstrumentMapping.ValidateGridMapping(gridMapping);
             SequenceIndex = sequenceIndex;
             ConditionIndex = conditionIndex;
             Repetition = repetition;
@@ -177,6 +200,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             EyePresentation = eyePresentation;
             InstrumentDistortionK = instrumentDistortionK;
             InstrumentMagnificationM = instrumentMagnificationM;
+            AllowPincushionExtension = allowPincushionExtension;
+            GridMapping = gridMapping;
         }
 
         public CheckerboardTrial CreateRepeatedAttempt()

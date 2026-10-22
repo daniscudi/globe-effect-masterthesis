@@ -13,9 +13,11 @@
         _ApparentHalfAngleRad ("Apparent Half Angle [rad]", Float) = 0.785398
         _ApertureEdgeSoftnessRad ("Aperture Edge Softness [rad]", Float) = 0.0174533
         _UseCircularAperture ("Use Circular Aperture", Float) = 1
-        _InstrumentDistortionK ("Instrument distortion k", Range(0, 2)) = 0.5
+        _InstrumentDistortionK ("Distortion: k or negative custom extension", Range(-2, 2)) = 0.5
+        _AllowPincushionExtension ("Allow custom tanh extension (not Merlitz)", Float) = 0
         _InstrumentMagnificationM ("Instrument magnification m", Range(1, 20)) = 10
         _GridLineSpacingUv ("Grid Line Spacing [u/v]", Float) = 0.176327
+        _GridSourceScale ("Source grid normalization", Float) = 1
         _CheckerboardEnabled ("Checkerboard Enabled", Float) = 1
         _CheckerboardInverted ("Checkerboard Inverted", Float) = 0
         _NoiseEnabled ("Noise Enabled", Float) = 0
@@ -73,8 +75,10 @@
             float _ApertureEdgeSoftnessRad;
             float _UseCircularAperture;
             float _InstrumentDistortionK;
+            float _AllowPincushionExtension;
             float _InstrumentMagnificationM;
             float _GridLineSpacingUv;
+            float _GridSourceScale;
             float _CheckerboardEnabled;
             float _CheckerboardInverted;
             float _NoiseEnabled;
@@ -291,11 +295,14 @@
 
                 // Exakte Umkehrung derselben Instrumentengleichung wie bei den Dots.
                 // m*tan(A) bezeichnet das unverzeichnete Referenzgitter (k = 1).
-                // Keine k-abhängige Randnormierung und keine Wahrnehmungsabbildung l.
+                // Keine Wahrnehmungsabbildung l. Der optionale Quellgitterfaktor
+                // normiert Variante 3 am Rand; bei Variante 2 ist er exakt 1.
                 float validInstrument = step(_InstrumentDistortionK * visualAngle, 1.560796);
-                float objectAngle = MerlitzObjectAngle(
+                validInstrument *= _InstrumentDistortionK < 0.0 ? step(0.5, _AllowPincushionExtension) : 1.0;
+                float objectAngle = CheckerboardExtendedObjectAngle(
                     visualAngle, _InstrumentMagnificationM, _InstrumentDistortionK);
                 float sourceRadius = _InstrumentMagnificationM * tan(objectAngle) / tangentAtBoundary;
+                sourceRadius *= _GridSourceScale;
 
                 float2 radialDirection = displayRadius > 1e-6
                     ? displayPosition / displayRadius

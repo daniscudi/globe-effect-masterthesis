@@ -34,6 +34,8 @@ namespace GlobeEffect.VRCheckerboard.Editor
             ["maskDemoGraySeconds"] = "Afterimage Test: Grey Screen (s)",
             // Checkerboard-Ablauf und Training
             ["trialSequence"] = "Trial Order",
+            ["testFixedSourceGrid"] = "Variant 2: Fixed Source Grid",
+            ["testEdgeNormalizedGrid"] = "Variant 3: Edge-Normalized Grid",
             ["patternSeconds"] = "Checkerboard Time (s)",
             ["answerTimeoutSeconds"] = "Time To Answer (s)",
             ["preStimulusSeconds"] = "Time Before Checkerboard (s)",
@@ -297,12 +299,29 @@ namespace GlobeEffect.VRCheckerboard.Editor
             if (Section("Session And Trial Plan"))
             {
                 Fields(serializedObject, "participantId", "sessionLabel", "randomSeed", "fieldOfViewValues",
-                    "eyePresentations", "instrumentMagnificationM", "repeatsPerCondition");
-                long repetitions = LevelTable("instrumentDistortionKValues", "repeatsPerKValue", "k");
-                EditorGUILayout.HelpBox("Merlitz instrument mapping (k, m), not the old visual-space l " +
-                    "mapping. Use new pilot data. Match m to the random-dot condition; m = 1 makes all " +
-                    "k values look straight.", MessageType.Info);
-                long trials = (long)Count("fieldOfViewValues") * Count("eyePresentations") * repetitions;
+                    "eyePresentations", "instrumentMagnificationM", "allowPincushionExtension",
+                    "testFixedSourceGrid", "testEdgeNormalizedGrid", "repeatsPerCondition");
+                bool extended = serializedObject.FindProperty("allowPincushionExtension").boolValue;
+                long repetitions = LevelTable("instrumentDistortionKValues", "repeatsPerKValue",
+                    extended ? "k / -κ" : "k");
+                if (extended)
+                    EditorGUILayout.HelpBox("CUSTOM EXTENSION: negative settings use tanh, NOT Merlitz k. " +
+                        "These sessions have a separate mapping version and stimulus-parameter PSE. " +
+                        "Random dots are unchanged.", MessageType.Warning);
+                EditorGUILayout.HelpBox("Standard: Merlitz instrument mapping with m = 10 and a fixed source " +
+                    "grid (variant 2), no extra scaling at the window edge or in the centre. Not the old " +
+                    "visual-space l mapping. Use new pilot data. For a random-dot comparison use the same m " +
+                    "there; m = 1 makes all k values look straight.", MessageType.Info);
+                int mappings = (serializedObject.FindProperty("testFixedSourceGrid").boolValue ? 1 : 0)
+                    + (serializedObject.FindProperty("testEdgeNormalizedGrid").boolValue ? 1 : 0);
+                long perMapping = (long)Count("fieldOfViewValues") * Count("eyePresentations") * repetitions;
+                long trials = perMapping * mappings;
+                if (mappings == 0)
+                    EditorGUILayout.HelpBox("Select at least one grid variant.", MessageType.Error);
+                else
+                    EditorGUILayout.HelpBox($"{perMapping} trials per selected variant. Both selected = " +
+                        "one jointly shuffled session, with separate PSE fits. Same k values and repeats " +
+                        "for both. Practice shows each selected variant.", MessageType.Info);
                 Fields(serializedObject, "blocksPerSession", "invertCheckerboardEachTrial");
                 EditorGUILayout.HelpBox($"Planned: {trials} valid trials{BlockText(trials)}. " +
                     "Trials that fail (for example looking away) are repeated on top.", MessageType.Info);
@@ -337,10 +356,24 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "Change the settings below and see the result right away. " +
                     "Preview Shows Noise switches between checkerboard and noise.", MessageType.Info);
                 LinkedFields("stimulus", "fieldOfViewDegrees", "edgeSoftnessDegrees", "useCircularAperture",
-                    "instrumentDistortionK", "instrumentMagnificationM", "gridSpacingDegrees",
+                    "allowPincushionExtension", "instrumentDistortionK", "instrumentMagnificationM", "gridMapping",
+                    "gridSpacingDegrees",
                     "eyePresentation", "darkColor", "lightColor", "invertCheckerboard",
                     "backgroundColor", "showFixationTarget", "fixationSizeDegrees", "fixationColor");
                 NoiseFields();
+                var previewStimulus = serializedObject.FindProperty("stimulus").objectReferenceValue
+                    as VrCheckerboardStimulus;
+                string mappingProblem = previewStimulus != null ? previewStimulus.InstrumentMappingProblem : null;
+                if (mappingProblem != null)
+                    EditorGUILayout.HelpBox("This combination cannot be drawn, so only grey is shown: " +
+                        mappingProblem, MessageType.Error);
+                float planM = ((CheckerboardExperimentManager)target).InstrumentMagnificationM;
+                if (previewStimulus != null && previewStimulus.InstrumentMagnificationM != planM)
+                    EditorGUILayout.HelpBox("The preview shows m = " + previewStimulus.InstrumentMagnificationM +
+                        ", the trials use m = " + planM + " from the trial plan.", MessageType.Info);
+                EditorGUILayout.HelpBox("Negative preview values require Allow Pincushion Extension. " +
+                    "They use a custom tanh formula, not negative Merlitz k. Preview values are restored " +
+                    "on exit unless explicitly taken over.", MessageType.Info);
                 Fields(serializedObject, "maskDemoKey", "maskDemoPatternSeconds", "maskDemoMaskSeconds",
                     "maskDemoGraySeconds");
                 EditorGUILayout.HelpBox("Afterimage test: during the preview press M (or the button). It shows " +
