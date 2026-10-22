@@ -1762,7 +1762,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private string BuildResponsePrompt()
         {
             return keyboardController != null
-                ? keyboardController.BuildResponseLines("A / OUTWARD", "B / INWARD")
+                ? keyboardController.BuildResponseLines("OUTWARD / GLOBE", "INWARD / DENT")
                 : string.Empty;
         }
 

@@ -155,16 +155,22 @@ MonoBehaviour:
   fieldOfViewDegrees: 60
   edgeSoftnessDegrees: 5
   useCircularAperture: 1
-  visualSpaceL: 0.5
+  instrumentDistortionK: 0.35
+  instrumentMagnificationM: 10
+  gridMapping: 0
+  allowPincushionExtension: 1
   gridSpacingDegrees: 8
   darkColor: {r: 0, g: 0, b: 0, a: 1}
   lightColor: {r: 1, g: 1, b: 1, a: 1}
+  invertCheckerboard: 0
   eyePresentation: 0
   showFixationTarget: 1
   fixationSizeDegrees: 0.5
   fixationColor: {r: 1, g: 0, b: 0, a: 1}
   backgroundColor: {r: 0.7294118, g: 0.7294118, b: 0.7294118, a: 1}
-  noiseSizeInPixels: 1
+  noiseType: 2
+  noiseBroadbandFinestDegrees: 0.5
+  noiseBroadbandCoarsestDegrees: 8
   noiseDotSizePixels: 1.5
   noiseDotSizeDegrees: 0.064
   noiseRefreshRateHz: 0
@@ -786,19 +792,36 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 085f4814d3964a8f96e76bcb22d5340e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: GlobeEffect.VRCheckerboard.Runtime::GlobeEffect.VRCheckerboard.Experiment.CheckerboardExperimentManager
-  stimulus: {fileID: 607094975}
-  keyboardController: {fileID: 607094979}
   eyeTrackingToolbox: {fileID: 1800000003}
-  fixationMonitor: {fileID: 1800000004}
   participantId: pilot_td
-  sessionLabel: checkerboard_pilot
   randomSeed: 20260901
   outputRoot: 
   autoStartOnPlay: 0
   fieldOfViewValues:
   - 60
   eyePresentations: 00000000
-  visualSpaceLValues:
+  repeatsPerCondition: 15
+  blocksPerSession: 4
+  requireFixation: 0
+  maxLookAwaySeconds: 0.15
+  maxNoDataSeconds: 0.2
+  maxSampleAgeSeconds: 0.1
+  maxRepeatsPerTrial: 0
+  startSessionKey: 98
+  abortSessionKey: 99
+  trainingKey: 34
+  previewKey: 30
+  valuesBeforePreviewTakeover: 
+  currentTrialNumber: 0
+  totalTrials: 0
+  validTrialsCompleted: 0
+  presentationCount: 0
+  activeSessionFolder: 
+  stimulus: {fileID: 607094975}
+  keyboardController: {fileID: 607094979}
+  fixationMonitor: {fileID: 1800000004}
+  sessionLabel: checkerboard_pilot
+  instrumentDistortionKValues:
   - 0.2
   - 0.3
   - 0.4
@@ -810,26 +833,13 @@ MonoBehaviour:
   - 1
   - 1.1
   - 1.2
-  repeatsPerCondition: 15
-  repeatsPerLValue:
-  - 16
-  - 25
-  - 25
-  - 25
-  - 25
-  - 25
-  - 25
-  - 25
-  - 25
-  - 25
-  - 8
-  blocksPerSession: 4
-  requireFixation: 0
-  maxLookAwaySeconds: 0.15
-  maxNoDataSeconds: 0.2
-  maxSampleAgeSeconds: 0.1
-  maxRepeatsPerTrial: 0
-  trialSequence: 1
+  instrumentMagnificationM: 10
+  testFixedSourceGrid: 1
+  testEdgeNormalizedGrid: 0
+  allowPincushionExtension: 0
+  repeatsPerKValue: 1000000019000000190000001900000019000000190000001900000019000000190000001900000010000000
+  invertCheckerboardEachTrial: 1
+  trialSequence: 0
   patternSeconds: 0.8
   answerTimeoutSeconds: 50
   preStimulusSeconds: 0.5
@@ -837,30 +847,47 @@ MonoBehaviour:
   concaveResponseKey: 64
   useVrControllerButtons: 1
   controllerMapping: 1
-  categoryALabel: CATEGORY A
-  categoryBLabel: CATEGORY B
-  trainingKey: 34
+  categoryALabel: OUTWARD / GLOBE
+  categoryBLabel: INWARD /  DENT
+  previewShowsNoise: 0
+  maskDemoKey: 27
+  maskDemoPatternSeconds: 2
+  maskDemoMaskSeconds: 1
+  maskDemoGraySeconds: 3
   continueTrainingKey: 1
-  requireTrainingBeforeSession: 0
+  requireTrainingBeforeSession: 1
   trainingExampleA: 1.4
   trainingExampleB: 0
-  trainingLValues:
+  trainingEasyKValues:
+  - 0
+  - 1.4
   - 0.2
-  - 0.4
-  - 0.8
   - 1.2
-  trainingRepeatsPerValue: 3
+  - 0
+  - 1.4
+  - 0.2
+  - 1.2
+  - 0
+  - 1.4
+  - 0.2
+  - 1.2
+  trainingHardKValues:
+  - 0.4
+  - 1
+  - 0.5
+  - 1.2
+  - 0.6
+  - 0.9
+  - 0.4
+  - 1.1
+  - 0.5
+  - 1
+  - 0.6
+  - 1.2
   trainingExampleSeconds: 2
   trainingNoiseSeconds: 0.5
   trainingFixationSeconds: 0.5
-  startSessionKey: 98
-  abortSessionKey: 99
   sessionState: 0
-  currentTrialNumber: 0
-  totalTrials: 0
-  validTrialsCompleted: 0
-  presentationCount: 0
-  activeSessionFolder: 
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
