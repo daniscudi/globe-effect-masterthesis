@@ -23,7 +23,6 @@
         _NoiseEnabled ("Noise Enabled", Float) = 0
         _NoiseCellSizeUv ("Noise Cell Size [u/v]", Float) = 0.0349
         _NoiseSeed ("Noise Seed", Integer) = 0
-        _NoiseType ("Noise Type (0 fine, 1 single, 2 broadband)", Float) = 2
         _NoiseOctaves ("Noise Octaves (broadband)", Float) = 5
         _EyeMode ("Eye Mode", Float) = 0
         _FixationEnabled ("Fixation Enabled", Float) = 1
@@ -84,7 +83,6 @@
             float _NoiseEnabled;
             float _NoiseCellSizeUv;
             int _NoiseSeed;
-            float _NoiseType;
             float _NoiseOctaves;
             float _EyeMode;
             float _FixationEnabled;
@@ -345,9 +343,8 @@
                 // Schachbrett. Ohne das springt jede harte Kante im Headset bei
                 // jeder winzigen Kopfbewegung um ein Pixel hin und her, und man
                 // sieht wandernde waagrechte und senkrechte Linien.
-                float noiseValue = _NoiseType > 1.5
-                    ? BroadbandNoise(displayPosition)
-                    : NoiseLayer(displayPosition, _NoiseCellSizeUv, 0u);
+                // Nur noch das breitbandige Rauschen (feine und grobe Punkte).
+                float noiseValue = BroadbandNoise(displayPosition);
                 fixed4 noiseColor = lerp(_DarkColor, _LightColor, noiseValue);
 
                 fixed4 visiblePattern = lerp(

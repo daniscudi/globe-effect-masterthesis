@@ -80,7 +80,6 @@ if has_l == has_k
 end
 % The presence of k alone no longer identifies random dots.
 is_random_dot = has_k && ismember('motion_mode', T.Properties.VariableNames);
-is_extended_checkerboard = false;
 if is_random_dot
     random_dot_columns = {'motion_mode', 'instrument_magnification_m', 'content_zoom'};
     if ~all(ismember(random_dot_columns, T.Properties.VariableNames))
@@ -98,10 +97,9 @@ else
                 ~all(strcmpi(string(T.stimulus_task), "Checkerboard"))
             error('Instrument checkerboard CSV is missing its task/mapping/magnification metadata.');
         end
-        is_extended_checkerboard = all(startsWith(string(T.mapping_version), ...
-            "custom-tan-tanh-checkerboard-"));
-        if ~is_extended_checkerboard && ...
-                ~all(startsWith(string(T.mapping_version), "merlitz-instrument-checkerboard-"))
+        % The custom tan/tanh extension exists only in the Unity live preview and is
+        % never saved for trials; such mapping versions are rejected here.
+        if ~all(startsWith(string(T.mapping_version), "merlitz-instrument-checkerboard-"))
             error('Unexpected checkerboard mapping version; do not reinterpret old pilot l as k.');
         end
         output_prefix = 'checkerboard_instrument';
@@ -114,27 +112,6 @@ else
                     any(fixed & ~contains(string(T.mapping_version), "-fixed-source-grid-"))
                 error('Inconsistent checkerboard grid_mapping / mapping_version metadata.');
             end
-        end
-        if is_extended_checkerboard
-            needed_extension = {'stimulus_distortion_parameter', 'mapping_family', ...
-                'extension_kappa', 'allow_pincushion_extension'};
-            if ~all(ismember(needed_extension, T.Properties.VariableNames))
-                error('Custom checkerboard is missing its signed-setting/extension metadata.');
-            end
-            s = T.stimulus_distortion_parameter;
-            negative = s < 0;
-            if any(~isfinite(s) | s < -2 | s > 2) || ...
-                    any(T.allow_pincushion_extension ~= 1) || ...
-                    any(string(T.mapping_family(negative)) ~= "custom_tanh") || ...
-                    any(string(T.mapping_family(~negative)) ~= "merlitz_tan") || ...
-                    any(~isnan(T.instrument_distortion_k(negative))) || ...
-                    any(~isfinite(T.extension_kappa(negative))) || ...
-                    any(abs(T.extension_kappa(negative) + s(negative)) > 1e-6) || ...
-                    any(~isfinite(T.instrument_distortion_k(~negative))) || ...
-                    any(abs(T.instrument_distortion_k(~negative) - s(~negative)) > 1e-6)
-                error('Inconsistent custom checkerboard mapping metadata. Negative settings are NOT Merlitz k.');
-            end
-            output_prefix = 'checkerboard_extended';
         end
     end
 end
@@ -156,17 +133,6 @@ else
     pse_column = 'pse_visual_space_l';
     jnd_column = 'jnd_l';
     reference_column = 'pse_minus_straight_l1';
-end
-if is_extended_checkerboard
-    warning(['Custom tan/tanh checkerboard: the fitted PSE is a signed stimulus setting, ', ...
-        'NOT an original Merlitz k-PSE. Do not pool it with the unextended family.']);
-    stimulus_name = 'signed setting';
-    stimulus_column = 'stimulus_distortion_parameter';
-    x_label = 'Signed stimulus setting (custom tan/tanh family)';
-    reference_label = 'setting = 1 (straight, Merlitz branch)';
-    pse_column = 'pse_stimulus_distortion_parameter';
-    jnd_column = 'jnd_stimulus_distortion_parameter';
-    reference_column = 'pse_minus_straight_setting1';
 end
 fprintf('detected task: %s; stimulus column: %s\n', task_name, stimulus_column);
 

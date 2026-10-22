@@ -23,7 +23,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             int randomSeed,
             IReadOnlyList<int> repetitionsPerK = null,
             float instrumentMagnificationM = 10f,
-            bool allowPincushionExtension = false,
             IReadOnlyList<CheckerboardGridMapping> gridMappings = null)
         {
             gridMappings ??= new[] { CheckerboardGridMapping.FixedSourceGrid };
@@ -39,7 +38,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             // abbrechen, als mitten in der Messung zu merken, dass etwas fehlt.
             ValidateValues(
                 angularDiametersDegrees, eyePresentations, instrumentDistortionKValues, repetitions,
-                instrumentMagnificationM, allowPincushionExtension);
+                instrumentMagnificationM);
             for (int index = 0; index < instrumentDistortionKValues.Count; index++)
             {
                 PlannerTools.RepetitionsFor(repetitionsPerK, index, repetitions);
@@ -68,7 +67,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                             {
                                 trials.Add(new CheckerboardTrial(sequenceIndex: 0, conditionIndex,
                                     repetition, attemptNumber: 1, angularDiameter, eye, instrumentDistortionK,
-                                    instrumentMagnificationM, allowPincushionExtension, gridMapping));
+                                    instrumentMagnificationM, gridMapping));
                             }
                         }
                     }
@@ -93,8 +92,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             IReadOnlyList<CheckerboardEyePresentation> eyePresentations,
             IReadOnlyList<float> instrumentDistortionKValues,
             int repetitions,
-            float instrumentMagnificationM,
-            bool allowPincushionExtension)
+            float instrumentMagnificationM)
         {
             PlannerTools.RequireNonEmpty(angularDiametersDegrees, nameof(angularDiametersDegrees));
             PlannerTools.RequireNonEmpty(eyePresentations, nameof(eyePresentations));
@@ -119,8 +117,7 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 foreach (float instrumentDistortionK in instrumentDistortionKValues)
                 {
                     CheckerboardInstrumentMapping.ValidateParameters(
-                        angularDiameter, instrumentMagnificationM, instrumentDistortionK,
-                        allowPincushionExtension: allowPincushionExtension);
+                        angularDiameter, instrumentMagnificationM, instrumentDistortionK);
                 }
             }
         }
@@ -176,7 +173,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public CheckerboardEyePresentation EyePresentation { get; }
         public float InstrumentDistortionK { get; }
         public float InstrumentMagnificationM { get; }
-        public bool AllowPincushionExtension { get; }
         public CheckerboardGridMapping GridMapping { get; }
 
         public CheckerboardTrial(
@@ -188,7 +184,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             CheckerboardEyePresentation eyePresentation,
             float instrumentDistortionK,
             float instrumentMagnificationM = 10f,
-            bool allowPincushionExtension = false,
             CheckerboardGridMapping gridMapping = CheckerboardGridMapping.FixedSourceGrid)
         {
             CheckerboardInstrumentMapping.ValidateGridMapping(gridMapping);
@@ -200,7 +195,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             EyePresentation = eyePresentation;
             InstrumentDistortionK = instrumentDistortionK;
             InstrumentMagnificationM = instrumentMagnificationM;
-            AllowPincushionExtension = allowPincushionExtension;
             GridMapping = gridMapping;
         }
 

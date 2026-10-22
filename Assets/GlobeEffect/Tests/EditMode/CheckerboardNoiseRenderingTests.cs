@@ -57,9 +57,10 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 stimulus.SetAngularDiameter(70f);
                 stimulus.SetApertureEdgeSoftness(0f);
                 var settings = new SerializedObject(stimulus);
-                // Hier wird bewusst in Grad getestet, damit die drei Größen fest sind.
-                settings.FindProperty("noiseType").enumValueIndex = (int)NoiseMaskType.SingleScaleDegrees;
-                settings.FindProperty("noiseDotSizeDegrees").floatValue = dotSize;
+                // Kleinste = größte Punktgröße: eine einzige Punktgröße in Grad, damit
+                // die drei geprüften Größen fest sind.
+                settings.FindProperty("noiseBroadbandFinestDegrees").floatValue = dotSize;
+                settings.FindProperty("noiseBroadbandCoarsestDegrees").floatValue = dotSize;
                 settings.ApplyModifiedPropertiesWithoutUndo();
 
                 // Zwei benachbarte große Zahlen dürfen nicht zum gleichen Float
@@ -142,19 +143,19 @@ namespace GlobeEffect.VRCheckerboard.Tests
         public void BroadbandNoise_HasCoarseStructureThatFineNoiseLacks()
         {
             // Wie oft haben zwei Pixel im Abstand von 2 Pixeln (knapp 1°) dieselbe Farbe?
-            // Feines Rauschen (1,5 Pixel): etwa halb so oft wie zufällig, also 0,5.
+            // Nur feine Punkte (0,7°, etwa 1,5 Pixel): etwa so oft wie zufällig, also 0,5.
             // Breitband (0,5° bis 8°): deutlich öfter, weil grobe Zellen mitwirken.
             // Genau diese groben Anteile braucht es, um das grobe Schachbrett zu maskieren.
             if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null)
                 Assert.Ignore("Der Bildtest braucht eine aktive Grafikausgabe.");
 
-            float fine = SameColorFraction(NoiseMaskType.FinePixels);
-            float broadband = SameColorFraction(NoiseMaskType.Broadband);
+            float fine = SameColorFraction(0.7f, 0.7f);
+            float broadband = SameColorFraction(0.5f, 8f);
             Assert.That(fine, Is.LessThan(0.56f), "Feines Rauschen hat kaum grobe Struktur.");
             Assert.That(broadband, Is.GreaterThan(0.6f), "Breitband muss grobe Struktur enthalten.");
         }
 
-        private static float SameColorFraction(NoiseMaskType type)
+        private static float SameColorFraction(float finestDegrees, float coarsestDegrees)
         {
             Scene scene = EditorSceneManager.NewPreviewScene();
             var target = new RenderTexture(256, 256, 24);
@@ -181,10 +182,8 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 stimulus.SetAngularDiameter(80f);
                 stimulus.SetApertureEdgeSoftness(0f);
                 var settings = new SerializedObject(stimulus);
-                settings.FindProperty("noiseType").enumValueIndex = (int)type;
-                settings.FindProperty("noiseDotSizePixels").floatValue = 1.5f;
-                settings.FindProperty("noiseBroadbandFinestDegrees").floatValue = 0.5f;
-                settings.FindProperty("noiseBroadbandCoarsestDegrees").floatValue = 8f;
+                settings.FindProperty("noiseBroadbandFinestDegrees").floatValue = finestDegrees;
+                settings.FindProperty("noiseBroadbandCoarsestDegrees").floatValue = coarsestDegrees;
                 settings.FindProperty("showFixationTarget").boolValue = false;
                 settings.ApplyModifiedPropertiesWithoutUndo();
 
@@ -209,7 +208,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
                     }
                 }
                 float lightFraction = light / (float)pixels;
-                Assert.That(lightFraction, Is.InRange(0.3f, 0.7f), $"{type}: Hell und dunkel etwa gleich häufig.");
+                Assert.That(lightFraction, Is.InRange(0.3f, 0.7f), $"{finestDegrees}-{coarsestDegrees}°: Hell und dunkel etwa gleich häufig.");
                 return same / (float)pairs;
             }
             finally

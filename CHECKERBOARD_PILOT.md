@@ -1,8 +1,10 @@
 # Checkerboard: vom Teststand zum Pilotdurchlauf
 
-> **20. Oktober 2026:** Variante 2 und Variante 3 können jetzt einzeln oder
-> gemeinsam gemischt gemessen werden. Die aktuelle Bedienung, Trialzahlen und
-> getrennte PSE-Auswertung stehen in [README: Checkerboard-Pilot](README.md#checkerboard-pilot-variante-2-und-3-vergleichen-20-oktober-2026).
+> **22. Oktober 2026:** Es gibt nur noch eine Abbildung (Merlitz' Instrument, festes
+> Quellgitter, Standard m = 10) und einen Ablauf (Noise beim Antworten, danach Grau).
+> Ablauf B und die Noise-Typen „Fine Pixels“/„One Spot Size“ wurden entfernt, die
+> tanh-Erweiterung gibt es nur noch in der Live-Vorschau, das randnormierte Gitter ist
+> ausgeblendet. Details: [README: Was für den Test verwendet wird](README.md#was-für-den-test-verwendet-wird-22-oktober-2026).
 
 > **Umstellung 18. Oktober 2026:** Die Angaben unten dokumentieren den historischen
 > l-Piloten. Das aktuelle Checkerboard verwendet Merlitz' Instrumentenabbildung
@@ -47,7 +49,7 @@ Es gibt keine zusätzliche Kopie, die auseinanderlaufen könnte.
 | Einstellung | Zuständige Komponente | Im Manager-Inspector |
 | --- | --- | --- |
 | Person, Seed, FOV, Augen, Verzerrungsstufen, Wiederholungen | CheckerboardExperimentManager | Sitzung und Versuchsplan |
-| Darbietungsdauer, Antwortzeit, Ablauf A/B, Vorphase | CheckerboardExperimentManager | Ablauf und Zeiten |
+| Darbietungsdauer, Antwortzeit, Vorphase | CheckerboardExperimentManager | Ablauf und Zeiten |
 | Blicktoleranz und ruhige Fixationsdauer | CheckerboardFixationMonitor | Blickkontrolle, verknüpft |
 | Erlaubtes Wegschauen, fehlende Daten, Wiederholungsgrenze | CheckerboardExperimentManager | Blickkontrolle |
 | Karogröße, Farben, Kreuz, Rand, Noise | VrCheckerboardStimulus | Muster, Fixationskreuz und Noise, verknüpft |
@@ -83,7 +85,7 @@ F5 bereitet die Sitzung vor; die Weiter-Taste startet danach den eigentlichen Ve
 
 ## Vor dem nächsten echten Piloten entscheiden
 
-1. **Ein Ablauf für alle festlegen.** A maskiert direkt nach dem Schachbrett;
+1. **Ein Ablauf für alle festlegen.** (Erledigt am 22. Oktober 2026: nur noch Ablauf A.) A maskiert direkt nach dem Schachbrett;
    B zeigt zunächst Grau und maskiert erst vor dem nächsten Trial. B ist daher nicht dieselbe
    unmittelbare Nachmaske. Bei A hängt die Maskendauer von der Antwortzeit ab.
 2. **Blickkontrolle zeitlich festlegen.** Momentan gilt sie beim Checkerboard während Muster

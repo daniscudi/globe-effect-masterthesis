@@ -56,19 +56,16 @@ namespace GlobeEffect.VRCheckerboard.Tests
         }
 
         [Test]
-        public void NegativeTrials_RequireExplicitOptInAndPreserveItWhenRepeated()
+        public void NegativeTrials_AreAlwaysRejected_TheExtensionIsPreviewOnly()
         {
+            // Die tanh-Erweiterung gibt es nur in der Live-Vorschau. Ein Trialplan
+            // nimmt nur Merlitz-k von 0 bis 2 an.
             Assert.Throws<ArgumentOutOfRangeException>(() =>
                 CheckerboardTrialPlanner.CreateRandomizedPlan(new[] { 60f },
                     new[] { CheckerboardEyePresentation.BothEyes }, new[] { -1f }, 1, 1));
-            var plan = CheckerboardTrialPlanner.CreateRandomizedPlan(new[] { 60f },
-                new[] { CheckerboardEyePresentation.BothEyes }, new[] { -2f, 0f, 1f }, 1, 1,
-                allowPincushionExtension: true);
-            foreach (CheckerboardTrial trial in plan)
-            {
-                Assert.That(trial.AllowPincushionExtension, Is.True);
-                Assert.That(trial.CreateRepeatedAttempt().AllowPincushionExtension, Is.True);
-            }
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                CheckerboardTrialPlanner.CreateRandomizedPlan(new[] { 60f },
+                    new[] { CheckerboardEyePresentation.BothEyes }, new[] { 0.5f, -0.01f }, 1, 1));
             Assert.That(CheckerboardInstrumentMapping.FamilyFor(-1), Is.EqualTo("custom_tanh"));
             Assert.That(CheckerboardInstrumentMapping.FamilyFor(0), Is.EqualTo("merlitz_tan"));
         }

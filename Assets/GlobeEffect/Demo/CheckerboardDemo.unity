@@ -848,7 +848,7 @@ MonoBehaviour:
   useVrControllerButtons: 1
   controllerMapping: 1
   categoryALabel: OUTWARD / GLOBE
-  categoryBLabel: INWARD /  DENT
+  categoryBLabel: INWARD / DENT
   previewShowsNoise: 0
   maskDemoKey: 27
   maskDemoPatternSeconds: 2

@@ -26,7 +26,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             plan.fieldOfViewValues = new List<float> { preview.fieldOfViewDegrees };
             plan.eyePresentations = new List<CheckerboardEyePresentation> { preview.eyePresentation };
             plan.instrumentMagnificationM = preview.instrumentMagnificationM;
-            plan.allowPincushionExtension = preview.allowPincushionExtension;
             plan.testFixedSourceGrid = preview.gridMapping == CheckerboardGridMapping.FixedSourceGrid;
             plan.testEdgeNormalizedGrid = preview.gridMapping == CheckerboardGridMapping.EdgeNormalized;
 
@@ -62,7 +61,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             public List<float> fieldOfViewValues = new();
             public List<CheckerboardEyePresentation> eyePresentations = new();
             public float instrumentMagnificationM = 10f;
-            public bool allowPincushionExtension;
             public bool testFixedSourceGrid = true;
             public bool testEdgeNormalizedGrid;
         }
@@ -74,7 +72,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             public float fieldOfViewDegrees;
             public CheckerboardEyePresentation eyePresentation;
             public float instrumentMagnificationM = 10f;
-            public bool allowPincushionExtension;
             public CheckerboardGridMapping gridMapping;
         }
 
@@ -85,7 +82,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         {
             // Auch beim Zurücksetzen/Behalten der Vorschau das sichtbare m mitnehmen.
             public float instrumentMagnificationM = 10f;
-            public bool allowPincushionExtension;
             public CheckerboardGridMapping gridMapping;
             public float edgeSoftnessDegrees;
             public bool useCircularAperture;
@@ -96,11 +92,8 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             public bool showFixationTarget;
             public float fixationSizeDegrees;
             public Color fixationColor;
-            public NoiseMaskType noiseType;
             public float noiseBroadbandFinestDegrees;
             public float noiseBroadbandCoarsestDegrees;
-            public float noiseDotSizePixels;
-            public float noiseDotSizeDegrees;
             public float noiseRefreshRateHz;
         }
     }

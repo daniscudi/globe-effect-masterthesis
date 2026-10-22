@@ -80,9 +80,8 @@ methodische Grundlage, mit der wir Oomes' und Merlitz' Versuche in VR nachbilden
 - kopffeste Darstellung ohne Nahdisparität, also virtuelle Unendlichkeit
 - Darstellung für beide Augen, nur links oder nur rechts
 - feste `l`-Werte, Wiederholungen und Reihenfolge über den Inspector
-- zwei wählbare Abläufe (`Trial Sequence`): A = Checkerboard mit einstellbarer Dauer, dann
-  Noise-Maske mit Antwort, dann graue Fläche; B = Checkerboard,
-  dann graue Fläche mit Antwort, dann Noise-Maske. Die Phase vor dem nächsten
+- ein Ablauf: Checkerboard mit einstellbarer Dauer, dann Noise-Maske mit Antwort,
+  dann graue Fläche (Ablauf B wurde am 22. Oktober 2026 entfernt). Die Phase vor dem nächsten
   Checkerboard dauert mindestens `Pre Stimulus Seconds`; die Antwortzeit
   begrenzt `Answer Timeout Seconds` (0 = unbegrenzt). Noise mit 0 Hz ist statisch,
   mit positiver Refresh Rate flimmernd
@@ -191,7 +190,7 @@ oder einer Versuchsauswertung verbunden.
 
 1. Beide Szenen einmal vollständig auf der XR-4 testen: Rand, Monokularmodus,
    Fixation, virtuelle Unendlichkeit, Bewegungsrichtung und gespeicherte CSV.
-2. Zuerst das Checkerboard-Protokoll festlegen: Ablauf A/B und Zeitraum der Blickkontrolle.
+2. Zuerst das Checkerboard-Protokoll festlegen: Zeitraum der Blickkontrolle (der Ablauf steht fest).
 3. Reizwerte, FOV, Zeiten, Wiederholungen, Pausen und Augenbedingungen festlegen.
 4. Einen kleinen Pilottest mit wenigen Personen durchführen und prüfen, ob die
    Antworten über die gewählten Werte tatsächlich von konkav zu konvex wechseln.

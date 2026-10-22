@@ -45,64 +45,46 @@ bei m = 10 ohne zusätzliche Randnormierung.
   Visual-Space-Funktion ohne Randnormierung. Nur zwischen m = 1 und etwa 5 ändert m
   die Verzeichnung deutlich.
 * Ungültige Kombinationen (Tangens-Grenze aus FOV + weichem Rand und k, negative
-  Werte ohne ausdrücklich eingeschaltete tanh-Erweiterung) werden abgewiesen oder in
-  der Vorschau als Fehler gemeldet und dann nicht gezeichnet. Sie werden nicht still
-  auf einen anderen Wert gesetzt.
-* Auswahl: `Variant 2: Fixed Source Grid` ist Standard. Die randnormierte Variante 3
-  und die eigene tanh-Erweiterung bleiben getrennt wählbar und getrennt gekennzeichnet.
+  Werte ohne die Vorschau-Erweiterung) werden abgewiesen oder in der Vorschau als
+  Fehler gemeldet und dann nicht gezeichnet. Sie werden nicht still auf einen anderen
+  Wert gesetzt.
+* Diese Abbildung ist die einzige für Training und Trials; es gibt keine Varianten-Auswahl
+  im Inspector (siehe nächsten Abschnitt).
 * Daten: Kennung unverändert `merlitz-instrument-checkerboard-fixed-source-grid-v2`
   (das Bild ist dasselbe wie vorher). Jede Zeile enthält außerdem das verwendete
   `instrument_magnification_m` (Standard 10), `grid_mapping = FixedSourceGrid`,
-  `grid_source_scale = 1`, FOV, weichen Rand und Gitterabstand. Alte l-Daten und
-  andere Varianten haben eigene Kennungen; die MATLAB-Auswertung poolt sie nicht.
+  `grid_source_scale = 1`, FOV, weichen Rand und Gitterabstand. Alte l-Daten haben
+  eine eigene Kennung; die MATLAB-Auswertung poolt sie nicht.
 
 Das ist keine vollständige Replikation von Merlitz' Online-Experiment. Ein PSE in k
 beim Checkerboard und bei den Random Dots hat nicht automatisch dieselbe Bedeutung;
 ob beide übereinstimmen, ist eine zu prüfende Vorhersage.
 
-## Checkerboard-Pilot: Variante 2 und 3 vergleichen (20. Oktober 2026)
+## Was für den Test verwendet wird (22. Oktober 2026)
 
-Im **Checkerboard Experiment Manager → Session And Trial Plan** gibt es zwei Häkchen:
+Für den Checkerboard-Test wurden nicht verwendete Optionen entfernt oder ausgeblendet,
+damit Inspector, Dateien und Beschreibung nur noch das zeigen, was wirklich benutzt wird:
 
-* **Variant 2: Fixed Source Grid**: bisherige Instrumentenabbildung, unverändertes Quellgitter.
-* **Variant 3: Edge-Normalized Grid**: dieselbe Instrumentengleichung mit
-  `S_norm(r) = S_fixed(r) / S_fixed(1)`. Die Quellgitterweite wird angepasst, damit
-  die Feldspanne am nominalen Kreisrand gleich bleibt. Die zentrale Kästchengröße
-  ändert sich dadurch; es ist keine Skalierung des fertigen Bildes wie in HTML-Variante 5.
-
-Ein Häkchen = nur diese Variante. Beide Häkchen = **eine gemeinsam gemischte Sitzung**,
-nicht zwei aufeinanderfolgende Versuche. Keine Auswahl wird vor dem Start abgewiesen.
-FOV, Augenmodus, m, k-Stufen und Wiederholungen gelten gemeinsam für beide Varianten.
-Der Inspector zeigt Trials pro Variante und insgesamt an. Bestehende Szenen bleiben
-standardmäßig bei Variante 2; Szenen- und Messdateien wurden nicht umgestellt.
-
-Für einen kurzen Pilot z. B. sieben k-Stufen und **10 Wiederholungen neben jeder
-Stufe in der Tabelle** eintragen: bei einem FOV und einem Augenmodus ergeben beide
-Varianten zusammen 140 gültige Trials. Mit 25 Wiederholungen sind es 350 insgesamt.
-`Repeats Per Condition` ist nur der Ersatzwert für fehlende Tabelleneinträge.
-Ungültige Trials behalten ihre Variante und kommen wie bisher hinten wieder dazu.
-Die Reihenfolge wird mit dem Seed reproduzierbar über die ganze Sitzung gemischt;
-einzelne Pausenabschnitte sind nicht zusätzlich exakt ausbalanciert.
-
-Die Übung zeigt jede ausgewählte Variante für die eingetragenen Beispiele und
-Übungs-k-Werte. Sind beide aktiv, wird die Übung entsprechend länger. Die Antworten
-und die Variante stehen im Übungsprotokoll des Versuchsleiters, ohne Richtig/Falsch-Feedback.
-In **Live Preview (No Recording)** lässt sich `Grid Mapping` unabhängig ansehen.
-Normales Verlassen der Vorschau setzt die Werte zurück. Nur der ausdrückliche
-Übernahme-Knopf übernimmt auch die einzelne Vorschauvariante in den Versuchsplan.
-
-CSV: Jede Plan- und Ergebniszeile enthält die tatsächliche `mapping_version`,
-`grid_mapping` (`FixedSourceGrid` oder `EdgeNormalized`), `grid_source_scale`
-und `effective_source_grid_spacing_uv`. `grid_line_spacing_uv` bleibt der
-unveränderte Referenzabstand. Variante 3 hat die eigene Kennung
-`merlitz-instrument-checkerboard-edge-normalized-v1`.
-Die optionale tanh-Erweiterung behält zusätzlich ihre eigene Abbildungsfamilie.
-
-`fit_checkerboard_pse_psignifit.m` liest die gemeinsame Trialdatei und erstellt
-**getrennte PSEs, 95%-Intervalle, XLSX-Dateien und Abbildungen je Gittervariante**
-sowie eine gemeinsame Ergebnistabelle. Die Varianten werden nie zu einem Fit gepoolt.
-Alte CSVs ohne `grid_mapping` bleiben auf ihrer ursprünglichen Skala auswertbar.
-Random-Dot-Reize und -Ablauf sind durch diese Ergänzung unverändert.
+* **Entfernt:** Ablauf B (graue Fläche beim Antworten, Noise danach). Es gibt nur noch
+  einen Ablauf: Schachbrett → Noise-Maske beim Antworten → graue Fläche → nächstes
+  Schachbrett. Die CSV-Spalten `trial_sequence`, `noise_until_response` und
+  `post_response_noise_s` entfallen in neuen Dateien.
+* **Entfernt:** die Noise-Typen „Fine Pixels“ und „One Spot Size“. Die Maske besteht
+  immer aus feinen und groben Punkten (`Smallest Spots` bis `Largest Spots`).
+* **Nur noch Live-Vorschau:** die eigene tanh-Erweiterung für stärkere
+  Kissenverzeichnung (negative Werte, nicht Merlitz). Training und Trials nehmen nur
+  Merlitz-k von 0 bis 2 an; die Erweiterungsspalten (`stimulus_distortion_parameter`,
+  `mapping_family`, `extension_kappa`, `allow_pincushion_extension`) entfallen, und
+  die MATLAB-Auswertung weist Dateien mit der Erweiterungskennung ab.
+* **Ausgeblendet (Code bleibt):** das randnormierte Gitter
+  (`S_norm(r) = S_fixed(r)/S_fixed(1)`, Kennung
+  `merlitz-instrument-checkerboard-edge-normalized-v1`). Im Inspector gibt es keine
+  Varianten-Auswahl mehr; Trials verwenden immer das feste Quellgitter. Ist die
+  Option in einer alten Szene noch aktiv, zeigt der Inspector eine Warnung.
+  `grid_mapping`, `grid_source_scale` und `effective_source_grid_spacing_uv` stehen
+  weiter in den Dateien (bei der Standardabbildung `FixedSourceGrid`, 1, Referenzabstand).
+* **Unsichtbar behalten:** die alte l-Abbildung, nur damit Yannicks Pilotdaten
+  auswertbar bleiben.
 
 ## Umstellung der Checkerboards am 18. Oktober 2026
 
@@ -216,9 +198,8 @@ Headset-Abnahmetest.
 
 Die Versuchsperson fixiert zuerst das rote Kreuz und sieht danach kurz ein
 kreisrundes Schachbrett mit einem festen Verzerrungswert. Direkt danach beginnt
-die Antwortphase. Je nach gewähltem Ablauf ist dabei eine flimmernde
-Schwarz-Weiß-Noise-Maske (Ablauf A) oder eine graue Fläche (Ablauf B) zu sehen,
-jeweils mit Fixationskreuz. Die andere Darstellung folgt nach der Antwort als
+die Antwortphase. Dabei ist eine flimmernde Schwarz-Weiß-Noise-Maske mit
+Fixationskreuz zu sehen. Nach der Antwort folgt die graue Fläche mit Kreuz als
 kurze Phase vor dem nächsten Schachbrett. Im Hauptversuch wird kein zusätzlicher
 Antworttext mehr eingeblendet, damit er nicht vom Reiz oder von der Fixation
 ablenkt.
@@ -227,9 +208,9 @@ Die Tastenbelegung steht auf dem Welcome Screen, im Training und vor dem
 Hauptversuch im Headset. Sie richtet sich nach der im Inspector gewählten
 Zuordnung, zum Beispiel:
 
-* `TRIGGER = A / OUTWARD`
+* `TRIGGER = OUTWARD / GLOBE`
 
-* `TRACKPAD CLICK = B / INWARD`
+* `TRACKPAD CLICK = INWARD / DENT`
 
 Auf der Tastatur gelten zusätzlich Pfeil hoch (Category A) und Pfeil runter
 (Category B).
@@ -478,46 +459,39 @@ dieser Entfernung").
 
 ## Ablauf eines Durchgangs
 
-Am `Checkerboard Experiment Manager` wird unter `Trial Sequence` einer von zwei
-Abläufen gewählt:
-
-* A: Checkerboard → Noise-Maske mit Antwort → graue Fläche → nächstes
-  Checkerboard
-
-* B: Checkerboard → graue Fläche mit Antwort → Noise-Maske → nächstes
-  Checkerboard
+Ablauf: Checkerboard → Noise-Maske mit Antwort → graue Fläche → nächstes
+Checkerboard. (Der frühere Ablauf B mit grauer Fläche beim Antworten wurde am
+22. Oktober 2026 entfernt.)
 
 Die Schritte im Einzelnen:
 
-1. Vor dem Checkerboard steht die Phase vor dem Stimulus: bei A die graue
-   Fläche, bei B die Noise-Maske, jeweils mit Fixationskreuz. Sie dauert
+1. Vor dem Checkerboard steht die Phase vor dem Stimulus: die graue Fläche mit
+   Fixationskreuz. Sie dauert
    mindestens `Pre Stimulus Seconds` (voreingestellt 0,5 s). Mit
    Fixationskontrolle geht es erst weiter, wenn zusätzlich der Blick ruhig auf
    dem Kreuz liegt.
 2. Das Checkerboard wird für die eingestellte Zeit eingeblendet. Der Startwert
    beträgt 600 ms.
-3. Direkt danach beginnt die Antwortphase: bei A mit der Noise-Maske, bei B mit
-   der grauen Fläche, jeweils mit Fixationskreuz.
+3. Direkt danach beginnt die Antwortphase mit der Noise-Maske und dem
+   Fixationskreuz.
 4. Die im Training gelernte Antwort wird ohne erneuten Hinweistext gegeben. Die
    Antwortzeit begrenzt `Response Timeout Seconds`; `0` bedeutet ohne Zeitlimit.
 5. Antwort, Reaktionszeit, k, m, FOV, Augenmodus und Fixationswerte werden sofort
    gespeichert. Pro Durchgang zählt nur die erste Antwort; weitere Tastendrücke
    werden bis zur nächsten Antwortphase ignoriert.
 6. Nach der Antwort beginnt sofort die Phase vor dem nächsten Stimulus mit der
-   jeweils anderen Darstellung. Ein schwarzer Zwischenbildschirm wird vermieden.
+   grauen Fläche. Ein schwarzer Zwischenbildschirm wird vermieden.
 
 Die Noise-Maske soll ein Nachbild des Schachbretts verhindern. Sie erscheint in
 derselben runden Öffnung wie das Checkerboard, schwarz/weiß und mit derselben
 mittleren Helligkeit, und wird mit `Noise Refresh Rate Hz` neu ausgewürfelt
-(`0` lässt das Bild stehen). `Noise Type` am `Checkerboard Stimulus`:
-
-* **Fine And Coarse Spots (Breitband, Standard):** Zufallsmuster in mehreren
-  Zellgrößen von `Smallest Spots` (0,5°) bis `Largest Spots` (8°), je Faktor 2 (also 0,5°, 1°, 2°, 4°, 8°), gleich gewichtet addiert und dann
-  schwarz/weiß geschaltet. Jede Oktave erhält so etwa gleich viel Energie
-  (1/f-Rauschen), von der Grundfrequenz des Schachbretts bis zu feinen Kanten.
-* **One Spot Size:** eine Zellgröße in Grad (`Spot Size (degrees)`, bis 10°).
-* **Fine Pixels (TV Static):** das frühere „Ameisenmuster“ nahe der Pixelgröße
-  (`Spot Size (pixels)`), nur noch zum Vergleich.
+(`0` lässt das Bild stehen). Die Maske besteht aus feinen und groben Punkten:
+Zufallsmuster in mehreren Zellgrößen von `Smallest Spots` (0,5°) bis
+`Largest Spots` (8°), je Faktor 2 (also 0,5°, 1°, 2°, 4°, 8°), gleich gewichtet
+addiert und dann schwarz/weiß geschaltet. Jede Oktave erhält so etwa gleich viel
+Energie (1/f-Rauschen), von der Grundfrequenz des Schachbretts bis zu feinen Kanten.
+(Die früheren Typen „Fine Pixels“ und „One Spot Size“ wurden am 22. Oktober 2026
+entfernt.)
 
 Begründung: Eine Maske wirkt nur in Größenordnungen nahe ihrer eigenen, etwa
 ± 1 Oktave (Stromeyer, C. F. & Julesz, B. (1972). Spatial-frequency masking in
@@ -527,13 +501,12 @@ Grundfrequenz bei etwa 0,07 Zyklen pro Grad, feines Rauschen mit 0,1°-Punkten
 liegt bei 3–5 Zyklen pro Grad, rund 6 Oktaven entfernt, und maskiert das
 Schachbrett deshalb kaum. Zu grob (Zellen so groß wie die Felder) wäre die Maske
 selbst ein grobes Muster mit eigenen Kanten; deshalb endet die gröbste Oktave
-bei 8°. Der Marker `SessionStart` enthält `noise_type`, `noise_broadband_deg`
-(nur bei Breitband aussagekräftig) und `noise_octaves`.
+bei 8°. Der Marker `SessionStart` enthält `noise_broadband_deg` und `noise_octaves`.
 
 Vergleich im Headset: In der Checkerboard-Vorschau (P) spielt `M` bzw. der Knopf
 „Play Afterimage Test“ Schachbrett (2 s) → eingestellte Maske (1 s) → graue
 Fläche (3 s) ab. Bleibt auf der grauen Fläche ein Nachbild des Schachbretts,
-maskiert die Maske zu schwach. `Noise Type` umstellen und wiederholen. Mit
+maskiert die Maske zu schwach. Andere Punktgrößen einstellen und wiederholen. Mit
 `Invert Checkerboard Each Trial` wechselt jeder Druck auf `M` die Polarität.
 
 ## Welcome Screen und Training
@@ -629,9 +602,6 @@ Die wichtigsten Einstellungen befinden sich am Objekt
 * `Maximum Attempts Per Trial`: 0 für unbegrenzte Wiedervorlage
 
 * `Stimulus Duration Seconds`: Dauer des Checkerboards; voreingestellt auf 0,6 s
-
-* `Trial Sequence`: Ablauf A (Noise-Maske in der Antwortphase, danach graue
-  Fläche) oder B (graue Fläche in der Antwortphase, danach Noise-Maske)
 
 * `Pre Stimulus Seconds`: Mindestdauer der Phase vor dem nächsten Checkerboard;
   voreingestellt auf 0,5 s
@@ -1089,8 +1059,8 @@ Marker wie `TrialStart`, `StimulusEnded`, `NoiseMaskStarted`,
 `GrayScreenStarted`, `TrialResponse`, `TrialInvalid` und `TrialRepeatQueued`
 verbinden den Versuchsablauf zeitlich mit den Rohdaten. `NoiseMaskStarted` und
 `GrayScreenStarted` nennen mit `phase=response` oder `phase=pre_stimulus`, zu
-welcher Phase die Darstellung gehört. Der gewählte Ablauf steht als
-`trial_sequence` im Plan, in jeder Ergebniszeile und in den Markern.
+welcher Phase die Darstellung gehört (`pre_stimulus` = graue Fläche,
+`response` = Noise-Maske).
 
 Beim Random-Dot-Test werden zusätzlich unter anderem festgehalten:
 
@@ -1350,12 +1320,11 @@ dieselbe Abbildung für jeden sichtbaren Pixel aus.
 
 ## Checkerboard: stärkere Kissenverzeichnung (eigene tanh-Erweiterung)
 
-**Stand 19. Oktober 2026.** Im Manager unter `Session And Trial Plan` lässt sich
-`Allow Pincushion Extension` einschalten. Erst dann sind negative Einstellungen
-in der Trialliste und im Training erlaubt. Die Live-Vorschau besitzt denselben
-Schalter separat; Vorschauänderungen werden beim Verlassen zurückgesetzt, sofern
-sie nicht ausdrücklich übernommen wurden. Standard ist **aus**; vorhandene
-Triallisten und Szenen wurden nicht verändert. Random Dots bleiben unverändert.
+**Seit 22. Oktober 2026 nur in der Live-Vorschau.** Am Stimulus lässt sich in
+der Vorschau `Allow Pincushion Extension` einschalten; dann sind negative Werte
+zum Ansehen erlaubt. Training und Trials schalten die Erweiterung immer aus und
+nehmen nur Merlitz-k von 0 bis 2 an. Vorschauänderungen werden beim Verlassen
+zurückgesetzt. Random Dots bleiben unverändert.
 
 Der gemeinsame Zahlenregler ist bei aktivierter Erweiterung ein **vorzeichenbehafteter
 Reizparameter s**, nicht durchgehend Merlitz-k:
@@ -1381,18 +1350,9 @@ Grenze `abs(m*tanh(kappa*A)) < 1`; sie ist nicht für beliebige Objektwinkel def
 Die ursprüngliche tan-Gleichung mit negativem k würde keine stärkere Kissenform
 liefern, weil sich die Vorzeichen aufheben. Deshalb gibt es einen eigenen Zweig.
 
-**Nachvollziehbare Daten:** Erweiterungssitzungen tragen
-`custom-tan-tanh-checkerboard-fixed-source-grid-v1`, auch wenn einzelne Trials
-auf dem nichtnegativen Zweig liegen. CSV-Zusätze: `stimulus_distortion_parameter`,
-`mapping_family` (`merlitz_tan`/`custom_tanh`), `extension_kappa` und
-`allow_pincushion_extension`. Für negative Reizwerte bleibt die Spalte
-`instrument_distortion_k` absichtlich leer. Das MATLAB-Skript passt die gesamte
-erweiterte Familie über den vorzeichenbehafteten Reizwert an und schreibt
-`pse_stimulus_distortion_parameter` mit dem Dateipräfix `checkerboard_extended`.
-Dieser PSE darf nicht einfach als ursprünglicher Merlitz-k-PSE bezeichnet oder
-mit nicht erweiterten Sitzungen gepoolt werden. Die Wahl, ob die Erweiterung nur
-im Training oder auch im Hauptversuch verwendet wird, bleibt eine Protokollentscheidung;
-neue Pilotdaten sind weiterhin erforderlich.
+**Daten:** Weil die Erweiterung nicht mehr in Trials vorkommt, gibt es dafür keine
+CSV-Spalten mehr. Die MATLAB-Auswertung weist Dateien mit der früheren
+Erweiterungskennung `custom-tan-tanh-checkerboard-…` ab.
 
 **Vorherige Parametrisierung (historisch, z. B. Yannick-Pilot):**
 `S_old = tan(l*a)/tan(l*beta)` mit `a = atan(r*tan(beta))`, `beta = FOV/2`;

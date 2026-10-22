@@ -17,7 +17,6 @@ using UnityEngine.TestTools;
 using UnityEngine.XR.Management;
 using Object = UnityEngine.Object;
 using Response = GlobeEffect.VRCheckerboard.CheckerboardCurvatureResponse;
-using Sequence = GlobeEffect.VRCheckerboard.Experiment.CheckerboardTrialSequence;
 
 namespace GlobeEffect.VRCheckerboard.Tests
 {
@@ -48,28 +47,30 @@ namespace GlobeEffect.VRCheckerboard.Tests
 
         private static string OutputRoot => Path.Combine(Path.GetTempPath(), "GlobeEffectPlayTests");
 
+        // Ablauf: graue Fläche vor dem Muster, Noise-Maske beim Antworten. Einmal
+        // mit jeder Controller-Zuordnung, damit beide in der echten Szene geprüft sind.
         [UnityTest]
-        public IEnumerator CheckerboardSequenceA_ShowsNoiseForTheResponseAndGrayBeforeThePattern()
+        public IEnumerator CheckerboardSession_NoiseWhileAnsweringGreyBefore_TrackpadConcave()
         {
-            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            PrepareCheckerboardScene(VrControllerMapping.TrackpadConcaveTriggerConvex);
             yield return new EnterPlayMode();
-            yield return RunCheckerboardSession(Sequence.NoiseResponseThenGray);
+            yield return RunCheckerboardSession(VrControllerMapping.TrackpadConcaveTriggerConvex);
             yield return new ExitPlayMode();
         }
 
         [UnityTest]
-        public IEnumerator CheckerboardSequenceB_ShowsGrayForTheResponseAndNoiseBeforeThePattern()
+        public IEnumerator CheckerboardSession_NoiseWhileAnsweringGreyBefore_TrackpadConvex()
         {
-            PrepareCheckerboardScene(Sequence.GrayResponseThenNoise);
+            PrepareCheckerboardScene(VrControllerMapping.TrackpadConvexTriggerConcave);
             yield return new EnterPlayMode();
-            yield return RunCheckerboardSession(Sequence.GrayResponseThenNoise);
+            yield return RunCheckerboardSession(VrControllerMapping.TrackpadConvexTriggerConcave);
             yield return new ExitPlayMode();
         }
 
         [UnityTest]
         public IEnumerator CheckerboardMixedGridVariants_ReachTheShaderAndAreSavedSeparately()
         {
-            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            PrepareCheckerboardScene();
             var config = new SerializedObject(Object.FindAnyObjectByType<CheckerboardExperimentManager>());
             config.FindProperty("testFixedSourceGrid").boolValue = true;
             config.FindProperty("testEdgeNormalizedGrid").boolValue = true;
@@ -109,7 +110,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         [UnityTest]
         public IEnumerator CheckerboardMixedVariantPractice_ShowsBothAndLogsTheirAnswers()
         {
-            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            PrepareCheckerboardScene();
             var config = new SerializedObject(Object.FindAnyObjectByType<CheckerboardExperimentManager>());
             config.FindProperty("testEdgeNormalizedGrid").boolValue = true;
             SetFloats(config.FindProperty("trainingEasyKValues"), 0.2f, 1.2f);
@@ -157,7 +158,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         [UnityTest]
         public IEnumerator Checkerboard_WithRequiredFixation_AbortsIfTheRecordingStops()
         {
-            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            PrepareCheckerboardScene();
             var settings = new SerializedObject(Object.FindAnyObjectByType<CheckerboardExperimentManager>());
             settings.FindProperty("requireFixation").boolValue = true;
             settings.ApplyModifiedPropertiesWithoutUndo();
@@ -178,7 +179,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         [UnityTest]
         public IEnumerator CheckerboardPreview_IsLiveAndDoesNotCreateASession()
         {
-            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            PrepareCheckerboardScene();
             yield return new EnterPlayMode();
             yield return null;
             var manager = Object.FindAnyObjectByType<CheckerboardExperimentManager>();
@@ -442,7 +443,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         [UnityTest]
         public IEnumerator Checkerboard_PausesAtHalfTimeUntilTheExperimenterContinues()
         {
-            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            PrepareCheckerboardScene();
             var config = new SerializedObject(Object.FindAnyObjectByType<CheckerboardExperimentManager>());
             SetInts(config.FindProperty("repeatsPerKValue"), 1, 1);
             config.FindProperty("blocksPerSession").intValue = 2;
@@ -718,14 +719,13 @@ namespace GlobeEffect.VRCheckerboard.Tests
         [UnityTest]
         public IEnumerator CheckerboardPractice_FixedOrderPolarityAndAnswersOnlyInTheMonitor()
         {
-            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            PrepareCheckerboardScene();
             var config = new SerializedObject(Object.FindAnyObjectByType<CheckerboardExperimentManager>());
             // Die Szene speichert die neuen Listen noch nicht: Es gelten die Standardwerte.
             Assert.That(ReadFloats(config.FindProperty("trainingEasyKValues")), Is.EqualTo(new[]
                 { 0f, 1.4f, 0.2f, 1.2f, 0f, 1.4f, 0.2f, 1.2f, 0f, 1.4f, 0.2f, 1.2f }));
             Assert.That(ReadFloats(config.FindProperty("trainingHardKValues")), Is.EqualTo(new[]
                 { 0.4f, 1.0f, 0.5f, 1.2f, 0.6f, 0.9f, 0.4f, 1.1f, 0.5f, 1.0f, 0.6f, 1.2f }));
-            Assert.That(config.FindProperty("invertCheckerboardEachTrial").boolValue, Is.False);
             // Kürzere Listen, damit der Test schnell bleibt.
             SetFloats(config.FindProperty("trainingEasyKValues"), 0f, 1.4f, 0.2f, 1.2f);
             SetFloats(config.FindProperty("trainingHardKValues"), 0.4f, 1.0f, 0.5f, 0.9f);
@@ -815,7 +815,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
         [UnityTest]
         public IEnumerator CheckerboardSession_InvertsEveryShownTrialIncludingRepeatsAndSavesIt()
         {
-            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            PrepareCheckerboardScene();
             var config = new SerializedObject(Object.FindAnyObjectByType<CheckerboardExperimentManager>());
             config.FindProperty("invertCheckerboardEachTrial").boolValue = true;
             config.FindProperty("answerTimeoutSeconds").floatValue = 0.2f;
@@ -945,11 +945,13 @@ namespace GlobeEffect.VRCheckerboard.Tests
         [UnityTest]
         public IEnumerator CheckerboardPreviewValues_NeverReachPracticeOrTrials_AndPlanMIsSaved()
         {
-            PrepareCheckerboardScene(Sequence.NoiseResponseThenGray);
+            PrepareCheckerboardScene();
             // m ist einstellbar. Training und Trials verwenden das m des Versuchsplans
             // (hier 5), weder das m am Stimulus (12) noch ein Vorschau-m (20).
             var stimulusConfig = new SerializedObject(Object.FindAnyObjectByType<VrCheckerboardStimulus>());
             stimulusConfig.FindProperty("instrumentMagnificationM").floatValue = 12f;
+            // Szenenunabhängig: Die Vorschau-Erweiterung ist vor der Vorschau aus.
+            stimulusConfig.FindProperty("allowPincushionExtension").boolValue = false;
             stimulusConfig.ApplyModifiedPropertiesWithoutUndo();
             var config = new SerializedObject(Object.FindAnyObjectByType<CheckerboardExperimentManager>());
             config.FindProperty("instrumentMagnificationM").floatValue = 5f;
@@ -1033,8 +1035,9 @@ namespace GlobeEffect.VRCheckerboard.Tests
                 Assert.That(row["instrument_magnification_m"], Is.EqualTo("5"));
                 Assert.That(row["grid_mapping"], Is.EqualTo("FixedSourceGrid"));
                 Assert.That(row["grid_source_scale"], Is.EqualTo("1"));
-                Assert.That(row["mapping_family"], Is.EqualTo("merlitz_tan"));
-                Assert.That(row["allow_pincushion_extension"], Is.EqualTo("0"));
+                // Die tanh-Erweiterung gibt es nur in der Vorschau: keine Spalten dafür.
+                Assert.That(row.ContainsKey("mapping_family"), Is.False);
+                Assert.That(row.ContainsKey("allow_pincushion_extension"), Is.False);
                 Assert.That(row["angular_diameter_deg"], Is.EqualTo("60"));
                 Assert.That(row["aperture_edge_softness_deg"], Is.EqualTo("5"));
                 Assert.That(row["grid_line_spacing_deg"], Is.EqualTo("8"));
@@ -1159,23 +1162,23 @@ namespace GlobeEffect.VRCheckerboard.Tests
             }
         }
 
-        private static IEnumerator RunCheckerboardSession(Sequence sequence)
+        private static IEnumerator RunCheckerboardSession(VrControllerMapping mapping)
         {
             yield return null;
             var manager = Object.FindAnyObjectByType<CheckerboardExperimentManager>();
             var stimulus = Object.FindAnyObjectByType<VrCheckerboardStimulus>();
             var controller = Object.FindAnyObjectByType<CheckerboardKeyboardController>();
-            bool noiseBeforePattern = sequence.ShowsNoiseBeforeStimulus();
-            bool noiseForResponse = sequence.ShowsNoiseDuringResponse();
+            // Einziger Ablauf: graue Fläche vor dem Muster, Noise-Maske beim Antworten.
+            bool noiseBeforePattern = false;
+            bool noiseForResponse = true;
 
             // Der Startbildschirm und der Hinweis vor dem Versuch nennen die
             // Tastenbelegung, die für diesen Test im Inspector eingestellt wurde.
-            string responseLines = ExpectedResponseLines(MappingFor(sequence), "A / OUTWARD", "B / INWARD");
+            string responseLines = ExpectedResponseLines(mapping, "OUTWARD / GLOBE", "INWARD / DENT");
             TextMesh prompt = stimulus.GetComponentInChildren<TextMesh>(includeInactive: true);
             Assert.That(manager.SessionState, Is.EqualTo(CheckerboardSessionState.Welcome));
             Assert.That(prompt.text, Does.Contain(responseLines));
 
-            Assert.That(manager.TrialSequence, Is.EqualTo(sequence));
             Assert.That(manager.StartSession(), Is.True, "Die Sitzung muss starten.");
             Assert.That(manager.SessionState, Is.EqualTo(CheckerboardSessionState.WaitingForExperimentReady));
             AssertSettingsSaved(manager);
@@ -1239,7 +1242,7 @@ namespace GlobeEffect.VRCheckerboard.Tests
             foreach (Dictionary<string, string> row in rows)
             {
                 Assert.That(row["valid_for_analysis"], Is.EqualTo("1"));
-                Assert.That(row["trial_sequence"], Is.EqualTo(sequence.ToString()));
+                Assert.That(row.ContainsKey("trial_sequence"), Is.False, "Es gibt nur noch einen Ablauf.");
             }
         }
 
@@ -1312,15 +1315,6 @@ namespace GlobeEffect.VRCheckerboard.Tests
             }
         }
 
-        // Ablauf A läuft mit der ersten Controller-Zuordnung, Ablauf B mit der
-        // zweiten. So sind beide Zuordnungen in der echten Szene geprüft.
-        private static VrControllerMapping MappingFor(Sequence sequence)
-        {
-            return sequence == Sequence.NoiseResponseThenGray
-                ? VrControllerMapping.TrackpadConcaveTriggerConvex
-                : VrControllerMapping.TrackpadConvexTriggerConcave;
-        }
-
         private static string ExpectedResponseLines(
             VrControllerMapping mapping, string convexLabel, string concaveLabel)
         {
@@ -1388,12 +1382,12 @@ namespace GlobeEffect.VRCheckerboard.Tests
             Assert.That(manager.SessionState, Is.EqualTo(state));
         }
 
-        private static void PrepareCheckerboardScene(Sequence sequence)
+        private static void PrepareCheckerboardScene(
+            VrControllerMapping mapping = VrControllerMapping.TrackpadConcaveTriggerConvex)
         {
             OpenSceneForTest(CheckerboardScene);
             var manager = new SerializedObject(Object.FindAnyObjectByType<CheckerboardExperimentManager>());
-            manager.FindProperty("trialSequence").intValue = (int)sequence;
-            manager.FindProperty("controllerMapping").intValue = (int)MappingFor(sequence);
+            manager.FindProperty("controllerMapping").intValue = (int)mapping;
             manager.FindProperty("useVrControllerButtons").boolValue = true;
             manager.FindProperty("preStimulusSeconds").floatValue = PreStimulusSeconds;
             manager.FindProperty("patternSeconds").floatValue = 0.1f;

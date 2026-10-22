@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using GlobeEffect.VRCheckerboard.EyeTracking;
 
 namespace GlobeEffect.VRCheckerboard.Experiment
@@ -29,7 +28,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public float LongestOffTargetSeconds;
         public float LongestInvalidGazeSeconds;
         public string Status = string.Empty;
-        public CheckerboardTrialSequence TrialSequence;
 
         // Schwarze und weiße Felder vertauscht (nur mit "Invert Checkerboard Each Trial").
         public bool CheckerboardInverted;
@@ -37,10 +35,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         public double StimulusDurationSeconds =>
             Math.Max(0d, StimulusEndUnitySeconds - TrialStartUnitySeconds);
 
-        // Wie lange die Noise-Maske in der Antwortphase zu sehen war. Bei Ablauf B
-        // steht dort die graue Fläche; die Maske kommt erst vor dem nächsten Muster.
-        public double NoiseMaskDurationSeconds =>
-            TrialSequence.ShowsNoiseDuringResponse() ? ResponseTimeSeconds : 0d;
+        // Wie lange die Noise-Maske zu sehen war: Sie steht während der ganzen
+        // Antwortphase, ist also so lang wie die Antwortzeit.
+        public double NoiseMaskDurationSeconds => ResponseTimeSeconds;
 
         public double ResponseTimeSeconds =>
             Math.Max(0d, TrialEndUnitySeconds - ResponseWindowStartUnitySeconds);
@@ -55,10 +52,9 @@ namespace GlobeEffect.VRCheckerboard.Experiment
         private const string PlanHeader = SessionColumns + "stimulus_task," +
             "sequence_index,total_planned_trials,condition_index,repetition,eye_presentation," +
             "angular_diameter_deg,grid_line_spacing_deg,grid_line_spacing_uv,instrument_distortion_k," +
-            "instrument_magnification_m,stimulus_duration_s,noise_until_response," +
-            "post_response_noise_s,response_timeout_s,category_a_key,category_b_key," +
-            "response_keys_swapped,trial_sequence,pre_stimulus_s,controller_mapping,invert_checkerboard_each_trial," +
-            "stimulus_distortion_parameter,mapping_family,extension_kappa,allow_pincushion_extension," +
+            "instrument_magnification_m,stimulus_duration_s," +
+            "response_timeout_s,category_a_key,category_b_key," +
+            "response_keys_swapped,pre_stimulus_s,controller_mapping,invert_checkerboard_each_trial," +
             "grid_mapping,grid_source_scale,effective_source_grid_spacing_uv";
 
         // Die Kopfzeile der Ergebnisdatei. Sie wird einmal am Anfang geschrieben
@@ -72,30 +68,24 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             "grid_line_spacing_uv,instrument_distortion_k,instrument_magnification_m,response," +
             "valid_for_analysis,fixation_sample_valid,fixation_inside_tolerance," +
             "fixation_angle_deg,continuous_fixation_s,fixation_valid_sample_fraction," +
-            "longest_off_target_s,longest_invalid_gaze_s,status,trial_sequence,checkerboard_inverted," +
-            "stimulus_distortion_parameter,mapping_family,extension_kappa,allow_pincushion_extension," +
+            "longest_off_target_s,longest_invalid_gaze_s,status,checkerboard_inverted," +
             "grid_mapping,grid_source_scale,effective_source_grid_spacing_uv";
-
-        private readonly bool allowPincushionExtension;
 
         public CheckerboardExperimentFiles(
             string outputRoot,
             string participantId,
             string sessionLabel,
             DateTime sessionStartUtc,
-            int randomSeed,
-            bool allowPincushionExtension = false)
+            int randomSeed)
             : base(outputRoot, participantId, sessionLabel, "session", sessionStartUtc, randomSeed,
-                CheckerboardInstrumentMapping.VersionFor(allowPincushionExtension))
+                CheckerboardInstrumentMapping.MappingVersion)
         {
-            this.allowPincushionExtension = allowPincushionExtension;
         }
 
         public void WritePlan(
             IReadOnlyList<CheckerboardTrial> trials,
             float gridLineSpacingDegrees,
             float stimulusDurationSeconds,
-            CheckerboardTrialSequence trialSequence,
             float preStimulusSeconds,
             float responseTimeoutSeconds,
             string categoryAKey,
@@ -104,12 +94,6 @@ namespace GlobeEffect.VRCheckerboard.Experiment
             VrControllerMapping controllerMapping,
             bool invertCheckerboardEachTrial = false)
         {
-            // Die beiden alten Spalten bleiben für bestehende Auswertungen stehen:
-            // noise_until_response sagt, ob die Maske in der Antwortphase zu sehen
-            // ist (Ablauf A), post_response_noise_s nennt die Mindestdauer der
-            // Maske nach der Antwort (Ablauf B, sonst 0).
-            bool noiseDuringResponse = trialSequence.ShowsNoiseDuringResponse();
-            float postResponseNoiseSeconds = noiseDuringResponse ? 0f : preStimulusSeconds;
             var rows = new List<CsvRow>();
             foreach (CheckerboardTrial trial in trials)
             {
@@ -122,15 +106,12 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                     .Add(trial.SequenceIndex).Add(trials.Count)
                     .Add(trial.ConditionIndex).Add(trial.Repetition)
                     .Add(trial.EyePresentation.ToString()).Add(trial.AngularDiameterDegrees)
-                    .Add(gridLineSpacingDegrees).Add(gridSpacingUv).Add(InstrumentKValue(trial))
+                    .Add(gridLineSpacingDegrees).Add(gridSpacingUv).Add(trial.InstrumentDistortionK)
                     .Add(trial.InstrumentMagnificationM)
-                    .Add(stimulusDurationSeconds).Add(noiseDuringResponse).Add(postResponseNoiseSeconds)
+                    .Add(stimulusDurationSeconds)
                     .Add(responseTimeoutSeconds).Add(categoryAKey).Add(categoryBKey)
-                    .Add(responseKeysSwapped).Add(trialSequence.ToString()).Add(preStimulusSeconds)
+                    .Add(responseKeysSwapped).Add(preStimulusSeconds)
                     .Add(controllerMapping.ToString()).Add(invertCheckerboardEachTrial)
-                    .Add(trial.InstrumentDistortionK)
-                    .Add(CheckerboardInstrumentMapping.FamilyFor(trial.InstrumentDistortionK))
-                    .Add(KappaValue(trial)).Add(allowPincushionExtension)
                     .Add(trial.GridMapping.ToString()).Add(sourceScale).Add(gridSpacingUv / sourceScale));
             }
 
@@ -155,43 +136,31 @@ namespace GlobeEffect.VRCheckerboard.Experiment
                 .Add(trial.EyePresentation.ToString()).Add(trial.AngularDiameterDegrees)
                 .Add(result.ApertureEdgeSoftnessDegrees).Add(result.CircularApertureEnabled)
                 .Add(result.GridLineSpacingDegrees).Add(result.GridLineSpacingUv)
-                .Add(InstrumentKValue(trial))
+                .Add(trial.InstrumentDistortionK)
                 .Add(trial.InstrumentMagnificationM)
                 .Add(result.Response.ToString()).Add(result.ValidForAnalysis)
                 .Add(result.Gaze.SampleValid).Add(result.Gaze.OnTarget)
                 .Add(result.Gaze.AngleDegrees).Add(result.Gaze.SteadySeconds)
                 .Add(result.Gaze.ValidSampleFraction).Add(result.LongestOffTargetSeconds)
                 .Add(result.LongestInvalidGazeSeconds).Add(result.Status)
-                .Add(result.TrialSequence.ToString()).Add(result.CheckerboardInverted)
-                .Add(trial.InstrumentDistortionK)
-                .Add(CheckerboardInstrumentMapping.FamilyFor(trial.InstrumentDistortionK))
-                .Add(KappaValue(trial)).Add(allowPincushionExtension)
+                .Add(result.CheckerboardInverted)
                 .Add(trial.GridMapping.ToString()).Add(sourceScale)
                 .Add(result.GridLineSpacingUv / sourceScale));
         }
 
         private static string VersionFor(CheckerboardTrial trial) =>
-            CheckerboardInstrumentMapping.VersionFor(trial.AllowPincushionExtension, trial.GridMapping);
+            CheckerboardInstrumentMapping.VersionFor(false, trial.GridMapping);
 
         private static double SourceScale(CheckerboardTrial trial) =>
             CheckerboardInstrumentMapping.GridSourceScale(trial.AngularDiameterDegrees,
-                trial.InstrumentMagnificationM, trial.InstrumentDistortionK,
-                trial.AllowPincushionExtension, trial.GridMapping);
+                trial.InstrumentMagnificationM, trial.InstrumentDistortionK, false, trial.GridMapping);
 
-        private void ValidateTrialMapping(CheckerboardTrial trial)
+        // Trials verwenden nur Merlitz-k von 0 bis 2 (die tanh-Erweiterung gibt es
+        // nur in der Live-Vorschau). Ungültige Trials werden nicht gespeichert.
+        private static void ValidateTrialMapping(CheckerboardTrial trial)
         {
-            if (trial.AllowPincushionExtension != allowPincushionExtension)
-                throw new ArgumentException("Trial und Sitzung verwenden verschiedene Abbildungsfamilien.");
             CheckerboardInstrumentMapping.ValidateParameters(trial.AngularDiameterDegrees,
-                trial.InstrumentMagnificationM, trial.InstrumentDistortionK,
-                allowPincushionExtension: allowPincushionExtension);
+                trial.InstrumentMagnificationM, trial.InstrumentDistortionK);
         }
-
-        // Negative Einstellungen niemals als negatives Merlitz-k exportieren.
-        private static string InstrumentKValue(CheckerboardTrial trial) => trial.InstrumentDistortionK < 0f
-            ? string.Empty : trial.InstrumentDistortionK.ToString("G9", CultureInfo.InvariantCulture);
-
-        private static string KappaValue(CheckerboardTrial trial) => trial.InstrumentDistortionK < 0f
-            ? (-trial.InstrumentDistortionK).ToString("G9", CultureInfo.InvariantCulture) : string.Empty;
     }
 }

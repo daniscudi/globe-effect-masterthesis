@@ -59,8 +59,9 @@ namespace GlobeEffect.VRCheckerboard
 
         [Header("Instrument Mapping (Merlitz)")]
         [SerializeField, Range(-2f, 2f)]
-        [Tooltip("Nonnegative = Merlitz k. With Allow Pincushion Extension on: negative = custom " +
-            "tanh strength (-kappa), stronger pincushion. Negative values are NOT Merlitz k.")]
+        [Tooltip("Merlitz k, 0 to 2: 1 = straight, below 1 = pincushion, above 1 = barrel. Preview only: " +
+            "with Allow Pincushion Extension, negative values show a stronger pincushion (own tanh " +
+            "formula, NOT Merlitz). Trials and practice never use negative values.")]
         [FormerlySerializedAs("visualSpaceL")]
         private float instrumentDistortionK = 0.5f;
 
@@ -70,13 +71,13 @@ namespace GlobeEffect.VRCheckerboard
         private float instrumentMagnificationM = 10f;
 
         [SerializeField]
-        [Tooltip("Variant 2: fixed source grid. Variant 3: normalize the source grid at the nominal " +
-            "window edge so the field span stays constant. Trials are set by the Experiment Manager.")]
+        // Im Inspector ausgeblendet: Standard ist das feste Quellgitter.
+        [Tooltip("Fixed source grid (standard) or the hidden edge-normalized grid.")]
         private CheckerboardGridMapping gridMapping;
 
         [SerializeField]
-        [Tooltip("Explicitly allow a custom tanh formula for negative settings (-2 to 0). " +
-            "Not Merlitz's instrument mapping. Applies only to checkerboards.")]
+        [Tooltip("Preview only: allow negative values for a stronger pincushion (own tanh formula, " +
+            "not Merlitz). Trials and practice switch this off.")]
         private bool allowPincushionExtension;
 
         [FormerlySerializedAs("gridLineSpacingDegrees")]
@@ -134,17 +135,9 @@ namespace GlobeEffect.VRCheckerboard
         // grob (10-Grad-Felder, Grundfrequenz etwa 0,07 Zyklen pro Grad), ein ganz
         // feines "Ameisenmuster" maskiert es deshalb kaum. Standard ist darum das
         // breitbandige Rauschen: mehrere Zellgrößen, gleiche Energie pro Oktave.
-        //
-        // Feines Rauschen nahe der Pixelgröße bleibt zum Vergleich wählbar. Kleiner
-        // als ein Bildpixel geht nicht: Dann trifft jedes Pixel zufällig nur einen
-        // von mehreren Punkten. Das gibt ein Raster und Flackern bei jeder kleinen
-        // Kopfbewegung.
+        // Die früheren Varianten "feine Pixel" und "eine Punktgröße" wurden am
+        // 22.10.2026 entfernt; verwendet wird nur noch dieses Rauschen.
         [Header("Noise Mask")]
-        [SerializeField]
-        [Tooltip("Kind of noise between images. Fine and coarse spots: covers the checkerboard best. One " +
-            "spot size: all spots the same size. Fine pixels: very fine 'TV static'.")]
-        private NoiseMaskType noiseType = NoiseMaskType.Broadband;
-
         [SerializeField, Range(0.1f, 10f)]
         [Tooltip("Size of the smallest spots, in degrees.")]
         private float noiseBroadbandFinestDegrees = 0.5f;
@@ -152,14 +145,6 @@ namespace GlobeEffect.VRCheckerboard
         [SerializeField, Range(0.5f, 20f)]
         [Tooltip("Size of the largest spots, in degrees. About 8 fits 10 degree checkerboard squares.")]
         private float noiseBroadbandCoarsestDegrees = 8f;
-
-        [SerializeField, Range(1f, 10f)]
-        [Tooltip("Size of one spot in screen pixels. 1 = finest possible.")]
-        private float noiseDotSizePixels = 1.5f;
-
-        [SerializeField, Range(0.02f, 10f)]
-        [Tooltip("Size of one spot in degrees.")]
-        private float noiseDotSizeDegrees = 0.15f;
 
         [SerializeField, Range(0f, 120f)]
         [Tooltip("How often per second the noise changes. 0 = still image. More than 90 has no effect.")]
@@ -270,20 +255,14 @@ namespace GlobeEffect.VRCheckerboard
         public bool IsVisible => isVisible;
         public bool FixationTargetEnabled => showFixationTarget;
 
-        // Die Punktgröße, die gerade wirklich benutzt wird, in Grad in der
-        // Bildmitte. Im Pixel-Modus ohne Kamera wird der Gradwert genommen.
-        public float NoiseDotSizeDegrees =>
-            noiseType == NoiseMaskType.Broadband ? noiseBroadbandFinestDegrees
-            : noiseType == NoiseMaskType.FinePixels && TryGetDegreesPerPixel(out float degreesPerPixel)
-                ? noiseDotSizePixels * degreesPerPixel
-                : noiseDotSizeDegrees;
+        // Die kleinste Punktgröße der Maske, in Grad in der Bildmitte.
+        public float NoiseDotSizeDegrees => noiseBroadbandFinestDegrees;
 
-        public NoiseMaskType NoiseType => noiseType;
         public float NoiseBroadbandCoarsestDegrees => noiseBroadbandCoarsestDegrees;
 
-        // Breitband: Zahl der Zellgrößen von Finest bis Coarsest, je Faktor 2.
-        public int NoiseOctaves => noiseType != NoiseMaskType.Broadband ? 1
-            : Mathf.Clamp(Mathf.FloorToInt(Mathf.Log(
+        // Zahl der Zellgrößen von der kleinsten bis zur größten, je Faktor 2.
+        public int NoiseOctaves =>
+            Mathf.Clamp(Mathf.FloorToInt(Mathf.Log(
                 noiseBroadbandCoarsestDegrees / noiseBroadbandFinestDegrees, 2f) + 0.001f) + 1, 1, 8);
 
         // Dieselbe Größe in Bildpixeln. NaN, wenn keine Kamera da ist.
@@ -670,7 +649,6 @@ namespace GlobeEffect.VRCheckerboard
             propertyBlock.SetFloat("_CheckerboardInverted", invertCheckerboard ? 1f : 0f);
             propertyBlock.SetFloat("_NoiseEnabled", noiseVisible ? 1f : 0f);
             propertyBlock.SetFloat("_NoiseCellSizeUv", DegreesToUv(NoiseDotSizeDegrees));
-            propertyBlock.SetFloat("_NoiseType", (float)noiseType);
             propertyBlock.SetFloat("_NoiseOctaves", NoiseOctaves);
             // Beim Antworttext wird immer auf beiden Augen gezeigt, damit der Text
             // auch im Monokular-Durchgang gut lesbar bleibt.
@@ -914,11 +892,9 @@ namespace GlobeEffect.VRCheckerboard
                 (float)CheckerboardInstrumentMapping.MinimumExtendedSetting, 2f);
             instrumentMagnificationM = Mathf.Clamp(instrumentMagnificationM, 1f, 20f);
             gridSpacingDegrees = Mathf.Clamp(gridSpacingDegrees, 0.5f, 45f);
-            noiseDotSizeDegrees = Mathf.Clamp(noiseDotSizeDegrees, 0.02f, 10f);
             noiseBroadbandFinestDegrees = Mathf.Clamp(noiseBroadbandFinestDegrees, 0.1f, 10f);
             noiseBroadbandCoarsestDegrees = Mathf.Clamp(noiseBroadbandCoarsestDegrees,
                 noiseBroadbandFinestDegrees, 20f);
-            noiseDotSizePixels = Mathf.Clamp(noiseDotSizePixels, 1f, 10f);
             noiseRefreshRateHz = Mathf.Clamp(noiseRefreshRateHz, 0f, 120f);
             fixationSizeDegrees = Mathf.Clamp(fixationSizeDegrees, 0.05f, 5f);
             textDistanceMeters = Mathf.Max(0.5f, textDistanceMeters);
@@ -929,19 +905,6 @@ namespace GlobeEffect.VRCheckerboard
     // Diese beiden kurzen Listen stehen hier mit beim Stimulus. Sie sagen direkt,
     // wie gezeigt wird und wie die Antwort gespeichert wird. Dafür lohnen sich
     // keine eigenen Dateien.
-    // Art der Noise-Maske (siehe Tooltip an noiseType).
-    public enum NoiseMaskType
-    {
-        [InspectorName("Fine Pixels (TV Static)")]
-        FinePixels = 0,
-
-        [InspectorName("One Spot Size")]
-        SingleScaleDegrees = 1,
-
-        [InspectorName("Fine And Coarse Spots")]
-        Broadband = 2
-    }
-
     public enum CheckerboardEyePresentation
     {
         BothEyes = 0,

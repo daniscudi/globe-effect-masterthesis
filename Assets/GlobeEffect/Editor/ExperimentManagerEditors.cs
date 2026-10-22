@@ -25,17 +25,12 @@ namespace GlobeEffect.VRCheckerboard.Editor
             // Noise-Maske und Nachbild-Test
             ["noiseBroadbandFinestDegrees"] = "Smallest Spots (degrees)",
             ["noiseBroadbandCoarsestDegrees"] = "Largest Spots (degrees)",
-            ["noiseDotSizeDegrees"] = "Spot Size (degrees)",
-            ["noiseDotSizePixels"] = "Spot Size (pixels)",
             ["noiseRefreshRateHz"] = "Noise Changes Per Second",
             ["maskDemoKey"] = "Afterimage Test Key",
             ["maskDemoPatternSeconds"] = "Afterimage Test: Checkerboard (s)",
             ["maskDemoMaskSeconds"] = "Afterimage Test: Noise (s)",
             ["maskDemoGraySeconds"] = "Afterimage Test: Grey Screen (s)",
             // Checkerboard-Ablauf und Training
-            ["trialSequence"] = "Trial Order",
-            ["testFixedSourceGrid"] = "Variant 2: Fixed Source Grid",
-            ["testEdgeNormalizedGrid"] = "Variant 3: Edge-Normalized Grid",
             ["patternSeconds"] = "Checkerboard Time (s)",
             ["answerTimeoutSeconds"] = "Time To Answer (s)",
             ["preStimulusSeconds"] = "Time Before Checkerboard (s)",
@@ -299,41 +294,29 @@ namespace GlobeEffect.VRCheckerboard.Editor
             if (Section("Session And Trial Plan"))
             {
                 Fields(serializedObject, "participantId", "sessionLabel", "randomSeed", "fieldOfViewValues",
-                    "eyePresentations", "instrumentMagnificationM", "allowPincushionExtension",
-                    "testFixedSourceGrid", "testEdgeNormalizedGrid", "repeatsPerCondition");
-                bool extended = serializedObject.FindProperty("allowPincushionExtension").boolValue;
-                long repetitions = LevelTable("instrumentDistortionKValues", "repeatsPerKValue",
-                    extended ? "k / -κ" : "k");
-                if (extended)
-                    EditorGUILayout.HelpBox("CUSTOM EXTENSION: negative settings use tanh, NOT Merlitz k. " +
-                        "These sessions have a separate mapping version and stimulus-parameter PSE. " +
-                        "Random dots are unchanged.", MessageType.Warning);
-                EditorGUILayout.HelpBox("Standard: Merlitz instrument mapping with m = 10 and a fixed source " +
-                    "grid (variant 2), no extra scaling at the window edge or in the centre. Not the old " +
-                    "visual-space l mapping. Use new pilot data. For a random-dot comparison use the same m " +
-                    "there; m = 1 makes all k values look straight.", MessageType.Info);
-                int mappings = (serializedObject.FindProperty("testFixedSourceGrid").boolValue ? 1 : 0)
-                    + (serializedObject.FindProperty("testEdgeNormalizedGrid").boolValue ? 1 : 0);
-                long perMapping = (long)Count("fieldOfViewValues") * Count("eyePresentations") * repetitions;
-                long trials = perMapping * mappings;
-                if (mappings == 0)
-                    EditorGUILayout.HelpBox("Select at least one grid variant.", MessageType.Error);
-                else
-                    EditorGUILayout.HelpBox($"{perMapping} trials per selected variant. Both selected = " +
-                        "one jointly shuffled session, with separate PSE fits. Same k values and repeats " +
-                        "for both. Practice shows each selected variant.", MessageType.Info);
+                    "eyePresentations", "instrumentMagnificationM", "repeatsPerCondition");
+                long repetitions = LevelTable("instrumentDistortionKValues", "repeatsPerKValue", "k");
+                EditorGUILayout.HelpBox("Merlitz instrument mapping with a fixed source grid, no extra scaling " +
+                    "at the window edge or in the centre. Default m = 10; m = 1 makes all k values look " +
+                    "straight. For a random-dot comparison use the same m there.", MessageType.Info);
+                // Die randnormierte Variante ist ausgeblendet. Sollte sie in einer alten
+                // Szene noch aktiv sein, wird das hier gemeldet statt still mitzulaufen.
+                bool fixedGrid = serializedObject.FindProperty("testFixedSourceGrid").boolValue;
+                bool edgeGrid = serializedObject.FindProperty("testEdgeNormalizedGrid").boolValue;
+                int mappings = (fixedGrid ? 1 : 0) + (edgeGrid ? 1 : 0);
+                if (!fixedGrid || edgeGrid)
+                    EditorGUILayout.HelpBox("This scene uses the hidden edge-normalized grid option. " +
+                        "Set it back in the Debug Inspector if that was not intended.", MessageType.Warning);
+                long trials = (long)Count("fieldOfViewValues") * Count("eyePresentations") * repetitions * mappings;
                 Fields(serializedObject, "blocksPerSession", "invertCheckerboardEachTrial");
                 EditorGUILayout.HelpBox($"Planned: {trials} valid trials{BlockText(trials)}. " +
                     "Trials that fail (for example looking away) are repeated on top.", MessageType.Info);
             }
             if (Section("Timing"))
             {
-                Fields(serializedObject, "trialSequence", "patternSeconds", "answerTimeoutSeconds",
-                    "preStimulusSeconds");
-                bool noiseResponse = serializedObject.FindProperty("trialSequence").enumValueIndex == 0;
-                EditorGUILayout.HelpBox(noiseResponse
-                    ? "A: checkerboard → noise while answering → grey → next checkerboard."
-                    : "B: checkerboard → grey while answering → noise → next checkerboard.", MessageType.Info);
+                Fields(serializedObject, "patternSeconds", "answerTimeoutSeconds", "preStimulusSeconds");
+                EditorGUILayout.HelpBox("Checkerboard → noise while answering → grey → next checkerboard.",
+                    MessageType.Info);
                 EditorGUILayout.LabelField("Time To Answer 0 = no limit. Time Before Checkerboard is a minimum.",
                     EditorStyles.wordWrappedMiniLabel);
             }
@@ -356,7 +339,7 @@ namespace GlobeEffect.VRCheckerboard.Editor
                     "Change the settings below and see the result right away. " +
                     "Preview Shows Noise switches between checkerboard and noise.", MessageType.Info);
                 LinkedFields("stimulus", "fieldOfViewDegrees", "edgeSoftnessDegrees", "useCircularAperture",
-                    "allowPincushionExtension", "instrumentDistortionK", "instrumentMagnificationM", "gridMapping",
+                    "instrumentDistortionK", "instrumentMagnificationM", "allowPincushionExtension",
                     "gridSpacingDegrees",
                     "eyePresentation", "darkColor", "lightColor", "invertCheckerboard",
                     "backgroundColor", "showFixationTarget", "fixationSizeDegrees", "fixationColor");
@@ -371,14 +354,15 @@ namespace GlobeEffect.VRCheckerboard.Editor
                 if (previewStimulus != null && previewStimulus.InstrumentMagnificationM != planM)
                     EditorGUILayout.HelpBox("The preview shows m = " + previewStimulus.InstrumentMagnificationM +
                         ", the trials use m = " + planM + " from the trial plan.", MessageType.Info);
-                EditorGUILayout.HelpBox("Negative preview values require Allow Pincushion Extension. " +
-                    "They use a custom tanh formula, not negative Merlitz k. Preview values are restored " +
-                    "on exit unless explicitly taken over.", MessageType.Info);
+                EditorGUILayout.HelpBox("Allow Pincushion Extension is for the preview only: negative values " +
+                    "show a stronger pincushion with an own tanh formula, not Merlitz k. Trials and practice " +
+                    "never use it. Preview values are restored on exit unless explicitly taken over.",
+                    MessageType.Info);
                 Fields(serializedObject, "maskDemoKey", "maskDemoPatternSeconds", "maskDemoMaskSeconds",
                     "maskDemoGraySeconds");
                 EditorGUILayout.HelpBox("Afterimage test: during the preview press M (or the button). It shows " +
                     "the checkerboard, then the noise, then a grey screen. If you still see the checkerboard " +
-                    "on the grey screen, try another noise type. With Invert Checkerboard Each Trial on, each " +
+                    "on the grey screen, try other spot sizes. With Invert Checkerboard Each Trial on, each " +
                     "press swaps black and white.", MessageType.Info);
                 EditorGUILayout.HelpBox("When the preview ends, all changes are undone – unless you press " +
                     "\"Use Preview Values For The Experiment\".", MessageType.Info);
@@ -422,24 +406,14 @@ namespace GlobeEffect.VRCheckerboard.Editor
 
         private void NoiseFields()
         {
-            // Nur die Felder des gewählten Noise-Typs zeigen.
+            // Noise-Maske aus feinen und groben Punkten (einziger Noise-Typ).
             var stimulus = serializedObject.FindProperty("stimulus").objectReferenceValue as VrCheckerboardStimulus;
-            LinkedFields("stimulus", "noiseType");
-            NoiseMaskType type = stimulus != null ? stimulus.NoiseType : NoiseMaskType.Broadband;
-            if (type == NoiseMaskType.Broadband)
-                LinkedFields("stimulus", "noiseBroadbandFinestDegrees", "noiseBroadbandCoarsestDegrees");
-            else if (type == NoiseMaskType.SingleScaleDegrees)
-                LinkedFields("stimulus", "noiseDotSizeDegrees");
-            else
-                LinkedFields("stimulus", "noiseDotSizePixels");
-            LinkedFields("stimulus", "noiseRefreshRateHz");
-            if (stimulus != null && type == NoiseMaskType.Broadband)
+            LinkedFields("stimulus", "noiseBroadbandFinestDegrees", "noiseBroadbandCoarsestDegrees",
+                "noiseRefreshRateHz");
+            if (stimulus != null)
                 EditorGUILayout.HelpBox($"{stimulus.NoiseOctaves} spot sizes from {stimulus.NoiseDotSizeDegrees:0.##}° " +
                     $"to {stimulus.NoiseBroadbandCoarsestDegrees:0.##}°, each twice as big as the one before.",
                     MessageType.None);
-            if (type == NoiseMaskType.FinePixels)
-                EditorGUILayout.HelpBox("Very fine noise hardly hides the large checkerboard squares, so an " +
-                    "afterimage may stay. Fine and coarse spots work better.", MessageType.Warning);
         }
     }
 
